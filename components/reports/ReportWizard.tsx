@@ -2,7 +2,6 @@
 
 import React, { useState, useRef } from "react";
 import Image from "next/image";
-import AppLayout from "@/components/layouts/AppLayout";
 import Button from "@/components/ui/Button";
 import ReportWizardHeader from "./ReportWizardHeader";
 import styles from "./ReportWizard.module.css";
@@ -289,168 +288,162 @@ const ReportWizard: React.FC = () => {
      Render
   ───────────────────────────────────────── */
   return (
-    <AppLayout actions={headerActions}>
-      <div className={styles.page}>
-        {/* ── Banner ── */}
-        {message && (
-          <div
-            className={`${styles.banner} ${
-              message.type === "error"
-                ? styles.bannerError
-                : styles.bannerSuccess
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
-
-        {/* ── SimPRO Import ── */}
-        <div className={styles.card}>
-          <h3 className={styles.cardTitle}>Import from SimPRO</h3>
-          <div className={styles.importRow}>
-            <input
-              type="text"
-              placeholder="Enter job number..."
-              value={jobNumber}
-              onChange={(e) => setJobNumber(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchSimproPhotos()}
-              className={styles.importInput}
-            />
-            <Button
-              onClick={fetchSimproPhotos}
-              disabled={loadingImport || !jobNumber.trim()}
-              variant="primary"
-              icon={
-                <Image
-                  src="/icons/utility-outline/search.svg"
-                  alt=""
-                  width={18}
-                  height={18}
-                />
-              }
-            >
-              {loadingImport ? "Loading..." : "Fetch Photos"}
-            </Button>
-          </div>
+    <div className={styles.page}>
+      {/* ── Banner ── */}
+      {message && (
+        <div
+          className={`${styles.banner} ${
+            message.type === "error" ? styles.bannerError : styles.bannerSuccess
+          }`}
+        >
+          {message.text}
         </div>
+      )}
 
-        {/* ── File Upload ── */}
-        <div className={styles.card}>
-          <h3 className={styles.cardTitle}>Upload Photos</h3>
-          <div
-            className={styles.dropZone}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Image
-              src="/icons/utility-outline/add-image.svg"
-              alt=""
-              width={40}
-              height={40}
-              className={styles.dropZoneIcon}
-            />
-            <p className={styles.dropZoneText}>
-              Drop images here or click to browse
-            </p>
-            <Button
-              variant="secondary"
-              onClick={(e) => {
-                e?.stopPropagation();
-                fileInputRef.current?.click();
-              }}
-            >
-              Choose Files
-            </Button>
-          </div>
+      {/* ── SimPRO Import ── */}
+      <div className={styles.card}>
+        <h3 className={styles.cardTitle}>Import from SimPRO</h3>
+        <div className={styles.importRow}>
           <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFileUpload}
-            style={{ display: "none" }}
+            type="text"
+            placeholder="Enter job number..."
+            value={jobNumber}
+            onChange={(e) => setJobNumber(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && fetchSimproPhotos()}
+            className={styles.importInput}
           />
+          <Button
+            onClick={fetchSimproPhotos}
+            disabled={loadingImport || !jobNumber.trim()}
+            variant="primary"
+            icon={
+              <Image
+                src="/icons/utility-outline/search.svg"
+                alt=""
+                width={18}
+                height={18}
+              />
+            }
+          >
+            {loadingImport ? "Loading..." : "Fetch Photos"}
+          </Button>
         </div>
-
-        {/* ── Photo Grid ── */}
-        {sortedPhotos.length === 0 ? (
-          <div className={styles.emptyCard}>
-            <Image
-              src="/icons/utility-outline/map.svg"
-              alt=""
-              width={48}
-              height={48}
-            />
-            <h3 className={styles.emptyTitle}>No Photos Yet</h3>
-            <p className={styles.emptyText}>
-              Import photos from a SimPRO job or upload files to get started
-            </p>
-          </div>
-        ) : (
-          <div className={styles.card}>
-            <div className={styles.gridHeader}>
-              <h3 className={styles.gridTitle}>
-                Photos ({sortedPhotos.length})
-              </h3>
-              <span className={styles.gridHint}>Click photo names to edit</span>
-            </div>
-            <div className={styles.grid}>
-              {sortedPhotos.map((photo) => (
-                <div key={photo.id} className={styles.photoItem}>
-                  <div className={styles.photoThumb}>
-                    {isDataOrBlobUrl(photo.url) ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={photo.url} alt={photo.name} />
-                    ) : (
-                      <Image
-                        src={photo.url}
-                        alt={photo.name}
-                        fill
-                        style={{ objectFit: "cover" }}
-                      />
-                    )}
-                    <button
-                      className={styles.removeBtn}
-                      onClick={() => handlePhotoRemove(photo.id)}
-                      aria-label="Remove photo"
-                    >
-                      <Image
-                        src="/icons/utility-outline/cross.svg"
-                        alt="Remove"
-                        width={12}
-                        height={12}
-                        style={{ filter: "brightness(0) invert(1)" }}
-                      />
-                    </button>
-                  </div>
-
-                  {editingId === photo.id ? (
-                    <input
-                      className={styles.photoCaptionInput}
-                      value={editingName}
-                      autoFocus
-                      onChange={(e) => setEditingName(e.target.value)}
-                      onBlur={() => saveEdit(photo.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit(photo.id);
-                        if (e.key === "Escape") cancelEdit();
-                      }}
-                    />
-                  ) : (
-                    <p
-                      className={styles.photoCaption}
-                      onClick={() => startEditing(photo.id, photo.name)}
-                      title={photo.name.replace(/\.[^/.]+$/, "")}
-                    >
-                      {photo.name.replace(/\.[^/.]+$/, "")}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
-    </AppLayout>
+
+      {/* ── File Upload ── */}
+      <div className={styles.card}>
+        <h3 className={styles.cardTitle}>Upload Photos</h3>
+        <div
+          className={styles.dropZone}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <Image
+            src="/icons/utility-outline/add-image.svg"
+            alt=""
+            width={40}
+            height={40}
+            className={styles.dropZoneIcon}
+          />
+          <p className={styles.dropZoneText}>
+            Drop images here or click to browse
+          </p>
+          <Button
+            variant="secondary"
+            onClick={(e) => {
+              e?.stopPropagation();
+              fileInputRef.current?.click();
+            }}
+          >
+            Choose Files
+          </Button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={handleFileUpload}
+          style={{ display: "none" }}
+        />
+      </div>
+
+      {/* ── Photo Grid ── */}
+      {sortedPhotos.length === 0 ? (
+        <div className={styles.emptyCard}>
+          <Image
+            src="/icons/utility-outline/map.svg"
+            alt=""
+            width={48}
+            height={48}
+          />
+          <h3 className={styles.emptyTitle}>No Photos Yet</h3>
+          <p className={styles.emptyText}>
+            Import photos from a SimPRO job or upload files to get started
+          </p>
+        </div>
+      ) : (
+        <div className={styles.card}>
+          <div className={styles.gridHeader}>
+            <h3 className={styles.gridTitle}>Photos ({sortedPhotos.length})</h3>
+            <span className={styles.gridHint}>Click photo names to edit</span>
+          </div>
+          <div className={styles.grid}>
+            {sortedPhotos.map((photo) => (
+              <div key={photo.id} className={styles.photoItem}>
+                <div className={styles.photoThumb}>
+                  {isDataOrBlobUrl(photo.url) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={photo.url} alt={photo.name} />
+                  ) : (
+                    <Image
+                      src={photo.url}
+                      alt={photo.name}
+                      fill
+                      style={{ objectFit: "cover" }}
+                    />
+                  )}
+                  <button
+                    className={styles.removeBtn}
+                    onClick={() => handlePhotoRemove(photo.id)}
+                    aria-label="Remove photo"
+                  >
+                    <Image
+                      src="/icons/utility-outline/cross.svg"
+                      alt="Remove"
+                      width={12}
+                      height={12}
+                      style={{ filter: "brightness(0) invert(1)" }}
+                    />
+                  </button>
+                </div>
+
+                {editingId === photo.id ? (
+                  <input
+                    className={styles.photoCaptionInput}
+                    value={editingName}
+                    autoFocus
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={() => saveEdit(photo.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveEdit(photo.id);
+                      if (e.key === "Escape") cancelEdit();
+                    }}
+                  />
+                ) : (
+                  <p
+                    className={styles.photoCaption}
+                    onClick={() => startEditing(photo.id, photo.name)}
+                    title={photo.name.replace(/\.[^/.]+$/, "")}
+                  >
+                    {photo.name.replace(/\.[^/.]+$/, "")}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
