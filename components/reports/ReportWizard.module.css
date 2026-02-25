@@ -1,0 +1,225 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Error / success banner ── */
+.banner {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 500;
+}
+
+.bannerSuccess {
+  background-color: var(--primary-100, #e6faea);
+  color: var(--primary-500, #123319);
+  border: 1px solid var(--primary-200, #b4eec0);
+}
+
+.bannerError {
+  background-color: var(--red-wine-100, #faebf1);
+  color: var(--red-wine-300, #900c40);
+  border: 1px solid var(--red-wine-200, #e5cad5);
+}
+
+/* ── Section cards (Import / Upload / Grid) ── */
+.card {
+  background: var(--white, #fff);
+  border: 1px solid var(--out-light, #f5f5f5);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.cardTitle {
+  font-size: var(--font-size-md, 1rem);
+  font-weight: 600;
+  color: var(--for-darkest, #111827);
+  margin: 0 0 1rem 0;
+}
+
+/* ── SimPRO import row ── */
+.importRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.importInput {
+  flex: 1;
+  height: 42px;
+  padding: 0 1rem;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: 8px;
+  font-size: var(--font-size-md, 1rem);
+  color: var(--for-darkest, #374151);
+  background: var(--white, #fff);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.importInput::placeholder {
+  color: var(--for-light, #9ca3af);
+}
+
+.importInput:focus {
+  border-color: var(--primary-400, #74db89);
+}
+
+/* ── File upload drop zone ── */
+.dropZone {
+  border: 2px dashed var(--out-medium, #d9dbdb);
+  border-radius: 8px;
+  padding: 2.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  transition: border-color 0.2s;
+  cursor: pointer;
+}
+
+.dropZone:hover {
+  border-color: var(--primary-400, #74db89);
+}
+
+.dropZoneIcon {
+  color: var(--for-medium, #7e807f);
+}
+
+.dropZoneText {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--for-medium, #7e807f);
+  margin: 0;
+}
+
+/* ── Photo grid ── */
+.gridHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.gridTitle {
+  font-size: var(--font-size-md, 1rem);
+  font-weight: 600;
+  color: var(--for-darkest, #111827);
+  margin: 0;
+}
+
+.gridHint {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--for-medium, #7e807f);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ── Individual photo item ── */
+.photoItem {
+  position: relative;
+}
+
+.photoThumb {
+  aspect-ratio: 1 / 1;
+  background: var(--con-light, #fafafa);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.photoThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.removeBtn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--red-wine-300, #900c40);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.photoItem:hover .removeBtn {
+  opacity: 1;
+}
+
+.photoCaption {
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--for-dark, #374151);
+  text-align: center;
+  padding: 0 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.photoCaptionInput {
+  width: 100%;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  text-align: center;
+  border: 1px solid var(--primary-400, #74db89);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  outline: none;
+  color: var(--for-darkest, #374151);
+}
+
+/* ── Empty state ── */
+.emptyCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  background: var(--con-light, #fafafa);
+  border: 1px solid var(--out-light, #f5f5f5);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-size: var(--font-size-md, 1rem);
+  font-weight: 600;
+  color: var(--for-darkest, #111827);
+  margin: 0;
+}
+
+.emptyText {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--for-medium, #7e807f);
+  margin: 0;
+}

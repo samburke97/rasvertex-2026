@@ -1,4 +1,4 @@
-import PhotoGridApp from "@/components/ui/PhotoGridApp";
+import ReportWizard from "@/components/reports/ReportWizard";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function HomePage() {
-  return <PhotoGridApp />;
+  return <ReportWizard />;
 }
