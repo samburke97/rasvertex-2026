@@ -1,12 +1,11 @@
-import ReportWizard from "@/components/reports/ReportWizard";
+import ReportSelector from "@/components/reports/ReportSelector";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Photo Grid Report Builder | SimPRO CRM",
-  description:
-    "Generate professional photo reports from SimPRO jobs or uploaded images",
+  title: "Reports | RAS-VERTEX",
+  description: "Generate professional site reports from SimPRO jobs",
 };
 
-export default function HomePage() {
-  return <ReportWizard />;
+export default function ReportsPage() {
+  return <ReportSelector />;
 }

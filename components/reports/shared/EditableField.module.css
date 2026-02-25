@@ -1,0 +1,47 @@
+.display {
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 2px 5px;
+  margin: -2px -5px;
+  transition: background 0.12s;
+  display: inline;
+}
+
+.display:hover {
+  background: rgba(116, 219, 137, 0.15);
+}
+
+.placeholder {
+  color: var(--for-light, #9ca3af);
+  font-style: italic;
+}
+
+.input {
+  width: 100%;
+  padding: 2px 5px;
+  margin: -2px -5px;
+  border: 1px solid var(--primary-400, #74db89);
+  border-radius: 3px;
+  background: rgba(116, 219, 137, 0.06);
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  color: inherit;
+  outline: none;
+  line-height: inherit;
+}
+
+.textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--primary-400, #74db89);
+  border-radius: 4px;
+  background: rgba(116, 219, 137, 0.06);
+  font-size: inherit;
+  font-family: inherit;
+  color: inherit;
+  outline: none;
+  line-height: 1.7;
+  resize: vertical;
+  min-height: 100px;
+}

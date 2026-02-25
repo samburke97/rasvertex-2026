@@ -1,0 +1,88 @@
+.card {
+  background: var(--white, #fff);
+  border: 1px solid var(--out-light, #f5f5f5);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.hero {
+  background: linear-gradient(160deg, #0d1b3e 0%, #1a3a6e 60%, #0d2a4a 100%);
+  padding: 1.5rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.heroLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.logoName {
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.logoSub {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.55rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.heroCreds {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.heroCreds span {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.72rem;
+}
+
+.body {
+  padding: 1.5rem 2rem;
+}
+
+.title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #0d1b3e;
+  margin-bottom: 0.5rem;
+}
+
+.intro {
+  font-size: 0.82rem;
+  color: #666;
+  line-height: 1.65;
+  margin-bottom: 1.25rem;
+  max-width: 480px;
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 0.3rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.meta dt {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #0d1b3e;
+  font-size: 0.68rem;
+  padding-top: 3px;
+}
+
+.meta dd {
+  color: #333;
+  margin: 0;
+}

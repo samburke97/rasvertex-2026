@@ -1,0 +1,75 @@
+.page {
+  /* No height: fixed, no overflow: hidden — let MainLayout handle scrolling */
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.backBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--for-medium, #7e807f);
+  padding: 0;
+  transition: color 0.12s;
+}
+
+.backBtn:hover {
+  color: var(--for-darkest, #111827);
+}
+
+.topBarRight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.photoCount {
+  font-size: 0.78rem;
+  color: var(--for-light, #9ca3af);
+}
+
+.pageHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--for-darkest, #111827);
+  margin: 0;
+}
+
+.pageHint {
+  font-size: 0.78rem;
+  color: var(--for-light, #9ca3af);
+  margin: 0;
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.sectionLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--for-medium, #7e807f);
+  margin-bottom: 0.6rem;
+}
