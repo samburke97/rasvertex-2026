@@ -1,0 +1,97 @@
+/* TopNavbar.module.css - CSS Grid Version */
+
+.topNav {
+  grid-area: header;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px 0 0;
+  z-index: 1001;
+}
+
+/* Remove all position: fixed - not needed with grid */
+/* Rest of your styles stay the same */
+
+.leftSection {
+  display: flex;
+  align-items: center;
+  margin-left: 24px;
+}
+
+.logoContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logoIcon {
+  width: 60px;
+  height: 60px;
+}
+
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.icon {
+  width: 24px;
+  height: 24px;
+}
+
+.profileBadge {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1/1;
+  border-radius: 100px;
+  border: 1px solid var(--Outline-Medium, #d9dbdb);
+  background: var(--Container-Medium, #edf0f0);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.profileBadge:hover {
+  transform: scale(1.05);
+  border-color: #9ca3af;
+}
+
+.profileBadge:active {
+  transform: scale(0.98);
+}
+
+.profileImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 100px;
+}
+
+.profileInitials {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  text-transform: uppercase;
+  user-select: none;
+}

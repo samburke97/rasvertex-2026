@@ -1,0 +1,136 @@
+.dropdownContainer {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 500;
+  color: var(--for-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.required {
+  color: var(--red-wine-300);
+  margin-left: 0.25rem;
+}
+
+.wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.inputWrapper {
+  display: flex;
+  padding: 12px 16px;
+  align-items: center;
+  gap: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  background-color: var(--con-lightest, #fff);
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.15s ease);
+  position: relative;
+  width: 100%;
+}
+
+.inputWrapper:hover {
+  background-color: var(--con-light, #fafafa);
+}
+
+.inputWrapper.active {
+  background-color: var(--con-light, #fafafa);
+  border-color: var(--grey-500, #7e807f);
+}
+
+.inputWrapper.hasError {
+  border: 1px solid var(--red-wine-300);
+}
+
+.input {
+  width: 100%;
+  font-size: var(--font-size-md);
+  background: transparent;
+  border: none;
+  color: var(--for-darkest, #171717);
+  outline: none;
+  font-family: Inter, var(--font-family);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 24px;
+}
+
+.input::placeholder {
+  color: var(--Foreground-Medium, #7e807f);
+}
+
+.input:read-only {
+  cursor: pointer;
+}
+
+.dropdown {
+  width: 100%;
+  padding: 8px;
+  margin-top: 4px;
+  position: absolute;
+  left: 0;
+  z-index: 10;
+  border-radius: 8px;
+  border: 1px solid var(--out-medium);
+  background: var(--con-lightest);
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.option {
+  display: flex;
+  padding: 10px 16px;
+  align-items: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.option:hover {
+  background-color: var(--con-light);
+}
+
+.option.selected {
+  background-color: var(--con-medium);
+}
+
+.noResults {
+  display: flex;
+  padding: 12px 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--for-medium);
+}
+
+.errorText {
+  font-size: 0.875rem;
+  color: var(--red-wine-300);
+  margin-top: 0.25rem;
+}
+
+/* Customize scrollbar */
+.dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dropdown::-webkit-scrollbar-thumb {
+  background-color: var(--out-medium);
+  border-radius: 20px;
+  border: 2px solid transparent;
+}

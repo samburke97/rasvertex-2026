@@ -1,0 +1,190 @@
+/* Container to hold the entire component */
+.container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Label styling */
+.label {
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 500;
+  color: var(--for-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.required {
+  color: #ef4444;
+  margin-left: 0.25rem;
+}
+
+.errorText {
+  font-size: 0.875rem;
+  color: var(--red-wine-300);
+  margin-top: 0.25rem;
+}
+
+/* Original CSS preserved below */
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+}
+
+.uploaderContainer {
+  position: relative;
+  display: inline-block;
+}
+
+.uploaderButton {
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.uploaderButton:hover {
+  opacity: 0.9;
+  background-color: var(--con-light);
+}
+
+.uploaderButton:focus {
+  outline: none;
+}
+
+/* Delete button styling */
+.deleteButton {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background-color: var(--grey-500);
+  color: #fff;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.deleteButton:hover {
+  background-color: var(--red-wine-300);
+}
+
+.deleteButton.visible {
+  opacity: 1;
+}
+
+.whiteIcon {
+  filter: brightness(0) invert(1);
+}
+
+.emptyContainer {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed var(--Outline-Medium, #d9dbdb);
+}
+
+/* Error state styling for empty container */
+.hasError.emptyContainer,
+.hasError .emptyContainer {
+  border: 1px dashed var(--Red-Wine-Red-Wine, #900c40);
+}
+
+/* Image container styling */
+.imageContainer {
+  padding: 0;
+  border: 1px solid var(--Outline-Medium, #d9dbdb);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Error state styling for image container */
+.hasError.imageContainer,
+.hasError .imageContainer {
+  border: 1px solid var(--Red-Wine-Red-Wine, #900c40);
+}
+
+/* Image wrapper to ensure proper sizing */
+.imageWrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* Size variants */
+.sm {
+  width: 32px;
+  height: 32px;
+  aspect-ratio: 1/1;
+}
+
+.md {
+  width: 40px;
+  height: 40px;
+  aspect-ratio: 1/1;
+}
+
+.lg {
+  width: 48px;
+  height: 48px;
+  aspect-ratio: 1/1;
+}
+
+.xl {
+  width: 96px;
+  height: 96px;
+  aspect-ratio: 1/1;
+}
+
+/* Uploaded image styling */
+.uploadedImage {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+
+/* Add icon styling */
+.addIcon {
+  opacity: 0.7;
+}
+
+/* Hidden file input */
+.hiddenInput {
+  display: none;
+}
+
+.progressContainer {
+  width: var(--uploader-width);
+  height: 3px;
+  background-color: var(---grey-300);
+  margin-top: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background-color: var(--primary-300);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}

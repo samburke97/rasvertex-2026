@@ -1,0 +1,98 @@
+/* Fixed Dashboard page.module.css */
+
+.container {
+  position: relative;
+  height: 100%; /* Use 100% instead of calc() */
+  background-color: var(--bg-standard);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* REMOVE overflow: hidden - this was causing issues */
+}
+
+/* Background Art Layers */
+.backgroundArt {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.dotsPattern {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0.2;
+  object-fit: cover;
+}
+
+.linesPattern {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  opacity: 0.3;
+  object-fit: contain;
+}
+
+/* Main Content */
+.content {
+  position: relative;
+  z-index: 1;
+  max-width: 40rem;
+  margin: 0 auto;
+  text-align: left;
+  padding: 2rem;
+}
+
+.title {
+  font-size: 2.75rem;
+  font-weight: 700;
+  color: var(--for-darkest);
+  line-height: 1.2;
+  margin-bottom: var(--spacing-lg);
+  font-family: var(--font-family-heading);
+}
+
+.description {
+  font-size: 1.125rem;
+  color: var(--for-medium);
+  line-height: 1.6;
+  margin-bottom: var(--spacing-xl);
+}
+
+.buttonContainer {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+.primaryButton,
+.secondaryButton {
+  padding: 12px 24px;
+  min-width: 120px;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .content {
+    padding: 1rem;
+  }
+
+  .buttonContainer {
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+}
+
+@media (min-width: 768px) {
+  .title {
+    font-size: 3rem;
+  }
+}

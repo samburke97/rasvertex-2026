@@ -1,0 +1,181 @@
+/* Sidebar.module.css - Fixed version with working tooltips */
+
+.sidebar {
+  grid-area: sidebar;
+  background: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  transition: width 0.3s ease;
+  z-index: 1000;
+  overflow: visible; /* IMPORTANT: Changed from auto to visible for tooltips */
+  position: relative; /* IMPORTANT: Ensure proper positioning context */
+}
+
+.sidebar.expanded {
+  width: 240px;
+}
+
+.navItems {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  align-items: center;
+  flex: 1;
+  margin-top: 24px;
+  overflow: visible; /* IMPORTANT: Allow tooltips to show outside */
+}
+
+.navItemWrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow: visible; /* IMPORTANT: Allow tooltips to overflow */
+}
+
+.navItem {
+  display: flex;
+  padding: 14px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+
+.navItem.hovered {
+  background: var(--Container-Medium, #edf0f0);
+}
+
+.navItem.active {
+  background: var(--Container-Medium, #edf0f0);
+}
+
+.iconContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+}
+
+.icon {
+  width: 28px;
+  height: 28px;
+  transition: filter 0.2s ease;
+}
+
+.iconActive {
+  filter: brightness(0) saturate(100%);
+}
+
+/* FIXED TOOLTIP STYLES */
+.tooltip {
+  position: absolute;
+  left: calc(100% + 16px); /* Position to the right of the sidebar */
+  top: 50%;
+  transform: translateY(-50%);
+  background: #000000;
+  color: #ffffff;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 14px; /* Reduced from 18px for better readability */
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 1050; /* INCREASED z-index to be above TopNavbar */
+  opacity: 0;
+  pointer-events: none; /* IMPORTANT: Prevent tooltip from interfering with mouse events */
+  animation: fadeIn 0.2s ease forwards;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* Added shadow for better visibility */
+}
+
+/* TOOLTIP ARROW */
+.tooltip::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 8px solid #000000;
+}
+
+/* FADE IN ANIMATION */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+.toggleButton {
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+  margin-top: auto;
+}
+
+.toggleButton:hover {
+  background: #f3f4f6;
+}
+
+.toggleIcon {
+  transition: transform 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+}
+
+.toggleIcon.rotated {
+  transform: rotate(180deg);
+}
+
+/* Expanded State Styles */
+.sidebar.expanded .navItem {
+  width: auto;
+  min-width: 200px;
+  flex-direction: row;
+  justify-content: flex-start;
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+.sidebar.expanded .navItemWrapper {
+  justify-content: flex-start;
+  padding: 0 16px;
+}
+
+/* Mobile: Hide sidebar completely */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+}
+
+/* DEBUGGING: Uncomment to see tooltip boundaries */
+/*
+.tooltip {
+  border: 2px solid red !important;
+  background: red !important;
+}
+*/

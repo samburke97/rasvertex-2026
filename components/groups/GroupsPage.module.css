@@ -1,0 +1,64 @@
+.pageContainer {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem;
+  width: 100%;
+}
+
+.container {
+  width: 100%;
+  max-width: 896px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.titleContainer {
+  display: flex;
+  align-items: center;
+}
+
+.title {
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--text-color);
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+.count {
+  font-size: var(--font-size-md);
+  color: var(--text-light);
+  margin-left: 0.75rem;
+  font-weight: 400;
+  padding: 0.125rem 0.5rem;
+  background-color: var(--bg-color);
+  border-radius: var(--border-radius-full);
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.searchContainer {
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.groupNameCell {
+  display: flex;
+  align-items: center;
+}
+
+.groupIcon {
+  width: 16px;
+  height: 16px;
+  margin-right: 0.5rem;
+  color: var(--for-dark);
+}

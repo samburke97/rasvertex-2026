@@ -1,0 +1,154 @@
+.tableWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.tableContainer {
+  width: 100%;
+  overflow-x: auto;
+  background-color: transparent;
+  /* Removed border as requested */
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tableHeader {
+  text-align: left;
+  padding: 16px;
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--for-darkest, #212121);
+  border-bottom: 1px solid var(--Outline-Light, #f5f5f5);
+  white-space: nowrap;
+}
+
+.tableCell {
+  padding: 16px;
+  font-size: 1rem;
+  color: var(--for-medium);
+  border-bottom: 1px solid var(--Outline-Light, #f5f5f5);
+  white-space: nowrap;
+}
+
+/* Hover effect for table rows */
+.table tr {
+  transition: background-color 0.15s ease;
+}
+
+.table tr:hover {
+  background-color: var(--con-light, #fafafa);
+}
+
+/* Clickable row styles */
+.clickableRow {
+  cursor: pointer;
+}
+
+/* Selected row styling */
+tr.selected {
+  background-color: var(--con-light, #fafafa);
+}
+
+/* Name cell styling from SelectableDataTable */
+.nameCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.iconContainer {
+  display: flex;
+  width: 40px;
+  height: 40px;
+  padding: 10px;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  aspect-ratio: 1/1;
+  background-color: var(--con-light, #fafafa);
+  border-radius: 4px;
+}
+
+.itemImage {
+  object-fit: cover;
+}
+
+/* Loading state */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: var(--for-medium, #7e807f);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--out-light, #f5f5f5);
+  border-top-color: var(--for-dark, #4c4d4c);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--for-medium, #7e807f);
+  font-size: 14px;
+}
+
+/* Loading dots animation */
+.loadingDots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.loadingDots span {
+  width: 4px;
+  height: 4px;
+  background-color: var(--for-medium, #7e807f);
+  border-radius: 50%;
+  display: inline-block;
+  animation: dotFade 1.4s infinite ease-in-out both;
+}
+
+.loadingDots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loadingDots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dotFade {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}

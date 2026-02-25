@@ -1,0 +1,30 @@
+/* MainLayout.module.css - Modern CSS Grid Version */
+
+.layout {
+  display: grid;
+  grid-template-areas:
+    "header header"
+    "sidebar main";
+  grid-template-rows: 80px 1fr;
+  grid-template-columns: 100px 1fr;
+  height: 100vh;
+  width: 100%;
+}
+
+.main {
+  grid-area: main;
+  padding: 1.5rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg-standard);
+}
+
+/* Responsive: Hide sidebar on mobile */
+@media (max-width: 768px) {
+  .layout {
+    grid-template-areas:
+      "header"
+      "main";
+    grid-template-columns: 1fr;
+  }
+}

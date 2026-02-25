@@ -1,0 +1,469 @@
+/* components/calendar/WeekView.module.css */
+
+.weekView {
+  width: 100%;
+  height: 100%;
+  background: white;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Week Header */
+.weekHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafafa;
+}
+
+.weekTitle {
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  font-family: var(--font-family);
+}
+
+.weekStats {
+  display: flex;
+  gap: 24px;
+}
+
+.statItem {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Week Grid */
+.weekGrid {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  background: white;
+}
+
+/* Time Column */
+.timeColumn {
+  display: flex;
+  flex-direction: column;
+  width: 80px;
+  border-right: 1px solid #e5e7eb;
+  background: #fafafa;
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 10;
+}
+
+.timeHeaderCell {
+  height: 100px; /* Taller header for day info */
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.timeCell {
+  height: 40px; /* Shorter time cells for week view */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 4px 8px;
+  border-bottom: 1px solid #f3f4f6;
+  background: #fafafa;
+}
+
+.timeLabel {
+  font-size: 10px;
+  color: #6b7280;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.timeUnit {
+  font-size: 8px;
+  color: #9ca3af;
+  line-height: 1;
+}
+
+/* Day Columns */
+.dayColumn {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 150px;
+  border-right: 1px solid #e5e7eb;
+}
+
+.dayHeader {
+  height: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.dayHeader:hover {
+  background: #f3f4f6;
+  transform: translateY(-1px);
+}
+
+.dayHeader.today {
+  background: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.dayName {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.dayNumber {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.dayHeader.today .dayNumber {
+  color: #f59e0b;
+}
+
+.dayBookingCount {
+  font-size: 10px;
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+/* Bay Grid for each day */
+.dayBayGrid {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background: white;
+}
+
+.bayLane {
+  display: flex;
+  border-bottom: 1px solid #f3f4f6;
+  height: 40px; /* Match time cell height */
+  position: relative;
+}
+
+.bayIndicator {
+  width: 24px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 600;
+  color: white;
+  border-right: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.slotsContainer {
+  flex: 1;
+  position: relative;
+  background: white;
+}
+
+/* Week Time Slots */
+.weekTimeSlot {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.weekTimeSlot.available {
+  background: white;
+}
+
+.weekTimeSlot.available:hover {
+  background: #f0fdf4;
+}
+
+.weekTimeSlot.occupied {
+  background: #f9fafb;
+  cursor: not-allowed;
+}
+
+.weekTimeSlot.dragOver {
+  background: #dbeafe;
+  box-shadow: inset 0 0 0 2px #3b82f6;
+}
+
+/* Drag Over Indicator */
+.dragOverIndicator {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border: 1px dashed #3b82f6;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.05);
+  pointer-events: none;
+}
+
+/* Bookings Container */
+.bookingsContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* Week Booking Block */
+.weekBookingBlock {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  border-radius: 4px;
+  color: white;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  pointer-events: all;
+  transition: all 0.2s ease;
+}
+
+.weekBookingBlock:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+  z-index: 10;
+}
+
+.weekBookingContent {
+  padding: 2px 4px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 0;
+}
+
+.weekBookingTime {
+  font-size: 8px;
+  font-weight: 600;
+  opacity: 0.9;
+  line-height: 1;
+}
+
+.weekBookingTitle {
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 1px 0;
+}
+
+.weekBookingCustomer {
+  font-size: 8px;
+  opacity: 0.8;
+  font-weight: 500;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Quick Booking Modal */
+.quickBookingOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.quickBookingModal {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.quickBookingModal h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 16px 0;
+}
+
+.quickBookingModal p {
+  color: #6b7280;
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}
+
+.quickBookingActions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.quickBookingActions button {
+  padding: 12px 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: white;
+  color: #374151;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.quickBookingActions button:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+}
+
+.quickBookingActions button:active {
+  transform: scale(0.98);
+}
+
+/* Current time indicator */
+.currentTimeIndicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #ef4444;
+  z-index: 15;
+  box-shadow: 0 0 2px rgba(239, 68, 68, 0.5);
+}
+
+.currentTimeIndicator::before {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  width: 4px;
+  height: 4px;
+  background: #ef4444;
+  border-radius: 50%;
+  border: 1px solid white;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .weekHeader {
+    padding: 16px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .weekTitle {
+    font-size: 20px;
+  }
+
+  .timeColumn {
+    width: 60px;
+  }
+
+  .timeLabel {
+    font-size: 8px;
+  }
+
+  .timeUnit {
+    display: none;
+  }
+
+  .dayColumn {
+    min-width: 100px;
+  }
+
+  .dayHeader {
+    height: 80px;
+    padding: 8px 4px;
+  }
+
+  .dayNumber {
+    font-size: 16px;
+  }
+
+  .dayName {
+    font-size: 10px;
+  }
+
+  .dayBookingCount {
+    font-size: 8px;
+  }
+
+  .bayIndicator {
+    width: 20px;
+    font-size: 7px;
+  }
+
+  .quickBookingModal {
+    margin: 16px;
+    min-width: auto;
+    max-width: calc(100vw - 32px);
+  }
+
+  .quickBookingActions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Performance optimizations */
+.weekTimeSlot {
+  contain: layout style;
+}
+
+.weekBookingBlock {
+  contain: layout style paint;
+  will-change: transform;
+}
+
+/* Print styles */
+@media print {
+  .quickBookingOverlay {
+    display: none;
+  }
+
+  .weekView {
+    height: auto;
+  }
+
+  .weekGrid {
+    overflow: visible;
+  }
+}

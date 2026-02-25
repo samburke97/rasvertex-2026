@@ -1,0 +1,32 @@
+<svg width="24" height="25" viewBox="0 0 24 25" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="24" height="25" fill="#525252"/>
+<g id="Frame 1136380">
+<g clip-path="url(#clip0_3117_8163)">
+<rect x="-448" y="-380" width="1788" height="1869" rx="24" fill="#F7F7F7"/>
+<g id="Frame 1136361">
+<mask id="path-2-inside-1_3117_8163" fill="white">
+<path d="M-448 -200H1340V89H-448V-200Z"/>
+</mask>
+<path d="M1340 89V88H-448V89V90H1340V89Z" fill="#D9DBDB" mask="url(#path-2-inside-1_3117_8163)"/>
+<g id="Side Nav">
+<rect x="-31.5" y="-167.5" width="1175" height="224" rx="4.5" stroke="#9747FF" stroke-dasharray="10 5"/>
+<g id="State=Active, Type=Centres">
+<rect x="-12" y="-12" width="48" height="48" rx="8" fill="#EDF0F0"/>
+<g id="icon/menu/home/filled">
+<g id="vuesax/bold/home">
+<g id="home">
+<path id="Vector" d="M20.828 10.2522L14.278 5.01221C12.998 3.99221 10.998 3.98221 9.72801 5.00221L3.17801 10.2522C2.23801 11.0022 1.66801 12.5022 1.86801 13.6822L3.12801 21.2222C3.41801 22.9122 4.98801 24.2422 6.69801 24.2422H17.298C18.988 24.2422 20.588 22.8822 20.878 21.2122L22.138 13.6722C22.318 12.5022 21.748 11.0022 20.828 10.2522ZM12.748 20.2422C12.748 20.6522 12.408 20.9922 11.998 20.9922C11.588 20.9922 11.248 20.6522 11.248 20.2422V17.2422C11.248 16.8322 11.588 16.4922 11.998 16.4922C12.408 16.4922 12.748 16.8322 12.748 17.2422V20.2422Z" fill="#141414"/>
+</g>
+</g>
+</g>
+</g>
+</g>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_3117_8163">
+<rect x="-448" y="-380" width="1788" height="1869" rx="24" fill="white"/>
+</clipPath>
+</defs>
+</svg>

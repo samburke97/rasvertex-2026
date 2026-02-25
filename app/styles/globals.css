@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+/* CSS Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--bg-standard);
+  color: var(--for-darkest);
+  font-family: var(--font-family);
+  overflow-x: hidden;
+}
+
+/* CSS Variables */
+:root {
+  /* Primary Colors */
+  --primary-100: #e6fffa;
+  --primary-200: #b3f5e6;
+  --primary-300: #7ceb92;
+  --primary-400: #10b981;
+  --primary-500: #059669;
+  --primary-600: #047857;
+
+  /* Red Wine */
+  --red-wine-100: #fdf2f8;
+  --red-wine-200: #fce7f3;
+  --red-wine-300: #900c40;
+
+  /* Grey Scale */
+  --grey-100: #ffffff;
+  --grey-200: #fafafa;
+  --grey-300: #edf0f0;
+  --grey-400: #d9dbdb;
+  --grey-500: #7e807f;
+  --grey-600: #4c4d4c;
+  --grey-700: #2a2a2a;
+  --grey-800: #1f1f1f;
+  --grey-900: #141414;
+  --grey-950: #0f0f0f;
+
+  /* Colour Scheme */
+  --bg-standard: var(--grey-100);
+  --bg-reverse: var(--grey-200);
+
+  /* Container */
+  --con-lightest: var(--grey-100);
+  --con-light: var(--grey-200);
+  --con-medium: var(--grey-300);
+  --con-dark: var(--grey-400);
+  --con-darkest: var(--grey-500);
+
+  /* Foreground */
+  --for-darkest: var(--grey-900);
+  --for-dark: var(--grey-600);
+  --for-medium: var(--grey-500);
+  --for-light: var(--grey-400);
+  --for-lightest: var(--grey-300);
+
+  /* Outline */
+  --out-lightest: var(--grey-200);
+  --out-light: var(--grey-300);
+  --out-medium: var(--grey-400);
+  --out-dark: var(--grey-500);
+  --out-darkest: var(--grey-900);
+
+  /* Functional Variables */
+  --primary-color: var(--primary-400);
+  --primary-light: var(--primary-300);
+  --text-color: #374151;
+  --text-light: #6b7280;
+  --border-color: var(--grey-300);
+  --hover-bg: var(--grey-200);
+  --bg-color: #ffffff;
+  --white: var(--grey-100);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 2.5rem;
+
+  /* Typography */
+  --font-family:
+    Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  --font-family-heading:
+    var(--font-plus-jakarta-sans), "Plus Jakarta Sans", Inter, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+    "Open Sans", "Helvetica Neue", sans-serif;
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+  --font-size-4xl: 2.25rem;
+
+  /* Border Radius */
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.375rem;
+  --border-radius-lg: 0.5rem;
+  --border-radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+
+  /* Layout */
+  --sidebar-width: 250px;
+  --header-height: 80px; /* Fixed: was 64px */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+h1 {
+  color: var(--for-darkest);
+  font-family: var(--font-family-heading);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 2.5rem;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  h1 {
+    font-size: 1.8rem;
+    line-height: 2.2rem;
+  }
+}
+
+p,
+span {
+  color: var(--for-medium);
+  font-family: var(--font-family);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5rem;
+}
+
+.field-label {
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  line-height: 1.2rem;
+  font-weight: 500;
+  color: var(--for-dark);
+}

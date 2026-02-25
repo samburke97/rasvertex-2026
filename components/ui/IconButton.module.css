@@ -1,0 +1,95 @@
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  transition: all 0.2s;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Size variants */
+.sm {
+  width: 32px;
+  height: 32px;
+}
+
+.md {
+  width: 40px;
+  height: 40px;
+}
+
+.lg {
+  width: 48px;
+  height: 48px;
+}
+
+.xl {
+  width: 96px;
+  height: 96px;
+}
+
+/* Style variants */
+.primary {
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  color: #333;
+}
+
+.primary:hover {
+  background-color: #f5f5f5;
+}
+
+.secondary {
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  color: #333;
+}
+
+.secondary:hover {
+  background-color: #e0e0e0;
+}
+
+.ghost {
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  color: #333;
+}
+
+.ghost:hover {
+  background-color: #f5f5f5;
+}
+
+/* Dotted border variant */
+.dashed {
+  border: 1px dashed var(--out-medium, #d9dbdb);
+}
+
+/* Default icon sizing */
+.iconButton svg,
+.iconButton img {
+  width: 20px;
+  height: 20px;
+}
+
+.lg svg,
+.lg img {
+  width: 30px;
+  height: 30px;
+}
+
+.xl svg,
+.xl img {
+  width: 40px;
+  height: 40px;
+}
+
+/* Image container that fills the button */
+.imageContainer img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

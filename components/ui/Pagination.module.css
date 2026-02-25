@@ -1,0 +1,33 @@
+.paginationContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding: 0.5rem 0;
+}
+
+.paginationText {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--for-dark, #4c4d4c);
+  padding: 0 0.5rem;
+  display: flex;
+  align-items: center;
+  height: 2rem; /* Matches the height of the buttons */
+}
+
+.paginationButton {
+  color: var(--for-medium, #7e807f);
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.paginationButton:hover:not(:disabled) {
+  background-color: var(--con-light, #fafafa);
+  color: var(--for-darkest, #2a2a2a);
+}
+
+.paginationButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

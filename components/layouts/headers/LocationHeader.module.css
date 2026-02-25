@@ -1,0 +1,56 @@
+/* components/layouts/headers/LocationDetailsHeader.module.css - FIXED VERSION */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 8px 0; /* Keep minimal padding */
+  width: 100%;
+}
+
+.headerContent {
+  display: flex;
+  flex-direction: column;
+  max-width: 1200px;
+  width: 100%;
+}
+
+.progressContainer {
+  width: 100%;
+  margin-bottom: 18px; /* Exact 18px gap as requested */
+}
+
+.navigationRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0; /* Remove extra padding */
+}
+
+.backButtonContainer {
+  display: flex;
+  align-items: center;
+}
+
+.continueButtonContainer {
+  display: flex;
+  align-items: center;
+}
+
+.continueButton {
+  padding: 8px 16px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .headerContent {
+    padding: 0 16px; /* Minimal horizontal padding */
+  }
+}

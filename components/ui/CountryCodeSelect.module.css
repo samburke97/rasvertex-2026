@@ -1,0 +1,89 @@
+.container {
+  position: relative;
+  width: 120px;
+}
+
+.selector {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-standard);
+  cursor: pointer;
+  transition: border-color 0.2s;
+  user-select: none;
+}
+
+.selector:hover {
+  border-color: var(--grey-500);
+}
+
+.flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.code {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+.arrow {
+  font-size: 10px;
+  color: var(--grey-500);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 240px;
+  max-height: 300px;
+  overflow-y: auto;
+  background-color: var(--bg-standard);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.option:hover {
+  background-color: var(--hover-bg);
+}
+
+.option.selected {
+  background-color: var(--primary-100);
+}
+
+.option .flag {
+  width: 24px;
+}
+
+.option .name {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+.option .code {
+  font-size: 14px;
+  color: var(--text-light);
+}
+
+@media (max-width: 768px) {
+  .container {
+    width: 100%;
+  }
+}

@@ -1,0 +1,34 @@
+.progressBarContainer {
+  display: flex;
+  width: 100%;
+  margin-bottom: 40px;
+  justify-content: space-between;
+}
+
+.step {
+  flex: 1;
+  position: relative;
+}
+
+.step:not(:last-child) {
+  margin-right: 4px;
+}
+
+.bar {
+  height: 8px;
+  width: 100%;
+  border-radius: 4px;
+  background-color: var(--grey-300);
+}
+
+.activeBar {
+  background-color: var(--primary-400);
+}
+
+.step.active .bar {
+  background-color: var(--primary-400);
+}
+
+.step.completed .bar {
+  background-color: var(--primary-400);
+}

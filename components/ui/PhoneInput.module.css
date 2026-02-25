@@ -1,0 +1,226 @@
+/* components/ui/PhoneInput.module.css - Updated to match TextInput exactly */
+
+.wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--for-dark);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: Inter;
+  font-style: normal;
+  line-height: 20px;
+}
+
+.required {
+  color: #ef4444;
+  margin-left: 0.25rem;
+}
+
+.inputWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.phoneContainer {
+  display: flex;
+  padding: 12px 20px;
+  align-items: center;
+  gap: 12px;
+  flex: 1 0 0;
+  border-radius: 8px;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  background: var(--con-lightest, #fff);
+  width: 100%;
+  position: relative;
+  transition: all var(--transition-fast, 0.15s ease);
+}
+
+.phoneContainer:hover:not(:focus-within):not(.disabled) {
+  border-color: var(--grey-500, #7e807f);
+}
+
+.phoneContainer:focus-within {
+  outline: none;
+  border-color: var(--grey-500, #7e807f);
+}
+
+.phoneContainer.error {
+  border: 1px solid var(--Red-Wine-Red-Wine, #900c40);
+}
+
+.phoneContainer.disabled {
+  background-color: var(--con-light, #fafafa);
+  opacity: 0.7;
+}
+
+/* Country Selector */
+.countrySelector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.countryBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+  color: var(--for-darkest, #171717);
+  font-family: Inter;
+  padding: 0;
+}
+
+.countryBtn:disabled {
+  cursor: not-allowed;
+}
+
+.flag {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.code {
+  font-family: monospace;
+  font-size: 16px;
+  color: var(--for-darkest, #171717);
+}
+
+.arrow {
+  color: var(--Foreground-Medium, #7e807f);
+  transition: transform 0.15s ease;
+}
+
+.arrowUp {
+  transform: rotate(180deg);
+}
+
+/* Separator */
+.separator {
+  width: 1px;
+  height: 24px;
+  background: var(--out-medium, #d9dbdb);
+  flex-shrink: 0;
+}
+
+/* Phone Input */
+.phoneInput {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: Inter, var(--font-family);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 24px;
+  color: var(--for-darkest, #171717);
+  width: 100%;
+  flex: 1;
+}
+
+/* Remove autofill background - same as TextInput */
+.phoneInput:-webkit-autofill,
+.phoneInput:-webkit-autofill:hover,
+.phoneInput:-webkit-autofill:focus,
+.phoneInput:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px var(--con-lightest, #fff) inset !important;
+  -webkit-text-fill-color: var(--for-darkest, #171717) !important;
+  background-color: var(--con-lightest, #fff) !important;
+}
+
+/* Firefox autofill */
+.phoneInput:-moz-autofill {
+  background-color: var(--con-lightest, #fff) !important;
+}
+
+/* Remove browser contacts autofill button */
+.phoneInput::-webkit-contacts-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
+.phoneInput::placeholder {
+  color: var(--Foreground-Medium, #7e807f);
+}
+
+.phoneInput:disabled {
+  cursor: not-allowed;
+}
+
+/* Dropdown */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9998;
+  background: transparent;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  min-width: 280px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  font-family: Inter;
+  transition: background-color 0.15s ease;
+}
+
+.option:hover {
+  background-color: #f9fafb;
+}
+
+.countryName {
+  flex: 1;
+  font-weight: 400;
+  color: var(--for-darkest, #171717);
+}
+
+.option .code {
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--Foreground-Medium, #7e807f);
+}
+
+/* Error Text */
+.errorText {
+  font-size: 0.875rem;
+  color: var(--red-wine-300);
+  margin-top: 4px;
+}
