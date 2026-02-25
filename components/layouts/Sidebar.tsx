@@ -15,6 +15,7 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
   { icon: "/icons/menu/home.svg", href: "/dashboard", label: "Home" },
+  { icon: "/icons/menu/reports.svg", href: "/reports", label: "Reports" },
   { icon: "/icons/menu/calendar.svg", href: "/calendar", label: "Calendar" },
   { icon: "/icons/menu/sales.svg", href: "/sales", label: "Sales" },
   { icon: "/icons/menu/inventory.svg", href: "/inventory", label: "Inventory" },
@@ -24,7 +25,6 @@ const sidebarItems: SidebarItem[] = [
     label: "Marketplace",
   },
   { icon: "/icons/menu/players.svg", href: "/players", label: "Players" },
-  { icon: "/icons/menu/reports.svg", href: "/reports", label: "Reports" },
   { icon: "/icons/menu/settings.svg", href: "/settings", label: "Settings" },
 ];
 

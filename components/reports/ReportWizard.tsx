@@ -6,9 +6,6 @@ import Button from "@/components/ui/Button";
 import ReportWizardHeader from "./ReportWizardHeader";
 import styles from "./ReportWizard.module.css";
 
-/* ─────────────────────────────────────────────
-   Types
-───────────────────────────────────────────── */
 interface Photo {
   id: string;
   name: string;
@@ -16,22 +13,10 @@ interface Photo {
   size: number;
 }
 
-interface SimproAttachment {
-  ID: string;
-  Filename: string;
-  MimeType: string;
-  FileSizeBytes: number;
-  Base64Data?: string;
-}
-
-/* ─────────────────────────────────────────────
-   Helpers
-───────────────────────────────────────────── */
 function naturalSort(a: string, b: string): number {
   const chunkify = (str: string) => str.split(/(\d+)/).filter((c) => c !== "");
   const chunksA = chunkify(a);
   const chunksB = chunkify(b);
-
   for (let i = 0; i < Math.max(chunksA.length, chunksB.length); i++) {
     const ca = chunksA[i] || "";
     const cb = chunksB[i] || "";
@@ -50,9 +35,6 @@ function isDataOrBlobUrl(url: string) {
   return url.startsWith("data:") || url.startsWith("blob:");
 }
 
-/* ─────────────────────────────────────────────
-   PhotoGridApp
-───────────────────────────────────────────── */
 const ReportWizard: React.FC = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [message, setMessage] = useState<{
@@ -61,62 +43,136 @@ const ReportWizard: React.FC = () => {
   } | null>(null);
   const [jobNumber, setJobNumber] = useState("");
   const [loadingImport, setLoadingImport] = useState(false);
+  const [importProgress, setImportProgress] = useState<{
+    loaded: number;
+    total: number;
+  } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showMessage = (text: string, type: "success" | "error" = "success") => {
     setMessage({ text, type });
-    setTimeout(() => setMessage(null), 3000);
+    setTimeout(() => setMessage(null), 4000);
   };
 
-  /* ── Natural-sorted photos ── */
   const sortedPhotos = React.useMemo(
     () => [...photos].sort((a, b) => naturalSort(a.name, b.name)),
     [photos],
   );
 
-  /* ── SimPRO import ── */
   const fetchSimproPhotos = async () => {
     if (!jobNumber.trim()) {
       showMessage("Please enter a job number", "error");
       return;
     }
+
     setLoadingImport(true);
+    setImportProgress(null);
     setMessage(null);
 
     try {
       const response = await fetch(
         `/api/simpro/jobs/${jobNumber}/attachments?companyId=0`,
       );
-      if (!response.ok) throw new Error("Failed to fetch photos from SimPRO");
 
-      const { attachments } = await response.json();
-      if (!attachments || attachments.length === 0) {
-        showMessage(`No photos found for job ${jobNumber}`, "error");
-        return;
+      if (!response.ok || !response.body) {
+        throw new Error("Failed to connect to SimPRO");
       }
 
-      const newPhotos: Photo[] = attachments.map((att: SimproAttachment) => ({
-        id: `simpro_${att.ID}`,
-        name: att.Filename,
-        url: `data:${att.MimeType};base64,${att.Base64Data}`,
-        size: att.FileSizeBytes || 0,
-      }));
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      setPhotos((prev) => [...prev, ...newPhotos]);
-      showMessage(`Loaded ${newPhotos.length} photos from SimPRO`);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() ?? "";
+
+        for (const frame of frames) {
+          if (!frame.trim()) continue;
+
+          const lines = frame.split("\n");
+          let eventName = "message";
+          let dataLine = "";
+
+          for (const line of lines) {
+            if (line.startsWith("event: ")) eventName = line.slice(7).trim();
+            if (line.startsWith("data: ")) dataLine = line.slice(6).trim();
+          }
+
+          if (!dataLine) continue;
+
+          let payload: Record<string, unknown>;
+          try {
+            payload = JSON.parse(dataLine);
+          } catch {
+            continue;
+          }
+
+          switch (eventName) {
+            case "start":
+              setImportProgress({ loaded: 0, total: payload.total as number });
+              break;
+
+            case "photo":
+              setPhotos((prev) => [
+                ...prev,
+                {
+                  id: payload.id as string,
+                  name: payload.name as string,
+                  url: payload.url as string,
+                  size: payload.size as number,
+                },
+              ]);
+              break;
+
+            case "progress":
+              setImportProgress({
+                loaded: payload.loaded as number,
+                total: payload.total as number,
+              });
+              break;
+
+            case "done":
+              setImportProgress(null);
+              if ((payload.loaded as number) === 0) {
+                showMessage(`No photos found for job ${jobNumber}`, "error");
+              } else {
+                showMessage(
+                  `Loaded ${payload.loaded} photo${payload.loaded === 1 ? "" : "s"} from SimPRO${
+                    (payload.failed as number) > 0
+                      ? ` (${payload.failed} failed)`
+                      : ""
+                  }`,
+                );
+              }
+              break;
+
+            case "error":
+              showMessage(
+                (payload.message as string) || "Failed to fetch photos",
+                "error",
+              );
+              break;
+          }
+        }
+      }
     } catch (err) {
       showMessage(
         err instanceof Error ? err.message : "Failed to fetch photos",
         "error",
       );
+      setImportProgress(null);
     } finally {
       setLoadingImport(false);
     }
   };
 
-  /* ── File upload ── */
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const imageFiles = files.filter((f) => f.type.startsWith("image/"));
@@ -145,7 +201,6 @@ const ReportWizard: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  /* ── Photo actions ── */
   const handlePhotoRemove = (id: string) =>
     setPhotos((prev) => prev.filter((p) => p.id !== id));
 
@@ -173,7 +228,6 @@ const ReportWizard: React.FC = () => {
     setEditingName("");
   };
 
-  /* ── Print ── */
   const generatePrint = async () => {
     if (!photos.length) return;
 
@@ -271,9 +325,9 @@ const ReportWizard: React.FC = () => {
     setPhotos([]);
     setJobNumber("");
     setMessage(null);
+    setImportProgress(null);
   };
 
-  /* ── Header actions passed to AppLayout ── */
   const headerActions = (
     <ReportWizardHeader
       hasPhotos={photos.length > 0}
@@ -284,12 +338,16 @@ const ReportWizard: React.FC = () => {
     />
   );
 
-  /* ─────────────────────────────────────────
-     Render
-  ───────────────────────────────────────── */
+  const fetchButtonLabel = () => {
+    if (loadingImport && importProgress) {
+      return `${importProgress.loaded} / ${importProgress.total}`;
+    }
+    if (loadingImport) return "Connecting...";
+    return "Fetch Photos";
+  };
+
   return (
     <div className={styles.page}>
-      {/* ── Banner ── */}
       {message && (
         <div
           className={`${styles.banner} ${
@@ -300,7 +358,17 @@ const ReportWizard: React.FC = () => {
         </div>
       )}
 
-      {/* ── SimPRO Import ── */}
+      {loadingImport && importProgress && (
+        <div className={styles.progressBar}>
+          <div
+            className={styles.progressFill}
+            style={{
+              width: `${Math.round((importProgress.loaded / importProgress.total) * 100)}%`,
+            }}
+          />
+        </div>
+      )}
+
       <div className={styles.card}>
         <h3 className={styles.cardTitle}>Import from SimPRO</h3>
         <div className={styles.importRow}>
@@ -325,12 +393,11 @@ const ReportWizard: React.FC = () => {
               />
             }
           >
-            {loadingImport ? "Loading..." : "Fetch Photos"}
+            {fetchButtonLabel()}
           </Button>
         </div>
       </div>
 
-      {/* ── File Upload ── */}
       <div className={styles.card}>
         <h3 className={styles.cardTitle}>Upload Photos</h3>
         <div
@@ -367,7 +434,6 @@ const ReportWizard: React.FC = () => {
         />
       </div>
 
-      {/* ── Photo Grid ── */}
       {sortedPhotos.length === 0 ? (
         <div className={styles.emptyCard}>
           <Image

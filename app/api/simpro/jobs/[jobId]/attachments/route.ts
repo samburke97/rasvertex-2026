@@ -1,11 +1,12 @@
-// app/api/simpro/jobs/[jobId]/attachments/route.ts - Simplified and properly typed
 import { NextRequest, NextResponse } from "next/server";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
 
-// Types based on SimPRO API documentation
-interface SimproAttachmentList {
+const CONCURRENCY = 10;
+const REQUEST_TIMEOUT_MS = 8000;
+
+interface SimproAttachmentListItem {
   ID: string;
   Filename: string;
 }
@@ -13,222 +14,196 @@ interface SimproAttachmentList {
 interface SimproAttachmentDetail {
   ID: string;
   Filename: string;
-  Folder?: {
-    ID: number;
-    Name: string;
-  } | null;
+  Folder?: { ID: number; Name: string } | null;
   Public?: boolean;
   Email?: boolean;
   MimeType?: string;
   FileSizeBytes?: number;
   DateAdded?: string;
-  AddedBy?: {
-    ID: number;
-    Name: string;
-    Type: string;
-    TypeId: number;
-  } | null;
-  Base64Data?: string; // Only present when using ?display=Base64
+  AddedBy?: { ID: number; Name: string; Type: string; TypeId: number } | null;
+  Base64Data?: string;
 }
 
-async function apiRequest<T>(url: string, options?: RequestInit): Promise<T> {
-  console.log(`Making API request to: ${url}`);
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
-
-  console.log(`Response status: ${response.status} ${response.statusText}`);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`API Error Response: ${errorText}`);
-    throw new Error(
-      `HTTP error! status: ${response.status} - ${response.statusText}`
-    );
+async function simproFetch<T>(url: string): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(
+        `HTTP ${res.status} ${res.statusText}${body ? `: ${body}` : ""}`,
+      );
+    }
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timer);
   }
+}
 
-  const data = await response.json();
-  console.log(
-    `Received ${Array.isArray(data) ? data.length : "non-array"} items`
-  );
-  return data;
+function sseEvent(event: string, data: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> }
+  { params }: { params: Promise<{ jobId: string }> },
 ) {
   const { jobId } = await params;
   const { searchParams } = new URL(request.url);
-  const companyId = parseInt(searchParams.get("companyId") || "0");
+  const companyId = parseInt(searchParams.get("companyId") || "0", 10);
 
-  console.log(`=== SIMPRO ATTACHMENTS REQUEST ===`);
-  console.log(`Job ID from params: ${jobId} (type: ${typeof jobId})`);
-  console.log(`Company ID: ${companyId}`);
-  console.log(`Full URL: ${request.url}`);
-
-  // Validate environment variables
   if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN) {
-    console.error("Missing required environment variables");
-    console.error("SIMPRO_BASE_URL:", SIMPRO_BASE_URL ? "✓ Set" : "✗ Missing");
-    console.error(
-      "SIMPRO_ACCESS_TOKEN:",
-      SIMPRO_ACCESS_TOKEN ? "✓ Set" : "✗ Missing"
-    );
     return NextResponse.json(
       {
         success: false,
         error:
-          "SimPRO configuration missing. Please check environment variables.",
+          "SimPRO configuration missing. Check NEXT_PUBLIC_SIMPRO_BASE_URL and SIMPRO_ACCESS_TOKEN.",
         code: "CONFIGURATION_MISSING",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
-  // Validate job ID - check for undefined, null, or empty string
   if (!jobId || jobId === "undefined" || jobId.trim() === "") {
-    console.error(
-      `Invalid job ID received: "${jobId}" (type: ${typeof jobId})`
-    );
     return NextResponse.json(
-      {
-        success: false,
-        error: `Invalid job ID: "${jobId}". Please provide a valid job number.`,
-        code: "INVALID_JOB_ID",
-      },
-      { status: 400 }
+      { success: false, error: "Invalid job ID.", code: "INVALID_JOB_ID" },
+      { status: 400 },
     );
   }
 
   const parsedJobId = parseInt(jobId, 10);
   if (isNaN(parsedJobId) || parsedJobId <= 0) {
-    console.error(`Job ID is not a valid number: ${jobId}`);
     return NextResponse.json(
       {
         success: false,
-        error: `Job ID must be a valid positive number. Received: "${jobId}"`,
+        error: "Job ID must be a positive integer.",
         code: "INVALID_JOB_ID_FORMAT",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  try {
-    console.log(`Fetching attachments for job ${parsedJobId}...`);
+  const encoder = new TextEncoder();
 
-    // Step 1: Get list of all attachments for the job
-    const listAttachmentsUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}/attachments/files/?pageSize=250`;
-
-    console.log(`Fetching attachment list from: ${listAttachmentsUrl}`);
-    const attachmentsList = await apiRequest<SimproAttachmentList[]>(
-      listAttachmentsUrl
-    );
-
-    console.log(`Found ${attachmentsList.length} total attachments`);
-
-    if (attachmentsList.length === 0) {
-      console.log(`No attachments found for job ${parsedJobId}`);
-      return NextResponse.json({
-        success: true,
-        attachments: [],
-        message: `No attachments found for job ${parsedJobId}`,
-      });
-    }
-
-    // Step 2: Get detailed info for each attachment with Base64 data
-    console.log("Fetching detailed attachment info...");
-    const detailedAttachments: SimproAttachmentDetail[] = [];
-
-    for (const attachment of attachmentsList) {
-      try {
-        console.log(`Getting details for attachment: ${attachment.Filename}`);
-
-        const detailUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}/attachments/files/${attachment.ID}?display=Base64`;
-        const detailedAttachment = await apiRequest<SimproAttachmentDetail>(
-          detailUrl
-        );
-
-        // Only include image attachments
-        if (
-          detailedAttachment.MimeType &&
-          detailedAttachment.MimeType.startsWith("image/")
-        ) {
-          console.log(`✓ Added image: ${detailedAttachment.Filename}`);
-          detailedAttachments.push(detailedAttachment);
-        } else {
-          console.log(
-            `✗ Skipped non-image: ${detailedAttachment.Filename} (${detailedAttachment.MimeType})`
-          );
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: unknown) => {
+        try {
+          controller.enqueue(encoder.encode(sseEvent(event, data)));
+        } catch {
+          // client disconnected
         }
-      } catch (error) {
-        console.warn(
-          `Failed to get details for attachment ${attachment.ID}:`,
-          error as Error
+      };
+
+      try {
+        const listUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}/attachments/files/?pageSize=250`;
+
+        let attachmentsList: SimproAttachmentListItem[];
+        try {
+          attachmentsList =
+            await simproFetch<SimproAttachmentListItem[]>(listUrl);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes("404")) {
+            send("error", {
+              code: "JOB_NOT_FOUND",
+              message: `Job ${parsedJobId} not found in SimPRO.`,
+            });
+          } else if (msg.includes("401") || msg.includes("403")) {
+            send("error", {
+              code: "AUTH_FAILED",
+              message: "SimPRO authentication failed.",
+            });
+          } else {
+            send("error", {
+              code: "LIST_FETCH_FAILED",
+              message: "Failed to fetch attachment list.",
+              details: msg,
+            });
+          }
+          controller.close();
+          return;
+        }
+
+        const imageExtensions =
+          /\.(jpg|jpeg|png|gif|webp|bmp|tiff|heic|heif)$/i;
+        const candidates = attachmentsList.filter((a) =>
+          imageExtensions.test(a.Filename),
         );
-        // Continue with other attachments
+
+        send("start", { total: candidates.length, jobId: parsedJobId });
+
+        if (candidates.length === 0) {
+          send("done", { total: 0, loaded: 0, failed: 0 });
+          controller.close();
+          return;
+        }
+
+        let loaded = 0;
+        let failed = 0;
+        let index = 0;
+
+        async function worker() {
+          while (index < candidates.length) {
+            const i = index++;
+            const att = candidates[i];
+            const detailUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}/attachments/files/${att.ID}?display=Base64`;
+
+            try {
+              const detail =
+                await simproFetch<SimproAttachmentDetail>(detailUrl);
+              if (detail.MimeType?.startsWith("image/") && detail.Base64Data) {
+                send("photo", {
+                  id: `simpro_${detail.ID}`,
+                  name: detail.Filename,
+                  url: `data:${detail.MimeType};base64,${detail.Base64Data}`,
+                  size: detail.FileSizeBytes ?? 0,
+                  index: i,
+                });
+                loaded++;
+              }
+            } catch (err) {
+              failed++;
+              console.warn(
+                `[SimPRO] Attachment ${att.ID} (${att.Filename}) failed:`,
+                err instanceof Error ? err.message : err,
+              );
+            }
+
+            send("progress", { loaded, failed, total: candidates.length });
+          }
+        }
+
+        await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+
+        send("done", { total: candidates.length, loaded, failed });
+      } catch (err) {
+        send("error", {
+          code: "UNEXPECTED",
+          message:
+            err instanceof Error
+              ? err.message
+              : "An unexpected error occurred.",
+        });
+      } finally {
+        controller.close();
       }
-    }
+    },
+  });
 
-    console.log(
-      `Returning ${detailedAttachments.length} image attachments for job ${parsedJobId}`
-    );
-
-    return NextResponse.json({
-      success: true,
-      attachments: detailedAttachments,
-      total: detailedAttachments.length,
-      jobId: parsedJobId,
-    });
-  } catch (error) {
-    console.error(
-      `Error fetching attachments for job ${jobId}:`,
-      error as Error
-    );
-
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-
-    // Check for specific SimPRO errors
-    if (errorMessage.includes("404")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Job ${parsedJobId} not found in SimPRO`,
-          code: "JOB_NOT_FOUND",
-          details: errorMessage,
-        },
-        { status: 404 }
-      );
-    }
-
-    if (errorMessage.includes("401") || errorMessage.includes("403")) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Authentication failed with SimPRO API",
-          code: "AUTHENTICATION_FAILED",
-          details: errorMessage,
-        },
-        { status: 401 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch job attachments",
-        code: "FETCH_FAILED",
-        details: errorMessage,
-        jobId: parsedJobId,
-      },
-      { status: 500 }
-    );
-  }
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
