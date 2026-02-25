@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import AppLayout from "@/components/layout/AppLayout";
-import ErrorMessage from "@/components/ui/ErrorMessage";
+import AppLayout from "@/components/layouts/AppLayout";
 import HeaderActions from "@/components/ui/HeaderActions";
 import SimproImport from "@/components/photo/SimproImport";
 import FileUpload from "@/components/photo/FileUpload";
@@ -68,8 +67,8 @@ const PhotoGridApp: React.FC = () => {
   const handlePhotoRename = (id: string, newName: string) => {
     setPhotos((prev) =>
       prev.map((photo) =>
-        photo.id === id ? { ...photo, name: newName } : photo
-      )
+        photo.id === id ? { ...photo, name: newName } : photo,
+      ),
     );
   };
 
@@ -118,7 +117,7 @@ const PhotoGridApp: React.FC = () => {
           console.error("Error converting image:", error);
           return photo;
         }
-      })
+      }),
     );
 
     const printWindow = window.open("", "_blank");
@@ -232,10 +231,10 @@ const PhotoGridApp: React.FC = () => {
                 </div>
                 <div class="caption">${photo.name.replace(
                   /\.[^/.]+$/,
-                  ""
+                  "",
                 )}</div>
               </div>
-            `
+            `,
               )
               .join("")}
           </div>
@@ -274,8 +273,6 @@ const PhotoGridApp: React.FC = () => {
 
   return (
     <AppLayout actions={headerActions}>
-      {error && <ErrorMessage message={error} />}
-
       <SimproImport
         jobNumber={jobNumber}
         onJobNumberChange={setJobNumber}

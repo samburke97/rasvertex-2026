@@ -1,4 +1,4 @@
-import PhotoGridApp from "@/components/PhotoGridApp";
+import PhotoGridApp from "@/components/ui/PhotoGridApp";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {

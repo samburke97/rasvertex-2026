@@ -37,20 +37,18 @@ export default function DashboardPage() {
       <div className={styles.content}>
         {/* Main Heading */}
         <h1 className={styles.title}>
-          Go live on the bord
+          Welcome to
           <br />
-          marketplace today
+          RAS-VERTEX
         </h1>
-
-        {/* Subtitle */}
+        {/* Subtitle
         <p className={styles.description}>
-          Add your business to the new sports and activity platform to
+          We're everyday means
           <br />
-          attract players from all types of fields.
-        </p>
-
+          higher standards.
+        </p> */}
         {/* Action Buttons */}
-        <div className={styles.buttonContainer}>
+        {/* <div className={styles.buttonContainer}>
           <Button
             variant="primary-green"
             onClick={handleStartNow}
@@ -66,7 +64,7 @@ export default function DashboardPage() {
           >
             Learn More
           </Button>
-        </div>
+        </div> */}
       </div>
     </div>
   );
