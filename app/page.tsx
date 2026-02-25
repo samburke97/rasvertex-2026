@@ -1,7 +1,5 @@
-import { redirect } from "next/dist/server/api-utils";
+import { redirect } from "next/navigation"; // ← fix wrong import
 
-const Home = () => {
-  return redirect("/dashboard");
-};
-
-export default Home;
+export default function Home() {
+  redirect("/dashboard");
+}
