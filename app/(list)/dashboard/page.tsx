@@ -1,12 +1,10 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import styles from "./page.module.css";
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
   const router = useRouter();
 
   const handleStartNow = () => {

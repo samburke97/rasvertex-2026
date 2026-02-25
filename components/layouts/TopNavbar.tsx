@@ -1,12 +1,10 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import styles from "./TopNavbar.module.css";
 
 export default function TopNavbar() {
-  const { data: session } = useSession();
   const pathname = usePathname();
 
   const getPageTitle = () => {
@@ -16,26 +14,17 @@ export default function TopNavbar() {
   };
 
   const getProfileInitials = () => {
-    const firstName = session?.user?.firstName;
-    const lastName = session?.user?.lastName;
-
-    if (firstName && lastName) {
-      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-    }
-
-    // Fallback to email if no first/last name
-    if (session?.user?.email) {
-      return session.user.email.charAt(0).toUpperCase();
-    }
+    // if (firstName && lastName) {
+    //   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 
     return "U"; // Ultimate fallback
   };
 
   const getProfileImage = () => {
     // OAuth profile image
-    if (session?.user?.image) {
-      return session.user.image;
-    }
+    // if (session?.user?.image) {
+    //   return session.user.image;
+    // }
 
     return null;
   };
@@ -52,14 +41,17 @@ export default function TopNavbar() {
 
   const handleProfileClick = () => {
     // Sign out when profile is clicked
-    signOut({ callbackUrl: "/login" });
+    // signOut({ callbackUrl: "/login" });
   };
 
   return (
     <header className={styles.topNav}>
       {/* Left section - Bord Logo */}
       <div className={styles.leftSection}>
-        <div className={styles.logoContainer}>RAS-VERTEX</div>
+        <div className={styles.logoContainer}>
+          {" "}
+          <Image src="/ras.png" alt="Notifications" width={150} height={50} />
+        </div>
       </div>
 
       {/* Right section - Search, Notifications, Profile */}
