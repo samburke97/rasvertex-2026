@@ -1,3 +1,4 @@
+// components/reports/condition/ConditionReportPage.tsx
 "use client";
 
 import React, { useState, useCallback } from "react";
@@ -15,8 +16,8 @@ import {
   type ImportStatus,
   type ReportJobDetails,
   type ReportPhoto,
-  type SimproJobResponse,
 } from "@/lib/reports/condition.types";
+import type { EnrichedJob } from "@/lib/simpro/types";
 
 interface ConditionReportPageProps {
   onBack: () => void;
@@ -136,13 +137,13 @@ export default function ConditionReportPage({
     }
   }, []);
 
-  // ── Job details fetch ─────────────────────────────────────────────────────
+  // ── Job details fetch — now uses EnrichedJob from the API ─────────────────
   const fetchJobDetails = useCallback(async (jobId: string) => {
     try {
       const res = await fetch(`/api/simpro/jobs/${jobId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: SimproJobResponse = await res.json();
-      const jobDetails = mapJobToReportDetails(data);
+      const enrichedJob: EnrichedJob = await res.json();
+      const jobDetails = mapJobToReportDetails(enrichedJob);
       setReport((prev) => ({ ...prev, job: jobDetails }));
     } catch (err) {
       console.warn("[ConditionReport] Job details fetch failed:", err);
@@ -155,7 +156,7 @@ export default function ConditionReportPage({
     (jobNumber: string) => {
       setReport((prev) => ({ ...prev, photos: [] }));
       setImportStatus({ phase: "fetching-job" });
-      setView("editor"); // Show editor straight away so photos stream in visibly
+      setView("editor");
 
       // Fire both in parallel — job details is fast, photos take time
       fetchJobDetails(jobNumber);
