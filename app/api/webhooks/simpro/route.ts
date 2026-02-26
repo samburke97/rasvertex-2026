@@ -1,5 +1,6 @@
 // app/api/webhooks/simpro/route.ts
-// SimPRO sends a lightweight reference payload — we then fetch full job details.
+// SimPRO sends: { name: "Job", action: "updated", reference: { companyID: 0, jobID: 10862 } }
+// We then fetch full job + site details from SimPRO API.
 
 import { NextRequest, NextResponse } from "next/server";
 import { buildPaymentSchedule } from "@/lib/reports/works-agreement/types";
@@ -12,44 +13,66 @@ const THRESHOLD = 20000;
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
 
-// ── Fetch full job details from SimPRO API ────────────────────────────────
-async function fetchJob(companyId: number, jobId: number) {
-  const res = await fetch(
-    `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${jobId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
+async function simproGet<T>(url: string): Promise<T> {
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
+      "Content-Type": "application/json",
     },
-  );
-  if (!res.ok) throw new Error(`SimPRO job fetch failed: ${res.status}`);
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`SimPRO ${res.status}: ${url}`);
   return res.json();
 }
 
-// ── Fetch site address ────────────────────────────────────────────────────
+// Safely extract a string from a field that might be a string or a nested object
+function extractString(val: unknown): string {
+  if (!val) return "";
+  if (typeof val === "string") return val.trim();
+  if (typeof val === "number") return String(val);
+  // If it's an object, try common nested field names
+  if (typeof val === "object") {
+    const obj = val as Record<string, unknown>;
+    const nested =
+      obj.Address ??
+      obj.Street ??
+      obj.StreetAddress ??
+      obj.Name ??
+      obj.Value ??
+      obj.Text ??
+      "";
+    return extractString(nested);
+  }
+  return "";
+}
+
 async function fetchSiteAddress(
   companyId: number,
   siteId: number,
 ): Promise<string> {
   try {
-    const res = await fetch(
+    const site = await simproGet<Record<string, unknown>>(
       `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/sites/${siteId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        cache: "no-store",
-      },
     );
-    if (!res.ok) return "";
-    const site = await res.json();
-    return [site.Address, site.City, site.State, site.PostCode]
-      .filter(Boolean)
-      .join(", ");
-  } catch {
+    console.log("[Webhook] Site raw:", JSON.stringify(site));
+
+    // Extract each part safely — handles both flat strings and nested objects
+    const addr = extractString(
+      site.Address ?? site.Street ?? site.StreetAddress ?? "",
+    );
+    const city = extractString(site.City ?? site.Suburb ?? "");
+    const state = extractString(site.State ?? "");
+    const postcode = extractString(
+      site.PostCode ?? site.PostalCode ?? site.Postcode ?? "",
+    );
+
+    const parts = [addr, city, state, postcode].filter(Boolean);
+    const result = parts.join(", ");
+
+    console.log(`[Webhook] Site address resolved: "${result}"`);
+    return result;
+  } catch (err) {
+    console.warn("[Webhook] Site fetch failed:", err);
     return "";
   }
 }
@@ -58,10 +81,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     console.log("[Webhook] Received:", JSON.stringify(body));
-
-    // ── SimPRO payload shape ──────────────────────────────────────────────
-    // { ID: "job.updated", name: "Job", action: "updated",
-    //   reference: { companyID: 0, jobID: 10862 }, date_triggered: "..." }
 
     const action: string = body.action ?? "";
     const name: string = body.name ?? "";
@@ -78,13 +97,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, skipped: "not a job event" });
     }
 
-    console.log(`[Webhook] Job ${jobId} — ${action}. Fetching full details...`);
-
-    // ── Fetch full job from SimPRO ────────────────────────────────────────
-    const job = await fetchJob(companyId, jobId);
+    console.log(`[Webhook] Fetching job ${jobId}...`);
+    const job = await simproGet<Record<string, unknown>>(
+      `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${jobId}`,
+    );
     console.log("[Webhook] Job fetched:", JSON.stringify(job));
 
-    const totalIncGst: number = job.Total?.IncTax ?? 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const total = job.Total as any;
+    const totalIncGst: number = total?.IncTax ?? 0;
     console.log(`[Webhook] Total Inc GST: $${totalIncGst}`);
 
     if (totalIncGst < THRESHOLD) {
@@ -97,38 +118,43 @@ export async function POST(request: NextRequest) {
 
     const jobIdStr = String(jobId);
 
-    // Don't duplicate on create
     if (action === "created") {
       const existing = await getAgreement(jobIdStr);
       if (existing) {
-        console.log(`[Webhook] Agreement already exists for job ${jobIdStr}`);
         return NextResponse.json({ received: true, skipped: "already exists" });
       }
     }
 
-    // ── Build agreement data ──────────────────────────────────────────────
-    const customer = job.Customer ?? null;
+    // ── Build client name ─────────────────────────────────────────────────
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const customer = job.Customer as any;
     const clientName =
       customer?.CompanyName?.trim() ||
       [customer?.GivenName, customer?.FamilyName].filter(Boolean).join(" ") ||
       "Client";
 
-    const siteAddress = job.Site?.ID
-      ? await fetchSiteAddress(companyId, job.Site.ID)
+    // ── Fetch site address ────────────────────────────────────────────────
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const site = job.Site as any;
+    const siteAddress = site?.ID
+      ? await fetchSiteAddress(companyId, site.ID)
       : "";
 
-    const date = new Date(job.DateIssued || Date.now()).toLocaleDateString(
-      "en-AU",
-    );
+    const siteAddressFinal = siteAddress || site?.Name || "";
+    console.log(`[Webhook] Final site address: "${siteAddressFinal}"`);
+
+    const date = new Date(
+      (job.DateIssued as string) || Date.now(),
+    ).toLocaleDateString("en-AU");
 
     const agreement = {
       jobId: jobIdStr,
       jobNo: job.No ? `#${job.No}` : `#${jobId}`,
-      jobName: job.Name?.trim() || `Job ${jobId}`,
+      jobName: (job.Name as string)?.trim() || `Job ${jobId}`,
       clientName,
-      siteAddress,
-      siteName: job.Site?.Name?.trim() || clientName,
-      initialWorks: job.Name?.trim() || "",
+      siteAddress: siteAddressFinal,
+      siteName: site?.Name?.trim() || clientName,
+      initialWorks: (job.Name as string)?.trim() || "",
       colourScheme: "To be advised",
       totalIncGst,
       paymentSchedule: buildPaymentSchedule(totalIncGst),
@@ -140,7 +166,7 @@ export async function POST(request: NextRequest) {
 
     await saveAgreement(agreement);
     console.log(
-      `[Webhook] ✅ Saved — Job ${jobIdStr} $${totalIncGst.toLocaleString()}`,
+      `[Webhook] ✅ Saved — Job ${jobIdStr} $${totalIncGst.toLocaleString()} | Address: "${siteAddressFinal}"`,
     );
 
     return NextResponse.json({
@@ -148,6 +174,7 @@ export async function POST(request: NextRequest) {
       created: true,
       jobId: jobIdStr,
       totalIncGst,
+      siteAddress: siteAddressFinal,
       schedulePayments: agreement.paymentSchedule.length,
     });
   } catch (error) {
