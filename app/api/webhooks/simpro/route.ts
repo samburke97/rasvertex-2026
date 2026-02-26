@@ -1,7 +1,5 @@
 // app/api/webhooks/simpro/route.ts
-// SimPRO: System Setup → API → Webhook Subscriptions
-// Callback URL: https://rasvertex-2026-lt5c.vercel.app/api/webhooks/simpro
-// Events: Projects → Job → Created ON, Updated ON
+// SimPRO sends a lightweight reference payload — we then fetch full job details.
 
 import { NextRequest, NextResponse } from "next/server";
 import { buildPaymentSchedule } from "@/lib/reports/works-agreement/types";
@@ -11,109 +9,126 @@ import {
 } from "@/lib/reports/works-agreement/store";
 
 const THRESHOLD = 20000;
+const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
+const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
+
+// ── Fetch full job details from SimPRO API ────────────────────────────────
+async function fetchJob(companyId: number, jobId: number) {
+  const res = await fetch(
+    `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${jobId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) throw new Error(`SimPRO job fetch failed: ${res.status}`);
+  return res.json();
+}
+
+// ── Fetch site address ────────────────────────────────────────────────────
+async function fetchSiteAddress(
+  companyId: number,
+  siteId: number,
+): Promise<string> {
+  try {
+    const res = await fetch(
+      `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/sites/${siteId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) return "";
+    const site = await res.json();
+    return [site.Address, site.City, site.State, site.PostCode]
+      .filter(Boolean)
+      .join(", ");
+  } catch {
+    return "";
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    // ── Log everything raw first ──────────────────────────────────────────
-    const rawBody = await request.text();
-    console.log("[Webhook] RAW BODY:", rawBody);
+    const body = await request.json();
+    console.log("[Webhook] Received:", JSON.stringify(body));
 
-    const headers: Record<string, string> = {};
-    request.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
-    console.log("[Webhook] ALL HEADERS:", JSON.stringify(headers));
+    // ── SimPRO payload shape ──────────────────────────────────────────────
+    // { ID: "job.updated", name: "Job", action: "updated",
+    //   reference: { companyID: 0, jobID: 10862 }, date_triggered: "..." }
 
-    // ── Parse ─────────────────────────────────────────────────────────────
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const body: any = JSON.parse(rawBody);
-    console.log("[Webhook] TOP-LEVEL KEYS:", Object.keys(body));
-
-    // ── Figure out event name (SimPRO may use different field names) ──────
-    const eventRaw: string =
-      body.event ?? body.Event ?? body.eventType ?? body.EventType ?? "";
-    const eventLower = eventRaw.toLowerCase();
-
-    console.log("[Webhook] Event:", eventRaw);
+    const action: string = body.action ?? "";
+    const name: string = body.name ?? "";
+    const reference = body.reference ?? {};
+    const jobId: number = reference.jobID;
+    const companyId: number = reference.companyID ?? 0;
 
     const isJobEvent =
-      eventLower.includes("job") &&
-      (eventLower.includes("created") || eventLower.includes("updated"));
+      name.toLowerCase() === "job" &&
+      (action === "created" || action === "updated");
 
-    if (!isJobEvent) {
-      console.log(
-        "[Webhook] Skipped — not a job event. Full body:",
-        JSON.stringify(body, null, 2),
-      );
-      return NextResponse.json({
-        received: true,
-        skipped: "not a job event",
-        event: eventRaw,
-      });
+    if (!isJobEvent || !jobId) {
+      console.log(`[Webhook] Skipped — name: ${name}, action: ${action}`);
+      return NextResponse.json({ received: true, skipped: "not a job event" });
     }
 
-    // ── Extract job data (SimPRO may nest differently) ────────────────────
-    const jobData =
-      body.data ?? body.Data ?? body.payload ?? body.Payload ?? body;
-    const jobId = String(
-      jobData.ID ?? jobData.Id ?? jobData.JobID ?? "unknown",
-    );
+    console.log(`[Webhook] Job ${jobId} — ${action}. Fetching full details...`);
 
-    console.log("[Webhook] Job data keys:", Object.keys(jobData));
-    console.log("[Webhook] Job ID:", jobId);
-    console.log("[Webhook] Full job data:", JSON.stringify(jobData, null, 2));
+    // ── Fetch full job from SimPRO ────────────────────────────────────────
+    const job = await fetchJob(companyId, jobId);
+    console.log("[Webhook] Job fetched:", JSON.stringify(job));
 
-    const totalIncGst =
-      jobData.Total?.IncTax ??
-      jobData.TotalIncTax ??
-      jobData.TotalInc ??
-      jobData.Total?.IncludingTax ??
-      0;
-
+    const totalIncGst: number = job.Total?.IncTax ?? 0;
     console.log(`[Webhook] Total Inc GST: $${totalIncGst}`);
 
     if (totalIncGst < THRESHOLD) {
+      console.log(`[Webhook] $${totalIncGst} below threshold — skipping`);
       return NextResponse.json({
         received: true,
         skipped: `$${totalIncGst} below $${THRESHOLD} threshold`,
       });
     }
 
-    const isUpdate = eventLower.includes("updated");
+    const jobIdStr = String(jobId);
 
-    if (!isUpdate) {
-      const existing = await getAgreement(jobId);
+    // Don't duplicate on create
+    if (action === "created") {
+      const existing = await getAgreement(jobIdStr);
       if (existing) {
-        console.log(`[Webhook] Already exists for job ${jobId}`);
+        console.log(`[Webhook] Agreement already exists for job ${jobIdStr}`);
         return NextResponse.json({ received: true, skipped: "already exists" });
       }
     }
 
-    const site = jobData.Site ?? jobData.site ?? null;
-    const siteAddress = site
-      ? [site.Address, site.City, site.State, site.PostCode]
-          .filter(Boolean)
-          .join(", ")
-      : "";
-
-    const customer = jobData.Customer ?? jobData.customer ?? null;
+    // ── Build agreement data ──────────────────────────────────────────────
+    const customer = job.Customer ?? null;
     const clientName =
       customer?.CompanyName?.trim() ||
       [customer?.GivenName, customer?.FamilyName].filter(Boolean).join(" ") ||
       "Client";
 
-    const date = new Date(jobData.DateIssued || Date.now()).toLocaleDateString(
+    const siteAddress = job.Site?.ID
+      ? await fetchSiteAddress(companyId, job.Site.ID)
+      : "";
+
+    const date = new Date(job.DateIssued || Date.now()).toLocaleDateString(
       "en-AU",
     );
 
     const agreement = {
-      jobId,
-      jobNo: jobData.No ? `#${jobData.No}` : `#${jobId}`,
-      jobName: jobData.Name?.trim() || `Job ${jobId}`,
+      jobId: jobIdStr,
+      jobNo: job.No ? `#${job.No}` : `#${jobId}`,
+      jobName: job.Name?.trim() || `Job ${jobId}`,
       clientName,
       siteAddress,
-      siteName: site?.Name?.trim() || clientName,
-      initialWorks: jobData.Name?.trim() || "",
+      siteName: job.Site?.Name?.trim() || clientName,
+      initialWorks: job.Name?.trim() || "",
       colourScheme: "To be advised",
       totalIncGst,
       paymentSchedule: buildPaymentSchedule(totalIncGst),
@@ -125,13 +140,13 @@ export async function POST(request: NextRequest) {
 
     await saveAgreement(agreement);
     console.log(
-      `[Webhook] Saved — Job ${jobId} $${totalIncGst.toLocaleString()}`,
+      `[Webhook] ✅ Saved — Job ${jobIdStr} $${totalIncGst.toLocaleString()}`,
     );
 
     return NextResponse.json({
       received: true,
       created: true,
-      jobId,
+      jobId: jobIdStr,
       totalIncGst,
       schedulePayments: agreement.paymentSchedule.length,
     });
