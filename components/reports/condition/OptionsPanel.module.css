@@ -1,0 +1,196 @@
+/* components/reports/condition/OptionsPanel.module.css */
+
+.panel {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--white, #fff);
+  border-right: 1px solid var(--out-light, #f0f0f0);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow-y: auto;
+  min-height: 0; /* cooperate with flex parent */
+}
+
+/* ── Job number input ────────────────────────────────────────────────────── */
+.jobGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.jobLabel {
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--for-light, #9ca3af);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--out-light, #f0f0f0);
+}
+
+.jobInputRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.jobInput {
+  flex: 1;
+  height: 34px;
+  padding: 0 0.625rem;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--for-darkest, #111827);
+  background: var(--white, #fff);
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+
+.jobInput::placeholder {
+  color: var(--for-light, #9ca3af);
+}
+
+.jobInput:focus {
+  border-color: var(--primary-400, #74db89);
+}
+
+.jobInput:disabled {
+  background: var(--con-light, #fafafa);
+  color: var(--for-light, #9ca3af);
+}
+
+.jobBtn {
+  height: 34px;
+  padding: 0 0.75rem;
+  background: var(--grey-700, #374151);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+  flex-shrink: 0;
+}
+
+.jobBtn:hover:not(:disabled) {
+  background: var(--grey-600, #4b5563);
+}
+
+.jobBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Progress bar */
+.progressWrap {
+  height: 3px;
+  background: var(--out-light, #f0f0f0);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: var(--primary-400, #74db89);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.progressLabel {
+  font-size: 0.7rem;
+  color: var(--for-light, #9ca3af);
+  margin-top: 2px;
+}
+
+.jobError {
+  font-size: 0.72rem;
+  color: var(--red-wine-300, #900c40);
+}
+
+/* ── Section divider ─────────────────────────────────────────────────────── */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.groupLabel {
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--for-light, #9ca3af);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--out-light, #f0f0f0);
+}
+
+/* ── Toggle row ──────────────────────────────────────────────────────────── */
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.125rem 0;
+}
+
+.toggleLabel {
+  font-size: 0.8rem;
+  color: var(--for-darkest, #111827);
+  line-height: 1.4;
+}
+
+.toggleSub {
+  font-size: 0.7rem;
+  color: var(--for-light, #9ca3af);
+  margin-top: 1px;
+}
+
+/* ── Toggle switch ───────────────────────────────────────────────────────── */
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.toggleInput {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggleTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--out-medium, #d9dbdb);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.toggleInput:checked + .toggleTrack {
+  background: var(--primary-400, #74db89);
+}
+
+.toggleThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.18s;
+  pointer-events: none;
+}
+
+.toggleInput:checked ~ .toggleThumb {
+  transform: translateX(16px);
+}

@@ -159,7 +159,63 @@
   flex-shrink: 0;
 }
 
-/* ── Field label hint (shown above field on hover) ───────────────────────── */
+/* ── Rich text toolbar specifics ─────────────────────────────────────────── */
+.toolbarBtnBold {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+
+.toolbarBtnItalic {
+  font-style: italic;
+  font-size: 14px;
+}
+
+/* Active state for format toggles */
+.toolbarBtnActive {
+  background: rgba(116, 219, 137, 0.2) !important;
+  color: var(--primary-300, #7ceb92) !important;
+}
+
+/* Size picker dropdown */
+.sizeMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--grey-800, #1f2937);
+  border-radius: 6px;
+  overflow: hidden;
+  min-width: 80px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 110;
+}
+
+.sizeOption {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+
+.sizeOption:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.sizeOptionActive {
+  color: var(--primary-300, #7ceb92);
+}
+
+/* ── Field label hint ────────────────────────────────────────────────────── */
 .fieldLabel {
   position: absolute;
   top: calc(100% + 4px);

@@ -1,12 +1,12 @@
-// components/reports/condition/ConditionReportPage.tsx
 "use client";
+// components/reports/condition/ConditionReportPage.tsx
 
 import React, { useState, useCallback } from "react";
 import styles from "./ConditionReportPage.module.css";
-import ImportStep from "./steps/ImportStep";
 import CoverSection from "./sections/CoverSection";
 import PhotoSection from "./sections/PhotoSection";
 import SummarySection from "./sections/SummarySection";
+import OptionsPanel from "./OptionsPanel";
 import Button from "@/components/ui/Button";
 import { inferTemplatesFromPhotos } from "@/lib/reports/condition.templates";
 import { buildPrintHTML } from "@/lib/reports/condition.print";
@@ -16,6 +16,7 @@ import {
   type ImportStatus,
   type ReportJobDetails,
   type ReportPhoto,
+  type ReportSettings,
 } from "@/lib/reports/condition.types";
 import type { EnrichedJob } from "@/lib/simpro/types";
 
@@ -23,7 +24,9 @@ interface ConditionReportPageProps {
   onBack: () => void;
 }
 
-type View = "import" | "editor";
+const DEFAULT_SETTINGS: ReportSettings = {
+  showDates: false,
+};
 
 const DEFAULT_REPORT: ConditionReportData = {
   job: {
@@ -39,12 +42,12 @@ const DEFAULT_REPORT: ConditionReportData = {
     "A general inspection of the building was carried out. Maintenance requirements were identified and are documented within this report.",
   recommendations:
     "Carry out all identified repair works prior to application of the specified coating system. Re-inspect on completion.",
+  settings: DEFAULT_SETTINGS,
 };
 
 export default function ConditionReportPage({
   onBack,
 }: ConditionReportPageProps) {
-  const [view, setView] = useState<View>("import");
   const [report, setReport] = useState<ConditionReportData>(DEFAULT_REPORT);
   const [importStatus, setImportStatus] = useState<ImportStatus>({
     phase: "idle",
@@ -103,6 +106,7 @@ export default function ConditionReportPage({
               name: payload.name as string,
               url: payload.url as string,
               size: payload.size as number,
+              dateAdded: (payload.dateAdded as string | null) ?? null,
             };
             incoming.push(photo);
             setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] }));
@@ -137,37 +141,38 @@ export default function ConditionReportPage({
     }
   }, []);
 
-  // ── Job details fetch — now uses EnrichedJob from the API ─────────────────
+  // ── Job details fetch ─────────────────────────────────────────────────────
   const fetchJobDetails = useCallback(async (jobId: string) => {
     try {
       const res = await fetch(`/api/simpro/jobs/${jobId}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const enrichedJob: EnrichedJob = await res.json();
-      const jobDetails = mapJobToReportDetails(enrichedJob);
-      setReport((prev) => ({ ...prev, job: jobDetails }));
+      setReport((prev) => ({
+        ...prev,
+        job: mapJobToReportDetails(enrichedJob),
+      }));
     } catch (err) {
       console.warn("[ConditionReport] Job details fetch failed:", err);
-      // Non-fatal — all fields are click-to-edit
     }
   }, []);
 
-  // ── Import: switch to editor immediately, then load in background ─────────
+  // ── Import ────────────────────────────────────────────────────────────────
   const handleImport = useCallback(
     (jobNumber: string) => {
       setReport((prev) => ({ ...prev, photos: [] }));
       setImportStatus({ phase: "fetching-job" });
-      setView("editor");
-
-      // Fire both in parallel — job details is fast, photos take time
       fetchJobDetails(jobNumber);
       fetchPhotos(jobNumber);
     },
     [fetchJobDetails, fetchPhotos],
   );
 
-  // ── Report mutations ──────────────────────────────────────────────────────
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const updateJobField = (field: keyof ReportJobDetails, value: string) =>
     setReport((prev) => ({ ...prev, job: { ...prev.job, [field]: value } }));
+
+  const updateSettings = (settings: ReportSettings) =>
+    setReport((prev) => ({ ...prev, settings }));
 
   const addPhotos = (photos: ReportPhoto[]) =>
     setReport((prev) => ({ ...prev, photos: [...prev.photos, ...photos] }));
@@ -184,8 +189,8 @@ export default function ConditionReportPage({
       photos: prev.photos.map((p) => (p.id === id ? { ...p, name } : p)),
     }));
 
-  // ── Print ─────────────────────────────────────────────────────────────────
-  const handlePrint = () => {
+  // ── Export ────────────────────────────────────────────────────────────────
+  const handleExport = () => {
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(buildPrintHTML(report));
@@ -195,76 +200,63 @@ export default function ConditionReportPage({
 
   return (
     <div className={styles.page}>
+      {/* Top bar */}
       <div className={styles.topBar}>
-        <button
-          className={styles.backBtn}
-          onClick={view === "editor" ? () => setView("import") : onBack}
-        >
-          ← {view === "editor" ? "Back to import" : "Report types"}
+        <button className={styles.backBtn} onClick={onBack}>
+          ← Report types
         </button>
-        {view === "editor" && (
-          <div className={styles.topBarRight}>
-            <span className={styles.photoCount}>
-              {report.photos.length} photo
-              {report.photos.length !== 1 ? "s" : ""}
-            </span>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handlePrint}
-              disabled={report.photos.length === 0}
-            >
-              Export PDF
-            </Button>
-          </div>
-        )}
+        <div className={styles.topBarRight}>
+          <span className={styles.topBarTitle}>Condition Report</span>
+          <span className={styles.photoCount}>
+            {report.photos.length} photo{report.photos.length !== 1 ? "s" : ""}
+          </span>
+          <Button variant="secondary" size="sm" onClick={handleExport}>
+            Export PDF
+          </Button>
+        </div>
       </div>
 
-      <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Condition Report</h1>
-        {view === "editor" && (
-          <p className={styles.pageHint}>Click any field to edit</p>
-        )}
-      </div>
-
-      {view === "import" ? (
-        <ImportStep
+      {/* Body: options panel + PDF canvas */}
+      <div className={styles.editorBody}>
+        <OptionsPanel
+          settings={report.settings}
+          importStatus={importStatus}
+          onSettings={updateSettings}
           onImport={handleImport}
-          onSkip={() => setView("editor")}
-          status={importStatus}
         />
-      ) : (
-        <div className={styles.sections}>
-          <section>
-            <div className={styles.sectionLabel}>Cover Page</div>
-            <CoverSection job={report.job} onChange={updateJobField} />
-          </section>
 
-          <section>
+        <div className={styles.canvas}>
+          <div className={styles.pageLabel}>Cover Page</div>
+          <CoverSection job={report.job} onChange={updateJobField} />
+
+          <div className={styles.pageLabel}>
+            Photos · {report.photos.length} image
+            {report.photos.length !== 1 ? "s" : ""}
+          </div>
+          <div className={styles.photoPage}>
             <PhotoSection
               photos={report.photos}
               importStatus={importStatus}
+              showDates={report.settings.showDates}
               onPhotosAdded={addPhotos}
               onPhotoRemove={removePhoto}
               onPhotoRename={renamePhoto}
             />
-          </section>
+          </div>
 
-          <section>
-            <div className={styles.sectionLabel}>Summary Page</div>
-            <SummarySection
-              comments={report.comments}
-              recommendations={report.recommendations}
-              onCommentsChange={(v) =>
-                setReport((prev) => ({ ...prev, comments: v }))
-              }
-              onRecommendationsChange={(v) =>
-                setReport((prev) => ({ ...prev, recommendations: v }))
-              }
-            />
-          </section>
+          <div className={styles.pageLabel}>Summary Page</div>
+          <SummarySection
+            comments={report.comments}
+            recommendations={report.recommendations}
+            onCommentsChange={(v) =>
+              setReport((prev) => ({ ...prev, comments: v }))
+            }
+            onRecommendationsChange={(v) =>
+              setReport((prev) => ({ ...prev, recommendations: v }))
+            }
+          />
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -1,9 +1,4 @@
 // lib/reports/condition.types.ts
-// ─────────────────────────────────────────────────────────────────────────────
-// Condition report-specific types and field mapping.
-// Job data arrives as EnrichedJob (from lib/simpro/client) — no raw SimPRO
-// parsing happens here anymore.
-// ─────────────────────────────────────────────────────────────────────────────
 
 import type { EnrichedJob } from "@/lib/simpro/types";
 
@@ -12,15 +7,21 @@ export interface ReportPhoto {
   name: string;
   url: string;
   size: number;
+  dateAdded?: string | null; // ISO string from SimPRO DateAdded
 }
 
 export interface ReportJobDetails {
   preparedFor: string;
   preparedBy: string;
   address: string;
-  reportType: string; // e.g. "Building Condition Report"
-  project: string; // Job Name e.g. "Baywatch Repaint"
+  reportType: string;
+  project: string;
   date: string;
+}
+
+/** Per-report toggle settings — shown in the options panel */
+export interface ReportSettings {
+  showDates: boolean;
 }
 
 export interface ConditionReportData {
@@ -28,6 +29,7 @@ export interface ConditionReportData {
   photos: ReportPhoto[];
   comments: string;
   recommendations: string;
+  settings: ReportSettings;
 }
 
 export type ImportStatus =
@@ -39,16 +41,6 @@ export type ImportStatus =
 
 // ── Field mapping ─────────────────────────────────────────────────────────────
 
-/**
- * Maps an EnrichedJob to the fields shown on the condition report cover page.
- *
- *   preparedFor  → job.preparedFor (SiteContact → CustomerContact → clientName)
- *   address      → job.siteAddress (fully resolved, never [object Object])
- *   project      → job.name
- *   date         → job.date
- *   preparedBy   → "Phil Clark" (always editable)
- *   reportType   → "Building Condition Report" (always editable)
- */
 export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
   return {
     preparedFor: job.preparedFor,
@@ -60,5 +52,4 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
   };
 }
 
-// Re-export EnrichedJob so existing imports from condition.types still work
 export type { EnrichedJob as SimproJobResponse };

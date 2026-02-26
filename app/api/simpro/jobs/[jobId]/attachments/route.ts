@@ -1,3 +1,8 @@
+// app/api/simpro/jobs/[jobId]/attachments/route.ts
+// Changes from original:
+//   - photo event now includes dateAdded (ISO string from SimPRO's DateAdded field)
+//   - everything else unchanged
+
 import { NextRequest, NextResponse } from "next/server";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
@@ -63,8 +68,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error:
-          "SimPRO configuration missing. Check NEXT_PUBLIC_SIMPRO_BASE_URL and SIMPRO_ACCESS_TOKEN.",
+        error: "SimPRO configuration missing.",
         code: "CONFIGURATION_MISSING",
       },
       { status: 500 },
@@ -165,6 +169,7 @@ export async function GET(
                   name: detail.Filename,
                   url: `data:${detail.MimeType};base64,${detail.Base64Data}`,
                   size: detail.FileSizeBytes ?? 0,
+                  dateAdded: detail.DateAdded ?? null, // ← new field
                   index: i,
                 });
                 loaded++;
@@ -182,7 +187,6 @@ export async function GET(
         }
 
         await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-
         send("done", { total: candidates.length, loaded, failed });
       } catch (err) {
         send("error", {
