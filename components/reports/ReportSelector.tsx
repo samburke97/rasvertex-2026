@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import ConditionReportPage from "./condition/ConditionReportPage";
+import WorksAgreementPage from "./works-agreement/WorksAgreementPage";
 import styles from "./ReportSelector.module.css";
 
 type ReportTypeId =
@@ -133,7 +134,7 @@ const REPORT_TYPES: ReportType[] = [
     label: "Works Agreement",
     description:
       "Formal works agreement outlining scope, terms, and sign-off for approved jobs.",
-    available: false,
+    available: true,
     category: "finance",
     icon: (
       <svg
@@ -359,6 +360,10 @@ export default function ReportSelector() {
 
   if (active === "condition") {
     return <ConditionReportPage onBack={() => setActive(null)} />;
+  }
+
+  if (active === "finance-summary") {
+    return <WorksAgreementPage onBack={() => setActive(null)} />;
   }
 
   return (
