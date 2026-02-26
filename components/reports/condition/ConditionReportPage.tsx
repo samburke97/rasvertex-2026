@@ -12,6 +12,7 @@ import { inferTemplatesFromPhotos } from "@/lib/reports/condition.templates";
 import { buildPrintHTML } from "@/lib/reports/condition.print";
 import {
   mapJobToReportDetails,
+  filterPhotosByDateRange,
   type ConditionReportData,
   type ImportStatus,
   type ReportJobDetails,
@@ -26,6 +27,9 @@ interface ConditionReportPageProps {
 
 const DEFAULT_SETTINGS: ReportSettings = {
   showDates: false,
+  filterByDate: false,
+  dateFrom: null,
+  dateTo: null,
 };
 
 const DEFAULT_REPORT: ConditionReportData = {
@@ -198,6 +202,17 @@ export default function ConditionReportPage({
     setTimeout(() => win.print(), 800);
   };
 
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const filteredPhotos = report.settings.filterByDate
+    ? filterPhotosByDateRange(
+        report.photos,
+        report.settings.dateFrom,
+        report.settings.dateTo,
+      )
+    : report.photos;
+
+  const isFiltered = filteredPhotos.length !== report.photos.length;
+
   return (
     <div className={styles.page}>
       {/* Top bar */}
@@ -216,10 +231,11 @@ export default function ConditionReportPage({
         </div>
       </div>
 
-      {/* Body: options panel + PDF canvas */}
+      {/* Body */}
       <div className={styles.editorBody}>
         <OptionsPanel
           settings={report.settings}
+          photos={report.photos}
           importStatus={importStatus}
           onSettings={updateSettings}
           onImport={handleImport}
@@ -230,19 +246,17 @@ export default function ConditionReportPage({
           <CoverSection job={report.job} onChange={updateJobField} />
 
           <div className={styles.pageLabel}>
-            Photos · {report.photos.length} image
-            {report.photos.length !== 1 ? "s" : ""}
+            Photos · {filteredPhotos.length} image
+            {filteredPhotos.length !== 1 ? "s" : ""}
           </div>
-          <div className={styles.photoPage}>
-            <PhotoSection
-              photos={report.photos}
-              importStatus={importStatus}
-              showDates={report.settings.showDates}
-              onPhotosAdded={addPhotos}
-              onPhotoRemove={removePhoto}
-              onPhotoRename={renamePhoto}
-            />
-          </div>
+          <PhotoSection
+            photos={filteredPhotos}
+            importStatus={importStatus}
+            showDates={report.settings.showDates}
+            onPhotosAdded={addPhotos}
+            onPhotoRemove={removePhoto}
+            onPhotoRename={renamePhoto}
+          />
 
           <div className={styles.pageLabel}>Summary Page</div>
           <SummarySection

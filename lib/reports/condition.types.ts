@@ -7,7 +7,7 @@ export interface ReportPhoto {
   name: string;
   url: string;
   size: number;
-  dateAdded?: string | null; // ISO string from SimPRO DateAdded
+  dateAdded?: string | null;
 }
 
 export interface ReportJobDetails {
@@ -19,9 +19,11 @@ export interface ReportJobDetails {
   date: string;
 }
 
-/** Per-report toggle settings — shown in the options panel */
 export interface ReportSettings {
   showDates: boolean;
+  filterByDate: boolean;
+  dateFrom: string | null; // "YYYY-MM-DD"
+  dateTo: string | null; // "YYYY-MM-DD"
 }
 
 export interface ConditionReportData {
@@ -39,7 +41,7 @@ export type ImportStatus =
   | { phase: "done" }
   | { phase: "error"; message: string };
 
-// ── Field mapping ─────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
   return {
@@ -50,6 +52,21 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
     project: job.name,
     date: job.date,
   };
+}
+
+export function filterPhotosByDateRange(
+  photos: ReportPhoto[],
+  dateFrom: string | null,
+  dateTo: string | null,
+): ReportPhoto[] {
+  if (!dateFrom && !dateTo) return photos;
+  return photos.filter((p) => {
+    if (!p.dateAdded) return true;
+    const day = p.dateAdded.slice(0, 10);
+    if (dateFrom && day < dateFrom) return false;
+    if (dateTo && day > dateTo) return false;
+    return true;
+  });
 }
 
 export type { EnrichedJob as SimproJobResponse };
