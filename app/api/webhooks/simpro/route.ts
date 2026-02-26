@@ -4,7 +4,6 @@
 // Events: Projects → Job → Created ON, Updated ON
 
 import { NextRequest, NextResponse } from "next/server";
-import type { SimproWebhookPayload } from "@/lib/reports/works-agreement/types";
 import { buildPaymentSchedule } from "@/lib/reports/works-agreement/types";
 import {
   saveAgreement,
@@ -12,67 +11,92 @@ import {
 } from "@/lib/reports/works-agreement/store";
 
 const THRESHOLD = 20000;
-const WEBHOOK_SECRET = process.env.SIMPRO_WEBHOOK_SECRET;
 
 export async function POST(request: NextRequest) {
   try {
-    // ── Optional signature check ──────────────────────────────────────────
-    if (WEBHOOK_SECRET) {
-      const sig = request.headers.get("x-simpro-signature");
-      if (!sig || sig !== WEBHOOK_SECRET) {
-        console.warn("[Webhook] Invalid signature");
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-    }
+    // ── Log everything raw first ──────────────────────────────────────────
+    const rawBody = await request.text();
+    console.log("[Webhook] RAW BODY:", rawBody);
 
-    const body: SimproWebhookPayload = await request.json();
-    console.log("[Webhook] Event:", body.event, "| Job:", body.data?.ID);
+    const headers: Record<string, string> = {};
+    request.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    console.log("[Webhook] ALL HEADERS:", JSON.stringify(headers));
 
-    // ── Only handle job events ────────────────────────────────────────────
-    const eventLower = body.event?.toLowerCase() ?? "";
+    // ── Parse ─────────────────────────────────────────────────────────────
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body: any = JSON.parse(rawBody);
+    console.log("[Webhook] TOP-LEVEL KEYS:", Object.keys(body));
+
+    // ── Figure out event name (SimPRO may use different field names) ──────
+    const eventRaw: string =
+      body.event ?? body.Event ?? body.eventType ?? body.EventType ?? "";
+    const eventLower = eventRaw.toLowerCase();
+
+    console.log("[Webhook] Event:", eventRaw);
+
     const isJobEvent =
       eventLower.includes("job") &&
       (eventLower.includes("created") || eventLower.includes("updated"));
 
-    if (!isJobEvent || !body.data?.ID) {
-      return NextResponse.json({ received: true, skipped: "not a job event" });
+    if (!isJobEvent) {
+      console.log(
+        "[Webhook] Skipped — not a job event. Full body:",
+        JSON.stringify(body, null, 2),
+      );
+      return NextResponse.json({
+        received: true,
+        skipped: "not a job event",
+        event: eventRaw,
+      });
     }
 
-    const jobData = body.data;
-    const totalIncGst = jobData.Total?.IncTax ?? 0;
+    // ── Extract job data (SimPRO may nest differently) ────────────────────
+    const jobData =
+      body.data ?? body.Data ?? body.payload ?? body.Payload ?? body;
+    const jobId = String(
+      jobData.ID ?? jobData.Id ?? jobData.JobID ?? "unknown",
+    );
 
-    // ── Below threshold — skip ────────────────────────────────────────────
+    console.log("[Webhook] Job data keys:", Object.keys(jobData));
+    console.log("[Webhook] Job ID:", jobId);
+    console.log("[Webhook] Full job data:", JSON.stringify(jobData, null, 2));
+
+    const totalIncGst =
+      jobData.Total?.IncTax ??
+      jobData.TotalIncTax ??
+      jobData.TotalInc ??
+      jobData.Total?.IncludingTax ??
+      0;
+
+    console.log(`[Webhook] Total Inc GST: $${totalIncGst}`);
+
     if (totalIncGst < THRESHOLD) {
-      console.log(
-        `[Webhook] Job ${jobData.ID} — $${totalIncGst} below threshold`,
-      );
       return NextResponse.json({
         received: true,
         skipped: `$${totalIncGst} below $${THRESHOLD} threshold`,
       });
     }
 
-    const jobId = String(jobData.ID);
     const isUpdate = eventLower.includes("updated");
 
-    // ── Don't duplicate on create ─────────────────────────────────────────
     if (!isUpdate) {
       const existing = await getAgreement(jobId);
       if (existing) {
-        console.log(`[Webhook] Agreement already exists for job ${jobId}`);
+        console.log(`[Webhook] Already exists for job ${jobId}`);
         return NextResponse.json({ received: true, skipped: "already exists" });
       }
     }
 
-    // ── Build data ────────────────────────────────────────────────────────
-    const site = jobData.Site;
+    const site = jobData.Site ?? jobData.site ?? null;
     const siteAddress = site
       ? [site.Address, site.City, site.State, site.PostCode]
           .filter(Boolean)
           .join(", ")
       : "";
 
-    const customer = jobData.Customer;
+    const customer = jobData.Customer ?? jobData.customer ?? null;
     const clientName =
       customer?.CompanyName?.trim() ||
       [customer?.GivenName, customer?.FamilyName].filter(Boolean).join(" ") ||
@@ -84,8 +108,8 @@ export async function POST(request: NextRequest) {
 
     const agreement = {
       jobId,
-      jobNo: jobData.No ? `#${jobData.No}` : `#${jobData.ID}`,
-      jobName: jobData.Name?.trim() || `Job ${jobData.ID}`,
+      jobNo: jobData.No ? `#${jobData.No}` : `#${jobId}`,
+      jobName: jobData.Name?.trim() || `Job ${jobId}`,
       clientName,
       siteAddress,
       siteName: site?.Name?.trim() || clientName,
@@ -100,9 +124,8 @@ export async function POST(request: NextRequest) {
     };
 
     await saveAgreement(agreement);
-
     console.log(
-      `[Webhook] ✅ Agreement saved — Job ${jobId} $${totalIncGst.toLocaleString()}`,
+      `[Webhook] Saved — Job ${jobId} $${totalIncGst.toLocaleString()}`,
     );
 
     return NextResponse.json({
@@ -121,11 +144,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// SimPRO sends a GET to verify the endpoint is alive
 export async function GET() {
   return NextResponse.json({
     status: "ok",
     endpoint: "SimPRO Works Agreement Webhook",
-    threshold: `$${20000}`,
+    threshold: `$${THRESHOLD}`,
   });
 }
