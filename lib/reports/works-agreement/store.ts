@@ -1,47 +1,71 @@
 // lib/reports/works-agreement/store.ts
-// In production, replace this with a real database (Postgres/Prisma).
-// For now, a module-level Map persists across Next.js hot reloads in dev
-// and across requests within the same server process.
+// Neon Postgres via @neondatabase/serverless
+// Run the migration SQL once to create the table (see bottom of file).
 
+import { neon } from "@neondatabase/serverless";
 import type { WorksAgreementData } from "./types";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __worksAgreementStore: Map<string, WorksAgreementData> | undefined;
+function sql() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set");
+  return neon(url);
 }
 
-function getStore(): Map<string, WorksAgreementData> {
-  if (!global.__worksAgreementStore) {
-    global.__worksAgreementStore = new Map();
-  }
-  return global.__worksAgreementStore;
+// ── Migration — run this ONCE in Neon SQL Editor ──────────────────────────
+// CREATE TABLE IF NOT EXISTS works_agreements (
+//   job_id        TEXT PRIMARY KEY,
+//   data          JSONB NOT NULL,
+//   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+// );
+
+export async function saveAgreement(
+  agreement: WorksAgreementData,
+): Promise<void> {
+  const db = sql();
+  await db`
+    INSERT INTO works_agreements (job_id, data, created_at)
+    VALUES (${agreement.jobId}, ${JSON.stringify(agreement)}, ${agreement.createdAt})
+    ON CONFLICT (job_id) DO UPDATE SET data = EXCLUDED.data
+  `;
 }
 
-export function saveAgreement(agreement: WorksAgreementData): void {
-  getStore().set(agreement.jobId, agreement);
+export async function getAgreement(
+  jobId: string,
+): Promise<WorksAgreementData | null> {
+  const db = sql();
+  const rows = await db`
+    SELECT data FROM works_agreements WHERE job_id = ${jobId}
+  `;
+  if (!rows.length) return null;
+  return rows[0].data as WorksAgreementData;
 }
 
-export function getAgreement(jobId: string): WorksAgreementData | undefined {
-  return getStore().get(jobId);
+export async function getAllAgreements(): Promise<WorksAgreementData[]> {
+  const db = sql();
+  const rows = await db`
+    SELECT data FROM works_agreements ORDER BY created_at DESC
+  `;
+  return rows.map((r) => r.data as WorksAgreementData);
 }
 
-export function getAllAgreements(): WorksAgreementData[] {
-  return Array.from(getStore().values()).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
-}
-
-export function updateAgreement(
+export async function updateAgreement(
   jobId: string,
   updates: Partial<WorksAgreementData>,
-): WorksAgreementData | null {
-  const existing = getStore().get(jobId);
+): Promise<WorksAgreementData | null> {
+  const existing = await getAgreement(jobId);
   if (!existing) return null;
   const updated = { ...existing, ...updates };
-  getStore().set(jobId, updated);
+  const db = sql();
+  await db`
+    UPDATE works_agreements SET data = ${JSON.stringify(updated)} WHERE job_id = ${jobId}
+  `;
   return updated;
 }
 
-export function deleteAgreement(jobId: string): boolean {
-  return getStore().delete(jobId);
+export async function deleteAgreement(jobId: string): Promise<boolean> {
+  const db = sql();
+  const result = await db`
+    DELETE FROM works_agreements WHERE job_id = ${jobId} RETURNING job_id
+  `;
+  return result.length > 0;
 }

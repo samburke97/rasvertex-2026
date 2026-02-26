@@ -8,17 +8,22 @@ import {
 } from "@/lib/reports/works-agreement/store";
 import { buildPaymentSchedule } from "@/lib/reports/works-agreement/types";
 
-// ── GET: list all works agreements ────────────────────────────────────────
 export async function GET() {
-  const agreements = getAllAgreements();
-  return NextResponse.json({ agreements });
+  try {
+    const agreements = await getAllAgreements();
+    return NextResponse.json({ agreements });
+  } catch (error) {
+    console.error("[Works Agreements] GET error:", error);
+    return NextResponse.json(
+      { error: "Failed to load agreements" },
+      { status: 500 },
+    );
+  }
 }
 
-// ── POST: manually create a works agreement ───────────────────────────────
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-
     const {
       jobId,
       jobNo,
@@ -39,11 +44,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Prevent duplicate manual creation
-    const existing = getAgreement(String(jobId));
+    const existing = await getAgreement(String(jobId));
     if (existing) {
       return NextResponse.json(
-        { error: "A works agreement already exists for this job", existing },
+        { error: "Agreement already exists for this job", existing },
         { status: 409 },
       );
     }
@@ -65,11 +69,10 @@ export async function POST(request: NextRequest) {
       triggeredBy: "manual" as const,
     };
 
-    saveAgreement(agreement);
-
+    await saveAgreement(agreement);
     return NextResponse.json({ success: true, agreement }, { status: 201 });
   } catch (error) {
-    console.error("[Works Agreement] Manual creation error:", error);
+    console.error("[Works Agreements] POST error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },
