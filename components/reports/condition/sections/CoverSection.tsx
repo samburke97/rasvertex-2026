@@ -1,4 +1,7 @@
 "use client";
+// components/reports/condition/sections/CoverSection.tsx
+// Renders as the actual PDF cover page — full A4 width, hero banner, meta table.
+// Every text field is inline-editable via the Grammarly-style EditableField.
 
 import React from "react";
 import styles from "./CoverSection.module.css";
@@ -21,45 +24,59 @@ const META_ROWS: { label: string; field: keyof ReportJobDetails }[] = [
 
 export default function CoverSection({ job, onChange }: CoverSectionProps) {
   return (
-    <div className={styles.card}>
+    <div className={styles.page}>
+      {/* ── Hero ── */}
       <div className={styles.hero}>
-        <div className={styles.heroLeft}>
-          <div className={styles.logoName}>RAS VERTEX</div>
-          <div className={styles.logoSub}>
+        <div className={styles.heroLogo}>
+          <div className={styles.heroLogoName}>RAS VERTEX</div>
+          <div className={styles.heroLogoSub}>
             Maintenance Solutions · Sunshine Coast
           </div>
         </div>
+
+        <div className={styles.heroWeb}>rasvertex.com.au</div>
+
         <div className={styles.heroCreds}>
-          <span>QBCC: 1307234</span>
-          <span>ABN: 53 167 652 637</span>
+          <div className={styles.heroCredsItem}>
+            QBCC: <span>1307234</span>
+          </div>
+          <div className={styles.heroCredsItem}>
+            ABN: <span>53 167 652 637</span>
+          </div>
         </div>
       </div>
 
+      {/* ── Body ── */}
       <div className={styles.body}>
-        {/* The cover title uses reportType as the headline */}
-        <h2 className={styles.title}>
+        {/* Report title — editable */}
+        <h1 className={styles.reportTitle}>
           <EditableField
             value={job.reportType}
             onChange={(v) => onChange("reportType", v)}
-            placeholder="Report type"
+            placeholder="Report Type"
+            label="Report Type"
           />
-        </h2>
+        </h1>
+
         <p className={styles.intro}>
           This report documents the condition of the building and identifies
           maintenance requirements, defects, and recommended remediation works.
         </p>
+
+        {/* Meta table */}
         <dl className={styles.meta}>
           {META_ROWS.map(({ label, field }) => (
-            <React.Fragment key={field}>
-              <dt>{label}</dt>
-              <dd>
+            <div key={field} className={styles.metaRow}>
+              <dt className={styles.metaLabel}>{label}</dt>
+              <dd className={styles.metaValue}>
                 <EditableField
                   value={job[field]}
                   onChange={(v) => onChange(field, v)}
-                  placeholder={label}
+                  placeholder={`Enter ${label.toLowerCase()}`}
+                  label={label}
                 />
               </dd>
-            </React.Fragment>
+            </div>
           ))}
         </dl>
       </div>

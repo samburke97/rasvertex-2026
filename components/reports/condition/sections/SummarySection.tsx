@@ -1,4 +1,5 @@
 "use client";
+// components/reports/condition/sections/SummarySection.tsx
 
 import React from "react";
 import styles from "./SummarySection.module.css";
@@ -18,9 +19,9 @@ export default function SummarySection({
   onRecommendationsChange,
 }: SummarySectionProps) {
   return (
-    <div className={styles.card}>
-      <div className={styles.heroBar}>
-        <span className={styles.heroTitle}>Summary</span>
+    <div className={styles.page}>
+      <div className={styles.hero}>
+        <div className={styles.heroTitle}>Summary</div>
       </div>
 
       <div className={styles.body}>
@@ -31,6 +32,7 @@ export default function SummarySection({
               value={comments}
               onChange={onCommentsChange}
               multiline
+              label="Comments"
               placeholder="Enter comments about the building condition…"
             />
           </div>
@@ -45,10 +47,21 @@ export default function SummarySection({
               value={recommendations}
               onChange={onRecommendationsChange}
               multiline
+              label="Recommendations"
               placeholder="Enter recommended works…"
             />
           </div>
         </div>
+      </div>
+
+      <div className={styles.footer}>
+        <span>
+          RAS-VERTEX Maintenance Solutions · QBCC 1307234 · ABN 53 167 652 637 ·
+          rasvertex.com.au
+        </span>
+        <span>
+          Smart Strata · Ebix · Trades Monitor · Pegasus · Haymes Paint
+        </span>
       </div>
     </div>
   );

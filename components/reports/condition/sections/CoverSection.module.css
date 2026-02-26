@@ -1,88 +1,142 @@
-.card {
-  background: var(--white, #fff);
-  border: 1px solid var(--out-light, #f5f5f5);
-  border-radius: 10px;
+/* components/reports/condition/sections/CoverSection.module.css */
+/* ─────────────────────────────────────────────────────────────────────────
+   Renders to look exactly like the printed PDF cover page.
+   A4 proportions: 794px wide, hero clips at the same angle as print.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Page shell ─────────────────────────────────────────────────────────── */
+.page {
+  width: 794px;
+  min-height: 1123px;
+  background: #fff;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.1),
+    0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
   overflow: hidden;
-}
-
-.hero {
-  background: linear-gradient(160deg, #0d1b3e 0%, #1a3a6e 60%, #0d2a4a 100%);
-  padding: 1.5rem 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.heroLeft {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  font-family: "Barlow", "Inter", Arial, sans-serif;
+  color: #1a1a2e;
+  position: relative;
 }
 
-.logoName {
-  color: white;
-  font-size: 1.1rem;
+/* ── Hero banner ─────────────────────────────────────────────────────────── */
+.hero {
+  background: linear-gradient(160deg, #0d1b3e 0%, #1a3a6e 60%, #0d2a4a 100%);
+  position: relative;
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 0 100%);
+  min-height: 420px;
+  flex-shrink: 0;
+}
+
+.heroLogo {
+  position: absolute;
+  top: 2.5rem;
+  left: 3rem;
+}
+
+.heroLogoName {
+  color: #fff;
+  font-size: 1.4rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
-}
-
-.logoSub {
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 0.55rem;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
-.heroCreds {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
+.heroLogoSub {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-top: 3px;
 }
 
-.heroCreds span {
-  color: rgba(255, 255, 255, 0.65);
+.heroWeb {
+  position: absolute;
+  top: 2.7rem;
+  right: 3rem;
+  color: rgba(255, 255, 255, 0.55);
   font-size: 0.72rem;
 }
 
-.body {
-  padding: 1.5rem 2rem;
+.heroCreds {
+  position: absolute;
+  bottom: 5rem;
+  right: 3rem;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.title {
-  font-size: 1.4rem;
+.heroCredsItem {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.heroCredsItem span {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+/* ── Content area ────────────────────────────────────────────────────────── */
+.body {
+  padding: 3rem 3rem 3rem;
+  flex: 1;
+}
+
+.reportTitle {
+  font-size: 2rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #0d1b3e;
-  margin-bottom: 0.5rem;
+  margin: 0 0 0.75rem;
+  line-height: 1.15;
 }
 
 .intro {
   font-size: 0.82rem;
   color: #666;
-  line-height: 1.65;
-  margin-bottom: 1.25rem;
-  max-width: 480px;
+  line-height: 1.75;
+  margin: 0 0 2rem;
+  max-width: 400px;
 }
 
+/* ── Meta table ──────────────────────────────────────────────────────────── */
 .meta {
   display: grid;
-  grid-template-columns: 120px 1fr;
-  gap: 0.3rem 0.75rem;
-  font-size: 0.82rem;
+  grid-template-columns: 130px 1fr;
+  gap: 0;
+  border-top: 1px solid #eee;
 }
 
-.meta dt {
+.metaRow {
+  display: contents;
+}
+
+.metaLabel {
+  font-size: 0.67rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: #0d1b3e;
-  font-size: 0.68rem;
-  padding-top: 3px;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
 }
 
-.meta dd {
+.metaValue {
+  font-size: 0.82rem;
   color: #333;
-  margin: 0;
+  padding: 0.7rem 0 0.7rem 1rem;
+  border-bottom: 1px solid #f0f0f0;
+  display: flex;
+  align-items: center;
+  min-height: 38px;
 }
