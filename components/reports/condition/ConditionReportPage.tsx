@@ -40,6 +40,7 @@ const DEFAULT_REPORT: ConditionReportData = {
     reportType: "Building Condition Report",
     project: "",
     date: new Date().toLocaleDateString("en-AU"),
+    coverPhoto: null,
   },
   photos: [],
   comments:
@@ -153,7 +154,11 @@ export default function ConditionReportPage({
       const enrichedJob: EnrichedJob = await res.json();
       setReport((prev) => ({
         ...prev,
-        job: mapJobToReportDetails(enrichedJob),
+        job: {
+          ...mapJobToReportDetails(enrichedJob),
+          // preserve any cover photo already set
+          coverPhoto: prev.job.coverPhoto,
+        },
       }));
     } catch (err) {
       console.warn("[ConditionReport] Job details fetch failed:", err);
@@ -177,6 +182,9 @@ export default function ConditionReportPage({
 
   const updateSettings = (settings: ReportSettings) =>
     setReport((prev) => ({ ...prev, settings }));
+
+  const updateCoverPhoto = (coverPhoto: string | null) =>
+    setReport((prev) => ({ ...prev, job: { ...prev.job, coverPhoto } }));
 
   const addPhotos = (photos: ReportPhoto[]) =>
     setReport((prev) => ({ ...prev, photos: [...prev.photos, ...photos] }));
@@ -236,9 +244,11 @@ export default function ConditionReportPage({
         <OptionsPanel
           settings={report.settings}
           photos={report.photos}
+          job={report.job}
           importStatus={importStatus}
           onSettings={updateSettings}
           onImport={handleImport}
+          onCoverPhoto={updateCoverPhoto}
         />
 
         <div className={styles.canvas}>

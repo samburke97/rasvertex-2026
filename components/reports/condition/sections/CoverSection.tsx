@@ -1,7 +1,5 @@
 "use client";
 // components/reports/condition/sections/CoverSection.tsx
-// Renders as the actual PDF cover page — full A4 width, hero banner, meta table.
-// Every text field is inline-editable via the Grammarly-style EditableField.
 
 import React from "react";
 import styles from "./CoverSection.module.css";
@@ -17,7 +15,6 @@ const META_ROWS: { label: string; field: keyof ReportJobDetails }[] = [
   { label: "Prepared For", field: "preparedFor" },
   { label: "Prepared By", field: "preparedBy" },
   { label: "Address", field: "address" },
-  { label: "Report Type", field: "reportType" },
   { label: "Project", field: "project" },
   { label: "Date", field: "date" },
 ];
@@ -25,42 +22,84 @@ const META_ROWS: { label: string; field: keyof ReportJobDetails }[] = [
 export default function CoverSection({ job, onChange }: CoverSectionProps) {
   return (
     <div className={styles.page}>
-      {/* ── Hero ── */}
+      {/* ── Hero ────────────────────────────────────────────────────────── */}
       <div className={styles.hero}>
+        {/* Layer 1 — solid navy base, always visible */}
+        <div className={styles.heroNavy} />
+
+        {/* Layer 2 — cover photo (only when provided) */}
+        {job.coverPhoto && (
+          <div
+            className={styles.heroCoverPhoto}
+            style={{ backgroundImage: `url(${job.coverPhoto})` }}
+          />
+        )}
+
+        {/* Layer 3 — dark blue tint overlay, always on top of photo */}
+        <div className={styles.heroOverlay} />
+
+        {/* Layer 4 — white chevron shape cut out at the bottom */}
+        {/*
+          The chevron is a white element using clip-path to create the
+          upward-pointing V shape. Three points:
+            - bottom-left corner  (0%, 100%)
+            - center peak         (~32% from left, ~62% height)
+            - bottom-right corner (100%, 100%)
+          This is positioned absolutely at the bottom of the hero.
+        */}
+        <div className={styles.heroChevron} />
+
+        {/* ── Content (all z-index above the layers) ── */}
+
+        {/* Top-left: RAS Vertex logo */}
         <div className={styles.heroLogo}>
-          <div className={styles.heroLogoName}>RAS VERTEX</div>
-          <div className={styles.heroLogoSub}>
-            Maintenance Solutions · Sunshine Coast
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/reports/ras-logo.png"
+            alt="RAS Vertex Maintenance Solutions"
+            className={styles.heroLogoImg}
+          />
         </div>
 
-        <div className={styles.heroWeb}>rasvertex.com.au</div>
+        {/* Top-right: website link image */}
+        <div className={styles.heroWeb}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/reports/link_white.png"
+            alt="rasvertex.com.au"
+            className={styles.heroWebImg}
+          />
+        </div>
 
+        {/* Bottom-right: QBCC / ABN in Bebas */}
         <div className={styles.heroCreds}>
           <div className={styles.heroCredsItem}>
-            QBCC: <span>1307234</span>
+            <span className={styles.heroCredsKey}>QBCC:</span>
+            <span className={styles.heroCredsVal}> 1307234</span>
           </div>
           <div className={styles.heroCredsItem}>
-            ABN: <span>53 167 652 637</span>
+            <span className={styles.heroCredsKey}>ABN:</span>
+            <span className={styles.heroCredsVal}> 53 167 652 637</span>
           </div>
         </div>
       </div>
 
-      {/* ── Body ── */}
+      {/* ── Body ────────────────────────────────────────────────────────── */}
       <div className={styles.body}>
-        {/* Report title — editable */}
+        {/* Editable title in Bebas */}
         <h1 className={styles.reportTitle}>
           <EditableField
             value={job.reportType}
             onChange={(v) => onChange("reportType", v)}
-            placeholder="Report Type"
-            label="Report Type"
+            placeholder="Report Title"
+            label="Report Title"
           />
         </h1>
 
         <p className={styles.intro}>
-          This report documents the condition of the building and identifies
-          maintenance requirements, defects, and recommended remediation works.
+          This report outlines the repairs and maintenance works completed,
+          including any updates, adjustments, and variations from the original
+          scope.
         </p>
 
         {/* Meta table */}
@@ -70,7 +109,7 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
               <dt className={styles.metaLabel}>{label}</dt>
               <dd className={styles.metaValue}>
                 <EditableField
-                  value={job[field]}
+                  value={job[field] as string}
                   onChange={(v) => onChange(field, v)}
                   placeholder={`Enter ${label.toLowerCase()}`}
                   label={label}

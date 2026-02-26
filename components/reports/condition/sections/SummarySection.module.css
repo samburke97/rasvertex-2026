@@ -1,5 +1,15 @@
 /* components/reports/condition/sections/SummarySection.module.css */
+/* Matches the reference design:
+   - White page, no hero box
+   - "SUMMARY" in Bebas Neue top-left, link_blue.png top-right
+   - Section labels in Bebas Neue with colon e.g. "COMMENTS:"
+   - Body text in Inter
+   - Footer: 6 partner logos in one centred row
+*/
 
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap");
+
+/* ── Page shell ──────────────────────────────────────────────────────────── */
 .page {
   width: 794px;
   min-height: 1123px;
@@ -11,69 +21,90 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  font-family: "Barlow", "Inter", Arial, sans-serif;
+  font-family: "Inter", Arial, sans-serif;
   color: #1a1a2e;
 }
 
-/* ── Hero banner ─────────────────────────────────────────────────────────── */
-.hero {
-  background: linear-gradient(160deg, #0d1b3e 0%, #1a3a6e 60%, #0d2a4a 100%);
-  padding: 2rem 3rem;
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+.topBar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 2.75rem 2.75rem 0;
   flex-shrink: 0;
 }
 
-.heroTitle {
-  color: #fff;
-  font-size: 1.6rem;
-  font-weight: 800;
+/* "SUMMARY" — Bebas Neue, large, navy */
+.title {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 3rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #0d1c45;
+  line-height: 1;
+  margin: 0;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+}
+
+/* Top-right website link image */
+.topBarLink {
+  height: 22px;
+  width: auto;
+  display: block;
+  margin-top: 0.5rem;
 }
 
 /* ── Body ────────────────────────────────────────────────────────────────── */
 .body {
-  padding: 2.5rem 3rem;
+  padding: 2.5rem 2.75rem 2rem;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 2.25rem;
 }
 
-.block {
+/* ── Section ─────────────────────────────────────────────────────────────── */
+.section {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.blockLabel {
-  font-size: 0.67rem;
-  font-weight: 700;
+/* "COMMENTS:" — Bebas Neue, navy, with colon */
+.sectionLabel {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: #0d1c45;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #0d1b3e;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid #0d1b3e;
+  line-height: 1;
 }
 
-.blockText {
+/* Body text — Inter */
+.sectionText {
+  font-family: "Inter", Arial, sans-serif;
   font-size: 0.85rem;
-  line-height: 1.8;
   color: #444;
+  line-height: 1.8;
 }
 
-.divider {
-  height: 1px;
-  background: #f0f0f0;
-}
-
-/* ── Footer ──────────────────────────────────────────────────────────────── */
+/* ── Footer: partner logos ───────────────────────────────────────────────── */
 .footer {
   margin-top: auto;
-  padding: 1.25rem 3rem;
+  padding: 1.5rem 2.75rem 2rem;
   border-top: 1px solid #eee;
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.65rem;
-  color: #aaa;
-  letter-spacing: 0.04em;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  align-items: center;
+  justify-items: center;
+  gap: 1rem;
+}
+
+.partnerLogo {
+  height: 36px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  display: block;
 }

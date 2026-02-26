@@ -17,6 +17,7 @@ export interface ReportJobDetails {
   reportType: string;
   project: string;
   date: string;
+  coverPhoto: string | null; // base64 data URL or null for plain navy
 }
 
 export interface ReportSettings {
@@ -51,6 +52,7 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
     reportType: "Building Condition Report",
     project: job.name,
     date: job.date,
+    coverPhoto: null,
   };
 }
 

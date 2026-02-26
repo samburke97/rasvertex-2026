@@ -1,11 +1,12 @@
 "use client";
 // components/reports/condition/OptionsPanel.tsx
 
-import React, { useId, useState, useMemo } from "react";
+import React, { useId, useRef, useState, useMemo } from "react";
 import styles from "./OptionsPanel.module.css";
 import Button from "@/components/ui/Button";
 import type {
   ImportStatus,
+  ReportJobDetails,
   ReportPhoto,
   ReportSettings,
 } from "@/lib/reports/condition.types";
@@ -13,9 +14,11 @@ import type {
 interface OptionsPanelProps {
   settings: ReportSettings;
   photos: ReportPhoto[];
+  job: ReportJobDetails;
   importStatus: ImportStatus;
   onSettings: (s: ReportSettings) => void;
   onImport: (jobNumber: string) => void;
+  onCoverPhoto: (dataUrl: string | null) => void;
 }
 
 // ── Toggle row ────────────────────────────────────────────────────────────────
@@ -109,11 +112,14 @@ function detectPreset(
 export default function OptionsPanel({
   settings,
   photos,
+  job,
   importStatus,
   onSettings,
   onImport,
+  onCoverPhoto,
 }: OptionsPanelProps) {
   const [jobNumber, setJobNumber] = useState("");
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const isLoading =
     importStatus.phase === "fetching-job" ||
@@ -134,7 +140,6 @@ export default function OptionsPanel({
 
   const activePreset = detectPreset(settings.dateFrom, settings.dateTo);
 
-  // Live count of photos passing the current filter
   const filteredCount = useMemo(() => {
     if (!settings.filterByDate || (!settings.dateFrom && !settings.dateTo))
       return photos.length;
@@ -149,6 +154,20 @@ export default function OptionsPanel({
 
   const isActivelyFiltered =
     settings.filterByDate && (!!settings.dateFrom || !!settings.dateTo);
+
+  // ── Cover photo handler ─────────────────────────────────────────────────
+  const handleCoverPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result;
+      if (typeof result === "string") onCoverPhoto(result);
+    };
+    reader.readAsDataURL(file);
+    // Reset so the same file can be re-selected
+    e.target.value = "";
+  };
 
   return (
     <aside className={styles.panel}>
@@ -196,94 +215,119 @@ export default function OptionsPanel({
         )}
       </div>
 
+      {/* ── Cover Photo ──────────────────────────────────────────────────── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabel}>Cover Photo</div>
+
+        {job.coverPhoto ? (
+          /* Thumbnail + remove button when a photo is set */
+          <div className={styles.coverPhotoPreview}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={job.coverPhoto}
+              alt="Cover photo preview"
+              className={styles.coverPhotoThumb}
+            />
+            <div className={styles.coverPhotoActions}>
+              <button
+                className={styles.coverPhotoChange}
+                onClick={() => coverInputRef.current?.click()}
+              >
+                Change
+              </button>
+              <button
+                className={styles.coverPhotoRemove}
+                onClick={() => onCoverPhoto(null)}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Upload prompt when no photo set */
+          <button
+            className={styles.coverPhotoUpload}
+            onClick={() => coverInputRef.current?.click()}
+          >
+            <span className={styles.coverPhotoUploadIcon}>↑</span>
+            <span className={styles.coverPhotoUploadText}>Upload photo</span>
+            <span className={styles.coverPhotoUploadSub}>
+              JPG, PNG — shown behind cover design
+            </span>
+          </button>
+        )}
+
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className={styles.hiddenInput}
+          onChange={handleCoverPhotoChange}
+        />
+      </div>
+
       {/* ── Photos ───────────────────────────────────────────────────────── */}
       <div className={styles.group}>
         <div className={styles.groupLabel}>Photos</div>
 
-        {/* Show dates */}
         <ToggleRow
           label="Show dates"
-          sub={hasPhotos ? "Group photos by upload date" : "Load a job first"}
+          sub={
+            hasPhotos
+              ? "Print capture date under each photo"
+              : "Load photos first"
+          }
           checked={settings.showDates}
+          onChange={(v) => set({ showDates: v })}
           disabled={!hasPhotos}
-          onChange={(v) => {
-            if (!v) {
-              // turning off show dates resets everything
-              set({
-                showDates: false,
-                filterByDate: false,
-                dateFrom: null,
-                dateTo: null,
-              });
-            } else {
-              set({ showDates: true });
-            }
-          }}
         />
 
-        {/* Filter by date — only visible once showDates is on */}
-        {settings.showDates && (
-          <ToggleRow
-            label="Filter by date"
-            sub="Show photos from a date range"
-            checked={settings.filterByDate}
-            disabled={!hasPhotos}
-            onChange={(v) => {
-              if (!v)
-                set({ filterByDate: false, dateFrom: null, dateTo: null });
-              else set({ filterByDate: true });
-            }}
-          />
+        <ToggleRow
+          label="Filter by date"
+          sub={
+            isActivelyFiltered
+              ? `Showing ${filteredCount} of ${photos.length}`
+              : "Show all dates"
+          }
+          checked={settings.filterByDate}
+          onChange={(v) => set({ filterByDate: v })}
+          disabled={!hasPhotos}
+        />
+
+        {settings.filterByDate && (
+          <div className={styles.presetRow}>
+            {PRESETS.map((p) => (
+              <button
+                key={p.key}
+                className={`${styles.presetBtn} ${
+                  activePreset === p.key ? styles.presetBtnActive : ""
+                }`}
+                onClick={() => {
+                  const r = p.resolve();
+                  set({ dateFrom: r.from, dateTo: r.to });
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         )}
 
-        {/* Date filter controls — only when filterByDate is on */}
-        {settings.showDates && settings.filterByDate && (
-          <div className={styles.filterSection}>
-            {/* Preset buttons — use our Button component */}
-            <div className={styles.presetRow}>
-              {PRESETS.map((p) => (
-                <Button
-                  key={p.key}
-                  variant={activePreset === p.key ? "primary" : "secondary"}
-                  size="sm"
-                  onClick={() => {
-                    const { from, to } = p.resolve();
-                    set({ dateFrom: from, dateTo: to });
-                  }}
-                >
-                  {p.label}
-                </Button>
-              ))}
-            </div>
-
-            {/* Manual date pickers */}
-            <div className={styles.dateInputs}>
-              <div className={styles.dateRow}>
-                <span className={styles.dateRowLabel}>From</span>
-                <input
-                  type="date"
-                  className={styles.dateInput}
-                  value={settings.dateFrom ?? ""}
-                  onChange={(e) => set({ dateFrom: e.target.value || null })}
-                />
-              </div>
-              <div className={styles.dateRow}>
-                <span className={styles.dateRowLabel}>To</span>
-                <input
-                  type="date"
-                  className={styles.dateInput}
-                  value={settings.dateTo ?? ""}
-                  onChange={(e) => set({ dateTo: e.target.value || null })}
-                />
-              </div>
-            </div>
-
-            {/* Count — same size/weight as everything else, green when filtered */}
-            <p
-              className={`${styles.filterCount} ${isActivelyFiltered ? styles.filterCountActive : ""}`}
-            >
-              {filteredCount} of {photos.length} photos shown
-            </p>
+        {settings.filterByDate && (
+          <div className={styles.dateRange}>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={settings.dateFrom ?? ""}
+              onChange={(e) => set({ dateFrom: e.target.value || null })}
+            />
+            <span className={styles.dateSep}>—</span>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={settings.dateTo ?? ""}
+              onChange={(e) => set({ dateTo: e.target.value || null })}
+            />
           </div>
         )}
       </div>
