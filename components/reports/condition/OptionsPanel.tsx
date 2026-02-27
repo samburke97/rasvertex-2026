@@ -123,7 +123,9 @@ export default function OptionsPanel({
 
   const isLoading =
     importStatus.phase === "fetching-job" ||
-    importStatus.phase === "fetching-photos";
+    importStatus.phase === "fetching-photos" ||
+    importStatus.phase === "fetching-schedule";
+
   const hasPhotos = photos.length > 0;
 
   const progressPct =
@@ -165,7 +167,6 @@ export default function OptionsPanel({
       if (typeof result === "string") onCoverPhoto(result);
     };
     reader.readAsDataURL(file);
-    // Reset so the same file can be re-selected
     e.target.value = "";
   };
 
@@ -190,37 +191,40 @@ export default function OptionsPanel({
             onClick={handleSubmit}
             disabled={isLoading || !jobNumber.trim()}
           >
-            {isLoading ? "…" : "Load"}
+            {isLoading ? "Loading…" : "Load"}
           </Button>
         </div>
 
+        {/* Progress bar */}
         {importStatus.phase === "fetching-photos" && (
-          <>
-            <div className={styles.progressWrap}>
-              <div
-                className={styles.progressBar}
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-            <span className={styles.hint}>
+          <div className={styles.progressOuter}>
+            <div
+              className={styles.progressBar}
+              style={{ width: `${progressPct}%` }}
+            />
+            <span className={styles.progressLabel}>
               {importStatus.loaded} / {importStatus.total} photos
             </span>
-          </>
+          </div>
         )}
-        {importStatus.phase === "fetching-job" && (
-          <span className={styles.hint}>Loading job details…</span>
+        {importStatus.phase === "fetching-schedule" && (
+          <div className={styles.progressOuter}>
+            <div
+              className={styles.progressBar}
+              style={{ width: "100%", opacity: 0.5 }}
+            />
+            <span className={styles.progressLabel}>Loading schedule…</span>
+          </div>
         )}
         {importStatus.phase === "error" && (
-          <span className={styles.error}>{importStatus.message}</span>
+          <div className={styles.errorMsg}>{importStatus.message}</div>
         )}
       </div>
 
       {/* ── Cover Photo ──────────────────────────────────────────────────── */}
       <div className={styles.group}>
         <div className={styles.groupLabel}>Cover Photo</div>
-
         {job.coverPhoto ? (
-          /* Thumbnail + remove button when a photo is set */
           <div className={styles.coverPhotoPreview}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -244,7 +248,6 @@ export default function OptionsPanel({
             </div>
           </div>
         ) : (
-          /* Upload prompt when no photo set */
           <button
             className={styles.coverPhotoUpload}
             onClick={() => coverInputRef.current?.click()}
@@ -256,7 +259,6 @@ export default function OptionsPanel({
             </span>
           </button>
         )}
-
         <input
           ref={coverInputRef}
           type="file"
@@ -299,9 +301,7 @@ export default function OptionsPanel({
             {PRESETS.map((p) => (
               <button
                 key={p.key}
-                className={`${styles.presetBtn} ${
-                  activePreset === p.key ? styles.presetBtnActive : ""
-                }`}
+                className={`${styles.presetBtn} ${activePreset === p.key ? styles.presetBtnActive : ""}`}
                 onClick={() => {
                   const r = p.resolve();
                   set({ dateFrom: r.from, dateTo: r.to });
@@ -329,6 +329,29 @@ export default function OptionsPanel({
               onChange={(e) => set({ dateTo: e.target.value || null })}
             />
           </div>
+        )}
+      </div>
+
+      {/* ── Schedule ─────────────────────────────────────────────────────── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabel}>Schedule</div>
+
+        <ToggleRow
+          label="Include schedule"
+          sub={
+            settings.scheduleLoaded
+              ? "Schedule page will appear in PDF"
+              : "Load a job to fetch schedule data"
+          }
+          checked={settings.showSchedule}
+          onChange={(v) => set({ showSchedule: v })}
+          disabled={!settings.scheduleLoaded}
+        />
+
+        {settings.showSchedule && settings.scheduleLoaded && (
+          <p className={styles.scheduleSub}>
+            Schedule uses the same date filter as photos above.
+          </p>
         )}
       </div>
     </aside>

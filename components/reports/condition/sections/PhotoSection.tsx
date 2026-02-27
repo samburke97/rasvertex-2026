@@ -58,31 +58,31 @@ function groupByDate(photos: ReportPhoto[]): PhotoGroup[] {
   }));
 }
 
-// Pagination constants — must exactly match print CSS
+// ── Pagination constants ──────────────────────────────────────────────────────
 // A4 at 96dpi: 794 x 1123px
-// print .photo-section padding: 2.75rem = 44px each side
+// .photo-page padding: 2.75rem = 44px each side
 // Available vertical space: 1123 - (44 * 2) = 1035px
-// Grid: 3 cols, gap 0.875rem = 14px
+// Grid gap: 0.875rem = 14px
 // Content width: 794 - (44 * 2) = 706px
 // Cell width: (706 - 14 * 2) / 3 = 226px
-// Cell height: 226px thumb (square) + 30px caption = 256px
-// Row height (incl. gap): 256 + 14 = 270px
-// Date header (incl. margin-bottom 1rem): 18 + 16 = 34px
-// Group gap: 2.25rem = 36px
-const PAGE_AVAILABLE_H = 1035;
-const ROW_H = 270;
-const DATE_HEADER_H = 34;
-const GROUP_GAP = 36;
+// Cell height: 226px thumb + 30px caption = 256px
+// Row height (incl. gap below): 256 + 14 = 270px
+// Date header height (incl. 1rem margin-bottom): 18 + 16 = 34px
+// Group gap between groups: 2.25rem = 36px
+export const PAGE_AVAILABLE_H = 1035;
+export const ROW_H = 270;
+export const DATE_HEADER_H = 34;
+export const GROUP_GAP = 36;
 
-type PageItem =
+export type PageItem =
   | { type: "dateHeader"; label: string }
   | { type: "photoRow"; photos: ReportPhoto[] };
 
-interface PreviewPage {
+export interface PreviewPage {
   items: PageItem[];
 }
 
-function paginateGroups(
+export function paginateGroups(
   groups: PhotoGroup[],
   showDates: boolean,
 ): PreviewPage[] {
@@ -98,38 +98,45 @@ function paginateGroups(
     }
   }
 
-  function tryAdd(item: PageItem, h: number) {
-    if (usedH > 0 && usedH + h > PAGE_AVAILABLE_H) {
-      flush();
-    }
-    current.push(item);
-    usedH += h;
-  }
-
   for (let g = 0; g < groups.length; g++) {
     const group = groups[g];
 
+    // ── Date header placement ─────────────────────────────────────────────
+    // Rule: header + its first row must always land on the same page.
+    // We check header + ROW_H combined — if they don't fit, flush first.
     if (showDates && group.label) {
-      // Never orphan a header — require header + at least one row to fit
-      if (usedH > 0 && usedH + DATE_HEADER_H + ROW_H > PAGE_AVAILABLE_H) {
+      const neededH = DATE_HEADER_H + ROW_H;
+      if (usedH > 0 && usedH + neededH > PAGE_AVAILABLE_H) {
         flush();
       }
       current.push({ type: "dateHeader", label: group.label });
       usedH += DATE_HEADER_H;
     }
 
+    // ── Photo rows ────────────────────────────────────────────────────────
     const rows: ReportPhoto[][] = [];
     for (let i = 0; i < group.photos.length; i += 3) {
       rows.push(group.photos.slice(i, i + 3));
     }
 
     for (const row of rows) {
-      tryAdd({ type: "photoRow", photos: row }, ROW_H);
+      // If this row won't fit, flush — but never flush if current is empty
+      // (that would mean even a single row is too tall, which shouldn't happen)
+      if (usedH > 0 && usedH + ROW_H > PAGE_AVAILABLE_H) {
+        flush();
+      }
+      current.push({ type: "photoRow", photos: row });
+      usedH += ROW_H;
     }
 
+    // ── Group gap (not on the last group) ─────────────────────────────────
     const isLastGroup = g === groups.length - 1;
-    if (!isLastGroup && usedH > 0 && usedH < PAGE_AVAILABLE_H) {
-      usedH += GROUP_GAP;
+    if (!isLastGroup && usedH > 0) {
+      // Only add the gap if the next group will still fit on this page;
+      // otherwise it's wasted space at the bottom — just let flush happen naturally.
+      if (usedH + GROUP_GAP < PAGE_AVAILABLE_H) {
+        usedH += GROUP_GAP;
+      }
     }
   }
 
@@ -173,7 +180,12 @@ export default function PhotoSection({
   };
 
   const isStreaming = importStatus.phase === "fetching-photos";
-  const progress = isStreaming ? importStatus : null;
+  const progress =
+    isStreaming &&
+    importStatus.phase === "fetching-photos" &&
+    "loaded" in importStatus
+      ? (importStatus as { phase: string; loaded: number; total: number })
+      : null;
 
   const groups: PhotoGroup[] = showDates
     ? groupByDate(photos)

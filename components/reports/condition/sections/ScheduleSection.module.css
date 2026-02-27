@@ -1,0 +1,278 @@
+/* components/reports/condition/sections/ScheduleSection.module.css */
+/*
+ * Schedule page — A4 preview block matching the photo/summary page style.
+ * Table uses the design system's dark industrial aesthetic with amber accents.
+ */
+
+/* ── A4 page block ───────────────────────────────────────────────────────── */
+.page {
+  width: 794px;
+  background: #fff;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.1),
+    0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+}
+
+.pageContent {
+  padding: 2.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Section heading ─────────────────────────────────────────────────────── */
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.headingTitle {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 1.6rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: #0d1c45;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.headingRule {
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+/* ── Table wrapper ───────────────────────────────────────────────────────── */
+.tableWrap {
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Inter", "DM Sans", Arial, sans-serif;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.th,
+.thNum,
+.thAction {
+  padding: 0.6rem 0.875rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--for-medium, #6b7280);
+  background: var(--con-light, #f9f9f9);
+  border-bottom: 1px solid var(--out-medium, #d9dbdb);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.thNum {
+  text-align: right;
+  width: 110px;
+}
+
+.thAction {
+  width: 36px;
+  padding: 0;
+}
+
+/* ── Data rows ───────────────────────────────────────────────────────────── */
+.dataRow {
+  border-bottom: 1px solid var(--out-light, #f0f0f0);
+  transition: background 0.1s;
+}
+
+.dataRow:last-child {
+  border-bottom: none;
+}
+
+.dataRow:hover {
+  background: rgba(116, 219, 137, 0.04);
+}
+
+.td,
+.tdNum,
+.tdNote,
+.tdAction {
+  padding: 0.5rem 0.875rem;
+  font-size: 0.8rem;
+  font-weight: 300;
+  color: var(--for-darkest, #111827);
+  vertical-align: middle;
+}
+
+.tdNum {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  width: 110px;
+}
+
+.tdNote {
+  color: var(--for-medium, #6b7280);
+  font-size: 0.75rem;
+}
+
+.tdAction {
+  width: 36px;
+  padding: 0 0.5rem;
+  text-align: center;
+}
+
+/* ── Editable cell ───────────────────────────────────────────────────────── */
+.cellDisplay {
+  cursor: text;
+  display: inline-block;
+  min-width: 1rem;
+  border-radius: 3px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  transition: background 0.12s;
+}
+
+.cellDisplay:hover {
+  background: rgba(116, 219, 137, 0.12);
+}
+
+.cellInput {
+  width: 100%;
+  border: 1px solid var(--primary-400, #74db89);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  font-weight: 300;
+  color: var(--for-darkest, #111827);
+  background: #fff;
+  outline: none;
+  min-width: 60px;
+}
+
+.cellInput[type="number"] {
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.cellInput[type="number"]::-webkit-inner-spin-button,
+.cellInput[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+/* ── Totals row ──────────────────────────────────────────────────────────── */
+.totalsRow {
+  background: var(--con-light, #f9f9f9);
+  border-top: 2px solid var(--out-medium, #d9dbdb);
+}
+
+.totalsLabel {
+  padding: 0.6rem 0.875rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--for-darkest, #111827);
+  text-align: right;
+}
+
+.totalsCell {
+  padding: 0.6rem 0.875rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--for-darkest, #111827);
+  text-align: right;
+  width: 110px;
+}
+
+/* ── Delete button ───────────────────────────────────────────────────────── */
+.deleteBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  border-radius: 4px;
+  color: var(--for-light, #9ca3af);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.deleteBtn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ── Empty cell ──────────────────────────────────────────────────────────── */
+.emptyCell {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--for-light, #9ca3af);
+  font-style: italic;
+}
+
+/* ── Add row button ──────────────────────────────────────────────────────── */
+.addRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 32px;
+  padding: 0 0.75rem;
+  border: 1px dashed var(--out-darkest, #c9cbcb);
+  border-radius: 6px;
+  background: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--for-medium, #6b7280);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+  align-self: flex-start;
+}
+
+.addRow:hover {
+  border-color: var(--primary-400, #74db89);
+  color: var(--primary-400, #74db89);
+}
+
+/* ── Loading state ───────────────────────────────────────────────────────── */
+.stateWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  justify-content: center;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--out-medium, #d9dbdb);
+  border-top-color: var(--primary-400, #74db89);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.stateText {
+  font-size: 0.82rem;
+  color: var(--for-medium, #6b7280);
+}

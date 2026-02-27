@@ -5,19 +5,21 @@ import React, { useState, useCallback } from "react";
 import styles from "./ConditionReportPage.module.css";
 import CoverSection from "./sections/CoverSection";
 import PhotoSection from "./sections/PhotoSection";
+import ScheduleSection from "./sections/ScheduleSection";
 import SummarySection from "./sections/SummarySection";
 import OptionsPanel from "./OptionsPanel";
 import Button from "@/components/ui/Button";
-import { inferTemplatesFromPhotos } from "@/lib/reports/condition.templates";
 import { buildPrintHTML } from "@/lib/reports/condition.print";
 import {
   mapJobToReportDetails,
   filterPhotosByDateRange,
+  filterScheduleByDateRange,
   type ConditionReportData,
   type ImportStatus,
   type ReportJobDetails,
   type ReportPhoto,
   type ReportSettings,
+  type ScheduleRow,
 } from "@/lib/reports/condition.types";
 import type { EnrichedJob } from "@/lib/simpro/types";
 
@@ -30,6 +32,8 @@ const DEFAULT_SETTINGS: ReportSettings = {
   filterByDate: false,
   dateFrom: null,
   dateTo: null,
+  showSchedule: false,
+  scheduleLoaded: false,
 };
 
 const DEFAULT_REPORT: ConditionReportData = {
@@ -45,6 +49,7 @@ const DEFAULT_REPORT: ConditionReportData = {
     coverPhoto: null,
   },
   photos: [],
+  schedule: [],
   comments:
     "A general inspection of the building was carried out. Maintenance requirements were identified and are documented within this report.",
   recommendations:
@@ -59,13 +64,131 @@ export default function ConditionReportPage({
   const [importStatus, setImportStatus] = useState<ImportStatus>({
     phase: "idle",
   });
+  const [scheduleLoading, setScheduleLoading] = useState(false);
 
-  // ── Photo SSE stream ──────────────────────────────────────────────────────
-  // API sends named SSE events: event: photo|progress|start|done|error
-  // Photo payload fields: { id, name, url, size, dateAdded }  (flat, not nested)
-  const fetchPhotos = useCallback(async (jobId: string) => {
+  // ── Settings helper ───────────────────────────────────────────────────────
+  const updateSettings = useCallback((s: ReportSettings) => {
+    setReport((prev) => ({ ...prev, settings: s }));
+  }, []);
+
+  // ── Field updates ─────────────────────────────────────────────────────────
+  const updateJobField = useCallback(
+    (field: keyof ReportJobDetails, value: string) => {
+      setReport((prev) => ({ ...prev, job: { ...prev.job, [field]: value } }));
+    },
+    [],
+  );
+
+  const updateCoverPhoto = useCallback((dataUrl: string | null) => {
+    setReport((prev) => ({
+      ...prev,
+      job: { ...prev.job, coverPhoto: dataUrl },
+    }));
+  }, []);
+
+  // ── Photo handlers ────────────────────────────────────────────────────────
+  const addPhotos = useCallback((photos: ReportPhoto[]) => {
+    setReport((prev) => ({ ...prev, photos: [...prev.photos, ...photos] }));
+  }, []);
+
+  const removePhoto = useCallback((id: string) => {
+    setReport((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((p) => p.id !== id),
+    }));
+  }, []);
+
+  const renamePhoto = useCallback((id: string, name: string) => {
+    setReport((prev) => ({
+      ...prev,
+      photos: prev.photos.map((p) => (p.id !== id ? p : { ...p, name })),
+    }));
+  }, []);
+
+  // ── Schedule handler ──────────────────────────────────────────────────────
+  const updateSchedule = useCallback((rows: ScheduleRow[]) => {
+    setReport((prev) => ({ ...prev, schedule: rows }));
+  }, []);
+
+  // ── Fetch schedule ────────────────────────────────────────────────────────
+  const fetchSchedule = useCallback(
+    async (jobId: string) => {
+      setScheduleLoading(true);
+      setImportStatus({ phase: "fetching-schedule" });
+      try {
+        const params = new URLSearchParams({ companyId: "0" });
+        if (report.settings.dateFrom)
+          params.set("dateFrom", report.settings.dateFrom);
+        if (report.settings.dateTo)
+          params.set("dateTo", report.settings.dateTo);
+
+        const res = await fetch(`/api/simpro/jobs/${jobId}/schedule?${params}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        setReport((prev) => ({
+          ...prev,
+          schedule: data.rows ?? [],
+          settings: {
+            ...prev.settings,
+            scheduleLoaded: true,
+            showSchedule: true,
+          },
+        }));
+      } catch (err) {
+        console.error("[Schedule] fetch failed:", err);
+        // Non-fatal — photos still loaded fine; just flag schedule unavailable
+        setReport((prev) => ({
+          ...prev,
+          settings: {
+            ...prev.settings,
+            scheduleLoaded: false,
+            showSchedule: false,
+          },
+        }));
+      } finally {
+        setScheduleLoading(false);
+        setImportStatus({ phase: "done" });
+      }
+    },
+    [report.settings.dateFrom, report.settings.dateTo],
+  );
+
+  // ── Main import (job + photos + schedule in parallel) ─────────────────────
+  const handleImport = useCallback(
+    async (jobNumber: string) => {
+      // 1. Fetch job details
+      setImportStatus({ phase: "fetching-job" });
+      try {
+        const jobRes = await fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
+        if (!jobRes.ok)
+          throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
+        const jobData: EnrichedJob = await jobRes.json();
+        setReport((prev) => ({
+          ...prev,
+          job: mapJobToReportDetails(jobData),
+        }));
+      } catch (err) {
+        setImportStatus({
+          phase: "error",
+          message: err instanceof Error ? err.message : "Failed to fetch job",
+        });
+        return;
+      }
+
+      // 2. Fetch photos (SSE stream) + schedule in parallel
+      // Photos use SSE — we kick it off first, then schedule fires concurrently
+      const photoPromise = fetchPhotosSSE(jobNumber);
+      const schedulePromise = fetchScheduleSilent(jobNumber);
+      await Promise.all([photoPromise, schedulePromise]);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // ── Photos SSE ────────────────────────────────────────────────────────────
+  const fetchPhotosSSE = useCallback(async (jobId: string) => {
     setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
-
     try {
       const response = await fetch(
         `/api/simpro/jobs/${jobId}/attachments?companyId=0`,
@@ -81,175 +204,80 @@ export default function ConditionReportPage({
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-
         const frames = buffer.split("\n\n");
         buffer = frames.pop() ?? "";
 
         for (const frame of frames) {
-          if (!frame.trim()) continue;
+          const eventMatch = frame.match(/^event:\s*(.+)$/m);
+          const dataMatch = frame.match(/^data:\s*(.+)$/m);
+          if (!eventMatch || !dataMatch) continue;
 
-          // Parse named SSE frame: extract event name and data line
-          const lines = frame.split("\n");
-          let eventName = "message";
-          let dataLine = "";
-          for (const line of lines) {
-            if (line.startsWith("event: ")) eventName = line.slice(7).trim();
-            if (line.startsWith("data: ")) dataLine = line.slice(6).trim();
-          }
-          if (!dataLine) continue;
-
+          const event = eventMatch[1].trim();
           let payload: Record<string, unknown>;
           try {
-            payload = JSON.parse(dataLine);
+            payload = JSON.parse(dataMatch[1]);
           } catch {
             continue;
           }
 
-          switch (eventName) {
-            case "start":
-              setImportStatus({
-                phase: "fetching-photos",
-                loaded: 0,
-                total: payload.total as number,
-              });
-              break;
-
-            case "photo":
-              // Photo fields are flat on payload: id, name, url, size, dateAdded
-              setReport((prev) => ({
-                ...prev,
-                photos: [
-                  ...prev.photos,
-                  {
-                    id: payload.id as string,
-                    name: payload.name as string,
-                    url: payload.url as string,
-                    size: payload.size as number,
-                    dateAdded: (payload.dateAdded as string) ?? null,
-                  },
-                ],
-              }));
-              break;
-
-            case "progress":
-              setImportStatus({
-                phase: "fetching-photos",
-                loaded: payload.loaded as number,
-                total: payload.total as number,
-              });
-              break;
-
-            case "done":
-              setImportStatus({ phase: "idle" });
-              break;
-
-            case "error":
-              setImportStatus({
-                phase: "error",
-                message: (payload.message as string) || "Failed to load photos",
-              });
-              break;
+          if (event === "photo") {
+            const photo: ReportPhoto = {
+              id: String(payload.id),
+              name: String(payload.name),
+              url: String(payload.url),
+              size: Number(payload.size) || 0,
+              dateAdded: payload.dateAdded ? String(payload.dateAdded) : null,
+            };
+            setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] }));
+          } else if (event === "progress") {
+            setImportStatus({
+              phase: "fetching-photos",
+              loaded: Number(payload.loaded) || 0,
+              total: Number(payload.total) || 0,
+            });
+          } else if (event === "done") {
+            setImportStatus({ phase: "done" });
+          } else if (event === "error") {
+            setImportStatus({
+              phase: "error",
+              message: String(payload.message ?? "Photo import failed"),
+            });
           }
         }
       }
-
-      // Stream ended cleanly — ensure we're back to idle
-      setImportStatus((prev) =>
-        prev.phase === "fetching-photos" ? { phase: "idle" } : prev,
-      );
     } catch (err) {
-      console.error("Photo fetch error:", err);
       setImportStatus({
         phase: "error",
-        message: err instanceof Error ? err.message : "Failed to load photos",
+        message: err instanceof Error ? err.message : "Photo import failed",
       });
     }
   }, []);
 
-  // ── Main import handler — fetches job details THEN photos ─────────────────
-  const handleImport = useCallback(
-    async (jobNumber: string) => {
-      // Step 1: fetch job details to populate cover fields
-      setImportStatus({ phase: "fetching-job" });
-      try {
-        const res = await fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error ?? `HTTP ${res.status}`);
-        }
-        const enrichedJob: EnrichedJob = await res.json();
-        const jobDetails = mapJobToReportDetails(enrichedJob);
-
-        // Populate cover fields — preserve any user edits to coverPhoto
+  // ── Schedule fetch (silent — runs alongside photos) ───────────────────────
+  const fetchScheduleSilent = useCallback(async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/simpro/jobs/${jobId}/schedule?companyId=0`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.rows?.length > 0) {
         setReport((prev) => ({
           ...prev,
-          job: {
-            ...jobDetails,
-            coverPhoto: prev.job.coverPhoto, // keep existing cover photo if set
+          schedule: data.rows,
+          settings: {
+            ...prev.settings,
+            scheduleLoaded: true,
+            showSchedule: true,
           },
         }));
-      } catch (err) {
-        console.error("Job fetch error:", err);
-        setImportStatus({
-          phase: "error",
-          message:
-            err instanceof Error
-              ? `Job details failed: ${err.message}`
-              : "Failed to load job details",
-        });
-        return; // don't attempt photo fetch if job fetch failed
+      } else {
+        setReport((prev) => ({
+          ...prev,
+          settings: { ...prev.settings, scheduleLoaded: true },
+        }));
       }
-
-      // Step 2: fetch photos via SSE stream
-      await fetchPhotos(jobNumber);
-    },
-    [fetchPhotos],
-  );
-
-  // ── Report field updates ──────────────────────────────────────────────────
-  const updateJobField = useCallback(
-    (field: keyof ReportJobDetails, value: string) => {
-      setReport((prev) => ({
-        ...prev,
-        job: { ...prev.job, [field]: value },
-      }));
-    },
-    [],
-  );
-
-  const updateSettings = useCallback((patch: Partial<ReportSettings>) => {
-    setReport((prev) => ({
-      ...prev,
-      settings: { ...prev.settings, ...patch },
-    }));
-  }, []);
-
-  const updateCoverPhoto = useCallback((url: string | null) => {
-    setReport((prev) => ({
-      ...prev,
-      job: { ...prev.job, coverPhoto: url },
-    }));
-  }, []);
-
-  const addPhotos = useCallback((photos: ReportPhoto[]) => {
-    setReport((prev) => ({
-      ...prev,
-      photos: [...prev.photos, ...photos],
-    }));
-  }, []);
-
-  const removePhoto = useCallback((id: string) => {
-    setReport((prev) => ({
-      ...prev,
-      photos: prev.photos.filter((p) => p.id !== id),
-    }));
-  }, []);
-
-  const renamePhoto = useCallback((id: string, name: string) => {
-    setReport((prev) => ({
-      ...prev,
-      photos: prev.photos.map((p) => (p.id === id ? { ...p, name } : p)),
-    }));
+    } catch {
+      // silent — schedule is optional
+    }
   }, []);
 
   // ── Export ────────────────────────────────────────────────────────────────
@@ -270,6 +298,14 @@ export default function ConditionReportPage({
       )
     : report.photos;
 
+  const filteredSchedule = report.settings.filterByDate
+    ? filterScheduleByDateRange(
+        report.schedule,
+        report.settings.dateFrom,
+        report.settings.dateTo,
+      )
+    : report.schedule;
+
   return (
     <div className={styles.page}>
       {/* Top bar */}
@@ -282,6 +318,12 @@ export default function ConditionReportPage({
           <span className={styles.photoCount}>
             {report.photos.length} photo{report.photos.length !== 1 ? "s" : ""}
           </span>
+          {report.settings.showSchedule && (
+            <span className={styles.photoCount}>
+              {filteredSchedule.length} schedule row
+              {filteredSchedule.length !== 1 ? "s" : ""}
+            </span>
+          )}
           <Button variant="secondary" size="sm" onClick={handleExport}>
             Export PDF
           </Button>
@@ -308,7 +350,6 @@ export default function ConditionReportPage({
             Photos &middot; {filteredPhotos.length} image
             {filteredPhotos.length !== 1 ? "s" : ""}
           </div>
-
           <PhotoSection
             photos={filteredPhotos}
             importStatus={importStatus}
@@ -317,6 +358,20 @@ export default function ConditionReportPage({
             onPhotoRemove={removePhoto}
             onPhotoRename={renamePhoto}
           />
+
+          {report.settings.showSchedule && (
+            <>
+              <div className={styles.pageLabel}>
+                Schedule &middot; {filteredSchedule.length} row
+                {filteredSchedule.length !== 1 ? "s" : ""}
+              </div>
+              <ScheduleSection
+                rows={filteredSchedule}
+                isLoading={scheduleLoading}
+                onChange={updateSchedule}
+              />
+            </>
+          )}
 
           <div className={styles.pageLabel}>Summary Page</div>
           <SummarySection
