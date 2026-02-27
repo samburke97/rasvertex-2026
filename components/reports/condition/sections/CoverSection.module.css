@@ -102,11 +102,15 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end; /* content sits at page bottom */
-  padding: 0 2.75rem 4.5rem; /* bottom matches summary footer spacing */
+  justify-content: flex-end;
+  padding: 0 2.75rem 4.5rem;
 }
 
-/* Title — Bebas Neue, NO border/underline */
+/*
+ * Title — rendered as <div> (not <h1>) so globals.css h1 rules never interfere.
+ * All child elements — including EditableField's .display span and .input —
+ * inherit font-family, font-size, etc. directly from this div.
+ */
 .reportTitle {
   font-family: "Bebas Neue", Arial, sans-serif;
   font-size: 2.75rem;
@@ -116,7 +120,8 @@
   line-height: 1.05;
   text-transform: uppercase;
   margin: 0 0 1.25rem;
-  /* no border-bottom */
+  /* EditableField .input has border-bottom: 2px green when active — that's correct UX.
+     No extra border here. */
 }
 
 /* Intro */
@@ -132,9 +137,9 @@
 
 /* ── Meta table — shrinks to content width ───────────────────────────────── */
 /*
- * Using display:table on the container and display:table-row / table-cell
- * on children so the lines only extend as far as the text, not full page width.
- * All borders match date-header lines: 1px #e5e7eb
+ * Using display:table so lines only extend as wide as the text,
+ * not full page width. border-collapse stops double borders.
+ * All borders: 1px #e5e7eb — same as date-header lines in photo pages.
  */
 .meta {
   display: table;

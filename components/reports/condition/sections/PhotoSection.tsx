@@ -58,6 +58,85 @@ function groupByDate(photos: ReportPhoto[]): PhotoGroup[] {
   }));
 }
 
+// Pagination constants — must exactly match print CSS
+// A4 at 96dpi: 794 x 1123px
+// print .photo-section padding: 2.75rem = 44px each side
+// Available vertical space: 1123 - (44 * 2) = 1035px
+// Grid: 3 cols, gap 0.875rem = 14px
+// Content width: 794 - (44 * 2) = 706px
+// Cell width: (706 - 14 * 2) / 3 = 226px
+// Cell height: 226px thumb (square) + 30px caption = 256px
+// Row height (incl. gap): 256 + 14 = 270px
+// Date header (incl. margin-bottom 1rem): 18 + 16 = 34px
+// Group gap: 2.25rem = 36px
+const PAGE_AVAILABLE_H = 1035;
+const ROW_H = 270;
+const DATE_HEADER_H = 34;
+const GROUP_GAP = 36;
+
+type PageItem =
+  | { type: "dateHeader"; label: string }
+  | { type: "photoRow"; photos: ReportPhoto[] };
+
+interface PreviewPage {
+  items: PageItem[];
+}
+
+function paginateGroups(
+  groups: PhotoGroup[],
+  showDates: boolean,
+): PreviewPage[] {
+  const pages: PreviewPage[] = [];
+  let current: PageItem[] = [];
+  let usedH = 0;
+
+  function flush() {
+    if (current.length > 0) {
+      pages.push({ items: current });
+      current = [];
+      usedH = 0;
+    }
+  }
+
+  function tryAdd(item: PageItem, h: number) {
+    if (usedH > 0 && usedH + h > PAGE_AVAILABLE_H) {
+      flush();
+    }
+    current.push(item);
+    usedH += h;
+  }
+
+  for (let g = 0; g < groups.length; g++) {
+    const group = groups[g];
+
+    if (showDates && group.label) {
+      // Never orphan a header — require header + at least one row to fit
+      if (usedH > 0 && usedH + DATE_HEADER_H + ROW_H > PAGE_AVAILABLE_H) {
+        flush();
+      }
+      current.push({ type: "dateHeader", label: group.label });
+      usedH += DATE_HEADER_H;
+    }
+
+    const rows: ReportPhoto[][] = [];
+    for (let i = 0; i < group.photos.length; i += 3) {
+      rows.push(group.photos.slice(i, i + 3));
+    }
+
+    for (const row of rows) {
+      tryAdd({ type: "photoRow", photos: row }, ROW_H);
+    }
+
+    const isLastGroup = g === groups.length - 1;
+    if (!isLastGroup && usedH > 0 && usedH < PAGE_AVAILABLE_H) {
+      usedH += GROUP_GAP;
+    }
+  }
+
+  flush();
+  return pages;
+}
+
 export default function PhotoSection({
   photos,
   importStatus,
@@ -96,93 +175,103 @@ export default function PhotoSection({
   const isStreaming = importStatus.phase === "fetching-photos";
   const progress = isStreaming ? importStatus : null;
 
-  // Build groups — one per date when showDates, else single flat group
   const groups: PhotoGroup[] = showDates
     ? groupByDate(photos)
     : [{ key: "all", label: null, photos }];
 
+  const pages = paginateGroups(groups, showDates);
+
+  // Global photo index counter — incremented across all pages
   let photoIndex = 0;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.section}>
-        {/* Header */}
-        <div className={styles.header}>
-          <div className={styles.headerLeft}>
-            <span className={styles.label}>Photos</span>
-            <span className={styles.count}>{photos.length}</span>
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            + Upload
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*"
-            onChange={handleFileChange}
-            style={{ display: "none" }}
-          />
+    <>
+      {/* Editor-only header bar — not rendered in PDF */}
+      <div className={styles.headerBar}>
+        <div className={styles.headerLeft}>
+          <span className={styles.label}>Photos</span>
+          <span className={styles.count}>{photos.length}</span>
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          + Upload
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={handleFileChange}
+          style={{ display: "none" }}
+        />
+      </div>
 
-        {isStreaming && progress && (
-          <div className={styles.progressWrap}>
-            <div
-              className={styles.progressBar}
-              style={{
-                width: `${progress.total > 0 ? Math.round((progress.loaded / progress.total) * 100) : 0}%`,
-              }}
-            />
-            <span className={styles.progressLabel}>
-              {progress.loaded} / {progress.total} photos loaded
-            </span>
-          </div>
-        )}
+      {isStreaming && progress && (
+        <div className={styles.progressOuter}>
+          <div
+            className={styles.progressBar}
+            style={{
+              width: `${progress.total > 0 ? Math.round((progress.loaded / progress.total) * 100) : 0}%`,
+            }}
+          />
+          <span className={styles.progressLabel}>
+            {progress.loaded} / {progress.total} photos loaded
+          </span>
+        </div>
+      )}
 
-        {photos.length === 0 ? (
+      {photos.length === 0 && (
+        <div className={styles.emptyPage}>
           <div className={styles.empty}>
             {isStreaming
-              ? "Loading photos from SimPRO…"
-              : "No photos yet — enter a job number or upload files."}
+              ? "Loading photos from SimPRO\u2026"
+              : "No photos yet \u2014 enter a job number or upload files."}
           </div>
-        ) : (
-          <div className={styles.groupsWrap}>
-            {groups.map((group) => (
-              <div key={group.key} className={styles.group}>
-                {/* Date header ABOVE the grid — only when showDates and label exists */}
-                {showDates && group.label && (
-                  <div className={styles.dateHeader}>
-                    <span className={styles.dateHeaderLine} />
-                    <span className={styles.dateHeaderText}>{group.label}</span>
-                    <span className={styles.dateHeaderLine} />
-                  </div>
-                )}
+        </div>
+      )}
 
-                {/* Photo grid — NO date sub-captions on individual photos */}
-                <div className={styles.grid}>
-                  {group.photos.map((photo) => {
-                    photoIndex++;
-                    return (
-                      <PhotoCard
-                        key={photo.id}
-                        photo={photo}
-                        index={photoIndex}
-                        showDate={false}
-                        onRemove={onPhotoRemove}
-                        onRename={onPhotoRename}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+      {photos.length > 0 &&
+        pages.map((page, pageIdx) => (
+          <div key={pageIdx} className={styles.page}>
+            <div className={styles.pageContent}>
+              {page.items.map((item, itemIdx) => {
+                if (item.type === "dateHeader") {
+                  return (
+                    <div key={"dh-" + itemIdx} className={styles.dateHeader}>
+                      <span className={styles.dateHeaderLine} />
+                      <span className={styles.dateHeaderText}>
+                        {item.label}
+                      </span>
+                      <span className={styles.dateHeaderLine} />
+                    </div>
+                  );
+                }
+                return (
+                  <div key={"row-" + itemIdx} className={styles.photoRow}>
+                    {item.photos.map((photo) => {
+                      photoIndex++;
+                      const idx = photoIndex;
+                      return (
+                        <div key={photo.id} className={styles.photoCell}>
+                          <PhotoCard
+                            photo={photo}
+                            index={idx}
+                            showDate={false}
+                            onRemove={onPhotoRemove}
+                            onRename={onPhotoRename}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        )}
-      </div>
-    </div>
+        ))}
+    </>
   );
 }

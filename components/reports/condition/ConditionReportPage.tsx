@@ -85,123 +85,85 @@ export default function ConditionReportPage({
         buffer = frames.pop() ?? "";
 
         for (const frame of frames) {
-          if (!frame.trim()) continue;
-          let eventName = "message";
-          let dataLine = "";
-          for (const line of frame.split("\n")) {
-            if (line.startsWith("event: ")) eventName = line.slice(7).trim();
-            if (line.startsWith("data: ")) dataLine = line.slice(6).trim();
-          }
-          if (!dataLine) continue;
-
-          let payload: Record<string, unknown>;
+          const line = frame.startsWith("data: ") ? frame.slice(6) : frame;
           try {
-            payload = JSON.parse(dataLine);
-          } catch {
-            continue;
-          }
-
-          if (eventName === "start") {
-            setImportStatus({
-              phase: "fetching-photos",
-              loaded: 0,
-              total: payload.total as number,
-            });
-          } else if (eventName === "photo") {
-            const photo: ReportPhoto = {
-              id: payload.id as string,
-              name: payload.name as string,
-              url: payload.url as string,
-              size: payload.size as number,
-              dateAdded: (payload.dateAdded as string | null) ?? null,
-            };
-            incoming.push(photo);
-            setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] }));
-          } else if (eventName === "progress") {
-            setImportStatus({
-              phase: "fetching-photos",
-              loaded: payload.loaded as number,
-              total: payload.total as number,
-            });
-          } else if (eventName === "done") {
-            const { comments, recommendations } =
-              inferTemplatesFromPhotos(incoming);
-            setReport((prev) => ({
-              ...prev,
-              comments: comments.join("\n\n"),
-              recommendations: recommendations.join("\n\n"),
-            }));
-            setImportStatus({ phase: "done" });
-          } else if (eventName === "error") {
-            setImportStatus({
-              phase: "error",
-              message: (payload.message as string) || "Failed to load photos",
-            });
-          }
+            const msg = JSON.parse(line);
+            if (msg.type === "progress") {
+              setImportStatus({
+                phase: "fetching-photos",
+                loaded: msg.loaded,
+                total: msg.total,
+              });
+            } else if (msg.type === "photo") {
+              incoming.push(msg.photo);
+            }
+          } catch {}
         }
       }
-    } catch (err) {
-      setImportStatus({
-        phase: "error",
-        message: err instanceof Error ? err.message : "Failed to fetch photos",
-      });
-    }
-  }, []);
 
-  // ── Job details fetch ─────────────────────────────────────────────────────
-  const fetchJobDetails = useCallback(async (jobId: string) => {
-    try {
-      const res = await fetch(`/api/simpro/jobs/${jobId}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const enrichedJob: EnrichedJob = await res.json();
       setReport((prev) => ({
         ...prev,
-        job: {
-          ...mapJobToReportDetails(enrichedJob),
-          // preserve any cover photo already set
-          coverPhoto: prev.job.coverPhoto,
-        },
+        photos: [...prev.photos, ...incoming],
       }));
+      setImportStatus({ phase: "idle" });
     } catch (err) {
-      console.warn("[ConditionReport] Job details fetch failed:", err);
+      console.error("Photo fetch error:", err);
+      setImportStatus({ phase: "idle" });
     }
   }, []);
 
-  // ── Import ────────────────────────────────────────────────────────────────
   const handleImport = useCallback(
-    (jobNumber: string) => {
-      setReport((prev) => ({ ...prev, photos: [] }));
-      setImportStatus({ phase: "fetching-job" });
-      fetchJobDetails(jobNumber);
-      fetchPhotos(jobNumber);
+    (jobId: string) => {
+      fetchPhotos(jobId);
     },
-    [fetchJobDetails, fetchPhotos],
+    [fetchPhotos],
   );
 
-  // ── Mutations ─────────────────────────────────────────────────────────────
-  const updateJobField = (field: keyof ReportJobDetails, value: string) =>
-    setReport((prev) => ({ ...prev, job: { ...prev.job, [field]: value } }));
+  // ── Report field updates ──────────────────────────────────────────────────
+  const updateJobField = useCallback(
+    (field: keyof ReportJobDetails, value: string) => {
+      setReport((prev) => ({
+        ...prev,
+        job: { ...prev.job, [field]: value },
+      }));
+    },
+    [],
+  );
 
-  const updateSettings = (settings: ReportSettings) =>
-    setReport((prev) => ({ ...prev, settings }));
+  const updateSettings = useCallback((patch: Partial<ReportSettings>) => {
+    setReport((prev) => ({
+      ...prev,
+      settings: { ...prev.settings, ...patch },
+    }));
+  }, []);
 
-  const updateCoverPhoto = (coverPhoto: string | null) =>
-    setReport((prev) => ({ ...prev, job: { ...prev.job, coverPhoto } }));
+  const updateCoverPhoto = useCallback((url: string | null) => {
+    setReport((prev) => ({
+      ...prev,
+      job: { ...prev.job, coverPhoto: url },
+    }));
+  }, []);
 
-  const addPhotos = (photos: ReportPhoto[]) =>
-    setReport((prev) => ({ ...prev, photos: [...prev.photos, ...photos] }));
+  const addPhotos = useCallback((photos: ReportPhoto[]) => {
+    setReport((prev) => ({
+      ...prev,
+      photos: [...prev.photos, ...photos],
+    }));
+  }, []);
 
-  const removePhoto = (id: string) =>
+  const removePhoto = useCallback((id: string) => {
     setReport((prev) => ({
       ...prev,
       photos: prev.photos.filter((p) => p.id !== id),
     }));
+  }, []);
 
-  const renamePhoto = (id: string, name: string) =>
+  const renamePhoto = useCallback((id: string, name: string) => {
     setReport((prev) => ({
       ...prev,
       photos: prev.photos.map((p) => (p.id === id ? { ...p, name } : p)),
     }));
+  }, []);
 
   // ── Export ────────────────────────────────────────────────────────────────
   const handleExport = () => {
@@ -220,8 +182,6 @@ export default function ConditionReportPage({
         report.settings.dateTo,
       )
     : report.photos;
-
-  const isFiltered = filteredPhotos.length !== report.photos.length;
 
   return (
     <div className={styles.page}>
@@ -258,9 +218,15 @@ export default function ConditionReportPage({
           <CoverSection job={report.job} onChange={updateJobField} />
 
           <div className={styles.pageLabel}>
-            Photos · {filteredPhotos.length} image
+            Photos &middot; {filteredPhotos.length} image
             {filteredPhotos.length !== 1 ? "s" : ""}
           </div>
+
+          {/*
+           * PhotoSection now renders its own A4 page blocks directly.
+           * No wrapper div here — the old .photoPage wrapper is removed.
+           * Each page is a discrete 794px white card matching PDF output exactly.
+           */}
           <PhotoSection
             photos={filteredPhotos}
             importStatus={importStatus}

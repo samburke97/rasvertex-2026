@@ -64,14 +64,20 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
 
       {/* ── Body — pushed to page bottom ─────────────────────────────── */}
       <div className={styles.body}>
-        <h1 className={styles.reportTitle}>
+        {/*
+         * Using <div> instead of <h1> to avoid globals.css h1 font-family
+         * override fighting the Bebas Neue declaration. The .reportTitle
+         * CSS class carries all the visual styling — no semantic h1 needed
+         * inside this print-preview component.
+         */}
+        <div className={styles.reportTitle}>
           <EditableField
             value={job.reportType}
             onChange={(v) => onChange("reportType", v)}
             placeholder="Report Title"
             label="Report Title"
           />
-        </h1>
+        </div>
 
         <p className={styles.intro}>
           This report outlines the repairs and maintenance works completed,
