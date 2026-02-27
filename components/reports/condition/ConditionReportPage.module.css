@@ -1,14 +1,8 @@
 /* components/reports/condition/ConditionReportPage.module.css */
 
-/*
-  The CRM main area has padding: 1.5rem and overflow-y: auto.
-  We break out of that padding with negative margins and take full height.
-*/
 .page {
-  /* Pull out of the 1.5rem padding on all sides */
   margin: -1.5rem;
-  /* Fill the full content area height */
-  height: calc(100vh - 80px); /* 80px = top navbar height */
+  height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -40,7 +34,6 @@
   gap: 0.375rem;
   transition: color 0.12s;
 }
-
 .backBtn:hover {
   color: var(--for-darkest, #111827);
 }
@@ -66,11 +59,11 @@
   border-radius: 20px;
 }
 
-/* ── Editor body: options panel + scrolling canvas ──────────────────────── */
+/* ── Editor body ────────────────────────────────────────────────────────── */
 .editorBody {
   flex: 1;
   display: flex;
-  min-height: 0; /* critical — allows flex children to shrink */
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -78,15 +71,18 @@
 .canvas {
   flex: 1;
   background: #e8e8e8;
+  /* Vertical padding only at top/bottom — no gap between page sections */
   padding: 2.5rem 2rem 5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
-  overflow-y: auto; /* only the canvas scrolls */
+  /* NO gap here — pages sit directly against each other like a real PDF */
+  gap: 0;
+  overflow-y: auto;
   min-height: 0;
 }
 
+/* Page labels float above each section — subtle, doesn't add spacing */
 .pageLabel {
   align-self: flex-start;
   margin-left: max(0px, calc(50% - 397px));
@@ -94,7 +90,14 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #999;
+  color: #aaa;
+  /* Push it up so it sits just above the next page block */
+  margin-top: 1.5rem;
+  margin-bottom: 0.4rem;
+}
+/* First page label needs no top margin */
+.canvas > .pageLabel:first-child {
+  margin-top: 0;
 }
 
 .photoPage {

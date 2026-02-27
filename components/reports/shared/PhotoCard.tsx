@@ -1,4 +1,5 @@
 "use client";
+// components/reports/shared/PhotoCard.tsx
 
 import React, { useState } from "react";
 import styles from "./PhotoCard.module.css";
@@ -7,6 +8,7 @@ import type { ReportPhoto } from "@/lib/reports/condition.types";
 interface PhotoCardProps {
   photo: ReportPhoto;
   index: number;
+  showDate?: boolean;
   onRemove: (id: string) => void;
   onRename: (id: string, name: string) => void;
 }
@@ -14,6 +16,7 @@ interface PhotoCardProps {
 export default function PhotoCard({
   photo,
   index,
+  showDate = false,
   onRemove,
   onRename,
 }: PhotoCardProps) {
@@ -32,6 +35,15 @@ export default function PhotoCard({
   };
 
   const displayName = photo.name.replace(/\.[^/.]+$/, "");
+
+  const formattedDate =
+    showDate && photo.dateAdded
+      ? new Date(photo.dateAdded).toLocaleDateString("en-AU", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : null;
 
   return (
     <div className={styles.card}>
@@ -72,6 +84,9 @@ export default function PhotoCard({
           {displayName}
         </p>
       )}
+
+      {/* Date sub-caption — only shown when showDate is true */}
+      {formattedDate && <p className={styles.date}>{formattedDate}</p>}
     </div>
   );
 }

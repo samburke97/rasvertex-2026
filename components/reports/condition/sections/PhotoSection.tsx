@@ -16,8 +16,6 @@ interface PhotoSectionProps {
   onPhotoRename: (id: string, name: string) => void;
 }
 
-// ── Date helpers ──────────────────────────────────────────────────────────────
-
 function formatGroupDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString("en-AU", {
@@ -60,8 +58,6 @@ function groupByDate(photos: ReportPhoto[]): PhotoGroup[] {
   }));
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export default function PhotoSection({
   photos,
   importStatus,
@@ -77,10 +73,8 @@ export default function PhotoSection({
       f.type.startsWith("image/"),
     );
     if (!files.length) return;
-
     const newPhotos: ReportPhoto[] = [];
     let processed = 0;
-
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (ev) => {
@@ -96,13 +90,13 @@ export default function PhotoSection({
       };
       reader.readAsDataURL(file);
     });
-
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const isStreaming = importStatus.phase === "fetching-photos";
   const progress = isStreaming ? importStatus : null;
 
+  // Build groups — one per date when showDates, else single flat group
   const groups: PhotoGroup[] = showDates
     ? groupByDate(photos)
     : [{ key: "all", label: null, photos }];
@@ -135,17 +129,12 @@ export default function PhotoSection({
           />
         </div>
 
-        {/* Progress bar while streaming */}
         {isStreaming && progress && (
           <div className={styles.progressWrap}>
             <div
               className={styles.progressBar}
               style={{
-                width: `${
-                  progress.total > 0
-                    ? Math.round((progress.loaded / progress.total) * 100)
-                    : 0
-                }%`,
+                width: `${progress.total > 0 ? Math.round((progress.loaded / progress.total) * 100) : 0}%`,
               }}
             />
             <span className={styles.progressLabel}>
@@ -154,7 +143,6 @@ export default function PhotoSection({
           </div>
         )}
 
-        {/* Empty state */}
         {photos.length === 0 ? (
           <div className={styles.empty}>
             {isStreaming
@@ -163,39 +151,35 @@ export default function PhotoSection({
           </div>
         ) : (
           <div className={styles.groupsWrap}>
-            {groups.map((group) => {
-              return (
-                <div key={group.key} className={styles.group}>
-                  {/* Date header */}
-                  {showDates && (
-                    <div className={styles.dateHeader}>
-                      <span className={styles.dateHeaderLine} />
-                      <span className={styles.dateHeaderText}>
-                        {group.label ?? "Date unknown"}
-                      </span>
-                      <span className={styles.dateHeaderLine} />
-                    </div>
-                  )}
-
-                  {/* Photo grid */}
-                  <div className={styles.grid}>
-                    {group.photos.map((photo) => {
-                      photoIndex++;
-                      const idx = photoIndex;
-                      return (
-                        <PhotoCard
-                          key={photo.id}
-                          photo={photo}
-                          index={idx}
-                          onRemove={onPhotoRemove}
-                          onRename={onPhotoRename}
-                        />
-                      );
-                    })}
+            {groups.map((group) => (
+              <div key={group.key} className={styles.group}>
+                {/* Date header ABOVE the grid — only when showDates and label exists */}
+                {showDates && group.label && (
+                  <div className={styles.dateHeader}>
+                    <span className={styles.dateHeaderLine} />
+                    <span className={styles.dateHeaderText}>{group.label}</span>
+                    <span className={styles.dateHeaderLine} />
                   </div>
+                )}
+
+                {/* Photo grid — NO date sub-captions on individual photos */}
+                <div className={styles.grid}>
+                  {group.photos.map((photo) => {
+                    photoIndex++;
+                    return (
+                      <PhotoCard
+                        key={photo.id}
+                        photo={photo}
+                        index={photoIndex}
+                        showDate={false}
+                        onRemove={onPhotoRemove}
+                        onRename={onPhotoRename}
+                      />
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>

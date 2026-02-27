@@ -15,6 +15,7 @@ export interface ReportJobDetails {
   preparedBy: string;
   address: string;
   reportType: string;
+  intro: string;
   project: string;
   date: string;
   coverPhoto: string | null; // base64 data URL or null for plain navy
@@ -50,6 +51,8 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
     preparedBy: "Phil Clark",
     address: job.siteAddress,
     reportType: "Building Condition Report",
+    intro:
+      "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
     project: job.name,
     date: job.date,
     coverPhoto: null,

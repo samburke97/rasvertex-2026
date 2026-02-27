@@ -1,3 +1,5 @@
+/* components/reports/shared/PhotoCard.module.css */
+
 .card {
   display: flex;
   flex-direction: column;
@@ -55,6 +57,7 @@
   opacity: 1;
 }
 
+/* Photo name caption — click to rename */
 .name {
   margin-top: 0.3rem;
   font-size: 0.68rem;
@@ -68,7 +71,6 @@
   border-radius: 3px;
   transition: background 0.12s;
 }
-
 .name:hover {
   background: rgba(116, 219, 137, 0.15);
 }
@@ -84,4 +86,14 @@
   outline: none;
   background: rgba(116, 219, 137, 0.06);
   color: var(--for-darkest, #374151);
+}
+
+/* Date sub-caption — shown when showDates is on, matches print .photo-date */
+.date {
+  font-size: 0.62rem;
+  font-weight: 300;
+  color: #9ca3af;
+  text-align: center;
+  margin-top: 2px;
+  line-height: 1.3;
 }

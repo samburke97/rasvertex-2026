@@ -1,15 +1,6 @@
 /* components/reports/condition/sections/CoverSection.module.css */
-/* ─────────────────────────────────────────────────────────────────────────
-   Cover page: A4 canvas (794 × 1123px).
-   Hero uses three stacked absolute layers:
-     1. Navy base
-     2. Optional cover photo (background-image)
-     3. Dark blue tint overlay
-   Flat bottom edge — no chevron.
-   All text in hero uses Bebas Neue. Body meta uses Inter.
-   ───────────────────────────────────────────────────────────────────────── */
 
-@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
 
 /* ── Page shell ──────────────────────────────────────────────────────────── */
 .page {
@@ -28,23 +19,19 @@
   position: relative;
 }
 
-/* ── Hero container ──────────────────────────────────────────────────────── */
+/* ── Hero ────────────────────────────────────────────────────────────────── */
 .hero {
   position: relative;
-  height: 500px;
+  height: 580px;
   flex-shrink: 0;
-  /* No overflow:hidden — the chevron needs to bleed into the white body */
+  overflow: hidden;
 }
-
-/* Layer 1 — solid navy base */
 .heroNavy {
   position: absolute;
   inset: 0;
   background: #0d1c45;
   z-index: 0;
 }
-
-/* Layer 2 — optional cover photo */
 .heroCoverPhoto {
   position: absolute;
   inset: 0;
@@ -52,54 +39,42 @@
   background-position: center;
   z-index: 1;
 }
-
-/* Layer 3 — dark tint overlay (always shown, dims photo when present) */
 .heroOverlay {
   position: absolute;
   inset: 0;
   background: rgba(10, 22, 60, 0.68);
   z-index: 2;
 }
-
-/* Layer 4 — flat bottom, no chevron */
 .heroChevron {
   display: none;
 }
 
-/* ── Positioned content — all z-index 4+ ────────────────────────────────── */
-
-/* Top-left logo */
 .heroLogo {
   position: absolute;
   top: 2.5rem;
   left: 2.75rem;
   z-index: 4;
 }
-
 .heroLogoImg {
-  height: 62px;
+  height: 41px;
   width: auto;
   display: block;
 }
 
-/* Top-right website */
 .heroWeb {
   position: absolute;
   top: 2.6rem;
   right: 2.75rem;
   z-index: 4;
 }
-
 .heroWebImg {
-  height: 20px;
+  height: 22px;
   width: auto;
   display: block;
 }
 
-/* Bottom-right credentials — sit above the chevron, in the still-dark zone */
 .heroCreds {
   position: absolute;
-  /* Keep in the dark area — above where chevron starts */
   bottom: 2.5rem;
   right: 2.75rem;
   text-align: right;
@@ -108,83 +83,90 @@
   flex-direction: column;
   gap: 2px;
 }
-
 .heroCredsItem {
-  font-family: "Bebas Neue", "Barlow", sans-serif;
+  font-family: "Bebas Neue", Arial, sans-serif;
   font-size: 1rem;
   letter-spacing: 0.06em;
   line-height: 1.4;
 }
-
 .heroCredsKey {
   color: #fff;
   font-weight: 400;
 }
-
 .heroCredsVal {
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.6);
 }
 
-/* ── Body ────────────────────────────────────────────────────────────────── */
+/* ── Body — pushed to bottom with flex-end ──────────────────────────────── */
 .body {
-  padding: 2.5rem 2.75rem 3rem;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end; /* content sits at page bottom */
+  padding: 0 2.75rem 4.5rem; /* bottom matches summary footer spacing */
 }
 
-/* Report title — Bebas Neue, large */
+/* Title — Bebas Neue, NO border/underline */
 .reportTitle {
-  font-family: "Bebas Neue", "Barlow", sans-serif;
-  font-size: 2.6rem;
-  font-weight: 400; /* Bebas is inherently bold */
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 2.75rem;
+  font-weight: 400;
   letter-spacing: 0.04em;
   color: #0d1c45;
-  margin: 0 0 0.6rem;
-  line-height: 1.1;
+  line-height: 1.05;
   text-transform: uppercase;
+  margin: 0 0 1.25rem;
+  /* no border-bottom */
 }
 
-/* Intro paragraph — Inter */
+/* Intro */
 .intro {
   font-family: "Inter", Arial, sans-serif;
   font-size: 0.82rem;
-  color: #555;
-  line-height: 1.75;
-  margin: 0 0 2rem;
-  max-width: 460px;
+  font-weight: 300;
+  color: #666;
+  line-height: 1.8;
+  margin: 0 0 1.75rem;
+  max-width: 520px;
 }
 
-/* ── Meta table ──────────────────────────────────────────────────────────── */
+/* ── Meta table — shrinks to content width ───────────────────────────────── */
+/*
+ * Using display:table on the container and display:table-row / table-cell
+ * on children so the lines only extend as far as the text, not full page width.
+ * All borders match date-header lines: 1px #e5e7eb
+ */
 .meta {
-  display: grid;
-  grid-template-columns: 140px 1fr;
-  gap: 0;
-  border-top: 1px solid #eee;
+  display: table;
+  border-collapse: collapse;
 }
-
 .metaRow {
-  display: contents;
+  display: table-row;
 }
-
-/* Labels — Bebas Neue */
 .metaLabel {
-  font-family: "Bebas Neue", "Barlow", sans-serif;
-  font-size: 0.82rem;
+  display: table-cell;
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 0.78rem;
   letter-spacing: 0.1em;
   color: #0d1c45;
-  padding: 0.65rem 0;
-  border-bottom: 1px solid #f0f0f0;
-  display: flex;
-  align-items: center;
+  padding: 0.6rem 2rem 0.6rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+  vertical-align: middle;
 }
-
-/* Values — Inter */
 .metaValue {
+  display: table-cell;
   font-family: "Inter", Arial, sans-serif;
   font-size: 0.82rem;
+  font-weight: 300;
   color: #333;
-  padding: 0.65rem 0 0.65rem 1rem;
-  border-bottom: 1px solid #f0f0f0;
-  display: flex;
-  align-items: center;
-  min-height: 38px;
+  padding: 0.6rem 3rem 0.6rem 0;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: middle;
+  min-width: 160px;
+}
+/* Top border on first row only */
+.metaRow:first-child .metaLabel,
+.metaRow:first-child .metaValue {
+  border-top: 1px solid #e5e7eb;
 }

@@ -12,14 +12,14 @@ interface SummarySectionProps {
   onRecommendationsChange: (value: string) => void;
 }
 
-// Partner association logos — 6 images in one row
-const PARTNERS = [
-  { src: "/reports/partners/smart-strata.png", alt: "Smart Strata" },
-  { src: "/reports/partners/ebix.png", alt: "Ebix" },
-  { src: "/reports/partners/trades-monitor.png", alt: "Trades Monitor" },
-  { src: "/reports/partners/pegasus.png", alt: "Pegasus" },
-  { src: "/reports/partners/community-select.png", alt: "Community Select" },
-  { src: "/reports/partners/haymes.png", alt: "Haymes Paint" },
+// Association logos from public/reports/associations/
+const ASSOCIATIONS = [
+  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
+  { src: "/reports/associations/dulux.png", alt: "Dulux" },
+  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
+  { src: "/reports/associations/mpa.png", alt: "MPA" },
+  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
+  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
 ];
 
 export default function SummarySection({
@@ -43,7 +43,6 @@ export default function SummarySection({
 
       {/* ── Body ── */}
       <div className={styles.body}>
-        {/* Comments */}
         <div className={styles.section}>
           <div className={styles.sectionLabel}>Comments:</div>
           <div className={styles.sectionText}>
@@ -57,7 +56,6 @@ export default function SummarySection({
           </div>
         </div>
 
-        {/* Recommendations */}
         <div className={styles.section}>
           <div className={styles.sectionLabel}>Recommendations:</div>
           <div className={styles.sectionText}>
@@ -72,15 +70,15 @@ export default function SummarySection({
         </div>
       </div>
 
-      {/* ── Footer: partner logos in one row ── */}
+      {/* ── Footer: association logos ── */}
       <div className={styles.footer}>
-        {PARTNERS.map((p) => (
+        {ASSOCIATIONS.map((a) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            key={p.alt}
-            src={p.src}
-            alt={p.alt}
-            className={styles.partnerLogo}
+            key={a.alt}
+            src={a.src}
+            alt={a.alt}
+            className={styles.assocLogo}
           />
         ))}
       </div>

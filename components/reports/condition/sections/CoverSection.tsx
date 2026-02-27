@@ -22,36 +22,18 @@ const META_ROWS: { label: string; field: keyof ReportJobDetails }[] = [
 export default function CoverSection({ job, onChange }: CoverSectionProps) {
   return (
     <div className={styles.page}>
-      {/* ── Hero ────────────────────────────────────────────────────────── */}
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div className={styles.hero}>
-        {/* Layer 1 — solid navy base, always visible */}
         <div className={styles.heroNavy} />
-
-        {/* Layer 2 — cover photo (only when provided) */}
         {job.coverPhoto && (
           <div
             className={styles.heroCoverPhoto}
             style={{ backgroundImage: `url(${job.coverPhoto})` }}
           />
         )}
-
-        {/* Layer 3 — dark blue tint overlay, always on top of photo */}
         <div className={styles.heroOverlay} />
-
-        {/* Layer 4 — white chevron shape cut out at the bottom */}
-        {/*
-          The chevron is a white element using clip-path to create the
-          upward-pointing V shape. Three points:
-            - bottom-left corner  (0%, 100%)
-            - center peak         (~32% from left, ~62% height)
-            - bottom-right corner (100%, 100%)
-          This is positioned absolutely at the bottom of the hero.
-        */}
         <div className={styles.heroChevron} />
 
-        {/* ── Content (all z-index above the layers) ── */}
-
-        {/* Top-left: RAS Vertex logo */}
         <div className={styles.heroLogo}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -60,8 +42,6 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
             className={styles.heroLogoImg}
           />
         </div>
-
-        {/* Top-right: website link image */}
         <div className={styles.heroWeb}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -70,8 +50,6 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
             className={styles.heroWebImg}
           />
         </div>
-
-        {/* Bottom-right: QBCC / ABN in Bebas */}
         <div className={styles.heroCreds}>
           <div className={styles.heroCredsItem}>
             <span className={styles.heroCredsKey}>QBCC:</span>
@@ -84,9 +62,8 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
         </div>
       </div>
 
-      {/* ── Body ────────────────────────────────────────────────────────── */}
+      {/* ── Body — pushed to page bottom ─────────────────────────────── */}
       <div className={styles.body}>
-        {/* Editable title in Bebas */}
         <h1 className={styles.reportTitle}>
           <EditableField
             value={job.reportType}
@@ -102,22 +79,27 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
           scope.
         </p>
 
-        {/* Meta table */}
-        <dl className={styles.meta}>
-          {META_ROWS.map(({ label, field }) => (
-            <div key={field} className={styles.metaRow}>
-              <dt className={styles.metaLabel}>{label}</dt>
-              <dd className={styles.metaValue}>
-                <EditableField
-                  value={job[field] as string}
-                  onChange={(v) => onChange(field, v)}
-                  placeholder={`Enter ${label.toLowerCase()}`}
-                  label={label}
-                />
-              </dd>
-            </div>
-          ))}
-        </dl>
+        {/*
+          Meta uses a real <table> so border-collapse works correctly
+          and lines only span as wide as the content — not full page width.
+        */}
+        <table className={styles.meta}>
+          <tbody>
+            {META_ROWS.map(({ label, field }) => (
+              <tr key={field} className={styles.metaRow}>
+                <td className={styles.metaLabel}>{label}</td>
+                <td className={styles.metaValue}>
+                  <EditableField
+                    value={job[field] as string}
+                    onChange={(v) => onChange(field, v)}
+                    placeholder={`Enter ${label.toLowerCase()}`}
+                    label={label}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

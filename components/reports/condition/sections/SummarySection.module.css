@@ -1,13 +1,11 @@
 /* components/reports/condition/sections/SummarySection.module.css */
-/* Matches the reference design:
-   - White page, no hero box
-   - "SUMMARY" in Bebas Neue top-left, link_blue.png top-right
-   - Section labels in Bebas Neue with colon e.g. "COMMENTS:"
-   - Body text in Inter
-   - Footer: 6 partner logos in one centred row
-*/
+/* ─────────────────────────────────────────────────────────────────────────
+   Summary page — A4 (794 × 1123px)
+   Bebas Neue: headings + labels | Inter Light (300): body
+   Footer: 6 association logos, same size, 20px gap
+   ───────────────────────────────────────────────────────────────────────── */
 
-@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
 
 /* ── Page shell ──────────────────────────────────────────────────────────── */
 .page {
@@ -34,7 +32,7 @@
   flex-shrink: 0;
 }
 
-/* "SUMMARY" — Bebas Neue, large, navy */
+/* "SUMMARY" — Bebas Neue, navy */
 .title {
   font-family: "Bebas Neue", Arial, sans-serif;
   font-size: 3rem;
@@ -46,7 +44,7 @@
   text-transform: uppercase;
 }
 
-/* Top-right website link image */
+/* link_blue — 22px, same as link_white on cover */
 .topBarLink {
   height: 22px;
   width: auto;
@@ -63,17 +61,16 @@
   gap: 2.25rem;
 }
 
-/* ── Section ─────────────────────────────────────────────────────────────── */
 .section {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-/* "COMMENTS:" — Bebas Neue, navy, with colon */
+/* "COMMENTS:" — Bebas Neue, navy */
 .sectionLabel {
   font-family: "Bebas Neue", Arial, sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 400;
   letter-spacing: 0.08em;
   color: #0d1c45;
@@ -81,30 +78,44 @@
   line-height: 1;
 }
 
-/* Body text — Inter */
+/* Body text — Inter Light */
 .sectionText {
   font-family: "Inter", Arial, sans-serif;
   font-size: 0.85rem;
+  font-weight: 300;
   color: #444;
-  line-height: 1.8;
+  line-height: 1.85;
+}
+.sectionText *,
+.sectionText span,
+.sectionText input,
+.sectionText div,
+.sectionText textarea {
+  font-family: "Inter", Arial, sans-serif !important;
+  font-weight: 300 !important;
+  color: #444 !important;
+  line-height: 1.85 !important;
 }
 
-/* ── Footer: partner logos ───────────────────────────────────────────────── */
+/* ── Footer: association logos ───────────────────────────────────────────── */
 .footer {
   margin-top: auto;
   padding: 1.5rem 2.75rem 2rem;
-  border-top: 1px solid #eee;
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  border-top: 1px solid #ebebeb;
+  display: flex;
+  flex-direction: row;
   align-items: center;
-  justify-items: center;
-  gap: 1rem;
+  justify-content: center;
+  gap: 20px; /* exactly 20px between logos */
+  flex-wrap: nowrap;
 }
 
-.partnerLogo {
+/* All logos same height, same proportional width */
+.assocLogo {
   height: 36px;
   width: auto;
-  max-width: 100%;
+  max-width: 80px;
   object-fit: contain;
   display: block;
+  opacity: 0.85;
 }

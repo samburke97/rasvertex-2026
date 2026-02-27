@@ -38,6 +38,8 @@ const DEFAULT_REPORT: ConditionReportData = {
     preparedBy: "Phil Clark",
     address: "",
     reportType: "Building Condition Report",
+    intro:
+      "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
     project: "",
     date: new Date().toLocaleDateString("en-AU"),
     coverPhoto: null,
