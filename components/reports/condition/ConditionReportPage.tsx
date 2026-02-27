@@ -61,9 +61,10 @@ export default function ConditionReportPage({
   });
 
   // ── Photo SSE stream ──────────────────────────────────────────────────────
+  // API sends named SSE events: event: photo|progress|start|done|error
+  // Photo payload fields: { id, name, url, size, dateAdded }  (flat, not nested)
   const fetchPhotos = useCallback(async (jobId: string) => {
     setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
-    const incoming: ReportPhoto[] = [];
 
     try {
       const response = await fetch(
@@ -85,36 +86,122 @@ export default function ConditionReportPage({
         buffer = frames.pop() ?? "";
 
         for (const frame of frames) {
-          const line = frame.startsWith("data: ") ? frame.slice(6) : frame;
+          if (!frame.trim()) continue;
+
+          // Parse named SSE frame: extract event name and data line
+          const lines = frame.split("\n");
+          let eventName = "message";
+          let dataLine = "";
+          for (const line of lines) {
+            if (line.startsWith("event: ")) eventName = line.slice(7).trim();
+            if (line.startsWith("data: ")) dataLine = line.slice(6).trim();
+          }
+          if (!dataLine) continue;
+
+          let payload: Record<string, unknown>;
           try {
-            const msg = JSON.parse(line);
-            if (msg.type === "progress") {
+            payload = JSON.parse(dataLine);
+          } catch {
+            continue;
+          }
+
+          switch (eventName) {
+            case "start":
               setImportStatus({
                 phase: "fetching-photos",
-                loaded: msg.loaded,
-                total: msg.total,
+                loaded: 0,
+                total: payload.total as number,
               });
-            } else if (msg.type === "photo") {
-              incoming.push(msg.photo);
-            }
-          } catch {}
+              break;
+
+            case "photo":
+              // Photo fields are flat on payload: id, name, url, size, dateAdded
+              setReport((prev) => ({
+                ...prev,
+                photos: [
+                  ...prev.photos,
+                  {
+                    id: payload.id as string,
+                    name: payload.name as string,
+                    url: payload.url as string,
+                    size: payload.size as number,
+                    dateAdded: (payload.dateAdded as string) ?? null,
+                  },
+                ],
+              }));
+              break;
+
+            case "progress":
+              setImportStatus({
+                phase: "fetching-photos",
+                loaded: payload.loaded as number,
+                total: payload.total as number,
+              });
+              break;
+
+            case "done":
+              setImportStatus({ phase: "idle" });
+              break;
+
+            case "error":
+              setImportStatus({
+                phase: "error",
+                message: (payload.message as string) || "Failed to load photos",
+              });
+              break;
+          }
         }
       }
 
-      setReport((prev) => ({
-        ...prev,
-        photos: [...prev.photos, ...incoming],
-      }));
-      setImportStatus({ phase: "idle" });
+      // Stream ended cleanly — ensure we're back to idle
+      setImportStatus((prev) =>
+        prev.phase === "fetching-photos" ? { phase: "idle" } : prev,
+      );
     } catch (err) {
       console.error("Photo fetch error:", err);
-      setImportStatus({ phase: "idle" });
+      setImportStatus({
+        phase: "error",
+        message: err instanceof Error ? err.message : "Failed to load photos",
+      });
     }
   }, []);
 
+  // ── Main import handler — fetches job details THEN photos ─────────────────
   const handleImport = useCallback(
-    (jobId: string) => {
-      fetchPhotos(jobId);
+    async (jobNumber: string) => {
+      // Step 1: fetch job details to populate cover fields
+      setImportStatus({ phase: "fetching-job" });
+      try {
+        const res = await fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `HTTP ${res.status}`);
+        }
+        const enrichedJob: EnrichedJob = await res.json();
+        const jobDetails = mapJobToReportDetails(enrichedJob);
+
+        // Populate cover fields — preserve any user edits to coverPhoto
+        setReport((prev) => ({
+          ...prev,
+          job: {
+            ...jobDetails,
+            coverPhoto: prev.job.coverPhoto, // keep existing cover photo if set
+          },
+        }));
+      } catch (err) {
+        console.error("Job fetch error:", err);
+        setImportStatus({
+          phase: "error",
+          message:
+            err instanceof Error
+              ? `Job details failed: ${err.message}`
+              : "Failed to load job details",
+        });
+        return; // don't attempt photo fetch if job fetch failed
+      }
+
+      // Step 2: fetch photos via SSE stream
+      await fetchPhotos(jobNumber);
     },
     [fetchPhotos],
   );
@@ -222,11 +309,6 @@ export default function ConditionReportPage({
             {filteredPhotos.length !== 1 ? "s" : ""}
           </div>
 
-          {/*
-           * PhotoSection now renders its own A4 page blocks directly.
-           * No wrapper div here — the old .photoPage wrapper is removed.
-           * Each page is a discrete 794px white card matching PDF output exactly.
-           */}
           <PhotoSection
             photos={filteredPhotos}
             importStatus={importStatus}

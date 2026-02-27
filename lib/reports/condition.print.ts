@@ -58,6 +58,15 @@ function groupPhotosByDate(photos: Photo[]): PhotoGroup[] {
 
 const D = "#e5e7eb";
 
+const ASSOCIATION_LOGOS = [
+  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
+  { src: "/reports/associations/dulux.png", alt: "Dulux" },
+  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
+  { src: "/reports/associations/mpa.png", alt: "MPA" },
+  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
+  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
+];
+
 const PRINT_STYLES = `
   @page { size: A4; margin: 0; }
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -91,73 +100,99 @@ const PRINT_STYLES = `
   .cover-hero-navy { position: absolute; inset: 0; background: #0d1c45; }
   .cover-hero-photo { position: absolute; inset: 0; background-size: cover; background-position: center; }
   .cover-hero-overlay { position: absolute; inset: 0; background: rgba(10,22,60,0.68); }
-
   .cover-logo { position: absolute; top: 2.5rem; left: 2.75rem; z-index: 5; }
   .cover-logo img { height: 41px; width: auto; display: block; }
   .cover-web { position: absolute; top: 2.6rem; right: 2.75rem; z-index: 5; }
   .cover-web img { height: 22px; width: auto; display: block; }
 
-  .cover-creds {
-    position: absolute; bottom: 2.5rem; right: 2.75rem;
-    text-align: right; z-index: 5;
-    display: flex; flex-direction: column; gap: 3px;
-  }
-  .creds-item { display: flex; align-items: baseline; justify-content: flex-end; line-height: 1.4; }
-  .cred-key { font-family: 'Bebas Neue', Arial, sans-serif; font-size: 0.95rem; letter-spacing: 0.08em; color: #fff; }
-  .cred-val { font-family: 'Inter', Arial, sans-serif; font-size: 0.82rem; font-weight: 300; color: #fff; padding-left: 0.25rem; }
-
   /*
-   * Cover body: justify-content:center so the title/intro/meta block sits
-   * in the dead middle of the white area below the hero image.
-   * (Was justify-content:flex-end with padding-bottom:4.5rem — changed.)
+   * Body: flex column
+   *   .cover-title-group — flex:1, centres title+intro vertically
+   *   .cover-meta-wrap   — sits below, compact
+   *   .cover-footer      — association logos pinned to bottom
    */
   .cover-body {
     flex: 1;
     display: flex;
     flex-direction: column;
+    padding: 0 2.75rem 0;
+  }
+
+  .cover-title-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     justify-content: center;
-    padding: 0 2.75rem;
   }
 
   .cover-title {
     font-family: 'Bebas Neue', Arial, sans-serif;
-    font-size: 2.75rem; letter-spacing: 0.04em; color: #0d1c45;
-    line-height: 1.05; text-transform: uppercase;
+    font-size: 2.75rem;
+    letter-spacing: 0.04em;
+    color: #0d1c45;
+    line-height: 1.05;
+    text-transform: uppercase;
     margin-bottom: 1.25rem;
   }
 
   .cover-intro {
     font-family: 'Inter', Arial, sans-serif;
-    font-size: 0.82rem; font-weight: 300; color: #666;
-    line-height: 1.8; max-width: 520px; margin-bottom: 1.75rem;
+    font-size: 0.82rem;
+    font-weight: 300;
+    color: #666;
+    line-height: 1.8;
     white-space: pre-wrap;
   }
 
+  .cover-meta-wrap {
+    padding-bottom: 2rem;
+  }
+
   /*
-   * Meta table — labels include colon suffix, tighter right padding (1rem)
-   * so values sit close to their labels, matching the editor layout.
+   * width:1px shrink-wraps the table to its content.
+   * Labels and values are tight — no min-width, no stretching.
    */
   .cover-meta {
     border-collapse: collapse;
+    width: 1px;
   }
   .cover-meta td {
     font-family: 'Inter', Arial, sans-serif;
-    font-size: 0.82rem; font-weight: 300;
-    padding: 0.5rem 0;
+    font-size: 0.82rem;
+    font-weight: 300;
+    padding: 0.4rem 0;
     border-bottom: 1px solid ${D};
     vertical-align: middle;
+    white-space: nowrap;
   }
   .cover-meta tr:first-child td { border-top: 1px solid ${D}; }
   .cover-meta td.lbl {
     font-family: 'Bebas Neue', Arial, sans-serif;
-    font-size: 0.78rem; letter-spacing: 0.1em; color: #0d1c45;
-    padding-right: 1rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    color: #0d1c45;
+    padding-right: 1.25rem;
     white-space: nowrap;
   }
-  .cover-meta td.val {
-    color: #333;
-    padding-right: 3rem;
-    min-width: 160px;
+  .cover-meta td.val { color: #333; }
+
+  /* Cover footer — identical to summary footer */
+  .cover-footer {
+    padding: 1.5rem 0 2rem;
+    border-top: 1px solid #ebebeb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: nowrap;
+  }
+  .cover-footer img {
+    height: 36px;
+    width: auto;
+    max-width: 80px;
+    object-fit: contain;
+    display: block;
+    opacity: 0.85;
   }
 
   /* ── PHOTO PAGES ─────────────────────────────────────────────────────────── */
@@ -216,9 +251,10 @@ const PRINT_STYLES = `
   }
   .summary-footer {
     margin-top: auto;
-    padding: 1.5rem 2.75rem;
-    border-top: 1px solid ${D};
+    padding: 1.5rem 2.75rem 2rem;
+    border-top: 1px solid #ebebeb;
     display: flex; align-items: center; justify-content: center; gap: 20px;
+    flex-wrap: nowrap;
   }
   .summary-footer img {
     height: 36px; width: auto; max-width: 80px;
@@ -226,19 +262,9 @@ const PRINT_STYLES = `
   }
 `;
 
-const ASSOCIATION_LOGOS = [
-  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
-  { src: "/reports/associations/dulux.png", alt: "Dulux" },
-  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
-  { src: "/reports/associations/mpa.png", alt: "MPA" },
-  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
-  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
-];
-
 export function buildPrintHTML(report: ConditionReportData): string {
   const { showDates } = report.settings;
 
-  // ── Photo section HTML ────────────────────────────────────────────────
   let photoSectionInner = "";
   let globalIndex = 0;
 
@@ -247,19 +273,12 @@ export function buildPrintHTML(report: ConditionReportData): string {
     photoSectionInner = groups
       .map((group) => {
         const header = group.label
-          ? `<div class="date-header">
-            <span class="date-line"></span>
-            <span class="date-text">${esc(group.label)}</span>
-            <span class="date-line"></span>
-          </div>`
+          ? `<div class="date-header"><span class="date-line"></span><span class="date-text">${esc(group.label)}</span><span class="date-line"></span></div>`
           : "";
         const items = group.photos
           .map((photo) => {
             globalIndex++;
-            return `<div class="photo-item">
-          <div class="photo-thumb"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div>
-          <div class="photo-caption">${globalIndex}. ${esc(stripExt(photo.name))}</div>
-        </div>`;
+            return `<div class="photo-item"><div class="photo-thumb"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div><div class="photo-caption">${globalIndex}. ${esc(stripExt(photo.name))}</div></div>`;
           })
           .join("\n");
         return `<div class="date-group">${header}<div class="photo-grid">${items}</div></div>`;
@@ -269,21 +288,16 @@ export function buildPrintHTML(report: ConditionReportData): string {
     const items = report.photos
       .map(
         (photo, i) =>
-          `<div class="photo-item">
-        <div class="photo-thumb"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div>
-        <div class="photo-caption">${i + 1}. ${esc(stripExt(photo.name))}</div>
-      </div>`,
+          `<div class="photo-item"><div class="photo-thumb"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div><div class="photo-caption">${i + 1}. ${esc(stripExt(photo.name))}</div></div>`,
       )
       .join("\n");
     photoSectionInner = `<div class="photo-grid">${items}</div>`;
   }
 
-  // ── Cover ─────────────────────────────────────────────────────────────
   const coverPhotoLayer = report.job.coverPhoto
     ? `<div class="cover-hero-photo" style="background-image:url('${report.job.coverPhoto}')"></div>`
     : "";
 
-  // Labels include colon suffix — matches editor JSX {label}:
   const metaRows = [
     { label: "Prepared For:", value: report.job.preparedFor },
     { label: "Prepared By:", value: report.job.preparedBy },
@@ -324,15 +338,16 @@ export function buildPrintHTML(report: ConditionReportData): string {
     <div class="cover-hero-overlay"></div>
     <div class="cover-logo"><img src="/reports/ras-logo.png" alt="RAS Vertex" /></div>
     <div class="cover-web"><img src="/reports/link_white.png" alt="rasvertex.com.au" /></div>
-    <div class="cover-creds">
-      <div class="creds-item"><span class="cred-key">QBCC:</span><span class="cred-val">1307234</span></div>
-      <div class="creds-item"><span class="cred-key">ABN:</span><span class="cred-val">53 167 652 637</span></div>
-    </div>
   </div>
   <div class="cover-body">
-    <div class="cover-title">${esc(report.job.reportType || "Building Condition Report")}</div>
-    <div class="cover-intro">${esc(introText)}</div>
-    <table class="cover-meta">${metaRows}</table>
+    <div class="cover-title-group">
+      <div class="cover-title">${esc(report.job.reportType || "Building Condition Report")}</div>
+      <div class="cover-intro">${esc(introText)}</div>
+    </div>
+    <div class="cover-meta-wrap">
+      <table class="cover-meta">${metaRows}</table>
+    </div>
+    <div class="cover-footer">${assocHTML}</div>
   </div>
 </div>
 

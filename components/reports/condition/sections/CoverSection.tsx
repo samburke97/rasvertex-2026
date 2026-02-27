@@ -19,10 +19,19 @@ const META_ROWS: { label: string; field: keyof ReportJobDetails }[] = [
   { label: "Date", field: "date" },
 ];
 
+const ASSOCIATIONS = [
+  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
+  { src: "/reports/associations/dulux.png", alt: "Dulux" },
+  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
+  { src: "/reports/associations/mpa.png", alt: "MPA" },
+  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
+  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
+];
+
 export default function CoverSection({ job, onChange }: CoverSectionProps) {
   return (
     <div className={styles.page}>
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      {/* ── Hero ───────────────────────────────────────────────────── */}
       <div className={styles.hero}>
         <div className={styles.heroNavy} />
         {job.coverPhoto && (
@@ -32,8 +41,6 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
           />
         )}
         <div className={styles.heroOverlay} />
-        <div className={styles.heroChevron} />
-
         <div className={styles.heroLogo}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -50,72 +57,64 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
             className={styles.heroWebImg}
           />
         </div>
-        <div className={styles.heroCreds}>
-          <div className={styles.heroCredsItem}>
-            <span className={styles.heroCredsKey}>QBCC:</span>
-            <span className={styles.heroCredsVal}> 1307234</span>
-          </div>
-          <div className={styles.heroCredsItem}>
-            <span className={styles.heroCredsKey}>ABN:</span>
-            <span className={styles.heroCredsVal}> 53 167 652 637</span>
-          </div>
-        </div>
       </div>
 
-      {/* ── Body — pushed to page bottom ─────────────────────────────── */}
+      {/* ── White body ─────────────────────────────────────────────── */}
       <div className={styles.body}>
-        {/*
-         * Using <div> instead of <h1> to avoid globals.css h1 font-family
-         * override fighting the Bebas Neue declaration.
-         */}
-        <div className={styles.reportTitle}>
-          <EditableField
-            value={job.reportType}
-            onChange={(v) => onChange("reportType", v)}
-            placeholder="Report Title"
-            label="Report Title"
-          />
+        {/* Title + description — centred vertically in space above meta */}
+        <div className={styles.titleGroup}>
+          <div className={styles.reportTitle}>
+            <EditableField
+              value={job.reportType}
+              onChange={(v) => onChange("reportType", v)}
+              placeholder="Report Title"
+              label="Report Title"
+            />
+          </div>
+          <div className={styles.intro}>
+            <EditableField
+              value={job.intro}
+              onChange={(v) => onChange("intro", v)}
+              placeholder="Enter report description…"
+              label="Report Description"
+              multiline
+            />
+          </div>
         </div>
 
-        {/*
-         * Intro paragraph — was a static <p>, now an EditableField so users
-         * can customise the description text that appears under the title.
-         * Uses multiline so Enter creates new lines, matching PDF output.
-         * print: .cover-intro { ... }  ←→  styles.intro wrapper
-         */}
-        <div className={styles.intro}>
-          <EditableField
-            value={job.intro}
-            onChange={(v) => onChange("intro", v)}
-            placeholder="Enter report description…"
-            label="Report Description"
-            multiline
-          />
+        {/* Meta fields — shrink-wrapped table, tight labels to values */}
+        <div className={styles.metaWrap}>
+          <table className={styles.meta}>
+            <tbody>
+              {META_ROWS.map(({ label, field }) => (
+                <tr key={field} className={styles.metaRow}>
+                  <td className={styles.metaLabel}>{label}:</td>
+                  <td className={styles.metaValue}>
+                    <EditableField
+                      value={job[field] as string}
+                      onChange={(v) => onChange(field, v)}
+                      placeholder={`Enter ${label.toLowerCase()}`}
+                      label={label}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
-        {/*
-         * Meta table — real <table> so border-collapse works correctly and
-         * lines only span as wide as the content, matching print output.
-         * Labels now include a colon suffix and the right-padding is tighter
-         * so values sit closer to their labels.
-         */}
-        <table className={styles.meta}>
-          <tbody>
-            {META_ROWS.map(({ label, field }) => (
-              <tr key={field} className={styles.metaRow}>
-                <td className={styles.metaLabel}>{label}:</td>
-                <td className={styles.metaValue}>
-                  <EditableField
-                    value={job[field] as string}
-                    onChange={(v) => onChange(field, v)}
-                    placeholder={`Enter ${label.toLowerCase()}`}
-                    label={label}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {/* Footer — identical to SummarySection */}
+        <div className={styles.footer}>
+          {ASSOCIATIONS.map((a) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={a.alt}
+              src={a.src}
+              alt={a.alt}
+              className={styles.assocLogo}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
