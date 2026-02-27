@@ -1,4 +1,20 @@
-/* components/reports/condition/sections/CoverSection.module.css */
+/* components/reports/condition/sections/CoverSection.module.css
+ *
+ * WYSIWYG CONTRACT — every value must match lib/reports/condition.print.ts
+ *
+ * Print class → Editor class mapping:
+ *   .cover-hero-navy    → .heroNavy
+ *   .cover-hero-overlay → .heroOverlay
+ *   .cover-creds        → .heroCreds
+ *   .creds-item         → .heroCredsItem
+ *   .cred-key           → .heroCredsKey
+ *   .cred-val           → .heroCredsVal
+ *   .cover-body         → .body
+ *   .cover-title        → .reportTitle
+ *   .cover-intro        → .intro
+ *   .cover-meta td.lbl  → .metaLabel
+ *   .cover-meta td.val  → .metaValue
+ */
 
 @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
 
@@ -15,11 +31,12 @@
   display: flex;
   flex-direction: column;
   font-family: "Inter", Arial, sans-serif;
+  font-weight: 300;
   color: #1a1a2e;
   position: relative;
 }
 
-/* ── Hero ────────────────────────────────────────────────────────────────── */
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
 .hero {
   position: relative;
   height: 580px;
@@ -53,7 +70,7 @@
   position: absolute;
   top: 2.5rem;
   left: 2.75rem;
-  z-index: 4;
+  z-index: 5;
 }
 .heroLogoImg {
   height: 41px;
@@ -65,7 +82,7 @@
   position: absolute;
   top: 2.6rem;
   right: 2.75rem;
-  z-index: 4;
+  z-index: 5;
 }
 .heroWebImg {
   height: 22px;
@@ -73,44 +90,62 @@
   display: block;
 }
 
+/* print: .cover-creds { bottom:2.5rem; right:2.75rem; gap:3px } */
 .heroCreds {
   position: absolute;
   bottom: 2.5rem;
   right: 2.75rem;
   text-align: right;
-  z-index: 4;
+  z-index: 5;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
+
+/* NO font-family on wrapper — each child sets its own */
 .heroCredsItem {
-  font-family: "Bebas Neue", Arial, sans-serif;
-  font-size: 1rem;
-  letter-spacing: 0.06em;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
   line-height: 1.4;
 }
+
+/* print: .cred-key { font-family:'Bebas Neue'; font-size:0.95rem; letter-spacing:0.08em; color:#fff } */
 .heroCredsKey {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
   color: #fff;
   font-weight: 400;
 }
+
+/* print: .cred-val { font-family:'Inter'; font-size:0.82rem; font-weight:300; color:#fff; padding-left:0.25rem } */
 .heroCredsVal {
-  color: rgba(255, 255, 255, 0.6);
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: #fff;
+  padding-left: 0.25rem;
 }
 
-/* ── Body — pushed to bottom with flex-end ──────────────────────────────── */
+/* ── Body ─────────────────────────────────────────────────────────────────── */
+/*
+ * print: .cover-body { flex:1; display:flex; flex-direction:column;
+ *                      justify-content:center; padding:0 2.75rem }
+ *
+ * Changed from justify-content:flex-end to justify-content:center so the
+ * title/intro/meta block sits in the dead centre of the white area below
+ * the hero, matching the reference layout with equal space above and below.
+ */
 .body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  padding: 0 2.75rem 4.5rem;
+  justify-content: center;
+  padding: 0 2.75rem;
 }
 
-/*
- * Title — rendered as <div> (not <h1>) so globals.css h1 rules never interfere.
- * All child elements — including EditableField's .display span and .input —
- * inherit font-family, font-size, etc. directly from this div.
- */
+/* print: .cover-title { font-family:'Bebas Neue'; font-size:2.75rem; ... } */
 .reportTitle {
   font-family: "Bebas Neue", Arial, sans-serif;
   font-size: 2.75rem;
@@ -120,11 +155,26 @@
   line-height: 1.05;
   text-transform: uppercase;
   margin: 0 0 1.25rem;
-  /* EditableField .input has border-bottom: 2px green when active — that's correct UX.
-     No extra border here. */
 }
 
-/* Intro */
+/* Force EditableField children to fully inherit typographic properties */
+.reportTitle :global(.display),
+.reportTitle :global(.input) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: normal;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+.reportTitle :global(.placeholder) {
+  font-style: normal;
+  color: rgba(13, 28, 69, 0.35);
+}
+
+/* print: .cover-intro { font-size:0.82rem; font-weight:300; color:#666; line-height:1.8; max-width:520px; margin-bottom:1.75rem } */
 .intro {
   font-family: "Inter", Arial, sans-serif;
   font-size: 0.82rem;
@@ -135,43 +185,83 @@
   max-width: 520px;
 }
 
-/* ── Meta table — shrinks to content width ───────────────────────────────── */
-/*
- * Using display:table so lines only extend as wide as the text,
- * not full page width. border-collapse stops double borders.
- * All borders: 1px #e5e7eb — same as date-header lines in photo pages.
- */
+.intro :global(.wrapBlock) {
+  display: block;
+}
+.intro :global(.display),
+.intro :global(.textarea),
+.intro :global(.input) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: normal;
+  letter-spacing: inherit;
+  line-height: inherit;
+  color: inherit;
+  text-transform: none;
+  width: 100%;
+}
+.intro :global(.placeholder) {
+  font-style: normal;
+  color: #bbb;
+}
+
+/* ── Meta table ───────────────────────────────────────────────────────────── */
 .meta {
-  display: table;
   border-collapse: collapse;
 }
-.metaRow {
-  display: table-row;
-}
+
+/*
+ * print: td.lbl { font-family:'Bebas Neue'; font-size:0.78rem;
+ *                 letter-spacing:0.1em; color:#0d1c45;
+ *                 padding-right:1rem; white-space:nowrap }
+ */
 .metaLabel {
-  display: table-cell;
   font-family: "Bebas Neue", Arial, sans-serif;
   font-size: 0.78rem;
   letter-spacing: 0.1em;
   color: #0d1c45;
-  padding: 0.6rem 2rem 0.6rem 0;
+  padding: 0.5rem 1rem 0.5rem 0;
   border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
   vertical-align: middle;
 }
+
+/*
+ * print: td.val { color:#333; padding-right:3rem; min-width:160px }
+ */
 .metaValue {
-  display: table-cell;
   font-family: "Inter", Arial, sans-serif;
   font-size: 0.82rem;
   font-weight: 300;
   color: #333;
-  padding: 0.6rem 3rem 0.6rem 0;
+  padding: 0.5rem 3rem 0.5rem 0;
   border-bottom: 1px solid #e5e7eb;
   vertical-align: middle;
   min-width: 160px;
+  text-align: left;
 }
-/* Top border on first row only */
+
 .metaRow:first-child .metaLabel,
 .metaRow:first-child .metaValue {
   border-top: 1px solid #e5e7eb;
+}
+
+.metaValue :global(.wrap) {
+  display: block;
+  text-align: left;
+}
+.metaValue :global(.display),
+.metaValue :global(.input) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  font-style: normal;
+  text-align: left;
+  text-transform: none;
+}
+.metaValue :global(.placeholder) {
+  font-style: normal;
+  color: #bbb;
 }

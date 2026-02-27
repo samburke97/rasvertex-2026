@@ -12,6 +12,18 @@
 }
 
 /* ── Display (read) state ────────────────────────────────────────────────── */
+/*
+ * WYSIWYG principle: the read-state <span> must look identical to what
+ * Puppeteer renders. Every typographic property must inherit from the
+ * parent context (e.g. .reportTitle sets Bebas Neue + uppercase + tracking,
+ * and those must flow through here unchanged).
+ *
+ * Key fixes vs original:
+ *  - font-style: inherit  (was missing — caused italic bleed from .placeholder)
+ *  - text-transform: inherit  (was missing — most common WYSIWYG mismatch)
+ *  - letter-spacing: inherit  (was missing)
+ *  - font-family/size/weight/color: inherit  (already present, kept)
+ */
 .display {
   cursor: text;
   border-radius: 3px;
@@ -20,6 +32,15 @@
   transition: background 0.12s;
   display: inline;
   outline: none;
+
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  color: inherit;
 }
 
 .display:hover {
@@ -30,12 +51,22 @@
   background: rgba(116, 219, 137, 0.12);
 }
 
+/*
+ * Placeholder: muted colour only — NO font-style:italic.
+ * Italic breaks display fonts like Bebas Neue (no italic variant → browser
+ * synthesises a slanted version that looks wrong and differs from the PDF).
+ * The colour alone is sufficient to communicate "empty field".
+ */
 .placeholder {
   color: var(--for-light, #9ca3af);
-  font-style: italic;
 }
 
-/* ── Input / textarea ────────────────────────────────────────────────────── */
+/* ── Input ────────────────────────────────────────────────────────────────── */
+/*
+ * Must inherit everything the parent sets so the active typing state looks
+ * identical to the read state. text-transform is the most critical — without
+ * it an uppercase Bebas Neue title field would show lowercase while typing.
+ */
 .input {
   width: 100%;
   padding: 1px 3px;
@@ -43,15 +74,19 @@
   border: none;
   border-bottom: 2px solid var(--primary-400, #74db89);
   background: transparent;
-  font-size: inherit;
-  font-family: inherit;
-  font-weight: inherit;
-  color: inherit;
   outline: none;
-  line-height: inherit;
+
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
   letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  color: inherit;
 }
 
+/* ── Textarea ─────────────────────────────────────────────────────────────── */
 .textarea {
   display: block;
   width: 100%;
@@ -59,17 +94,21 @@
   border: 2px solid var(--primary-400, #74db89);
   border-radius: 4px;
   background: rgba(116, 219, 137, 0.04);
-  font-size: inherit;
-  font-family: inherit;
-  font-weight: inherit;
-  color: inherit;
   outline: none;
-  line-height: inherit;
   resize: none;
   overflow: hidden;
+
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  color: inherit;
 }
 
-/* ── Floating toolbar ────────────────────────────────────────────────────── */
+/* ── Floating toolbar ─────────────────────────────────────────────────────── */
 .toolbar {
   position: absolute;
   bottom: calc(100% + 8px);
@@ -89,12 +128,10 @@
     0 1px 3px rgba(0, 0, 0, 0.12);
 
   white-space: nowrap;
-
-  /* Animate in */
   animation: toolbarIn 0.12s ease-out;
 }
 
-/* Caret */
+/* Caret pointing down toward the field */
 .toolbar::after {
   content: "";
   position: absolute;
@@ -171,13 +208,12 @@
   font-size: 14px;
 }
 
-/* Active state for format toggles */
 .toolbarBtnActive {
   background: rgba(116, 219, 137, 0.2) !important;
   color: var(--primary-300, #7ceb92) !important;
 }
 
-/* Size picker dropdown */
+/* ── Size picker dropdown ─────────────────────────────────────────────────── */
 .sizeMenu {
   position: absolute;
   top: calc(100% + 6px);
@@ -215,7 +251,7 @@
   color: var(--primary-300, #7ceb92);
 }
 
-/* ── Field label hint ────────────────────────────────────────────────────── */
+/* ── Field label hint ─────────────────────────────────────────────────────── */
 .fieldLabel {
   position: absolute;
   top: calc(100% + 4px);

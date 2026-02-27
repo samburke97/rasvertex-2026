@@ -56,8 +56,7 @@ function groupPhotosByDate(photos: Photo[]): PhotoGroup[] {
   }));
 }
 
-// Single shared divider spec — all lines across the entire document are identical
-const D = "#e5e7eb"; // same light grey, 1px
+const D = "#e5e7eb";
 
 const PRINT_STYLES = `
   @page { size: A4; margin: 0; }
@@ -97,6 +96,7 @@ const PRINT_STYLES = `
   .cover-logo img { height: 41px; width: auto; display: block; }
   .cover-web { position: absolute; top: 2.6rem; right: 2.75rem; z-index: 5; }
   .cover-web img { height: 22px; width: auto; display: block; }
+
   .cover-creds {
     position: absolute; bottom: 2.5rem; right: 2.75rem;
     text-align: right; z-index: 5;
@@ -107,19 +107,18 @@ const PRINT_STYLES = `
   .cred-val { font-family: 'Inter', Arial, sans-serif; font-size: 0.82rem; font-weight: 300; color: #fff; padding-left: 0.25rem; }
 
   /*
-   * Cover body: push content DOWN using justify-content: flex-end
-   * Bottom padding matches summary footer bottom (1.5rem padding + logos ~36px ≈ 4.5rem from bottom)
-   * This means last meta row sits the same distance from page bottom as the logo bar sits from page bottom
+   * Cover body: justify-content:center so the title/intro/meta block sits
+   * in the dead middle of the white area below the hero image.
+   * (Was justify-content:flex-end with padding-bottom:4.5rem — changed.)
    */
   .cover-body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
-    padding: 0 2.75rem 4.5rem;
+    justify-content: center;
+    padding: 0 2.75rem;
   }
 
-  /* Title — NO border, NO underline */
   .cover-title {
     font-family: 'Bebas Neue', Arial, sans-serif;
     font-size: 2.75rem; letter-spacing: 0.04em; color: #0d1c45;
@@ -131,20 +130,20 @@ const PRINT_STYLES = `
     font-family: 'Inter', Arial, sans-serif;
     font-size: 0.82rem; font-weight: 300; color: #666;
     line-height: 1.8; max-width: 520px; margin-bottom: 1.75rem;
+    white-space: pre-wrap;
   }
 
   /*
-   * Meta table — TRUE table element so lines stop at the rightmost text,
-   * not at the page edge. border-collapse so borders don't double up.
+   * Meta table — labels include colon suffix, tighter right padding (1rem)
+   * so values sit close to their labels, matching the editor layout.
    */
   .cover-meta {
     border-collapse: collapse;
-    /* width: auto means table shrinks to fit content */
   }
   .cover-meta td {
     font-family: 'Inter', Arial, sans-serif;
     font-size: 0.82rem; font-weight: 300;
-    padding: 0.6rem 0;
+    padding: 0.5rem 0;
     border-bottom: 1px solid ${D};
     vertical-align: middle;
   }
@@ -152,55 +151,27 @@ const PRINT_STYLES = `
   .cover-meta td.lbl {
     font-family: 'Bebas Neue', Arial, sans-serif;
     font-size: 0.78rem; letter-spacing: 0.1em; color: #0d1c45;
-    padding-right: 2rem;
+    padding-right: 1rem;
     white-space: nowrap;
   }
   .cover-meta td.val {
     color: #333;
-    padding-right: 3rem; /* generous right padding so last char isn't flush */
+    padding-right: 3rem;
     min-width: 160px;
   }
 
   /* ── PHOTO PAGES ─────────────────────────────────────────────────────────── */
-  /*
-   * padding: 2.75rem on all sides — same as summary page horizontal padding.
-   * This gives the date header breathing room from the page edge.
-   */
-  .photo-section {
-    padding: 2.75rem;
-  }
-
-  .date-group {
-    margin-bottom: 2.25rem;
-  }
-
-  /*
-   * Date header — SAME line design as meta table: 1px ${D}
-   * Lines flank the text symmetrically.
-   */
-  .date-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-  .date-line {
-    flex: 1;
-    height: 1px;
-    background: ${D};
-  }
+  .photo-section { padding: 2.75rem; }
+  .date-group { margin-bottom: 2.25rem; }
+  .date-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+  .date-line { flex: 1; height: 1px; background: ${D}; }
   .date-text {
     font-family: 'Inter', Arial, sans-serif;
     font-size: 0.65rem; font-weight: 600;
     letter-spacing: 0.1em; text-transform: uppercase;
     color: #9ca3af; white-space: nowrap;
   }
-
-  .photo-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.875rem;
-  }
+  .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.875rem; }
   .photo-item { break-inside: avoid; page-break-inside: avoid; }
   .photo-thumb { aspect-ratio: 1; background: #f3f4f6; border-radius: 6px; overflow: hidden; }
   .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -243,10 +214,9 @@ const PRINT_STYLES = `
     font-size: 0.85rem; font-weight: 300; color: #444;
     line-height: 1.85; white-space: pre-wrap;
   }
-  /* Footer — 1.5rem top padding above border, 1.5rem below = logos sit equidistant from bottom */
   .summary-footer {
     margin-top: auto;
-    padding: 1.5rem 2.75rem 1.5rem;
+    padding: 1.5rem 2.75rem;
     border-top: 1px solid ${D};
     display: flex; align-items: center; justify-content: center; gap: 20px;
   }
@@ -313,13 +283,13 @@ export function buildPrintHTML(report: ConditionReportData): string {
     ? `<div class="cover-hero-photo" style="background-image:url('${report.job.coverPhoto}')"></div>`
     : "";
 
-  // TRUE <table> element — browser renders lines only as wide as content
+  // Labels include colon suffix — matches editor JSX {label}:
   const metaRows = [
-    { label: "Prepared For", value: report.job.preparedFor },
-    { label: "Prepared By", value: report.job.preparedBy },
-    { label: "Address", value: report.job.address },
-    { label: "Project", value: report.job.project },
-    { label: "Date", value: report.job.date },
+    { label: "Prepared For:", value: report.job.preparedFor },
+    { label: "Prepared By:", value: report.job.preparedBy },
+    { label: "Address:", value: report.job.address },
+    { label: "Project:", value: report.job.project },
+    { label: "Date:", value: report.job.date },
   ]
     .map(
       (r) =>
