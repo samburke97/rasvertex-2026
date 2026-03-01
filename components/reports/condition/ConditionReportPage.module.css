@@ -71,18 +71,16 @@
 .canvas {
   flex: 1;
   background: #e8e8e8;
-  /* Vertical padding only at top/bottom — no gap between page sections */
   padding: 2.5rem 2rem 5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* NO gap here — pages sit directly against each other like a real PDF */
-  gap: 0;
+  gap: 2rem; /* ← uniform gap between ALL pages/sections */
   overflow-y: auto;
   min-height: 0;
 }
 
-/* Page labels float above each section — subtle, doesn't add spacing */
+/* Page labels sit above each section */
 .pageLabel {
   align-self: flex-start;
   margin-left: max(0px, calc(50% - 397px));
@@ -91,17 +89,13 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #aaa;
-  /* Push it up so it sits just above the next page block */
-  margin-top: 1.5rem;
-  margin-bottom: 0.4rem;
-}
-/* First page label needs no top margin */
-.canvas > .pageLabel:first-child {
-  margin-top: 0;
+  margin-top: 0; /* gap: 2rem on canvas handles spacing */
+  margin-bottom: -1.5rem; /* pull label close to the page below it */
 }
 
 .photoPage {
   width: 794px;
+  height: 1123px;
   background: #fff;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.1),

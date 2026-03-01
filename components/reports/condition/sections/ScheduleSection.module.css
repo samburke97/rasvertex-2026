@@ -1,39 +1,79 @@
 /* components/reports/condition/sections/ScheduleSection.module.css */
-/*
- * Schedule page — A4 preview block matching the photo/summary page style.
- * Table uses the design system's dark industrial aesthetic with amber accents.
- */
+/* ─────────────────────────────────────────────────────────────────────────
+   Schedule page — A4 (794 × 1123px)
+   Matches SummarySection layout exactly:
+     • topBar: title (Bebas Neue navy) left, link_blue right
+     • body: heading rule + table
+     • footer: 6 association logos
+   ───────────────────────────────────────────────────────────────────────── */
 
-/* ── A4 page block ───────────────────────────────────────────────────────── */
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
+
+/* ── Page shell ──────────────────────────────────────────────────────────── */
 .page {
   width: 794px;
+  min-height: 1123px;
   background: #fff;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.1),
     0 1px 4px rgba(0, 0, 0, 0.06);
   border-radius: 4px;
-}
-
-.pageContent {
-  padding: 2.75rem;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  font-family: "Inter", Arial, sans-serif;
+  color: #1a1a2e;
 }
 
-/* ── Section heading ─────────────────────────────────────────────────────── */
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+.topBar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 2.75rem 2.75rem 0;
+  flex-shrink: 0;
+}
+
+/* "SCHEDULE" — Bebas Neue, navy — identical to "SUMMARY" */
+.title {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 3rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #0d1c45;
+  line-height: 1;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.topBarLink {
+  height: 22px;
+  width: auto;
+  display: block;
+  margin-top: 0.5rem;
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.body {
+  padding: 2.5rem 2.75rem 2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Section heading (rule line) ─────────────────────────────────────────── */
 .heading {
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin-bottom: 0.25rem;
 }
 
 .headingTitle {
   font-family: "Bebas Neue", Arial, sans-serif;
-  font-size: 1.6rem;
+  font-size: 1.05rem;
   font-weight: 400;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   color: #0d1c45;
   text-transform: uppercase;
   line-height: 1;
@@ -46,147 +86,104 @@
   background: #e5e7eb;
 }
 
-/* ── Table wrapper ───────────────────────────────────────────────────────── */
+/* ── Table ───────────────────────────────────────────────────────────────── */
 .tableWrap {
-  border: 1px solid var(--out-medium, #d9dbdb);
-  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
   overflow: hidden;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-family: "Inter", "DM Sans", Arial, sans-serif;
 }
 
-/* ── Header ──────────────────────────────────────────────────────────────── */
-.th,
-.thNum,
-.thAction {
-  padding: 0.6rem 0.875rem;
-  font-size: 0.65rem;
+.th {
+  padding: 0.55rem 0.875rem;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--for-medium, #6b7280);
-  background: var(--con-light, #f9f9f9);
-  border-bottom: 1px solid var(--out-medium, #d9dbdb);
+  color: #6b7280;
+  background: #f9f9f9;
+  border-bottom: 1px solid #e5e7eb;
   text-align: left;
   white-space: nowrap;
 }
 
 .thNum {
+  composes: th;
   text-align: right;
   width: 110px;
 }
 
 .thAction {
+  composes: th;
   width: 36px;
-  padding: 0;
+  padding: 0.55rem 0.5rem;
 }
 
-/* ── Data rows ───────────────────────────────────────────────────────────── */
 .dataRow {
-  border-bottom: 1px solid var(--out-light, #f0f0f0);
-  transition: background 0.1s;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .dataRow:last-child {
   border-bottom: none;
 }
 
-.dataRow:hover {
-  background: rgba(116, 219, 137, 0.04);
-}
-
-.td,
-.tdNum,
-.tdNote,
-.tdAction {
-  padding: 0.5rem 0.875rem;
-  font-size: 0.8rem;
+.td {
+  padding: 0.48rem 0.875rem;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.78rem;
   font-weight: 300;
-  color: var(--for-darkest, #111827);
+  color: #111827;
   vertical-align: middle;
 }
 
 .tdNum {
+  composes: td;
   text-align: right;
   font-variant-numeric: tabular-nums;
   width: 110px;
 }
 
 .tdNote {
-  color: var(--for-medium, #6b7280);
-  font-size: 0.75rem;
+  composes: td;
+  color: #6b7280;
+  font-size: 0.72rem;
 }
 
 .tdAction {
+  padding: 0.48rem 0.5rem;
+  vertical-align: middle;
   width: 36px;
-  padding: 0 0.5rem;
-  text-align: center;
-}
-
-/* ── Editable cell ───────────────────────────────────────────────────────── */
-.cellDisplay {
-  cursor: text;
-  display: inline-block;
-  min-width: 1rem;
-  border-radius: 3px;
-  padding: 1px 3px;
-  margin: -1px -3px;
-  transition: background 0.12s;
-}
-
-.cellDisplay:hover {
-  background: rgba(116, 219, 137, 0.12);
-}
-
-.cellInput {
-  width: 100%;
-  border: 1px solid var(--primary-400, #74db89);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 0.8rem;
-  font-family: inherit;
-  font-weight: 300;
-  color: var(--for-darkest, #111827);
-  background: #fff;
-  outline: none;
-  min-width: 60px;
-}
-
-.cellInput[type="number"] {
-  text-align: right;
-  -moz-appearance: textfield;
-}
-.cellInput[type="number"]::-webkit-inner-spin-button,
-.cellInput[type="number"]::-webkit-outer-spin-button {
-  opacity: 1;
 }
 
 /* ── Totals row ──────────────────────────────────────────────────────────── */
 .totalsRow {
-  background: var(--con-light, #f9f9f9);
-  border-top: 2px solid var(--out-medium, #d9dbdb);
+  border-top: 2px solid #e5e7eb;
+  background: #f9f9f9;
 }
 
 .totalsLabel {
-  padding: 0.6rem 0.875rem;
-  font-size: 0.72rem;
+  padding: 0.55rem 0.875rem;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--for-darkest, #111827);
+  color: #111827;
   text-align: right;
 }
 
 .totalsCell {
-  padding: 0.6rem 0.875rem;
-  font-size: 0.82rem;
+  padding: 0.55rem 0.875rem;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.8rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--for-darkest, #111827);
+  color: #111827;
   text-align: right;
   width: 110px;
 }
@@ -275,4 +272,26 @@
 .stateText {
   font-size: 0.82rem;
   color: var(--for-medium, #6b7280);
+}
+
+/* ── Footer: association logos ───────────────────────────────────────────── */
+.footer {
+  margin-top: auto;
+  padding: 1.5rem 2.75rem 2rem;
+  border-top: 1px solid #ebebeb;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: nowrap;
+}
+
+.assocLogo {
+  height: 36px;
+  width: auto;
+  max-width: 80px;
+  object-fit: contain;
+  display: block;
+  opacity: 0.85;
 }

@@ -1,14 +1,9 @@
 "use client";
 // components/reports/condition/sections/ScheduleSection.tsx
-//
-// Editable schedule table — one row per employee per day.
-// Columns: Date | Employee | Scheduled Hrs | Actual Hrs | Note
-// Matches the RAS-VERTEX dark industrial design system.
 
 import React, { useState, useCallback } from "react";
 import styles from "./ScheduleSection.module.css";
 import type { ScheduleRow } from "@/lib/reports/condition.types";
-import { formatScheduleDate } from "@/lib/reports/condition.types";
 
 interface ScheduleSectionProps {
   rows: ScheduleRow[];
@@ -16,7 +11,17 @@ interface ScheduleSectionProps {
   onChange: (rows: ScheduleRow[]) => void;
 }
 
-// ── Editable cell ─────────────────────────────────────────────────────────────
+// Association logos — identical to SummarySection / CoverSection
+const ASSOCIATIONS = [
+  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
+  { src: "/reports/associations/dulux.png", alt: "Dulux" },
+  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
+  { src: "/reports/associations/mpa.png", alt: "MPA" },
+  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
+  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
+];
+
+// ── Editable cell (local — no shared component needed) ───────────────────────
 
 function EditableCell({
   value,
@@ -132,11 +137,20 @@ export default function ScheduleSection({
     onChange([...rows, newRow]);
   }, [rows, onChange]);
 
-  // ── Empty / loading states ──────────────────────────────────────────────
+  // ── Loading state ───────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className={styles.page}>
-        <div className={styles.pageContent}>
+        <div className={styles.topBar}>
+          <h1 className={styles.title}>Schedule</h1>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/reports/link_blue.png"
+            alt="rasvertex.com.au"
+            className={styles.topBarLink}
+          />
+        </div>
+        <div className={styles.body}>
           <div className={styles.stateWrap}>
             <div className={styles.spinner} />
             <span className={styles.stateText}>
@@ -144,14 +158,37 @@ export default function ScheduleSection({
             </span>
           </div>
         </div>
+        <div className={styles.footer}>
+          {ASSOCIATIONS.map((a) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={a.alt}
+              src={a.src}
+              alt={a.alt}
+              className={styles.assocLogo}
+            />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className={styles.page}>
-      <div className={styles.pageContent}>
-        {/* Section heading */}
+      {/* ── Top bar: SCHEDULE left, link_blue right ── */}
+      <div className={styles.topBar}>
+        <h1 className={styles.title}>Schedule</h1>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/reports/link_blue.png"
+          alt="rasvertex.com.au"
+          className={styles.topBarLink}
+        />
+      </div>
+
+      {/* ── Body ── */}
+      <div className={styles.body}>
+        {/* Section heading with rule */}
         <div className={styles.heading}>
           <div className={styles.headingTitle}>Hours Schedule</div>
           <div className={styles.headingRule} />
@@ -233,10 +270,11 @@ export default function ScheduleSection({
                         fill="none"
                       >
                         <path
-                          d="M2 2l10 10M12 2L2 12"
+                          d="M2 3.5h10M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M6 6v4M8 6v4M3 3.5l.7 7.3a1 1 0 001 .9h4.6a1 1 0 001-.9L11 3.5"
                           stroke="currentColor"
-                          strokeWidth="1.8"
+                          strokeWidth="1.25"
                           strokeLinecap="round"
+                          strokeLinejoin="round"
                         />
                       </svg>
                     </button>
@@ -254,16 +292,29 @@ export default function ScheduleSection({
 
         {/* Add row */}
         <button className={styles.addRow} onClick={addRow}>
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path
-              d="M7 1v12M1 7h12"
+              d="M6 1v10M1 6h10"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="1.5"
               strokeLinecap="round"
             />
           </svg>
           Add row
         </button>
+      </div>
+
+      {/* ── Footer: association logos ── */}
+      <div className={styles.footer}>
+        {ASSOCIATIONS.map((a) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={a.alt}
+            src={a.src}
+            alt={a.alt}
+            className={styles.assocLogo}
+          />
+        ))}
       </div>
     </div>
   );

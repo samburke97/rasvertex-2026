@@ -1,43 +1,4 @@
 /* components/reports/condition/sections/PhotoSection.module.css */
-/*
- * Preview pages are discrete A4 blocks (794px wide).
- * All padding/spacing matches print CSS exactly.
- * The headerBar is editor-only UI — it lives outside the page blocks.
- */
-
-/* ── Editor-only header bar (not part of any PDF page) ─────────────────── */
-.headerBar {
-  width: 794px;
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.625rem 0;
-  margin-bottom: 0.5rem;
-}
-
-.headerLeft {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-}
-
-.label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--for-medium, #7e807f);
-}
-
-.count {
-  font-size: 0.72rem;
-  color: var(--for-light, #9ca3af);
-  background: var(--con-light, #fafafa);
-  border: 1px solid var(--out-light, #f5f5f5);
-  border-radius: 999px;
-  padding: 1px 8px;
-}
 
 /* ── Progress bar (editor-only) ─────────────────────────────────────────── */
 .progressOuter {
@@ -66,7 +27,7 @@
 /* ── Empty state ────────────────────────────────────────────────────────── */
 .emptyPage {
   width: 794px;
-  min-height: 320px;
+  height: 1123px;
   background: #fff;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.1),
@@ -89,36 +50,36 @@
   color: var(--for-light, #9ca3af);
 }
 
-/* ── A4 page block ──────────────────────────────────────────────────────── */
+/* ── A4 page block — fixed height, matches PDF exactly ──────────────────── */
 .page {
   width: 794px;
+  height: 1123px; /* ← A4 at 96dpi, exactly like cover/schedule/summary */
   background: #fff;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.1),
     0 1px 4px rgba(0, 0, 0, 0.06);
   border-radius: 4px;
+  overflow: hidden; /* clip any content overflow within the A4 boundary */
+  flex-shrink: 0;
 }
 
-/*
- * Inner content — padding: 2.75rem on all sides, matching print:
- *   .photo-section { padding: 2.75rem; }
- */
+/* Inner content — padding matches print CSS exactly */
 .pageContent {
+  width: 100%;
+  height: 100%;
   padding: 2.75rem;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 /* ── Date separator ─────────────────────────────────────────────────────── */
-/*
- * Matches print:
- *   .date-header { display:flex; align-items:center; gap:1rem; margin-bottom:1rem; }
- */
 .dateHeader {
   display: flex;
   align-items: center;
   gap: 1rem;
   margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .dateHeaderLine {
@@ -138,19 +99,15 @@
   padding: 0 0.25rem;
 }
 
-/* ── Photo row — 3 columns, matches print grid ──────────────────────────── */
-/*
- * Matches print:
- *   .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.875rem; }
- */
+/* ── Photo row — 3 columns ──────────────────────────────────────────────── */
 .photoRow {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.875rem;
   margin-bottom: 0.875rem;
+  flex-shrink: 0;
 }
 
-/* Remove bottom margin from the last row on each page */
 .pageContent > .photoRow:last-child {
   margin-bottom: 0;
 }

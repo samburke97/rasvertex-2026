@@ -154,6 +154,44 @@ export default function ConditionReportPage({
     [report.settings.dateFrom, report.settings.dateTo],
   );
 
+  // ── Schedule fetch (silent — runs alongside photos) ───────────────────────
+  const fetchScheduleSilent = useCallback(async (jobId: string) => {
+    try {
+      const res = await fetch(`/api/simpro/jobs/${jobId}/schedule?companyId=0`);
+
+      // Always mark scheduleLoaded=true so the toggle is never permanently
+      // disabled — even if the response is an error or returns no rows.
+      if (!res.ok) {
+        setReport((prev) => ({
+          ...prev,
+          settings: { ...prev.settings, scheduleLoaded: true },
+        }));
+        return;
+      }
+
+      const data = await res.json();
+      const rows: ScheduleRow[] = data.rows ?? [];
+
+      setReport((prev) => ({
+        ...prev,
+        schedule: rows,
+        settings: {
+          ...prev.settings,
+          scheduleLoaded: true,
+          // Auto-enable the toggle only when rows were actually returned
+          showSchedule: rows.length > 0,
+        },
+      }));
+    } catch {
+      // Network / parse error — still unblock the toggle so the user can
+      // manually add rows or retry via the explicit fetch button.
+      setReport((prev) => ({
+        ...prev,
+        settings: { ...prev.settings, scheduleLoaded: true },
+      }));
+    }
+  }, []);
+
   // ── Main import (job + photos + schedule in parallel) ─────────────────────
   const handleImport = useCallback(
     async (jobNumber: string) => {
@@ -250,33 +288,6 @@ export default function ConditionReportPage({
         phase: "error",
         message: err instanceof Error ? err.message : "Photo import failed",
       });
-    }
-  }, []);
-
-  // ── Schedule fetch (silent — runs alongside photos) ───────────────────────
-  const fetchScheduleSilent = useCallback(async (jobId: string) => {
-    try {
-      const res = await fetch(`/api/simpro/jobs/${jobId}/schedule?companyId=0`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.rows?.length > 0) {
-        setReport((prev) => ({
-          ...prev,
-          schedule: data.rows,
-          settings: {
-            ...prev.settings,
-            scheduleLoaded: true,
-            showSchedule: true,
-          },
-        }));
-      } else {
-        setReport((prev) => ({
-          ...prev,
-          settings: { ...prev.settings, scheduleLoaded: true },
-        }));
-      }
-    } catch {
-      // silent — schedule is optional
     }
   }, []);
 
