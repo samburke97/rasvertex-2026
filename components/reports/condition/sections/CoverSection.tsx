@@ -4,6 +4,7 @@
 import React from "react";
 import styles from "./CoverSection.module.css";
 import EditableField from "../../shared/EditableField";
+import RichTextEditor from "../../shared/RichTextEditor";
 import type { ReportJobDetails } from "@/lib/reports/condition.types";
 
 interface CoverSectionProps {
@@ -71,18 +72,18 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
               label="Report Title"
             />
           </div>
+          {/* Intro uses RichTextEditor — supports bold, italic, bullets */}
           <div className={styles.intro}>
-            <EditableField
+            <RichTextEditor
               value={job.intro}
               onChange={(v) => onChange("intro", v)}
               placeholder="Enter report description…"
               label="Report Description"
-              multiline
             />
           </div>
         </div>
 
-        {/* Meta fields — shrink-wrapped table, tight labels to values */}
+        {/* Meta fields — single-line, use EditableField */}
         <div className={styles.metaWrap}>
           <table className={styles.meta}>
             <tbody>

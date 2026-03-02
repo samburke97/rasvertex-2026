@@ -165,32 +165,31 @@
   width: 1px; /* shrink-wrap trick */
 }
 
+/* CHANGED: font-size 0.78rem → 1.05rem, letter-spacing 0.1em → 0.08em,
+   line-height: 1 added, border-bottom removed */
 .metaLabel {
   font-family: "Bebas Neue", Arial, sans-serif;
-  font-size: 0.78rem;
-  letter-spacing: 0.1em;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
   color: #0d1c45;
   padding: 0.4rem 1.25rem 0.4rem 0;
-  border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
   vertical-align: middle;
 }
 
+/* CHANGED: border-bottom removed */
 .metaValue {
   font-family: "Inter", Arial, sans-serif;
   font-size: 0.82rem;
   font-weight: 300;
   color: #333;
   padding: 0.4rem 0;
-  border-bottom: 1px solid #e5e7eb;
   vertical-align: middle;
   white-space: nowrap;
 }
 
-.metaRow:first-child .metaLabel,
-.metaRow:first-child .metaValue {
-  border-top: 1px solid #e5e7eb;
-}
+/* REMOVED: .metaRow:first-child border-top rule (no more borders on this table) */
 
 /* EditableField inside meta cells renders inline so it doesn't stretch the cell */
 .metaValue :global(.wrap) {

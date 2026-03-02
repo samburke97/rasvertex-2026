@@ -3,7 +3,7 @@
 
 import React from "react";
 import styles from "./SummarySection.module.css";
-import EditableField from "../../shared/EditableField";
+import RichTextEditor from "../../shared/RichTextEditor";
 
 interface SummarySectionProps {
   comments: string;
@@ -12,7 +12,6 @@ interface SummarySectionProps {
   onRecommendationsChange: (value: string) => void;
 }
 
-// Association logos from public/reports/associations/
 const ASSOCIATIONS = [
   { src: "/reports/associations/communityselect.png", alt: "Community Select" },
   { src: "/reports/associations/dulux.png", alt: "Dulux" },
@@ -46,10 +45,9 @@ export default function SummarySection({
         <div className={styles.section}>
           <div className={styles.sectionLabel}>Comments:</div>
           <div className={styles.sectionText}>
-            <EditableField
+            <RichTextEditor
               value={comments}
               onChange={onCommentsChange}
-              multiline
               label="Comments"
               placeholder="Enter comments about the building condition…"
             />
@@ -59,10 +57,9 @@ export default function SummarySection({
         <div className={styles.section}>
           <div className={styles.sectionLabel}>Recommendations:</div>
           <div className={styles.sectionText}>
-            <EditableField
+            <RichTextEditor
               value={recommendations}
               onChange={onRecommendationsChange}
-              multiline
               label="Recommendations"
               placeholder="Enter recommended works…"
             />

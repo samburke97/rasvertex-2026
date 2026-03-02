@@ -196,12 +196,18 @@ const PRINT_STYLES = `
   .cover-body { flex:1; display:flex; flex-direction:column; padding:0 2.75rem 0; }
   .cover-title-group { flex:1; display:flex; flex-direction:column; justify-content:center; }
   .cover-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:2.75rem; letter-spacing:0.04em; color:#0d1c45; line-height:1.05; text-transform:uppercase; margin-bottom:1.25rem; }
-  .cover-intro { font-family:'Inter',Arial,sans-serif; font-size:0.82rem; font-weight:300; color:#666; line-height:1.8; white-space:pre-wrap; }
+  .cover-intro { font-family:'Inter',Arial,sans-serif; font-size:0.82rem; font-weight:300; color:#666; line-height:1.8; }
+  .cover-intro p { margin:0 0 0.35em; }
+  .cover-intro p:last-child { margin-bottom:0; }
+  .cover-intro strong { font-weight:600; }
+  .cover-intro em { font-style:italic; }
+  .cover-intro ul { list-style-type:disc; padding-left:1.4em; margin:0.2em 0 0.35em; }
+  .cover-intro ol { list-style-type:decimal; padding-left:1.4em; margin:0.2em 0 0.35em; }
+  .cover-intro li { margin-bottom:0.15em; }
   .cover-meta-wrap { padding-bottom:2rem; }
   .cover-meta { border-collapse:collapse; width:1px; }
-  .cover-meta td { font-family:'Inter',Arial,sans-serif; font-size:0.82rem; font-weight:300; padding:0.4rem 0; border-bottom:1px solid ${D}; vertical-align:middle; white-space:nowrap; }
-  .cover-meta tr:first-child td { border-top:1px solid ${D}; }
-  .cover-meta td.lbl { font-family:'Bebas Neue',Arial,sans-serif; font-size:0.78rem; letter-spacing:0.1em; color:#0d1c45; padding-right:1.25rem; }
+  .cover-meta td { font-family:'Inter',Arial,sans-serif; font-size:0.82rem; font-weight:300; padding:0.4rem 0; vertical-align:middle; white-space:nowrap; }
+  .cover-meta td.lbl { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.05rem; letter-spacing:0.08em; color:#0d1c45; padding-right:1.25rem; line-height:1; }
   .cover-meta td.val { color:#333; }
   .cover-footer { padding:1.5rem 0 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
   .cover-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
@@ -263,7 +269,15 @@ const PRINT_STYLES = `
   .summary-body { padding:2.5rem 2.75rem 2rem; flex:1; display:flex; flex-direction:column; gap:2.25rem; }
   .summary-section { display:flex; flex-direction:column; gap:0.75rem; }
   .summary-label { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.05rem; font-weight:400; letter-spacing:0.08em; color:#0d1c45; text-transform:uppercase; line-height:1; }
-  .summary-text { font-family:'Inter',Arial,sans-serif; font-size:0.85rem; font-weight:300; color:#444; line-height:1.85; white-space:pre-wrap; }
+  .summary-text { font-family:'Inter',Arial,sans-serif; font-size:0.85rem; font-weight:300; color:#444; line-height:1.85; }
+  .summary-text p { margin:0 0 0.4em; }
+  .summary-text p:last-child { margin-bottom:0; }
+  .summary-text strong { font-weight:600; color:#333; }
+  .summary-text em { font-style:italic; }
+  .summary-text ul,.summary-text ol { padding-left:1.4em; margin:0.2em 0 0.4em; }
+  .summary-text ul { list-style-type:disc; }
+  .summary-text ol { list-style-type:decimal; }
+  .summary-text li { margin-bottom:0.2em; }
   .summary-footer { margin-top:auto; padding:1.5rem 2.75rem 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
   .summary-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
 `;
@@ -490,7 +504,7 @@ export function buildPrintHTML(
   <div class="cover-body">
     <div class="cover-title-group">
       <div class="cover-title">${esc(report.job.reportType || "Building Condition Report")}</div>
-      <div class="cover-intro">${esc(introText)}</div>
+      <div class="cover-intro">${introText}</div>
     </div>
     <div class="cover-meta-wrap">
       <table class="cover-meta">${metaRows}</table>
@@ -514,11 +528,11 @@ ${scheduleHTML}
   <div class="summary-body">
     <div class="summary-section">
       <div class="summary-label">Comments:</div>
-      <div class="summary-text">${esc(report.comments || "")}</div>
+      <div class="summary-text">${report.comments || ""}</div>
     </div>
     <div class="summary-section">
       <div class="summary-label">Recommendations:</div>
-      <div class="summary-text">${esc(report.recommendations || "")}</div>
+      <div class="summary-text">${report.recommendations || ""}</div>
     </div>
   </div>
   <div class="summary-footer">${assocHTML}</div>
