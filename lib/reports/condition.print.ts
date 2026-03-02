@@ -1,13 +1,63 @@
 // lib/reports/condition.print.ts
+//
+// This file is the single source of truth for the print/PDF HTML.
+// It must be an exact replica of the React components it mirrors:
+//   - PhotoSection.tsx    → photo pages with page numbers
+//   - ScheduleSection.tsx → schedule pages with topBar, heading, table, footer
+//   - SummarySection.tsx  → summary page with topBar, body, footer
+//   - CoverSection.tsx    → cover page
+//
+// The browser Export PDF path uses this file directly (window.open + print()).
+// The Save to Job path uses Puppeteer to render this HTML server-side.
+// Both must produce identical output — do not diverge these two paths.
 
 import type { ConditionReportData, ScheduleRow } from "./condition.types";
 import { formatScheduleDate } from "./condition.types";
 
 // ── Shared pagination constants (also used by PhotoSection.tsx) ───────────────
+// A4 at 96dpi: 794 x 1123px; padding 2.75rem = 44px each side
+// Available height: 1123 - (44 * 2) = 1035px
 export const PAGE_AVAILABLE_H = 1035;
 export const ROW_H = 270;
 export const DATE_HEADER_H = 34;
 export const GROUP_GAP = 36;
+
+// Schedule rows per page — must match ScheduleSection.tsx
+const ROWS_PER_FIRST_PAGE = 16;
+const ROWS_PER_CONTINUATION = 22;
+
+// ── Static asset map ──────────────────────────────────────────────────────────
+// Browser path: omit — relative /public paths resolve normally.
+// Puppeteer path: pass pre-read base64 data URIs so headless Chrome needs
+// zero outbound requests and images always appear in the saved PDF.
+
+export interface StaticAssets {
+  rasLogo: string;
+  linkWhite: string;
+  linkBlue: string;
+  associations: {
+    communitySelect: string;
+    dulux: string;
+    haymes: string;
+    mpa: string;
+    qbcc: string;
+    smartStrata: string;
+  };
+}
+
+const DEFAULT_ASSETS: StaticAssets = {
+  rasLogo: "/reports/ras-logo.png",
+  linkWhite: "/reports/link_white.png",
+  linkBlue: "/reports/link_blue.png",
+  associations: {
+    communitySelect: "/reports/associations/communityselect.png",
+    dulux: "/reports/associations/dulux.png",
+    haymes: "/reports/associations/haymes.svg",
+    mpa: "/reports/associations/mpa.png",
+    qbcc: "/reports/associations/qbcc.png",
+    smartStrata: "/reports/associations/smartstrata.png",
+  },
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -66,7 +116,7 @@ function groupPhotosByDate(photos: Photo[]): PhotoGroup[] {
   }));
 }
 
-// ── Core paginator ────────────────────────────────────────────────────────────
+// ── Photo paginator ───────────────────────────────────────────────────────────
 
 type PrintItem =
   | { type: "dateHeader"; label: string }
@@ -112,71 +162,12 @@ function paginatePhotos(
   return pages;
 }
 
-// ── Schedule HTML builder ─────────────────────────────────────────────────────
-
-function buildSchedulePageHTML(rows: ScheduleRow[], D: string): string {
-  const totalScheduled = rows.reduce((s, r) => s + r.scheduledHours, 0);
-  const totalActual = rows.reduce((s, r) => s + r.actualHours, 0);
-
-  const dataRows = rows
-    .map(
-      (row) => `
-    <tr class="sch-row">
-      <td class="sch-td">${esc(formatScheduleDate(row.date))}</td>
-      <td class="sch-td">${esc(row.employeeName)}</td>
-      <td class="sch-td-num">${row.scheduledHours > 0 ? row.scheduledHours.toFixed(2) : "—"}</td>
-      <td class="sch-td-num">${row.actualHours > 0 ? row.actualHours.toFixed(2) : "—"}</td>
-      <td class="sch-td sch-note">${esc(row.note)}</td>
-    </tr>`,
-    )
-    .join("\n");
-
-  const totalsRow = `
-    <tr class="sch-totals">
-      <td colspan="2" class="sch-totals-label">Totals</td>
-      <td class="sch-totals-cell">${totalScheduled > 0 ? totalScheduled.toFixed(2) : "—"}</td>
-      <td class="sch-totals-cell">${totalActual > 0 ? totalActual.toFixed(2) : "—"}</td>
-      <td></td>
-    </tr>`;
-
-  return `
-<div class="sch-page">
-  <div class="sch-page-inner">
-    <div class="sch-heading">
-      <div class="sch-title">Hours Schedule</div>
-      <div class="sch-rule"></div>
-    </div>
-    <table class="sch-table">
-      <thead>
-        <tr>
-          <th class="sch-th">Date</th>
-          <th class="sch-th">Employee</th>
-          <th class="sch-th-num">Scheduled Hrs</th>
-          <th class="sch-th-num">Actual Hrs</th>
-          <th class="sch-th">Note</th>
-        </tr>
-      </thead>
-      <tbody>${dataRows}</tbody>
-      <tfoot>${rows.length > 0 ? totalsRow : ""}</tfoot>
-    </table>
-  </div>
-</div>`;
-}
-
 // ── Design tokens ─────────────────────────────────────────────────────────────
 
 const D = "#e5e7eb";
 
-const ASSOCIATION_LOGOS = [
-  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
-  { src: "/reports/associations/dulux.png", alt: "Dulux" },
-  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
-  { src: "/reports/associations/mpa.png", alt: "MPA" },
-  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
-  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
-];
-
 // ── Print styles ──────────────────────────────────────────────────────────────
+// Every rule here must exactly match the corresponding .module.css files.
 
 const PRINT_STYLES = `
   @page { size: A4; margin: 0; }
@@ -190,7 +181,9 @@ const PRINT_STYLES = `
     print-color-adjust: exact;
   }
 
-  /* ── COVER ── */
+  /* ─────────────────────────────────────────────────────────────────────────
+     COVER PAGE — mirrors CoverSection.tsx / CoverSection.module.css
+  ───────────────────────────────────────────────────────────────────────── */
   .cover { width:210mm; height:297mm; display:flex; flex-direction:column; page-break-after:always; break-after:page; overflow:hidden; }
   .cover-hero { position:relative; height:580px; flex-shrink:0; overflow:hidden; }
   .cover-hero-navy { position:absolute; inset:0; background:#0d1c45; }
@@ -213,53 +206,57 @@ const PRINT_STYLES = `
   .cover-footer { padding:1.5rem 0 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
   .cover-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
 
-  /* ── PHOTO PAGES ── */
-  .photo-page { width:210mm; break-after:page; page-break-after:always; }
+  /* ─────────────────────────────────────────────────────────────────────────
+     PHOTO PAGES — mirrors PhotoSection.tsx / PhotoSection.module.css
+  ───────────────────────────────────────────────────────────────────────── */
+  .photo-page { width:210mm; height:297mm; position:relative; break-after:page; page-break-after:always; overflow:hidden; }
   .photo-page:last-of-type { break-after:auto; page-break-after:auto; }
-  .photo-page-inner { padding:2.75rem; }
+  .photo-page-inner { padding:2.75rem; width:100%; height:100%; box-sizing:border-box; }
   .date-header { display:flex; align-items:center; gap:1rem; margin-bottom:1rem; }
   .date-line { flex:1; height:1px; background:${D}; }
   .date-text { font-family:'Inter',Arial,sans-serif; font-size:0.65rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#9ca3af; white-space:nowrap; }
   .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.875rem; margin-bottom:0.875rem; }
   .photo-grid:last-child { margin-bottom:0; }
   .photo-item { break-inside:avoid; page-break-inside:avoid; }
-  .photo-thumb { aspect-ratio:1; background:#f3f4f6; border-radius:6px; overflow:hidden; }
+  .photo-thumb { aspect-ratio:4/3; background:#f3f4f6; overflow:hidden; border-radius:4px; }
   .photo-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
-  .photo-caption { background:#f3f4f6; border-radius:5px; padding:0.35rem 0.6rem; margin-top:0.4rem; text-align:center; font-family:'Inter',Arial,sans-serif; font-size:0.68rem; font-weight:300; color:#374151; }
+  .photo-caption { font-family:'Inter',Arial,sans-serif; font-size:0.65rem; font-weight:400; color:#374151; background:#f9fafb; border-radius:4px; padding:0.35rem 0.5rem; margin-top:0.35rem; line-height:1.4; }
+  /* Page number — matches .pageNumber in PhotoSection.module.css */
+  .page-num { position:absolute; bottom:1.25rem; right:2.75rem; font-family:'Inter',Arial,sans-serif; font-size:0.65rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#9ca3af; line-height:1; }
 
-  /* ── SCHEDULE PAGE ── */
-  .sch-page { width:210mm; break-after:page; page-break-after:always; }
-  .sch-page-inner { padding:2.75rem; }
-  .sch-heading { display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem; }
-  .sch-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.6rem; font-weight:400; letter-spacing:0.05em; color:#0d1c45; text-transform:uppercase; line-height:1; white-space:nowrap; }
-  .sch-rule { flex:1; height:1px; background:${D}; }
-  .sch-table { width:100%; border-collapse:collapse; border:1px solid ${D}; border-radius:6px; overflow:hidden; }
-  .sch-th, .sch-th-num {
-    padding:0.55rem 0.875rem;
-    font-family:'Inter',Arial,sans-serif;
-    font-size:0.62rem; font-weight:700;
-    letter-spacing:0.1em; text-transform:uppercase;
-    color:#6b7280; background:#f9f9f9;
-    border-bottom:1px solid ${D};
-    text-align:left; white-space:nowrap;
-  }
-  .sch-th-num { text-align:right; width:100px; }
+  /* ─────────────────────────────────────────────────────────────────────────
+     SCHEDULE PAGES — mirrors ScheduleSection.tsx / ScheduleSection.module.css
+     - topBar (SCHEDULE + link_blue) on first page only
+     - "Hours Schedule" sub-heading + rule on first page only
+     - Bordered table container
+     - Association footer on EVERY schedule page
+  ───────────────────────────────────────────────────────────────────────── */
+  .sch-page { width:210mm; min-height:297mm; break-before:page; page-break-before:always; display:flex; flex-direction:column; font-family:'Inter',Arial,sans-serif; color:#1a1a2e; }
+  .sch-topbar { display:flex; align-items:flex-start; justify-content:space-between; padding:2.75rem 2.75rem 0; flex-shrink:0; }
+  .sch-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3rem; font-weight:400; letter-spacing:0.04em; color:#0d1c45; line-height:1; text-transform:uppercase; margin:0; }
+  .sch-topbar-link { height:22px; width:auto; display:block; margin-top:0.5rem; }
+  .sch-body { padding:2.5rem 2.75rem 2rem; flex:1; display:flex; flex-direction:column; gap:1.5rem; }
+  .sch-heading { display:flex; align-items:center; gap:1rem; }
+  .sch-heading-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.05rem; font-weight:400; letter-spacing:0.08em; color:#0d1c45; text-transform:uppercase; line-height:1; white-space:nowrap; }
+  .sch-heading-rule { flex:1; height:1px; background:${D}; }
+  .sch-table-wrap { border:1px solid ${D}; border-radius:6px; overflow:hidden; }
+  .sch-table { width:100%; border-collapse:collapse; }
+  .sch-th { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.62rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#6b7280; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:left; white-space:nowrap; }
+  .sch-th-num { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.62rem; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#6b7280; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:right; white-space:nowrap; width:100px; }
   .sch-row { border-bottom:1px solid #f0f0f0; }
   .sch-row:last-child { border-bottom:none; }
-  .sch-td, .sch-td-num {
-    padding:0.48rem 0.875rem;
-    font-family:'Inter',Arial,sans-serif;
-    font-size:0.78rem; font-weight:300;
-    color:#111827; vertical-align:middle;
-  }
-  .sch-td-num { text-align:right; font-variant-numeric:tabular-nums; width:100px; }
-  .sch-note { color:#6b7280; font-size:0.72rem; }
+  .sch-td { padding:0.48rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:300; color:#111827; vertical-align:middle; }
+  .sch-td-num { padding:0.48rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:300; color:#111827; text-align:right; font-variant-numeric:tabular-nums; vertical-align:middle; width:100px; }
   .sch-totals { border-top:2px solid ${D}; background:#f9f9f9; }
-  .sch-totals-label { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.68rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#111827; text-align:right; }
-  .sch-totals-cell { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.8rem; font-weight:600; font-variant-numeric:tabular-nums; color:#111827; text-align:right; width:100px; }
+  .sch-totals-label { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; text-align:left; }
+  .sch-totals-cell { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:600; color:#111827; text-align:right; font-variant-numeric:tabular-nums; }
+  .sch-footer { margin-top:auto; padding:1.5rem 2.75rem 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
+  .sch-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
 
-  /* ── SUMMARY PAGE ── */
-  .summary-page { width:210mm; min-height:297mm; page-break-before:always; break-before:page; display:flex; flex-direction:column; }
+  /* ─────────────────────────────────────────────────────────────────────────
+     SUMMARY PAGE — mirrors SummarySection.tsx / SummarySection.module.css
+  ───────────────────────────────────────────────────────────────────────── */
+  .summary-page { width:210mm; min-height:297mm; break-before:page; page-break-before:always; display:flex; flex-direction:column; }
   .summary-topbar { display:flex; align-items:flex-start; justify-content:space-between; padding:2.75rem 2.75rem 0; }
   .summary-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3rem; font-weight:400; letter-spacing:0.04em; color:#0d1c45; line-height:1; text-transform:uppercase; }
   .summary-link { height:22px; width:auto; display:block; margin-top:0.5rem; }
@@ -271,21 +268,145 @@ const PRINT_STYLES = `
   .summary-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
 `;
 
+// ── Schedule pages HTML builder ───────────────────────────────────────────────
+// Mirrors ScheduleSection.tsx exactly:
+//   - Paginates at ROWS_PER_FIRST_PAGE (16) then ROWS_PER_CONTINUATION (22)
+//   - topBar + sub-heading only on first page
+//   - Association footer on every page
+//   - Total row on last page only
+//   - 3 columns: Date, Employee, Hours (matches React component)
+
+function buildSchedulePagesHTML(
+  rows: ScheduleRow[],
+  assocHTML: string,
+  linkBlue: string,
+): string {
+  if (rows.length === 0) return "";
+
+  const totalHours = rows.reduce((s, r) => s + r.actualHours, 0);
+
+  // Paginate — identical logic to ScheduleSection.tsx
+  const pages: ScheduleRow[][] = [];
+  if (rows.length <= ROWS_PER_FIRST_PAGE) {
+    pages.push(rows);
+  } else {
+    pages.push(rows.slice(0, ROWS_PER_FIRST_PAGE));
+    let offset = ROWS_PER_FIRST_PAGE;
+    while (offset < rows.length) {
+      pages.push(rows.slice(offset, offset + ROWS_PER_CONTINUATION));
+      offset += ROWS_PER_CONTINUATION;
+    }
+  }
+
+  return pages
+    .map((pageRows, pageIdx) => {
+      const isFirst = pageIdx === 0;
+      const isLast = pageIdx === pages.length - 1;
+
+      const topBar = isFirst
+        ? `<div class="sch-topbar">
+            <h1 class="sch-title">Schedule</h1>
+            <img src="${esc(linkBlue)}" alt="rasvertex.com.au" class="sch-topbar-link" />
+          </div>`
+        : "";
+
+      const subHeading = isFirst
+        ? `<div class="sch-heading">
+            <div class="sch-heading-title">Hours Schedule</div>
+            <div class="sch-heading-rule"></div>
+          </div>`
+        : "";
+
+      const dataRows = pageRows
+        .map(
+          (row) => `
+        <tr class="sch-row">
+          <td class="sch-td">${esc(formatScheduleDate(row.date))}</td>
+          <td class="sch-td">${esc(row.employeeName)}</td>
+          <td class="sch-td-num">${row.actualHours > 0 ? row.actualHours.toFixed(2) : "—"}</td>
+        </tr>`,
+        )
+        .join("\n");
+
+      const totalsRow =
+        isLast && rows.length > 0
+          ? `<tfoot>
+              <tr class="sch-totals">
+                <td class="sch-totals-label">Total</td>
+                <td class="sch-td"></td>
+                <td class="sch-totals-cell">${totalHours > 0 ? totalHours.toFixed(2) : "—"}</td>
+              </tr>
+            </tfoot>`
+          : "";
+
+      return `
+<div class="sch-page">
+  ${topBar}
+  <div class="sch-body">
+    ${subHeading}
+    <div class="sch-table-wrap">
+      <table class="sch-table">
+        <thead>
+          <tr>
+            <th class="sch-th">Date</th>
+            <th class="sch-th">Employee</th>
+            <th class="sch-th-num">Hours</th>
+          </tr>
+        </thead>
+        <tbody>${dataRows}</tbody>
+        ${totalsRow}
+      </table>
+    </div>
+  </div>
+  <div class="sch-footer">${assocHTML}</div>
+</div>`;
+    })
+    .join("\n");
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export function buildPrintHTML(report: ConditionReportData): string {
+/**
+ * Builds the full print-ready HTML for a condition report.
+ *
+ * @param report  Report data. Photos must already have base64 `url` values
+ *                when called server-side (Puppeteer path).
+ * @param assets  Optional pre-loaded base64 data URIs for /public static assets.
+ *                Omit when calling from the browser — relative paths work fine.
+ *                Pass when calling from Puppeteer so headless Chrome has no
+ *                outbound image requests and all assets are embedded inline.
+ */
+export function buildPrintHTML(
+  report: ConditionReportData,
+  assets?: StaticAssets,
+): string {
   const { showDates, showSchedule } = report.settings;
+  const a = assets ?? DEFAULT_ASSETS;
+
+  // ── Association logos fragment (reused in cover, schedule, summary footers) ─
+  const ASSOC_LOGOS = [
+    { src: a.associations.communitySelect, alt: "Community Select" },
+    { src: a.associations.dulux, alt: "Dulux" },
+    { src: a.associations.haymes, alt: "Haymes Paint" },
+    { src: a.associations.mpa, alt: "MPA" },
+    { src: a.associations.qbcc, alt: "QBCC" },
+    { src: a.associations.smartStrata, alt: "Smart Strata" },
+  ];
+  const assocHTML = ASSOC_LOGOS.map(
+    (l) => `<img src="${esc(l.src)}" alt="${esc(l.alt)}" />`,
+  ).join("");
 
   // ── Photo pages ───────────────────────────────────────────────────────────
   const groups = showDates
     ? groupPhotosByDate(report.photos)
     : [{ key: "all", label: null, photos: report.photos }];
 
-  const pages = paginatePhotos(groups, showDates);
+  const photoPages = paginatePhotos(groups, showDates);
+  const totalPhotoPages = photoPages.length;
   let globalIndex = 0;
 
-  const photoPageHTML = pages
-    .map((items) => {
+  const photoPageHTML = photoPages
+    .map((items, pageIdx) => {
       const inner = items
         .map((item) => {
           if (item.type === "dateHeader") {
@@ -294,23 +415,36 @@ export function buildPrintHTML(report: ConditionReportData): string {
           const cells = item.photos
             .map((photo) => {
               globalIndex++;
-              return `<div class="photo-item"><div class="photo-thumb"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div><div class="photo-caption">${globalIndex}. ${esc(stripExt(photo.name))}</div></div>`;
+              return `<div class="photo-item">
+  <div class="photo-thumb"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div>
+  <div class="photo-caption">${globalIndex}. ${esc(stripExt(photo.name))}</div>
+</div>`;
             })
             .join("\n");
           return `<div class="photo-grid">${cells}</div>`;
         })
         .join("\n");
-      return `<div class="photo-page"><div class="photo-page-inner">\n${inner}\n</div></div>`;
+
+      // Page number — mirrors .pageNumber in PhotoSection.module.css
+      const pageLabel =
+        totalPhotoPages > 1
+          ? `PAGE ${pageIdx + 1} / ${totalPhotoPages}`
+          : `PAGE ${pageIdx + 1}`;
+
+      return `<div class="photo-page">
+  <div class="photo-page-inner">${inner}</div>
+  <div class="page-num">${pageLabel}</div>
+</div>`;
     })
     .join("\n");
 
-  // ── Schedule page ─────────────────────────────────────────────────────────
-  const schedulePageHTML =
+  // ── Schedule pages ────────────────────────────────────────────────────────
+  const scheduleHTML =
     showSchedule && report.schedule.length > 0
-      ? buildSchedulePageHTML(report.schedule, D)
+      ? buildSchedulePagesHTML(report.schedule, assocHTML, a.linkBlue)
       : "";
 
-  // ── Cover ─────────────────────────────────────────────────────────────────
+  // ── Cover page ────────────────────────────────────────────────────────────
   const coverPhotoLayer = report.job.coverPhoto
     ? `<div class="cover-hero-photo" style="background-image:url('${report.job.coverPhoto}')"></div>`
     : "";
@@ -328,10 +462,6 @@ export function buildPrintHTML(report: ConditionReportData): string {
     )
     .join("");
 
-  const assocHTML = ASSOCIATION_LOGOS.map(
-    (a) => `<img src="${esc(a.src)}" alt="${esc(a.alt)}" />`,
-  ).join("");
-
   const introText =
     report.job.intro ||
     "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.";
@@ -348,13 +478,14 @@ export function buildPrintHTML(report: ConditionReportData): string {
 </head>
 <body>
 
+<!-- ── COVER ── -->
 <div class="cover">
   <div class="cover-hero">
     <div class="cover-hero-navy"></div>
     ${coverPhotoLayer}
     <div class="cover-hero-overlay"></div>
-    <div class="cover-logo"><img src="/reports/ras-logo.png" alt="RAS Vertex" /></div>
-    <div class="cover-web"><img src="/reports/link_white.png" alt="rasvertex.com.au" /></div>
+    <div class="cover-logo"><img src="${esc(a.rasLogo)}" alt="RAS Vertex" /></div>
+    <div class="cover-web"><img src="${esc(a.linkWhite)}" alt="rasvertex.com.au" /></div>
   </div>
   <div class="cover-body">
     <div class="cover-title-group">
@@ -368,14 +499,17 @@ export function buildPrintHTML(report: ConditionReportData): string {
   </div>
 </div>
 
+<!-- ── PHOTO PAGES ── -->
 ${photoPageHTML}
 
-${schedulePageHTML}
+<!-- ── SCHEDULE PAGES ── -->
+${scheduleHTML}
 
+<!-- ── SUMMARY ── -->
 <div class="summary-page">
   <div class="summary-topbar">
     <div class="summary-title">Summary</div>
-    <img src="/reports/link_blue.png" alt="rasvertex.com.au" class="summary-link" />
+    <img src="${esc(a.linkBlue)}" alt="rasvertex.com.au" class="summary-link" />
   </div>
   <div class="summary-body">
     <div class="summary-section">

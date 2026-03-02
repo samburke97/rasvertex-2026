@@ -1,7 +1,12 @@
 // app/api/simpro/jobs/[jobId]/save-report/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { buildPrintHTML } from "@/lib/reports/condition.print";
+import path from "path";
+import fs from "fs";
+import {
+  buildPrintHTML,
+  type StaticAssets,
+} from "@/lib/reports/condition.print";
 import type { ConditionReportData } from "@/lib/reports/condition.types";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
@@ -11,6 +16,62 @@ interface SimproAttachmentListItem {
   ID: number;
   Filename: string;
 }
+
+// ── Static asset loader ───────────────────────────────────────────────────────
+// Reads files from the /public directory and returns them as base64 data URIs.
+// Results are cached in module scope so the filesystem is only read once per
+// server process lifetime — not on every PDF request.
+
+let cachedAssets: StaticAssets | null = null;
+
+function readPublicAsBase64(relativePath: string): string {
+  const fullPath = path.join(process.cwd(), "public", relativePath);
+  try {
+    const buffer = fs.readFileSync(fullPath);
+    const ext = path.extname(relativePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".svg": "image/svg+xml",
+      ".webp": "image/webp",
+    };
+    const mime = mimeTypes[ext] ?? "image/png";
+    return `data:${mime};base64,${buffer.toString("base64")}`;
+  } catch (err) {
+    // If an asset is missing, log a warning and fall back to the relative path
+    // so the PDF still generates (image will be absent, but no crash).
+    console.warn(
+      `[SaveReport] Could not read public asset: ${relativePath}`,
+      err,
+    );
+    return `/${relativePath}`;
+  }
+}
+
+function loadStaticAssets(): StaticAssets {
+  if (cachedAssets) return cachedAssets;
+
+  cachedAssets = {
+    rasLogo: readPublicAsBase64("reports/ras-logo.png"),
+    linkWhite: readPublicAsBase64("reports/link_white.png"),
+    linkBlue: readPublicAsBase64("reports/link_blue.png"),
+    associations: {
+      communitySelect: readPublicAsBase64(
+        "reports/associations/communityselect.png",
+      ),
+      dulux: readPublicAsBase64("reports/associations/dulux.png"),
+      haymes: readPublicAsBase64("reports/associations/haymes.svg"),
+      mpa: readPublicAsBase64("reports/associations/mpa.png"),
+      qbcc: readPublicAsBase64("reports/associations/qbcc.png"),
+      smartStrata: readPublicAsBase64("reports/associations/smartstrata.png"),
+    },
+  };
+
+  return cachedAssets;
+}
+
+// ── SimPRO fetch helper ───────────────────────────────────────────────────────
 
 async function simproFetch<T>(url: string, options?: RequestInit): Promise<T> {
   if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN)
@@ -30,6 +91,8 @@ async function simproFetch<T>(url: string, options?: RequestInit): Promise<T> {
   }
   return res.json() as Promise<T>;
 }
+
+// ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(
   request: NextRequest,
@@ -125,7 +188,14 @@ export async function POST(
     })),
   };
 
-  const htmlContent = buildPrintHTML(pdfReport);
+  // ── Load static assets as base64 data URIs ────────────────────────────────
+  // Puppeteer runs headless with no knowledge of your Next.js server, so
+  // relative paths like /reports/ras-logo.png resolve to nothing.
+  // We read each file from /public once (cached), embed them as data URIs,
+  // and pass them into buildPrintHTML — making the HTML fully self-contained.
+  const staticAssets = loadStaticAssets();
+
+  const htmlContent = buildPrintHTML(pdfReport, staticAssets);
 
   // ── Generate PDF via Puppeteer ────────────────────────────────────────────
   let pdfBuffer: Buffer;
