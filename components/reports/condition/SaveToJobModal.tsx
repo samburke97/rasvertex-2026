@@ -71,7 +71,6 @@ export default function SaveToJobModal({
     setModalState({ phase: "saving" });
 
     try {
-      // ── Build a lean payload ─────────────────────────────────────────────
       // Strip base64 urls out of the report (can be 50-100MB for 100 photos).
       // Send them separately as a flat id→dataURL map.
       // The server rebuilds the full report before passing to Puppeteer.
@@ -79,8 +78,8 @@ export default function SaveToJobModal({
       const strippedReport: ConditionReportData = {
         ...report,
         photos: report.photos.map((p) => {
-          if (p.url) photoData[p.id] = p.url; // stash base64
-          return { ...p, url: "" }; // strip from report
+          if (p.url) photoData[p.id] = p.url;
+          return { ...p, url: "" };
         }),
       };
 
@@ -216,7 +215,7 @@ export default function SaveToJobModal({
           )}
         </div>
 
-        {/* Success */}
+        {/* Success state */}
         {isSuccess && (
           <div className={styles.successBody}>
             <div className={styles.successTick}>

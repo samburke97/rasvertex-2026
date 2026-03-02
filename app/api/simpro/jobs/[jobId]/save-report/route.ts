@@ -1,21 +1,4 @@
 // app/api/simpro/jobs/[jobId]/save-report/route.ts
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /api/simpro/jobs/[jobId]/save-report
-//
-// Body: {
-//   filename: string
-//   report: ConditionReportData   ← photos have url = "" (stripped for transport)
-//   photoData: Record<string, string>  ← { [photoId]: "data:image/jpeg;base64,..." }
-//   companyId?: number
-// }
-//
-// Why this approach:
-//   - We can't use SimPRO URLs directly in Puppeteer — auth headers don't
-//     propagate to <img> src fetches inside the page
-//   - We can't send the full HTML with base64 inline — too large (50-100MB)
-//   - Instead: send report structure + a flat id→base64 map separately,
-//     then rebuild the HTML server-side with base64 injected back in
-// ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import { buildPrintHTML } from "@/lib/reports/condition.print";
@@ -30,9 +13,8 @@ interface SimproAttachmentListItem {
 }
 
 async function simproFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN) {
+  if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN)
     throw new Error("SimPRO configuration missing");
-  }
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -72,7 +54,7 @@ export async function POST(
   let body: {
     filename?: string;
     report?: ConditionReportData;
-    photoData?: Record<string, string>; // photoId → base64 data URL
+    photoData?: Record<string, string>;
     companyId?: number;
   };
   try {
@@ -135,8 +117,6 @@ export async function POST(
   }
 
   // ── Rebuild report with base64 photos injected back in ────────────────────
-  // The client strips photo urls before sending to keep the JSON small.
-  // We reconstitute them here from the photoData map before building HTML.
   const pdfReport: ConditionReportData = {
     ...report,
     photos: report.photos.map((p) => ({
@@ -165,13 +145,10 @@ export async function POST(
     try {
       const page = await browser.newPage();
 
-      // All images are inline base64 — no network calls needed.
-      // Intercept and block any outbound requests to keep things fast.
+      // All images are inline base64 — block outbound requests to keep it fast
       await page.setRequestInterception(true);
       page.on("request", (req) => {
         const type = req.resourceType();
-        // Allow: document, stylesheet, font, image (all inline data: URIs)
-        // Block: XHR, fetch, websocket — nothing should be calling out
         if (type === "xhr" || type === "fetch" || type === "websocket") {
           req.abort();
         } else {
@@ -180,11 +157,11 @@ export async function POST(
       });
 
       await page.setContent(htmlContent, {
-        waitUntil: "load", // no networkidle — everything is inline
+        waitUntil: "load",
         timeout: 30000,
       });
 
-      // Google Fonts load over network — wait for them or they'll fall back
+      // Wait for fonts
       await page.evaluate(() => document.fonts.ready);
 
       const pdfData = await page.pdf({
@@ -199,7 +176,7 @@ export async function POST(
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error("[SaveReport] Puppeteer PDF generation failed:", msg);
+    console.error("[SaveReport] Puppeteer failed:", msg);
     return NextResponse.json(
       {
         error: "PDF generation failed. Please try again.",

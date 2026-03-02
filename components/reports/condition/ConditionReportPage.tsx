@@ -68,16 +68,13 @@ export default function ConditionReportPage({
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [savedFilename, setSavedFilename] = useState<string | null>(null);
-
-  // ── Load guard ────────────────────────────────────────────────────────────
+  const [loadedJobId, setLoadedJobId] = useState<string>("");
   const currentLoadId = useRef(0);
 
-  // ── Settings helper ───────────────────────────────────────────────────────
   const updateSettings = useCallback((s: ReportSettings) => {
     setReport((prev) => ({ ...prev, settings: s }));
   }, []);
 
-  // ── Field updates ─────────────────────────────────────────────────────────
   const updateJobField = useCallback(
     (field: keyof ReportJobDetails, value: string) => {
       setReport((prev) => ({ ...prev, job: { ...prev.job, [field]: value } }));
@@ -92,7 +89,6 @@ export default function ConditionReportPage({
     }));
   }, []);
 
-  // ── Photo handlers ────────────────────────────────────────────────────────
   const removePhoto = useCallback((id: string) => {
     setReport((prev) => ({
       ...prev,
@@ -107,17 +103,14 @@ export default function ConditionReportPage({
     }));
   }, []);
 
-  // ── Schedule handler ──────────────────────────────────────────────────────
   const updateSchedule = useCallback((rows: ScheduleRow[]) => {
     setReport((prev) => ({ ...prev, schedule: rows }));
   }, []);
 
-  // ── Main import ───────────────────────────────────────────────────────────
   const handleImport = useCallback(async (jobNumber: string) => {
     const loadId = ++currentLoadId.current;
     const isStale = () => currentLoadId.current !== loadId;
 
-    // Hard reset — wipe everything including any previously saved state
     setReport({
       ...DEFAULT_REPORT,
       job: {
@@ -137,10 +130,7 @@ export default function ConditionReportPage({
         throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
       const jobData: EnrichedJob = await jobRes.json();
       if (isStale()) return;
-      setReport((prev) => ({
-        ...prev,
-        job: mapJobToReportDetails(jobData),
-      }));
+      setReport((prev) => ({ ...prev, job: mapJobToReportDetails(jobData) }));
     } catch (err) {
       if (isStale()) return;
       setImportStatus({
@@ -150,12 +140,12 @@ export default function ConditionReportPage({
       return;
     }
 
-    // 2. Photos SSE + schedule in parallel
+    // 2. Photos + schedule in parallel
     await Promise.all([
+      // Photos via SSE
       (async () => {
         if (isStale()) return;
         setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
-
         try {
           const response = await fetch(
             `/api/simpro/jobs/${jobNumber}/attachments?companyId=0`,
@@ -173,7 +163,6 @@ export default function ConditionReportPage({
               reader.cancel();
               return;
             }
-
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
@@ -185,11 +174,9 @@ export default function ConditionReportPage({
                 reader.cancel();
                 return;
               }
-
               const eventMatch = frame.match(/^event:\s*(.+)$/m);
               const dataMatch = frame.match(/^data:\s*(.+)$/m);
               if (!eventMatch || !dataMatch) continue;
-
               const event = eventMatch[1].trim();
               let payload: Record<string, unknown>;
               try {
@@ -208,29 +195,26 @@ export default function ConditionReportPage({
                     ? String(payload.dateAdded)
                     : null,
                 };
-                if (!isStale()) {
+                if (!isStale())
                   setReport((prev) => ({
                     ...prev,
                     photos: [...prev.photos, photo],
                   }));
-                }
               } else if (event === "progress") {
-                if (!isStale()) {
+                if (!isStale())
                   setImportStatus({
                     phase: "fetching-photos",
                     loaded: Number(payload.loaded) || 0,
                     total: Number(payload.total) || 0,
                   });
-                }
               } else if (event === "done") {
                 if (!isStale()) setImportStatus({ phase: "done" });
               } else if (event === "error") {
-                if (!isStale()) {
+                if (!isStale())
                   setImportStatus({
                     phase: "error",
                     message: String(payload.message ?? "Photo import failed"),
                   });
-                }
               }
             }
           }
@@ -243,6 +227,7 @@ export default function ConditionReportPage({
         }
       })(),
 
+      // Schedule (silent)
       (async () => {
         if (isStale()) return;
         try {
@@ -250,20 +235,16 @@ export default function ConditionReportPage({
             `/api/simpro/jobs/${jobNumber}/schedule?companyId=0`,
           );
           if (isStale()) return;
-
           if (!res.ok) {
-            if (!isStale()) {
+            if (!isStale())
               setReport((prev) => ({
                 ...prev,
                 settings: { ...prev.settings, scheduleLoaded: true },
               }));
-            }
             return;
           }
-
           const data = await res.json();
           if (isStale()) return;
-
           const rows: ScheduleRow[] = data.rows ?? [];
           setReport((prev) => ({
             ...prev,
@@ -275,52 +256,28 @@ export default function ConditionReportPage({
             },
           }));
         } catch {
-          if (!isStale()) {
+          if (!isStale())
             setReport((prev) => ({
               ...prev,
               settings: { ...prev.settings, scheduleLoaded: true },
             }));
-          }
         }
       })(),
     ]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Export PDF (auto-download via Blob) ───────────────────────────────────
+  // Export PDF — opens print dialog (instant, browser already has everything)
   const handleExportPDF = useCallback(() => {
-    const html = buildPrintHTML(report);
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-
-    // Use a hidden iframe to trigger print-to-PDF silently
-    // Falls back to opening a print window
-    const win = window.open(url, "_blank");
-    if (!win) {
-      URL.revokeObjectURL(url);
-      return;
-    }
-
-    win.addEventListener("load", () => {
-      setTimeout(() => {
-        win.print();
-        // Clean up the object URL after a delay
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
-      }, 800);
-    });
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(buildPrintHTML(report));
+    win.document.close();
+    setTimeout(() => win.print(), 800);
   }, [report]);
 
-  // ── Save to Job modal ─────────────────────────────────────────────────────
-  const hasJob = !!report.job.project || !!report.job.preparedFor;
-  const jobIdForSave = report.job.project
-    ? report.job.project.replace(/[^0-9]/g, "")
-    : "";
+  const hasReport = report.photos.length > 0 || !!report.job.preparedFor;
 
-  // Pull the numeric job ID from the job number field (e.g. "#10737" → "10737")
-  // We store it separately when the import completes
-  const [loadedJobId, setLoadedJobId] = useState<string>("");
-
-  // ── Derived ───────────────────────────────────────────────────────────────
   const filteredPhotos = report.settings.filterByDate
     ? filterPhotosByDateRange(
         report.photos,
@@ -337,11 +294,9 @@ export default function ConditionReportPage({
       )
     : report.schedule;
 
-  const hasReport = report.photos.length > 0 || hasJob;
-
   return (
     <div className={styles.page}>
-      {/* ── Top bar ─────────────────────────────────────────────────────── */}
+      {/* Top bar */}
       <div className={styles.topBar}>
         <button className={styles.backBtn} onClick={onBack}>
           ← Report types
@@ -357,8 +312,6 @@ export default function ConditionReportPage({
               {filteredSchedule.length !== 1 ? "s" : ""}
             </span>
           )}
-
-          {/* Saved badge */}
           {savedFilename && (
             <span className={styles.savedBadge}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -379,8 +332,6 @@ export default function ConditionReportPage({
               Saved
             </span>
           )}
-
-          {/* Save to Job */}
           <Button
             variant="secondary"
             size="sm"
@@ -389,8 +340,6 @@ export default function ConditionReportPage({
           >
             Save to Job
           </Button>
-
-          {/* Export PDF */}
           <Button
             variant="primary"
             size="sm"
@@ -402,7 +351,7 @@ export default function ConditionReportPage({
         </div>
       </div>
 
-      {/* ── Body ────────────────────────────────────────────────────────── */}
+      {/* Body */}
       <div className={styles.editorBody}>
         <OptionsPanel
           settings={report.settings}
@@ -411,7 +360,6 @@ export default function ConditionReportPage({
           importStatus={importStatus}
           onSettings={updateSettings}
           onImport={(jobNumber) => {
-            // Capture the raw job number for save-to-job use
             setLoadedJobId(jobNumber);
             handleImport(jobNumber);
           }}
@@ -462,13 +410,13 @@ export default function ConditionReportPage({
         </div>
       </div>
 
-      {/* ── Save to Job Modal ────────────────────────────────────────────── */}
+      {/* Save to Job Modal */}
       {showSaveModal && (
         <SaveToJobModal
           jobId={loadedJobId}
           jobNo={`#${loadedJobId}`}
           companyId={0}
-          htmlContent={buildPrintHTML(report)}
+          report={report}
           onClose={() => setShowSaveModal(false)}
           onSuccess={(filename) => {
             setSavedFilename(filename);
