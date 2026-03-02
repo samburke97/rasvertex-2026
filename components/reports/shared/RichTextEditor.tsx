@@ -1,7 +1,7 @@
 "use client";
 // components/reports/shared/RichTextEditor.tsx
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -125,6 +125,9 @@ export default function RichTextEditor({
   className = "",
 }: RichTextEditorProps) {
   const [focused, setFocused] = useState(false);
+  // Track focus in a ref so the sync effect can read it without
+  // becoming a stale closure — avoids key-repeat interruption.
+  const focusedRef = useRef(false);
 
   const editor = useEditor({
     extensions: [
@@ -146,16 +149,25 @@ export default function RichTextEditor({
       const html = editor.isEmpty ? "" : editor.getHTML();
       onChange(html);
     },
-    onFocus: () => setFocused(true),
-    onBlur: () => setFocused(false),
+    onFocus: () => {
+      setFocused(true);
+      focusedRef.current = true;
+    },
+    onBlur: () => {
+      setFocused(false);
+      focusedRef.current = false;
+    },
     editorProps: {
       attributes: { class: styles.editorContent },
     },
   });
 
-  // Sync when value changes externally (SimPRO import)
+  // Sync when value changes externally (SimPRO import or parent reset).
+  // CRITICAL: skip when the editor is focused — the user is typing and
+  // calling setContent would interrupt key-repeat and cursor position.
   React.useEffect(() => {
     if (!editor) return;
+    if (focusedRef.current) return; // ← key fix: don't reset while typing
     const current = editor.isEmpty ? "" : editor.getHTML();
     if (value !== current) {
       editor.commands.setContent(value || "", false);
