@@ -1,12 +1,5 @@
 "use client";
 // components/reports/shared/RichTextEditor.tsx
-// ─────────────────────────────────────────────────────────────────────────────
-// WYSIWYG rich text editor using Tiptap.
-// - Toolbar appears only when focused (slides in above the text area)
-// - Light styling matching schedule table header — #f9f9f9 bg, dark text, border
-// - Stores value as HTML — output directly into PDF, no markdown parsing needed
-// - Used for: Summary comments/recommendations, Cover intro
-// ─────────────────────────────────────────────────────────────────────────────
 
 import React, { useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -22,28 +15,14 @@ interface RichTextEditorProps {
   className?: string;
 }
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
 const IconBold = () => (
-  <span
-    style={{
-      fontWeight: 700,
-      fontSize: 12,
-      fontFamily: "Georgia, serif",
-      lineHeight: 1,
-    }}
-  >
+  <span style={{ fontWeight: 700, fontSize: 12, fontFamily: "Georgia,serif" }}>
     B
   </span>
 );
 const IconItalic = () => (
   <span
-    style={{
-      fontStyle: "italic",
-      fontSize: 12,
-      fontFamily: "Georgia, serif",
-      lineHeight: 1,
-    }}
+    style={{ fontStyle: "italic", fontSize: 12, fontFamily: "Georgia,serif" }}
   >
     I
   </span>
@@ -138,8 +117,6 @@ const IconOrdered = () => (
   </svg>
 );
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export default function RichTextEditor({
   value,
   onChange,
@@ -176,7 +153,7 @@ export default function RichTextEditor({
     },
   });
 
-  // Sync when value changes externally (SimPRO import populates fields)
+  // Sync when value changes externally (SimPRO import)
   React.useEffect(() => {
     if (!editor) return;
     const current = editor.isEmpty ? "" : editor.getHTML();
@@ -200,7 +177,7 @@ export default function RichTextEditor({
       type="button"
       title={title}
       onMouseDown={(e) => {
-        e.preventDefault(); // keep editor focused
+        e.preventDefault(); // prevent blur
         onClick();
       }}
       className={`${styles.btn} ${active ? styles.btnActive : ""}`}
@@ -211,56 +188,49 @@ export default function RichTextEditor({
 
   return (
     <div
-      className={`${styles.wrap} ${focused ? styles.focused : ""} ${className}`}
+      className={`${styles.wrap} ${focused ? styles.wrapFocused : ""} ${className}`}
     >
-      {/* ── Toolbar — slides in above editor on focus ── */}
-      <div
-        className={`${styles.toolbar} ${focused ? styles.toolbarVisible : ""}`}
-        aria-hidden={!focused}
-      >
-        {label && (
-          <>
-            <span className={styles.toolbarLabel}>{label}</span>
-            <div className={styles.divider} />
-          </>
-        )}
+      {/* ── Toolbar — ONLY rendered when focused ── */}
+      {focused && (
+        <div className={styles.toolbar}>
+          {label && (
+            <>
+              <span className={styles.toolbarLabel}>{label}</span>
+              <div className={styles.divider} />
+            </>
+          )}
+          <Btn
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+            active={editor?.isActive("bold")}
+            title="Bold"
+          >
+            <IconBold />
+          </Btn>
+          <Btn
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
+            active={editor?.isActive("italic")}
+            title="Italic"
+          >
+            <IconItalic />
+          </Btn>
+          <div className={styles.divider} />
+          <Btn
+            onClick={() => editor?.chain().focus().toggleBulletList().run()}
+            active={editor?.isActive("bulletList")}
+            title="Bullet list"
+          >
+            <IconBullet />
+          </Btn>
+          <Btn
+            onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+            active={editor?.isActive("orderedList")}
+            title="Numbered list"
+          >
+            <IconOrdered />
+          </Btn>
+        </div>
+      )}
 
-        <Btn
-          onClick={() => editor?.chain().focus().toggleBold().run()}
-          active={editor?.isActive("bold")}
-          title="Bold"
-        >
-          <IconBold />
-        </Btn>
-
-        <Btn
-          onClick={() => editor?.chain().focus().toggleItalic().run()}
-          active={editor?.isActive("italic")}
-          title="Italic"
-        >
-          <IconItalic />
-        </Btn>
-
-        <div className={styles.divider} />
-
-        <Btn
-          onClick={() => editor?.chain().focus().toggleBulletList().run()}
-          active={editor?.isActive("bulletList")}
-          title="Bullet list"
-        >
-          <IconBullet />
-        </Btn>
-
-        <Btn
-          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-          active={editor?.isActive("orderedList")}
-          title="Numbered list"
-        >
-          <IconOrdered />
-        </Btn>
-      </div>
-
-      {/* ── Editor ── */}
       <EditorContent editor={editor} className={styles.editorWrap} />
     </div>
   );
