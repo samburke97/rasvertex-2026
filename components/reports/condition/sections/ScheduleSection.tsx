@@ -21,7 +21,14 @@ const ASSOCIATIONS = [
   { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
 ];
 
-// ── Editable cell (local — no shared component needed) ───────────────────────
+// ── Pagination constants (A4 at 96dpi) ───────────────────────────────────────
+// First page: topBar ~120px + heading ~56px + thead ~44px + footer ~100px = ~320px overhead
+// Continuation: no topBar/heading, just body padding + thead + footer = ~184px overhead
+// Row height ~36px
+const ROWS_PER_FIRST_PAGE = 16;
+const ROWS_PER_CONTINUATION = 22;
+
+// ── Editable cell ─────────────────────────────────────────────────────────────
 
 function EditableCell({
   value,
@@ -80,25 +87,128 @@ function EditableCell({
   );
 }
 
-// ── Totals row ────────────────────────────────────────────────────────────────
+// ── Footer (shared) ───────────────────────────────────────────────────────────
 
-function TotalsRow({ rows }: { rows: ScheduleRow[] }) {
-  const totalScheduled = rows.reduce((s, r) => s + r.scheduledHours, 0);
-  const totalActual = rows.reduce((s, r) => s + r.actualHours, 0);
+function ScheduleFooter() {
   return (
-    <tr className={styles.totalsRow}>
-      <td colSpan={2} className={styles.totalsLabel}>
-        Totals
-      </td>
-      <td className={styles.totalsCell}>
-        {totalScheduled > 0 ? totalScheduled.toFixed(2) : "—"}
-      </td>
-      <td className={styles.totalsCell}>
-        {totalActual > 0 ? totalActual.toFixed(2) : "—"}
-      </td>
-      <td />
-      <td />
-    </tr>
+    <div className={styles.footer}>
+      {ASSOCIATIONS.map((a) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={a.alt} src={a.src} alt={a.alt} className={styles.assocLogo} />
+      ))}
+    </div>
+  );
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
+
+function ScheduleTable({
+  rows,
+  showTotals,
+  totalHours,
+  onUpdate,
+  onDelete,
+  onAdd,
+}: {
+  rows: ScheduleRow[];
+  showTotals: boolean;
+  totalHours: number;
+  onUpdate: (id: string, patch: Partial<ScheduleRow>) => void;
+  onDelete: (id: string) => void;
+  onAdd?: () => void;
+}) {
+  return (
+    <>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th className={styles.th}>Date</th>
+              <th className={styles.th}>Employee</th>
+              <th className={styles.thNum}>Hours</th>
+              <th className={styles.thAction} />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={4} className={styles.emptyCell}>
+                  No schedule data — enter a job number to load.
+                </td>
+              </tr>
+            )}
+            {rows.map((row) => (
+              <tr key={row.id} className={styles.dataRow}>
+                <td className={styles.td}>
+                  <EditableCell
+                    value={row.date}
+                    onChange={(v) => onUpdate(row.id, { date: v })}
+                  />
+                </td>
+                <td className={styles.td}>
+                  <EditableCell
+                    value={row.employeeName}
+                    onChange={(v) => onUpdate(row.id, { employeeName: v })}
+                  />
+                </td>
+                <td className={styles.tdNum}>
+                  <EditableCell
+                    value={row.actualHours}
+                    type="number"
+                    onChange={(v) =>
+                      onUpdate(row.id, { actualHours: parseFloat(v) || 0 })
+                    }
+                  />
+                </td>
+                <td className={styles.tdAction}>
+                  <button
+                    className={styles.deleteBtn}
+                    onClick={() => onDelete(row.id)}
+                    title="Remove row"
+                    aria-label="Remove row"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <path
+                        d="M2 3.5h10M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M6 6v4M8 6v4M3 3.5l.7 7.3a1 1 0 001 .9h4.6a1 1 0 001-.9L11 3.5"
+                        stroke="currentColor"
+                        strokeWidth="1.25"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {showTotals && rows.length > 0 && (
+            <tfoot>
+              <tr className={styles.totalsRow}>
+                <td className={styles.totalsLabel}>Total</td>
+                <td className={styles.td} />
+                <td className={styles.totalsCell}>
+                  {totalHours > 0 ? totalHours.toFixed(2) : "—"}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+      {onAdd && (
+        <button className={styles.addRow} onClick={onAdd}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path
+              d="M6 1v10M1 6h10"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </svg>
+          Add row
+        </button>
+      )}
+    </>
   );
 }
 
@@ -137,7 +247,9 @@ export default function ScheduleSection({
     onChange([...rows, newRow]);
   }, [rows, onChange]);
 
-  // ── Loading state ───────────────────────────────────────────────────────
+  const totalHours = rows.reduce((s, r) => s + r.actualHours, 0);
+
+  // ── Loading state ─────────────────────────────────────────────────────────
   if (isLoading) {
     return (
       <div className={styles.page}>
@@ -158,164 +270,68 @@ export default function ScheduleSection({
             </span>
           </div>
         </div>
-        <div className={styles.footer}>
-          {ASSOCIATIONS.map((a) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={a.alt}
-              src={a.src}
-              alt={a.alt}
-              className={styles.assocLogo}
-            />
-          ))}
-        </div>
+        <ScheduleFooter />
       </div>
     );
   }
 
+  // ── Paginate rows ─────────────────────────────────────────────────────────
+  const pages: ScheduleRow[][] = [];
+  if (rows.length <= ROWS_PER_FIRST_PAGE) {
+    pages.push(rows);
+  } else {
+    pages.push(rows.slice(0, ROWS_PER_FIRST_PAGE));
+    let offset = ROWS_PER_FIRST_PAGE;
+    while (offset < rows.length) {
+      pages.push(rows.slice(offset, offset + ROWS_PER_CONTINUATION));
+      offset += ROWS_PER_CONTINUATION;
+    }
+  }
+
   return (
-    <div className={styles.page}>
-      {/* ── Top bar: SCHEDULE left, link_blue right ── */}
-      <div className={styles.topBar}>
-        <h1 className={styles.title}>Schedule</h1>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/reports/link_blue.png"
-          alt="rasvertex.com.au"
-          className={styles.topBarLink}
-        />
-      </div>
+    <>
+      {pages.map((pageRows, pageIdx) => {
+        const isFirst = pageIdx === 0;
+        const isLast = pageIdx === pages.length - 1;
 
-      {/* ── Body ── */}
-      <div className={styles.body}>
-        {/* Section heading with rule */}
-        <div className={styles.heading}>
-          <div className={styles.headingTitle}>Hours Schedule</div>
-          <div className={styles.headingRule} />
-        </div>
-
-        {/* Table */}
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>Date</th>
-                <th className={styles.th}>Employee</th>
-                <th className={styles.thNum}>Scheduled Hrs</th>
-                <th className={styles.thNum}>Actual Hrs</th>
-                <th className={styles.th}>Note</th>
-                <th className={styles.thAction} />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan={6} className={styles.emptyCell}>
-                    No schedule data — enter a job number to load, or add rows
-                    manually.
-                  </td>
-                </tr>
-              )}
-              {rows.map((row) => (
-                <tr key={row.id} className={styles.dataRow}>
-                  <td className={styles.td}>
-                    <EditableCell
-                      value={row.date}
-                      onChange={(v) => updateRow(row.id, { date: v })}
-                    />
-                  </td>
-                  <td className={styles.td}>
-                    <EditableCell
-                      value={row.employeeName}
-                      onChange={(v) => updateRow(row.id, { employeeName: v })}
-                    />
-                  </td>
-                  <td className={styles.tdNum}>
-                    <EditableCell
-                      value={row.scheduledHours}
-                      type="number"
-                      onChange={(v) =>
-                        updateRow(row.id, {
-                          scheduledHours: parseFloat(v) || 0,
-                        })
-                      }
-                    />
-                  </td>
-                  <td className={styles.tdNum}>
-                    <EditableCell
-                      value={row.actualHours}
-                      type="number"
-                      onChange={(v) =>
-                        updateRow(row.id, { actualHours: parseFloat(v) || 0 })
-                      }
-                    />
-                  </td>
-                  <td className={styles.tdNote}>
-                    <EditableCell
-                      value={row.note}
-                      onChange={(v) => updateRow(row.id, { note: v })}
-                    />
-                  </td>
-                  <td className={styles.tdAction}>
-                    <button
-                      className={styles.deleteBtn}
-                      onClick={() => deleteRow(row.id)}
-                      title="Remove row"
-                      aria-label="Remove row"
-                    >
-                      <svg
-                        width="14"
-                        height="14"
-                        viewBox="0 0 14 14"
-                        fill="none"
-                      >
-                        <path
-                          d="M2 3.5h10M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M6 6v4M8 6v4M3 3.5l.7 7.3a1 1 0 001 .9h4.6a1 1 0 001-.9L11 3.5"
-                          stroke="currentColor"
-                          strokeWidth="1.25"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {rows.length > 0 && (
-              <tfoot>
-                <TotalsRow rows={rows} />
-              </tfoot>
+        return (
+          <div key={pageIdx} className={styles.page}>
+            {/* Header + heading only on first page */}
+            {isFirst && (
+              <div className={styles.topBar}>
+                <h1 className={styles.title}>Schedule</h1>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/reports/link_blue.png"
+                  alt="rasvertex.com.au"
+                  className={styles.topBarLink}
+                />
+              </div>
             )}
-          </table>
-        </div>
 
-        {/* Add row */}
-        <button className={styles.addRow} onClick={addRow}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path
-              d="M6 1v10M1 6h10"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
-          Add row
-        </button>
-      </div>
+            <div className={styles.body}>
+              {isFirst && (
+                <div className={styles.heading}>
+                  <div className={styles.headingTitle}>Hours Schedule</div>
+                  <div className={styles.headingRule} />
+                </div>
+              )}
 
-      {/* ── Footer: association logos ── */}
-      <div className={styles.footer}>
-        {ASSOCIATIONS.map((a) => (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            key={a.alt}
-            src={a.src}
-            alt={a.alt}
-            className={styles.assocLogo}
-          />
-        ))}
-      </div>
-    </div>
+              <ScheduleTable
+                rows={pageRows}
+                showTotals={isLast}
+                totalHours={totalHours}
+                onUpdate={updateRow}
+                onDelete={deleteRow}
+                onAdd={isLast ? addRow : undefined}
+              />
+            </div>
+
+            {/* Footer on EVERY page */}
+            <ScheduleFooter />
+          </div>
+        );
+      })}
+    </>
   );
 }

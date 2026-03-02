@@ -102,19 +102,19 @@ export default function CoverSection({ job, onChange }: CoverSectionProps) {
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Footer — identical to SummarySection */}
-        <div className={styles.footer}>
-          {ASSOCIATIONS.map((a) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={a.alt}
-              src={a.src}
-              alt={a.alt}
-              className={styles.assocLogo}
-            />
-          ))}
-        </div>
+      {/* ── Footer — outside .body so border-top spans full 794px width ── */}
+      <div className={styles.footer}>
+        {ASSOCIATIONS.map((a) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={a.alt}
+            src={a.src}
+            alt={a.alt}
+            className={styles.assocLogo}
+          />
+        ))}
       </div>
     </div>
   );

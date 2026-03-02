@@ -1,17 +1,15 @@
 "use client";
 // components/reports/condition/sections/PhotoSection.tsx
 
-import React, { useRef } from "react";
+import React from "react";
 import styles from "./PhotoSection.module.css";
 import PhotoCard from "../../shared/PhotoCard";
-import Button from "@/components/ui/Button";
 import type { ReportPhoto, ImportStatus } from "@/lib/reports/condition.types";
 
 interface PhotoSectionProps {
   photos: ReportPhoto[];
   importStatus: ImportStatus;
   showDates: boolean;
-  onPhotosAdded: (photos: ReportPhoto[]) => void;
   onPhotoRemove: (id: string) => void;
   onPhotoRename: (id: string, name: string) => void;
 }
@@ -101,9 +99,6 @@ export function paginateGroups(
   for (let g = 0; g < groups.length; g++) {
     const group = groups[g];
 
-    // ── Date header placement ─────────────────────────────────────────────
-    // Rule: header + its first row must always land on the same page.
-    // We check header + ROW_H combined — if they don't fit, flush first.
     if (showDates && group.label) {
       const neededH = DATE_HEADER_H + ROW_H;
       if (usedH > 0 && usedH + neededH > PAGE_AVAILABLE_H) {
@@ -113,15 +108,12 @@ export function paginateGroups(
       usedH += DATE_HEADER_H;
     }
 
-    // ── Photo rows ────────────────────────────────────────────────────────
     const rows: ReportPhoto[][] = [];
     for (let i = 0; i < group.photos.length; i += 3) {
       rows.push(group.photos.slice(i, i + 3));
     }
 
     for (const row of rows) {
-      // If this row won't fit, flush — but never flush if current is empty
-      // (that would mean even a single row is too tall, which shouldn't happen)
       if (usedH > 0 && usedH + ROW_H > PAGE_AVAILABLE_H) {
         flush();
       }
@@ -129,11 +121,8 @@ export function paginateGroups(
       usedH += ROW_H;
     }
 
-    // ── Group gap (not on the last group) ─────────────────────────────────
     const isLastGroup = g === groups.length - 1;
     if (!isLastGroup && usedH > 0) {
-      // Only add the gap if the next group will still fit on this page;
-      // otherwise it's wasted space at the bottom — just let flush happen naturally.
       if (usedH + GROUP_GAP < PAGE_AVAILABLE_H) {
         usedH += GROUP_GAP;
       }
@@ -148,37 +137,9 @@ export default function PhotoSection({
   photos,
   importStatus,
   showDates,
-  onPhotosAdded,
   onPhotoRemove,
   onPhotoRename,
 }: PhotoSectionProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter((f) =>
-      f.type.startsWith("image/"),
-    );
-    if (!files.length) return;
-    const newPhotos: ReportPhoto[] = [];
-    let processed = 0;
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        newPhotos.push({
-          id: Math.random().toString(36).slice(2),
-          name: file.name,
-          url: ev.target?.result as string,
-          size: file.size,
-          dateAdded: null,
-        });
-        processed++;
-        if (processed === files.length) onPhotosAdded(newPhotos);
-      };
-      reader.readAsDataURL(file);
-    });
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
   const isStreaming = importStatus.phase === "fetching-photos";
   const progress =
     isStreaming &&
@@ -192,35 +153,12 @@ export default function PhotoSection({
     : [{ key: "all", label: null, photos }];
 
   const pages = paginateGroups(groups, showDates);
+  const totalPages = pages.length;
 
-  // Global photo index counter — incremented across all pages
   let photoIndex = 0;
 
   return (
     <>
-      {/* Editor-only header bar — not rendered in PDF */}
-      <div className={styles.headerBar}>
-        <div className={styles.headerLeft}>
-          <span className={styles.label}>Photos</span>
-          <span className={styles.count}>{photos.length}</span>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          + Upload
-        </Button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*"
-          onChange={handleFileChange}
-          style={{ display: "none" }}
-        />
-      </div>
-
       {isStreaming && progress && (
         <div className={styles.progressOuter}>
           <div
@@ -240,7 +178,7 @@ export default function PhotoSection({
           <div className={styles.empty}>
             {isStreaming
               ? "Loading photos from SimPRO\u2026"
-              : "No photos yet \u2014 enter a job number or upload files."}
+              : "No photos yet \u2014 enter a job number to load photos from SimPRO."}
           </div>
         </div>
       )}
@@ -281,6 +219,13 @@ export default function PhotoSection({
                   </div>
                 );
               })}
+            </div>
+
+            {/* Page number — bottom-right, inside page boundary */}
+            <div className={styles.pageNumber}>
+              {totalPages > 1
+                ? `PAGE ${pageIdx + 1} / ${totalPages}`
+                : `PAGE ${pageIdx + 1}`}
             </div>
           </div>
         ))}

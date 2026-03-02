@@ -73,7 +73,7 @@
  * Body is a flex column with three children:
  *   .titleGroup  flex:1  — grows to fill space, centres title+desc within itself
  *   .metaWrap            — fixed height, sits below titleGroup
- *   .footer              — association logos, border-top
+ *   .footer              — association logos, border-top (full-bleed)
  */
 .body {
   flex: 1;
@@ -212,9 +212,14 @@
   color: #bbb;
 }
 
-/* ── Footer — identical to SummarySection ────────────────────────────────── */
+/* ── Footer — full-bleed border-top ──────────────────────────────────────── */
+/*
+ * The footer sits OUTSIDE .body so it is not constrained by body's side
+ * padding — border-top spans the full 794px width, matching Summary/Schedule.
+ */
 .footer {
-  padding: 1.5rem 0 2rem;
+  margin-top: auto;
+  padding: 1.5rem 2.75rem 2rem;
   border-top: 1px solid #ebebeb;
   display: flex;
   flex-direction: row;
@@ -223,6 +228,7 @@
   gap: 20px;
   flex-wrap: nowrap;
 }
+
 .assocLogo {
   height: 36px;
   width: auto;

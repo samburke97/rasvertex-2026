@@ -87,10 +87,6 @@ export default function ConditionReportPage({
   }, []);
 
   // ── Photo handlers ────────────────────────────────────────────────────────
-  const addPhotos = useCallback((photos: ReportPhoto[]) => {
-    setReport((prev) => ({ ...prev, photos: [...prev.photos, ...photos] }));
-  }, []);
-
   const removePhoto = useCallback((id: string) => {
     setReport((prev) => ({
       ...prev,
@@ -110,57 +106,11 @@ export default function ConditionReportPage({
     setReport((prev) => ({ ...prev, schedule: rows }));
   }, []);
 
-  // ── Fetch schedule ────────────────────────────────────────────────────────
-  const fetchSchedule = useCallback(
-    async (jobId: string) => {
-      setScheduleLoading(true);
-      setImportStatus({ phase: "fetching-schedule" });
-      try {
-        const params = new URLSearchParams({ companyId: "0" });
-        if (report.settings.dateFrom)
-          params.set("dateFrom", report.settings.dateFrom);
-        if (report.settings.dateTo)
-          params.set("dateTo", report.settings.dateTo);
-
-        const res = await fetch(`/api/simpro/jobs/${jobId}/schedule?${params}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        setReport((prev) => ({
-          ...prev,
-          schedule: data.rows ?? [],
-          settings: {
-            ...prev.settings,
-            scheduleLoaded: true,
-            showSchedule: true,
-          },
-        }));
-      } catch (err) {
-        console.error("[Schedule] fetch failed:", err);
-        // Non-fatal — photos still loaded fine; just flag schedule unavailable
-        setReport((prev) => ({
-          ...prev,
-          settings: {
-            ...prev.settings,
-            scheduleLoaded: false,
-            showSchedule: false,
-          },
-        }));
-      } finally {
-        setScheduleLoading(false);
-        setImportStatus({ phase: "done" });
-      }
-    },
-    [report.settings.dateFrom, report.settings.dateTo],
-  );
-
   // ── Schedule fetch (silent — runs alongside photos) ───────────────────────
   const fetchScheduleSilent = useCallback(async (jobId: string) => {
     try {
       const res = await fetch(`/api/simpro/jobs/${jobId}/schedule?companyId=0`);
 
-      // Always mark scheduleLoaded=true so the toggle is never permanently
-      // disabled — even if the response is an error or returns no rows.
       if (!res.ok) {
         setReport((prev) => ({
           ...prev,
@@ -178,13 +128,10 @@ export default function ConditionReportPage({
         settings: {
           ...prev.settings,
           scheduleLoaded: true,
-          // Auto-enable the toggle only when rows were actually returned
           showSchedule: rows.length > 0,
         },
       }));
     } catch {
-      // Network / parse error — still unblock the toggle so the user can
-      // manually add rows or retry via the explicit fetch button.
       setReport((prev) => ({
         ...prev,
         settings: { ...prev.settings, scheduleLoaded: true },
@@ -215,7 +162,6 @@ export default function ConditionReportPage({
       }
 
       // 2. Fetch photos (SSE stream) + schedule in parallel
-      // Photos use SSE — we kick it off first, then schedule fires concurrently
       const photoPromise = fetchPhotosSSE(jobNumber);
       const schedulePromise = fetchScheduleSilent(jobNumber);
       await Promise.all([photoPromise, schedulePromise]);
@@ -365,7 +311,6 @@ export default function ConditionReportPage({
             photos={filteredPhotos}
             importStatus={importStatus}
             showDates={report.settings.showDates}
-            onPhotosAdded={addPhotos}
             onPhotoRemove={removePhoto}
             onPhotoRename={renamePhoto}
           />

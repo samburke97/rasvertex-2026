@@ -53,14 +53,15 @@
 /* ── A4 page block — fixed height, matches PDF exactly ──────────────────── */
 .page {
   width: 794px;
-  height: 1123px; /* ← A4 at 96dpi, exactly like cover/schedule/summary */
+  height: 1123px;
   background: #fff;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.1),
     0 1px 4px rgba(0, 0, 0, 0.06);
   border-radius: 4px;
-  overflow: hidden; /* clip any content overflow within the A4 boundary */
+  overflow: hidden;
   flex-shrink: 0;
+  position: relative; /* needed for absolute page number */
 }
 
 /* Inner content — padding matches print CSS exactly */
@@ -71,6 +72,27 @@
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+}
+
+/* ── Page number ─────────────────────────────────────────────────────────── */
+.pageNumber {
+  position: absolute;
+  bottom: 1.25rem;
+  right: 2.75rem;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.pageNumberTotal {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #9ca3af;
 }
 
 /* ── Date separator ─────────────────────────────────────────────────────── */
