@@ -5,7 +5,7 @@
 /* ── Page shell ──────────────────────────────────────────────────────────── */
 .page {
   width: 794px;
-  min-height: 1123px;
+  height: 1123px;
   background: #fff;
   box-shadow:
     0 4px 24px rgba(0, 0, 0, 0.1),
@@ -47,23 +47,24 @@
 
 /* ── Body ────────────────────────────────────────────────────────────────── */
 .body {
-  padding: 2.5rem 2.75rem 2rem;
+  padding: 2rem 2.75rem 2rem;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
 }
 
-/* ── Section heading (rule line) ─────────────────────────────────────────── */
+/* ── Section heading ─────────────────────────────────────────────────────── */
 .heading {
   display: flex;
   align-items: center;
   gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-shrink: 0;
 }
 
 .headingTitle {
   font-family: "Bebas Neue", Arial, sans-serif;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   font-weight: 400;
   letter-spacing: 0.08em;
   color: #0d1c45;
@@ -74,17 +75,11 @@
 
 .headingRule {
   flex: 1;
-  height: 1px;
-  background: #e5e7eb;
+  height: 2px;
+  background: #0d1c45;
 }
 
 /* ── Table ───────────────────────────────────────────────────────────────── */
-.tableWrap {
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -93,11 +88,11 @@
 .th {
   padding: 0.55rem 0.875rem;
   font-family: "Inter", Arial, sans-serif;
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: #374151;
   background: #f9f9f9;
   border-bottom: 1px solid #e5e7eb;
   text-align: left;
@@ -153,7 +148,6 @@
   background: #f9f9f9;
 }
 
-/* "Total" label — left-aligned in the Date column */
 .totalsLabel {
   padding: 0.55rem 0.875rem;
   font-family: "Inter", Arial, sans-serif;
@@ -165,7 +159,6 @@
   text-align: left;
 }
 
-/* Total hours — right-aligned in the Hours column */
 .totalsCell {
   padding: 0.55rem 0.875rem;
   font-family: "Inter", Arial, sans-serif;
@@ -252,6 +245,8 @@
     border-color 0.15s,
     color 0.15s;
   align-self: flex-start;
+  margin-top: 0.75rem;
+  flex-shrink: 0;
 }
 
 .addRow:hover {
@@ -289,7 +284,7 @@
   color: var(--for-medium, #6b7280);
 }
 
-/* ── Footer: association logos — full-bleed, on every page ──────────────── */
+/* ── Footer ──────────────────────────────────────────────────────────────── */
 .footer {
   margin-top: auto;
   padding: 1.5rem 2.75rem 2rem;
@@ -300,6 +295,7 @@
   justify-content: center;
   gap: 20px;
   flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 
 .assocLogo {

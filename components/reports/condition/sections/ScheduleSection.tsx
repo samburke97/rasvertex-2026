@@ -4,6 +4,7 @@
 import React, { useState, useCallback } from "react";
 import styles from "./ScheduleSection.module.css";
 import type { ScheduleRow } from "@/lib/reports/condition.types";
+import { formatScheduleDate } from "@/lib/reports/condition.types";
 
 interface ScheduleSectionProps {
   rows: ScheduleRow[];
@@ -11,7 +12,6 @@ interface ScheduleSectionProps {
   onChange: (rows: ScheduleRow[]) => void;
 }
 
-// Association logos — identical to SummarySection / CoverSection
 const ASSOCIATIONS = [
   { src: "/reports/associations/communityselect.png", alt: "Community Select" },
   { src: "/reports/associations/dulux.png", alt: "Dulux" },
@@ -21,10 +21,7 @@ const ASSOCIATIONS = [
   { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
 ];
 
-// ── Pagination constants (A4 at 96dpi) ───────────────────────────────────────
-// First page: topBar ~120px + heading ~56px + thead ~44px + footer ~100px = ~320px overhead
-// Continuation: no topBar/heading, just body padding + thead + footer = ~184px overhead
-// Row height ~36px
+// Pagination — must match condition.print.ts
 const ROWS_PER_FIRST_PAGE = 16;
 const ROWS_PER_CONTINUATION = 22;
 
@@ -32,10 +29,12 @@ const ROWS_PER_CONTINUATION = 22;
 
 function EditableCell({
   value,
+  displayValue,
   type = "text",
   onChange,
 }: {
   value: string | number;
+  displayValue?: string;
   type?: "text" | "number";
   onChange: (v: string) => void;
 }) {
@@ -69,6 +68,14 @@ function EditableCell({
     );
   }
 
+  const label =
+    displayValue ??
+    (type === "number"
+      ? Number(value) > 0
+        ? Number(value).toFixed(2)
+        : "—"
+      : String(value) || "—");
+
   return (
     <span
       className={styles.cellDisplay}
@@ -78,16 +85,12 @@ function EditableCell({
       }}
       title="Click to edit"
     >
-      {type === "number"
-        ? Number(value) > 0
-          ? Number(value).toFixed(2)
-          : "—"
-        : value || "—"}
+      {label}
     </span>
   );
 }
 
-// ── Footer (shared) ───────────────────────────────────────────────────────────
+// ── Footer ────────────────────────────────────────────────────────────────────
 
 function ScheduleFooter() {
   return (
@@ -119,82 +122,82 @@ function ScheduleTable({
 }) {
   return (
     <>
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th className={styles.th}>Date</th>
+            <th className={styles.th}>Employee</th>
+            <th className={styles.thNum}>Hours</th>
+            <th className={styles.thAction} />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && (
             <tr>
-              <th className={styles.th}>Date</th>
-              <th className={styles.th}>Employee</th>
-              <th className={styles.thNum}>Hours</th>
-              <th className={styles.thAction} />
+              <td colSpan={4} className={styles.emptyCell}>
+                No schedule data — enter a job number to load.
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={4} className={styles.emptyCell}>
-                  No schedule data — enter a job number to load.
-                </td>
-              </tr>
-            )}
-            {rows.map((row) => (
-              <tr key={row.id} className={styles.dataRow}>
-                <td className={styles.td}>
-                  <EditableCell
-                    value={row.date}
-                    onChange={(v) => onUpdate(row.id, { date: v })}
-                  />
-                </td>
-                <td className={styles.td}>
-                  <EditableCell
-                    value={row.employeeName}
-                    onChange={(v) => onUpdate(row.id, { employeeName: v })}
-                  />
-                </td>
-                <td className={styles.tdNum}>
-                  <EditableCell
-                    value={row.actualHours}
-                    type="number"
-                    onChange={(v) =>
-                      onUpdate(row.id, { actualHours: parseFloat(v) || 0 })
-                    }
-                  />
-                </td>
-                <td className={styles.tdAction}>
-                  <button
-                    className={styles.deleteBtn}
-                    onClick={() => onDelete(row.id)}
-                    title="Remove row"
-                    aria-label="Remove row"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path
-                        d="M2 3.5h10M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M6 6v4M8 6v4M3 3.5l.7 7.3a1 1 0 001 .9h4.6a1 1 0 001-.9L11 3.5"
-                        stroke="currentColor"
-                        strokeWidth="1.25"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          {showTotals && rows.length > 0 && (
-            <tfoot>
-              <tr className={styles.totalsRow}>
-                <td className={styles.totalsLabel}>Total</td>
-                <td className={styles.td} />
-                <td className={styles.totalsCell}>
-                  {totalHours > 0 ? totalHours.toFixed(2) : "—"}
-                </td>
-                <td />
-              </tr>
-            </tfoot>
           )}
-        </table>
-      </div>
+          {rows.map((row) => (
+            <tr key={row.id} className={styles.dataRow}>
+              <td className={styles.td}>
+                {/* Display formatted date to match PDF; edit raw ISO value */}
+                <EditableCell
+                  value={row.date}
+                  displayValue={formatScheduleDate(row.date)}
+                  onChange={(v) => onUpdate(row.id, { date: v })}
+                />
+              </td>
+              <td className={styles.td}>
+                <EditableCell
+                  value={row.employeeName}
+                  onChange={(v) => onUpdate(row.id, { employeeName: v })}
+                />
+              </td>
+              <td className={styles.tdNum}>
+                <EditableCell
+                  value={row.actualHours}
+                  type="number"
+                  onChange={(v) =>
+                    onUpdate(row.id, { actualHours: parseFloat(v) || 0 })
+                  }
+                />
+              </td>
+              <td className={styles.tdAction}>
+                <button
+                  className={styles.deleteBtn}
+                  onClick={() => onDelete(row.id)}
+                  title="Remove row"
+                  aria-label="Remove row"
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path
+                      d="M2 3.5h10M5.5 3.5V2.5a1 1 0 011-1h1a1 1 0 011 1v1M6 6v4M8 6v4M3 3.5l.7 7.3a1 1 0 001 .9h4.6a1 1 0 001-.9L11 3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.25"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        {showTotals && rows.length > 0 && (
+          <tfoot>
+            <tr className={styles.totalsRow}>
+              <td className={styles.totalsLabel}>Total</td>
+              <td className={styles.td} />
+              <td className={styles.totalsCell}>
+                {totalHours > 0 ? totalHours.toFixed(2) : "—"}
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        )}
+      </table>
       {onAdd && (
         <button className={styles.addRow} onClick={onAdd}>
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -296,7 +299,6 @@ export default function ScheduleSection({
 
         return (
           <div key={pageIdx} className={styles.page}>
-            {/* Header + heading only on first page */}
             {isFirst && (
               <div className={styles.topBar}>
                 <h1 className={styles.title}>Schedule</h1>
@@ -327,7 +329,6 @@ export default function ScheduleSection({
               />
             </div>
 
-            {/* Footer on EVERY page */}
             <ScheduleFooter />
           </div>
         );

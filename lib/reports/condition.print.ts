@@ -23,7 +23,7 @@ export const DATE_HEADER_H = 34;
 export const GROUP_GAP = 36;
 
 // Schedule rows per page — must match ScheduleSection.tsx
-const ROWS_PER_FIRST_PAGE = 16;
+const ROWS_PER_FIRST_PAGE = 22;
 const ROWS_PER_CONTINUATION = 22;
 
 // ── Static asset map ──────────────────────────────────────────────────────────

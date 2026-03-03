@@ -10,7 +10,6 @@ import SummarySection from "./sections/SummarySection";
 import OptionsPanel from "./OptionsPanel";
 import Button from "@/components/ui/Button";
 import SaveToJobModal from "./SaveToJobModal";
-import { buildPrintHTML } from "@/lib/reports/condition.print";
 import {
   mapJobToReportDetails,
   filterPhotosByDateRange,
@@ -69,6 +68,7 @@ export default function ConditionReportPage({
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [savedFilename, setSavedFilename] = useState<string | null>(null);
   const [loadedJobId, setLoadedJobId] = useState<string>("");
+  const [isExporting, setIsExporting] = useState(false);
   const currentLoadId = useRef(0);
 
   const updateSettings = useCallback((s: ReportSettings) => {
@@ -267,13 +267,51 @@ export default function ConditionReportPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Export PDF — opens print dialog (instant, browser already has everything)
-  const handleExportPDF = useCallback(() => {
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(buildPrintHTML(report));
-    win.document.close();
-    setTimeout(() => win.print(), 800);
+  // Export PDF — generates server-side via Puppeteer, downloads directly
+  const handleExportPDF = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const photoData: Record<string, string> = {};
+      const strippedReport: ConditionReportData = {
+        ...report,
+        photos: report.photos.map((p) => {
+          if (p.url) photoData[p.id] = p.url;
+          return { ...p, url: "" };
+        }),
+      };
+
+      const filename = report.job.project
+        ? `Condition Report - ${report.job.project}`
+        : "Condition Report";
+
+      const res = await fetch("/api/reports/export-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename, report: strippedReport, photoData }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Export failed");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename + ".pdf";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[ExportPDF]", err);
+      alert(
+        err instanceof Error ? err.message : "Export failed. Please try again.",
+      );
+    } finally {
+      setIsExporting(false);
+    }
   }, [report]);
 
   const hasReport = report.photos.length > 0 || !!report.job.preparedFor;
@@ -344,9 +382,9 @@ export default function ConditionReportPage({
             variant="primary"
             size="sm"
             onClick={handleExportPDF}
-            disabled={!hasReport}
+            disabled={!hasReport || isExporting}
           >
-            Export PDF
+            {isExporting ? "Exporting…" : "Export PDF"}
           </Button>
         </div>
       </div>
