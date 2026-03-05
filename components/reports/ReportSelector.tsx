@@ -3,10 +3,12 @@
 import { useState, useRef, useEffect } from "react";
 import ConditionReportPage from "./condition/ConditionReportPage";
 import WorksAgreementPage from "./works-agreement/WorksAgreementPage";
+import AnchorInspectionPage from "./anchor-inspection/AnchorInspectionPage";
 import styles from "./ReportSelector.module.css";
 
 type ReportTypeId =
   | "condition"
+  | "anchor-inspection"
   | "waterproofing"
   | "building"
   | "finance-summary"
@@ -38,24 +40,25 @@ const PREVIOUSLY_SENT: SentReport[] = [
   },
   {
     id: "2",
+    report: "Anchor Inspection",
+    file: "anchor-inspection-grammar-school.pdf",
+    date: "08 Jan 2026",
+  },
+  {
+    id: "3",
     report: "Building Inspection",
     file: "building-inspection-marina.pdf",
     date: "05 Feb 2025",
   },
   {
-    id: "3",
-    report: "Finance Summary",
-    file: "finance-summary-q1-2025.pdf",
-    date: "01 Feb 2025",
-  },
-  {
     id: "4",
-    report: "Condition Report",
-    file: "condition-report-hilton-arcade.pdf",
+    report: "Works Agreement",
+    file: "works-agreement-hilton-arcade.pdf",
     date: "28 Jan 2025",
   },
 ];
 
+// ── Report type definitions ────────────────────────────────────────────────
 const REPORT_TYPES: ReportType[] = [
   {
     id: "condition",
@@ -83,7 +86,29 @@ const REPORT_TYPES: ReportType[] = [
       </svg>
     ),
   },
-
+  {
+    id: "anchor-inspection",
+    label: "Anchor Inspection",
+    description:
+      "Roof access & fall prevention systems inspection with aerial map zones and asset register.",
+    available: true,
+    category: "inspection",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="10" r="3" />
+        <path d="M12 2a8 8 0 00-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 00-8-8z" />
+      </svg>
+    ),
+  },
   {
     id: "building",
     label: "Building Inspection",
@@ -108,6 +133,28 @@ const REPORT_TYPES: ReportType[] = [
     ),
   },
   {
+    id: "waterproofing",
+    label: "Waterproofing Report",
+    description:
+      "Detailed waterproofing inspection and defect documentation report.",
+    available: false,
+    category: "inspection",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />
+      </svg>
+    ),
+  },
+  {
     id: "finance-summary",
     label: "Works Agreement",
     description:
@@ -128,6 +175,29 @@ const REPORT_TYPES: ReportType[] = [
         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
         <polyline points="14 2 14 8 20 8" />
         <path d="M9 15l2 2 4-4" />
+      </svg>
+    ),
+  },
+  {
+    id: "invoice",
+    label: "Invoice",
+    description:
+      "Generate a professional invoice directly from SimPRO job data.",
+    available: false,
+    category: "finance",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="2" y="5" width="20" height="14" rx="2" />
+        <line x1="2" y1="10" x2="22" y2="10" />
       </svg>
     ),
   },
@@ -314,6 +384,10 @@ export default function ReportSelector() {
 
   if (active === "condition") {
     return <ConditionReportPage onBack={() => setActive(null)} />;
+  }
+
+  if (active === "anchor-inspection") {
+    return <AnchorInspectionPage onBack={() => setActive(null)} />;
   }
 
   if (active === "finance-summary") {

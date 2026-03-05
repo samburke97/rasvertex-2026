@@ -1,0 +1,245 @@
+/* components/reports/anchor-inspection/AnchorPinModal.module.css */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1.5rem;
+}
+
+.modal {
+  background: var(--white, #fff);
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.18);
+  width: 100%;
+  max-width: 540px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 90vh;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--out-light, #edf0f0);
+  flex-shrink: 0;
+}
+
+.typeIndicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.title {
+  flex: 1;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--for-darkest, #141414);
+  margin: 0;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--for-light, #d9dbdb);
+  cursor: pointer;
+  border-radius: 6px;
+  transition:
+    color 0.12s,
+    background 0.12s;
+}
+
+.closeBtn:hover {
+  color: var(--for-darkest, #141414);
+  background: var(--con-light, #fafafa);
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--for-medium, #7e807f);
+}
+
+.input {
+  padding: 0.45rem 0.625rem;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: 7px;
+  font-size: 0.845rem;
+  color: var(--for-darkest, #141414);
+  background: var(--white, #fff);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  border-color: var(--primary-400, #10b981);
+}
+
+.input::placeholder {
+  color: var(--for-light, #d9dbdb);
+}
+
+.textarea {
+  padding: 0.45rem 0.625rem;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: 7px;
+  font-size: 0.845rem;
+  color: var(--for-darkest, #141414);
+  background: var(--white, #fff);
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+
+.textarea:focus {
+  border-color: var(--primary-400, #10b981);
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+/* ── Type grid ───────────────────────────────────────────────────────────── */
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.typeBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.5rem;
+  border: 1.5px solid var(--out-light, #edf0f0);
+  border-radius: 7px;
+  background: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--for-medium, #7e807f);
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: left;
+}
+
+.typeBtn:hover {
+  border-color: var(--out-medium, #d9dbdb);
+  color: var(--for-darkest, #141414);
+}
+
+.typeBtnActive {
+  font-weight: 600;
+}
+
+.typeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Result toggle ───────────────────────────────────────────────────────── */
+.resultToggle {
+  display: flex;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.resultBtn {
+  flex: 1;
+  padding: 0.45rem 0;
+  border: none;
+  background: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--for-medium, #7e807f);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.resultBtn + .resultBtn {
+  border-left: 1px solid var(--out-medium, #d9dbdb);
+}
+
+.resultBtnPass {
+  background: var(--primary-100, #e6fffa);
+  color: var(--primary-600, #047857);
+}
+
+.resultBtnFail {
+  background: #fdf2f8;
+  color: var(--red-wine-300, #900c40);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--out-light, #edf0f0);
+  flex-shrink: 0;
+}
+
+.footerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.deleteBtn {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--red-wine-300, #900c40);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.375rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+
+.deleteBtn:hover {
+  background: #fdf2f8;
+}

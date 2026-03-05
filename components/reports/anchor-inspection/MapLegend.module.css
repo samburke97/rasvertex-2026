@@ -1,0 +1,40 @@
+/* components/reports/anchor-inspection/MapLegend.module.css */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 0.875rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--out-light, #edf0f0);
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.label {
+  font-size: 0.775rem;
+  font-weight: 500;
+  color: var(--for-dark, #374151);
+}
+
+.count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--for-medium, #7e807f);
+  background: var(--con-light, #fafafa);
+  border-radius: 20px;
+  padding: 0.05rem 0.35rem;
+}

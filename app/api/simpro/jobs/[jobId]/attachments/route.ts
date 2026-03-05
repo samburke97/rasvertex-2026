@@ -1,7 +1,8 @@
 // app/api/simpro/jobs/[jobId]/attachments/route.ts
 // Changes from original:
 //   - photo event now includes dateAdded (ISO string from SimPRO's DateAdded field)
-//   - everything else unchanged
+//   - fixed: removed duplicate controller.close() calls before early returns
+//            (finally block handles close in all cases)
 
 import { NextRequest, NextResponse } from "next/server";
 
@@ -132,8 +133,7 @@ export async function GET(
               details: msg,
             });
           }
-          controller.close();
-          return;
+          return; // finally will close the controller
         }
 
         const imageExtensions =
@@ -146,8 +146,7 @@ export async function GET(
 
         if (candidates.length === 0) {
           send("done", { total: 0, loaded: 0, failed: 0 });
-          controller.close();
-          return;
+          return; // finally will close the controller
         }
 
         let loaded = 0;
@@ -169,7 +168,7 @@ export async function GET(
                   name: detail.Filename,
                   url: `data:${detail.MimeType};base64,${detail.Base64Data}`,
                   size: detail.FileSizeBytes ?? 0,
-                  dateAdded: detail.DateAdded ?? null, // ← new field
+                  dateAdded: detail.DateAdded ?? null,
                   index: i,
                 });
                 loaded++;
