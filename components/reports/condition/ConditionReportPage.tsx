@@ -1,8 +1,7 @@
 "use client";
-// components/reports/condition/ConditionReportPage.tsx
 
 import React, { useState, useCallback, useRef } from "react";
-import styles from "./ConditionReportPage.module.css";
+import styles from "../shared/ReportPage.module.css";
 import CoverSection from "./sections/CoverSection";
 import PhotoSection from "./sections/PhotoSection";
 import ScheduleSection from "./sections/ScheduleSection";

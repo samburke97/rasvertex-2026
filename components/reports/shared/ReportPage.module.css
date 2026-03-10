@@ -1,5 +1,5 @@
-/* components/reports/hours-breakdown/HoursBreakdownPage.module.css */
-/* Mirrors ConditionReportPage.module.css exactly */
+/* components/reports/shared/ReportPage.module.css */
+/* Single source of truth for all report page shell layouts. */
 
 .page {
   margin: -1.5rem;
@@ -10,7 +10,7 @@
   background: var(--bg-standard, #f9f9f9);
 }
 
-/* ── Sticky top bar ─────────────────────────────────────────────────────── */
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
 .topBar {
   flex-shrink: 0;
   display: flex;
@@ -36,6 +36,7 @@
   transition: color 0.12s;
   font-family: inherit;
 }
+
 .backBtn:hover {
   color: var(--for-darkest, #111827);
 }
@@ -53,7 +54,7 @@
   letter-spacing: 0.04em;
 }
 
-.photoCount {
+.badge {
   font-size: 0.8rem;
   color: var(--for-medium, #6b7280);
   background: var(--con-light, #f5f5f5);
@@ -73,7 +74,7 @@
   border-radius: 20px;
 }
 
-/* ── Editor body ────────────────────────────────────────────────────────── */
+/* ── Body ────────────────────────────────────────────────────────────────── */
 .editorBody {
   flex: 1;
   display: flex;
@@ -81,7 +82,7 @@
   overflow: hidden;
 }
 
-/* ── PDF canvas ─────────────────────────────────────────────────────────── */
+/* ── Canvas ──────────────────────────────────────────────────────────────── */
 .canvas {
   flex: 1;
   background: #e8e8e8;
@@ -94,7 +95,6 @@
   min-height: 0;
 }
 
-/* Page labels sit above each section */
 .pageLabel {
   align-self: flex-start;
   margin-left: max(0px, calc(50% - 397px));
@@ -103,6 +103,5 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: #aaa;
-  margin-top: 0;
   margin-bottom: -1.5rem;
 }

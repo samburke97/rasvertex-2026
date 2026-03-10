@@ -19,6 +19,21 @@
   color: #1a1a2e;
 }
 
+/*
+ * globals.css sets `p, span { font-size: 1rem; line-height: 1.5rem; }`
+ * which bleeds into every table cell span, inflating rows by ~11px each.
+ * Puppeteer never loads globals.css so the PDF renders correctly.
+ * This reset makes the browser preview match the export exactly.
+ */
+.page p,
+.page span {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+}
+
 /* ── Top bar ─────────────────────────────────────────────────────────────── */
 .topBar {
   display: flex;
@@ -47,16 +62,10 @@
 }
 
 /* ── Body ────────────────────────────────────────────────────────────────── */
-/*
- * min-height: 0 is critical — without it, a flex child ignores the parent's
- * fixed height and grows to fit its content, pushing the footer off the page.
- * overflow: hidden clips any content that genuinely exceeds the available space.
- */
 .body {
   padding: 2rem 2.75rem 2rem;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -131,6 +140,7 @@
   padding: 0.48rem 0.875rem;
   font-family: "Inter", Arial, sans-serif;
   font-size: 0.78rem;
+  line-height: 1.2;
   font-weight: 300;
   color: #111827;
   vertical-align: middle;

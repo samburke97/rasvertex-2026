@@ -1,0 +1,192 @@
+/* components/reports/shared/CoverSection.module.css */
+/* Single source of truth for the cover page design used by all reports. */
+
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
+
+.page {
+  width: 794px;
+  min-height: 1123px;
+  background: #fff;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.1),
+    0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: "Inter", Arial, sans-serif;
+  font-weight: 300;
+  color: #1a1a2e;
+  flex-shrink: 0;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  height: 580px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.heroNavy {
+  position: absolute;
+  inset: 0;
+  background: #0d1c45;
+  z-index: 0;
+}
+.heroCoverPhoto {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  z-index: 1;
+}
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 22, 60, 0.68);
+  z-index: 2;
+}
+.heroLogo {
+  position: absolute;
+  top: 2.5rem;
+  left: 2.75rem;
+  z-index: 5;
+}
+.heroLogoImg {
+  height: 41px;
+  width: auto;
+  display: block;
+}
+.heroWeb {
+  position: absolute;
+  top: 2.6rem;
+  right: 2.75rem;
+  z-index: 5;
+}
+.heroWebImg {
+  height: 22px;
+  width: auto;
+  display: block;
+}
+
+/* ── Body ─────────────────────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 2.75rem 0;
+}
+
+.titleGroup {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.reportTitle {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 2.75rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #0d1c45;
+  line-height: 1.05;
+  text-transform: uppercase;
+  margin: 0 0 1.25rem;
+}
+
+.intro {
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: #666;
+  line-height: 1.8;
+}
+
+/* ── Inline edit ──────────────────────────────────────────────────────────── */
+.inlineDisplay {
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+}
+.inlineDisplay:hover {
+  border-bottom-color: rgba(13, 28, 69, 0.3);
+}
+
+.inlinePlaceholder {
+  cursor: pointer;
+  color: rgba(13, 28, 69, 0.35);
+  border-bottom: 1px dashed rgba(13, 28, 69, 0.2);
+}
+
+.inlineInput {
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid #0d1c45;
+  outline: none;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  width: 100%;
+  padding: 0;
+}
+
+/* ── Meta table ───────────────────────────────────────────────────────────── */
+.metaWrap {
+  padding-bottom: 2rem;
+}
+
+.meta {
+  border-collapse: collapse;
+  width: 1px; /* shrink-wrap trick */
+}
+
+.metaRow {
+}
+
+.metaLabel {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: #0d1c45;
+  padding: 0.4rem 1.25rem 0.4rem 0;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.metaValue {
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: #333;
+  padding: 0.4rem 0;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+.footer {
+  margin-top: auto;
+  padding: 1.5rem 2.75rem 2rem;
+  border-top: 1px solid #ebebeb;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: nowrap;
+}
+
+.assocLogo {
+  height: 36px;
+  width: auto;
+  max-width: 80px;
+  object-fit: contain;
+  display: block;
+  opacity: 0.85;
+}

@@ -1,0 +1,228 @@
+.panel {
+  width: 260px;
+  min-width: 260px;
+  flex-shrink: 0;
+  background: var(--white, #fff);
+  border-right: 1px solid var(--out-light, #f0f0f0);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ── Group ───────────────────────────────────────────────────────────────── */
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem 1rem;
+  border-bottom: 1px solid var(--out-light, #f0f0f0);
+}
+
+.groupLabel {
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--for-light, #9ca3af);
+}
+
+.groupLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ── Cover photo upload ──────────────────────────────────────────────────── */
+.coverPhotoUpload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 1rem;
+  border: 1.5px dashed var(--out-medium, #d9dbdb);
+  border-radius: 8px;
+  background: var(--con-light, #fafafa);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  text-align: center;
+}
+
+.coverPhotoUpload:hover {
+  border-color: var(--primary-400, #74db89);
+  background: var(--primary-50, #f0fdf4);
+}
+
+.coverPhotoUploadIcon {
+  font-size: 1.25rem;
+  color: var(--for-light, #9ca3af);
+}
+
+.coverPhotoUploadText {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--for-darkest, #111827);
+}
+
+.coverPhotoUploadSub {
+  font-size: 0.7rem;
+  color: var(--for-light, #9ca3af);
+}
+
+.coverPhotoPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.coverPhotoThumb {
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+
+.coverPhotoActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.coverPhotoChange,
+.coverPhotoRemove {
+  flex: 1;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--out-darkest, #c9cbcb);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.coverPhotoChange {
+  background: var(--white, #fff);
+  color: var(--for-darkest, #111827);
+}
+
+.coverPhotoChange:hover {
+  border-color: var(--primary-400, #74db89);
+}
+
+.coverPhotoRemove {
+  background: var(--white, #fff);
+  color: var(--red-wine-300, #900c40);
+  border-color: var(--red-wine-100, #fce4ec);
+}
+
+.coverPhotoRemove:hover {
+  background: var(--red-wine-100, #fce4ec);
+}
+
+.hiddenInput {
+  display: none;
+}
+
+/* ── Preset buttons ──────────────────────────────────────────────────────── */
+.presetRow {
+  display: flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+}
+
+.presetBtn {
+  height: 26px;
+  padding: 0 0.625rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--out-darkest, #c9cbcb);
+  background: var(--white, #fff);
+  color: var(--for-dark, #374151);
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+  font-family: inherit;
+}
+
+.presetBtn:hover {
+  border-color: var(--primary-400, #74db89);
+}
+
+.presetBtnActive {
+  background: var(--primary-50, #f0fdf4);
+  border-color: var(--primary-400, #74db89);
+  color: var(--primary-700, #047857);
+}
+
+/* ── Date range inputs ───────────────────────────────────────────────────── */
+.dateRange {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.dateInput {
+  flex: 1;
+  height: 30px;
+  padding: 0 0.5rem;
+  border: 1px solid var(--out-darkest, #c9cbcb);
+  border-radius: 7px;
+  font-size: 0.72rem;
+  color: var(--for-darkest, #111827);
+  background: var(--white, #fff);
+  outline: none;
+  font-family: inherit;
+}
+
+.dateInput:focus {
+  border-color: var(--primary-400, #74db89);
+}
+
+.dateSep {
+  font-size: 0.75rem;
+  color: var(--for-light, #9ca3af);
+  flex-shrink: 0;
+}
+
+/* ── Misc ────────────────────────────────────────────────────────────────── */
+.filterCount {
+  font-size: 0.72rem;
+  color: var(--for-light, #9ca3af);
+  margin: 0;
+}
+
+.filterCountActive {
+  color: var(--primary-600, #059669);
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px dashed var(--out-darkest, #c9cbcb);
+  background: transparent;
+  color: var(--for-dark, #374151);
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+  font-family: inherit;
+  width: 100%;
+  justify-content: center;
+}
+
+.addBtn:hover {
+  border-color: var(--primary-400, #74db89);
+  color: var(--primary-700, #047857);
+}
