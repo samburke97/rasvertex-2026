@@ -1,8 +1,13 @@
 "use client";
 // components/reports/anchor-inspection/sections/AnchorCoverSection.tsx
+//
+// Identical design to CoverSection — navy hero, RAS logo, Bebas Neue title,
+// associations footer. Only difference: no "Project" row, no rich-text intro
+// (description is plain text), and fields map to AnchorReportJob.
 
 import React from "react";
 import styles from "./AnchorCoverSection.module.css";
+import EditableField from "../../shared/EditableField";
 import type { AnchorReportJob } from "@/lib/reports/anchor.types";
 
 interface AnchorCoverSectionProps {
@@ -10,111 +15,112 @@ interface AnchorCoverSectionProps {
   onUpdate: (field: keyof AnchorReportJob, value: string | null) => void;
 }
 
+const META_ROWS: { label: string; field: keyof AnchorReportJob }[] = [
+  { label: "Prepared For", field: "preparedFor" },
+  { label: "Prepared By", field: "preparedBy" },
+  { label: "Address", field: "address" },
+  { label: "Date", field: "date" },
+];
+
+const ASSOCIATIONS = [
+  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
+  { src: "/reports/associations/dulux.png", alt: "Dulux" },
+  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
+  { src: "/reports/associations/mpa.png", alt: "MPA" },
+  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
+  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
+];
+
 export default function AnchorCoverSection({
   job,
   onUpdate,
 }: AnchorCoverSectionProps) {
   return (
     <div className={styles.page}>
-      {/* Cover photo / hero */}
+      {/* ── Hero ───────────────────────────────────────────────────── */}
       <div className={styles.hero}>
+        <div className={styles.heroNavy} />
         {job.coverPhoto && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={job.coverPhoto} alt="Cover" className={styles.heroImg} />
+          <div
+            className={styles.heroCoverPhoto}
+            style={{ backgroundImage: `url(${job.coverPhoto})` }}
+          />
         )}
         <div className={styles.heroOverlay} />
+        <div className={styles.heroLogo}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/reports/ras-logo.png"
+            alt="RAS Vertex Maintenance Solutions"
+            className={styles.heroLogoImg}
+          />
+        </div>
+        <div className={styles.heroWeb}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/reports/link_white.png"
+            alt="rasvertex.com.au"
+            className={styles.heroWebImg}
+          />
+        </div>
       </div>
 
-      {/* Content block */}
+      {/* ── White body ─────────────────────────────────────────────── */}
       <div className={styles.body}>
-        {/* Brand strip */}
-        <div className={styles.brandStrip}>
-          <div className={styles.brandLogo}>
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-            >
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
+        {/* Title + description */}
+        <div className={styles.titleGroup}>
+          <div className={styles.reportTitle}>
+            <EditableField
+              value={job.reportType}
+              onChange={(v) => onUpdate("reportType", v)}
+              placeholder="Report Title"
+              label="Report Title"
+            />
           </div>
-          <span className={styles.brandName}>Australian Asset Compliance</span>
+          <div className={styles.intro}>
+            <EditableField
+              value={job.description}
+              onChange={(v) => onUpdate("description", v)}
+              placeholder="Enter report description…"
+              label="Report Description"
+              multiline
+            />
+          </div>
         </div>
 
-        {/* Report title */}
-        <div className={styles.titleBlock}>
-          <h1
-            className={styles.clientName}
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) =>
-              onUpdate("preparedFor", e.currentTarget.textContent ?? "")
-            }
-            data-placeholder="Client Name"
-          >
-            {job.preparedFor || ""}
-          </h1>
-          <p
-            className={styles.reportType}
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={(e) =>
-              onUpdate("reportType", e.currentTarget.textContent ?? "")
-            }
-          >
-            {job.reportType}
-          </p>
+        {/* Meta fields */}
+        <div className={styles.metaWrap}>
+          <table className={styles.meta}>
+            <tbody>
+              {META_ROWS.map(({ label, field }) => (
+                <tr key={field} className={styles.metaRow}>
+                  <td className={styles.metaLabel}>{label}:</td>
+                  <td className={styles.metaValue}>
+                    <EditableField
+                      value={(job[field] as string) ?? ""}
+                      onChange={(v) => onUpdate(field, v)}
+                      placeholder={`Enter ${label.toLowerCase()}`}
+                      label={label}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-
-        {/* Meta table */}
-        <table className={styles.metaTable}>
-          <tbody>
-            {[
-              {
-                label: "Prepared For",
-                value: job.preparedFor,
-                field: "preparedFor" as const,
-              },
-              {
-                label: "Prepared By",
-                value: job.preparedBy,
-                field: "preparedBy" as const,
-              },
-              {
-                label: "Address",
-                value: job.address,
-                field: "address" as const,
-              },
-              { label: "Date", value: job.date, field: "date" as const },
-            ].map(({ label, value, field }) => (
-              <tr key={field} className={styles.metaRow}>
-                <td className={styles.metaLabel}>{label}:</td>
-                <td
-                  className={styles.metaValue}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={(e) =>
-                    onUpdate(field, e.currentTarget.textContent ?? "")
-                  }
-                  data-placeholder={`Enter ${label.toLowerCase()}`}
-                >
-                  {value || ""}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
 
-      {/* Footer band */}
+      {/* ── Footer ── */}
       <div className={styles.footer}>
-        <span className={styles.footerText}>
-          1800 870 081 | info@australianassetcompliance.com.au
-        </span>
-        <span className={styles.footerPage}>Page 1</span>
+        {ASSOCIATIONS.map((a) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={a.alt}
+            src={a.src}
+            alt={a.alt}
+            className={styles.assocLogo}
+          />
+        ))}
       </div>
     </div>
   );

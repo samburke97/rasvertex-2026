@@ -1,10 +1,11 @@
 /* components/reports/anchor-inspection/AnchorInspectionPage.module.css */
+/* Mirrors ConditionReportPage.module.css */
 
 .page {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--bg-standard, #fff);
+  background: var(--bg-standard, #f5f6f7);
   overflow: hidden;
 }
 
@@ -12,12 +13,12 @@
 .topBar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.5rem;
+  gap: 1rem;
+  padding: 0.625rem 1.5rem;
   border-bottom: 1px solid var(--out-light, #edf0f0);
   background: var(--white, #fff);
   flex-shrink: 0;
-  gap: 1rem;
+  min-height: 52px;
 }
 
 .backBtn {
@@ -32,81 +33,61 @@
   cursor: pointer;
   padding: 0.25rem 0;
   transition: color 0.15s;
+  flex-shrink: 0;
+  font-family: inherit;
 }
 
 .backBtn:hover {
   color: var(--for-darkest, #141414);
 }
 
+.topMeta {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.photoCount {
+  font-size: 0.78rem;
+  color: var(--for-medium, #7e807f);
+  background: var(--con-light, #f5f6f7);
+  border: 1px solid var(--out-light, #edf0f0);
+  border-radius: 20px;
+  padding: 0.15rem 0.625rem;
+}
+
 .topActions {
   display: flex;
   align-items: center;
   gap: 0.625rem;
+  flex-shrink: 0;
 }
 
-/* ── Two-column layout ───────────────────────────────────────────────────── */
-.layout {
-  display: grid;
-  grid-template-columns: 320px 1fr;
+/* ── Editor body ─────────────────────────────────────────────────────────── */
+.editorBody {
+  display: flex;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
-/* ── Preview pane ────────────────────────────────────────────────────────── */
-.previewPane {
+/* ── Canvas ──────────────────────────────────────────────────────────────── */
+.canvas {
+  flex: 1;
   overflow-y: auto;
-  background: var(--con-light, #fafafa);
-  padding: 2rem;
+  padding: 2rem 2.5rem;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
+  gap: 2rem;
+  background: var(--bg-standard, #f5f6f7);
 }
 
-.previewInner {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-  width: 100%;
-  max-width: 860px;
-  align-items: center;
-}
-
-/* ── Empty zones state ───────────────────────────────────────────────────── */
-.emptyZones {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 3rem 2rem;
-  background: var(--white, #fff);
-  border: 1px solid var(--out-light, #edf0f0);
-  border-radius: 12px;
-  width: 100%;
-  text-align: center;
-}
-
-.emptyZonesIcon {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  background: var(--con-light, #fafafa);
-  border: 1px solid var(--out-light, #edf0f0);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--for-light, #d9dbdb);
-}
-
-.emptyZonesTitle {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--for-darkest, #141414);
-  margin: 0;
-}
-
-.emptyZonesSub {
-  font-size: 0.825rem;
+.pageLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--for-medium, #7e807f);
-  margin: 0;
+  margin-bottom: -1rem;
 }

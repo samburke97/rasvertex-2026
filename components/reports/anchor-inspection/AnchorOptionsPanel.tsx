@@ -1,9 +1,16 @@
 "use client";
 // components/reports/anchor-inspection/AnchorOptionsPanel.tsx
+//
+// Same structure/styling as condition report OptionsPanel:
+//   - Job Number + Load
+//   - Cover Photo
+//   - Zones list (replaces Photos/Settings)
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import styles from "./AnchorOptionsPanel.module.css";
+import Button from "@/components/ui/Button";
 import type { AnchorReportJob, Zone } from "@/lib/reports/anchor.types";
+import type { AnchorImportStatus } from "./AnchorInspectionPage";
 
 interface AnchorOptionsPanelProps {
   job: AnchorReportJob;
@@ -14,30 +21,8 @@ interface AnchorOptionsPanelProps {
   onDeleteZone: (zoneId: string) => void;
   totalAnchors: number;
   totalPassed: number;
-}
-
-function FieldRow({
-  label,
-  value,
-  placeholder,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className={styles.fieldRow}>
-      <label className={styles.fieldLabel}>{label}</label>
-      <input
-        className={styles.fieldInput}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </div>
-  );
+  importStatus: AnchorImportStatus;
+  onImport: (jobNumber: string) => void;
 }
 
 export default function AnchorOptionsPanel({
@@ -49,239 +34,196 @@ export default function AnchorOptionsPanel({
   onDeleteZone,
   totalAnchors,
   totalPassed,
+  importStatus,
+  onImport,
 }: AnchorOptionsPanelProps) {
+  const [jobNumber, setJobNumber] = useState("");
   const coverInputRef = useRef<HTMLInputElement>(null);
+
+  const isLoading = importStatus.phase === "fetching-job";
+
+  const handleSubmit = () => {
+    if (jobNumber.trim()) onImport(jobNumber.trim());
+  };
 
   const handleCoverPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) =>
-      onUpdateJob("coverPhoto", ev.target?.result as string);
+    reader.onload = (ev) => {
+      const result = ev.target?.result;
+      if (typeof result === "string") onUpdateJob("coverPhoto", result);
+    };
     reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   return (
-    <div className={styles.panel}>
-      {/* ── Stats strip ── */}
-      {totalAnchors > 0 && (
-        <div className={styles.statsStrip}>
-          <div className={styles.stat}>
-            <span className={styles.statValue}>{totalAnchors}</span>
-            <span className={styles.statLabel}>Assets</span>
-          </div>
-          <div className={styles.statDivider} />
-          <div className={styles.stat}>
-            <span className={`${styles.statValue} ${styles.statPass}`}>
-              {totalPassed}
-            </span>
-            <span className={styles.statLabel}>Passed</span>
-          </div>
-          <div className={styles.statDivider} />
-          <div className={styles.stat}>
-            <span
-              className={`${styles.statValue} ${
-                totalAnchors - totalPassed > 0 ? styles.statFail : ""
-              }`}
-            >
-              {totalAnchors - totalPassed}
-            </span>
-            <span className={styles.statLabel}>Failed</span>
-          </div>
+    <aside className={styles.panel}>
+      {/* ── Job Number ───────────────────────────────────────────────────── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabel}>Job Number</div>
+        <div className={styles.jobRow}>
+          <input
+            type="text"
+            placeholder="e.g. 10737"
+            value={jobNumber}
+            onChange={(e) => setJobNumber(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+            className={styles.jobInput}
+            disabled={isLoading}
+          />
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleSubmit}
+            disabled={isLoading || !jobNumber.trim()}
+          >
+            {isLoading ? "Loading…" : "Load"}
+          </Button>
         </div>
-      )}
+        {importStatus.phase === "done" && (
+          <div className={styles.successMsg}>✓ Job loaded successfully</div>
+        )}
+        {importStatus.phase === "error" && (
+          <div className={styles.errorMsg}>{importStatus.message}</div>
+        )}
+      </div>
 
-      <div className={styles.scroll}>
-        {/* ── Report Details ── */}
-        <div className={styles.group}>
-          <div className={styles.groupLabel}>Report Details</div>
+      {/* ── Cover Photo ──────────────────────────────────────────────────── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabel}>Cover Photo</div>
+        {job.coverPhoto ? (
+          <div className={styles.coverPhotoPreview}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={job.coverPhoto}
+              alt="Cover photo preview"
+              className={styles.coverPhotoThumb}
+            />
+            <div className={styles.coverPhotoActions}>
+              <button
+                className={styles.coverPhotoChange}
+                onClick={() => coverInputRef.current?.click()}
+              >
+                Change
+              </button>
+              <button
+                className={styles.coverPhotoRemove}
+                onClick={() => onUpdateJob("coverPhoto", null)}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className={styles.coverPhotoUpload}
+            onClick={() => coverInputRef.current?.click()}
+          >
+            <span className={styles.coverPhotoUploadIcon}>↑</span>
+            <span className={styles.coverPhotoUploadText}>Upload photo</span>
+            <span className={styles.coverPhotoUploadSub}>
+              JPG, PNG — shown behind cover design
+            </span>
+          </button>
+        )}
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className={styles.hiddenInput}
+          onChange={handleCoverPhotoChange}
+        />
+      </div>
 
-          <FieldRow
-            label="Prepared For"
-            value={job.preparedFor}
-            placeholder="Client name"
-            onChange={(v) => onUpdateJob("preparedFor", v)}
-          />
-          <FieldRow
-            label="Prepared By"
-            value={job.preparedBy}
-            placeholder="Inspector name"
-            onChange={(v) => onUpdateJob("preparedBy", v)}
-          />
-          <FieldRow
-            label="Address"
-            value={job.address}
-            placeholder="Site address"
-            onChange={(v) => onUpdateJob("address", v)}
-          />
-          <FieldRow
-            label="Date"
-            value={job.date}
-            placeholder="Inspection date"
-            onChange={(v) => onUpdateJob("date", v)}
-          />
+      {/* ── Zones ────────────────────────────────────────────────────────── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabelRow}>
+          <span className={styles.groupLabel}>Zones</span>
+          {totalAnchors > 0 && (
+            <span className={styles.zoneStats}>
+              {totalPassed}/{totalAnchors} passed
+            </span>
+          )}
         </div>
 
-        {/* ── Cover Photo ── */}
-        <div className={styles.group}>
-          <div className={styles.groupLabel}>Cover Photo</div>
-          {job.coverPhoto ? (
-            <div className={styles.coverPreview}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={job.coverPhoto}
-                alt="Cover"
-                className={styles.coverThumb}
-              />
-              <div className={styles.coverActions}>
+        <button className={styles.addZoneBtn} onClick={onAddZone}>
+          + Add Zone
+        </button>
+
+        {zones.length > 0 && (
+          <div className={styles.zoneList}>
+            {zones.map((zone) => (
+              <div key={zone.id} className={styles.zoneRow}>
                 <button
-                  className={styles.coverBtn}
-                  onClick={() => coverInputRef.current?.click()}
+                  className={styles.zoneMain}
+                  onClick={() => onOpenZone(zone.id)}
                 >
-                  Change
+                  <div className={styles.zoneThumb}>
+                    {zone.mapImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={zone.mapImageUrl}
+                        alt={zone.name}
+                        className={styles.zoneThumbImg}
+                      />
+                    ) : (
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className={styles.zoneInfo}>
+                    <span className={styles.zoneName}>{zone.name}</span>
+                    <span className={styles.zoneCount}>
+                      {zone.anchors.length} anchor
+                      {zone.anchors.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className={styles.zoneChevron}
+                  >
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
                 </button>
                 <button
-                  className={`${styles.coverBtn} ${styles.coverBtnRemove}`}
-                  onClick={() => onUpdateJob("coverPhoto", null)}
+                  className={styles.zoneDelete}
+                  onClick={() => onDeleteZone(zone.id)}
+                  title="Delete zone"
                 >
-                  Remove
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                  </svg>
                 </button>
               </div>
-            </div>
-          ) : (
-            <button
-              className={styles.uploadBtn}
-              onClick={() => coverInputRef.current?.click()}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              <span>Upload cover photo</span>
-            </button>
-          )}
-          <input
-            ref={coverInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className={styles.hiddenInput}
-            onChange={handleCoverPhotoChange}
-          />
-        </div>
-
-        {/* ── Zones ── */}
-        <div className={styles.group}>
-          <div className={styles.groupLabelRow}>
-            <span className={styles.groupLabel}>Zones</span>
-            <button className={styles.addZoneBtn} onClick={onAddZone}>
-              + Add Zone
-            </button>
+            ))}
           </div>
-
-          {zones.length === 0 ? (
-            <p className={styles.noZones}>
-              No zones yet — add a zone to start placing anchors
-            </p>
-          ) : (
-            <div className={styles.zoneList}>
-              {zones.map((zone) => (
-                <div key={zone.id} className={styles.zoneCard}>
-                  <button
-                    className={styles.zoneCardMain}
-                    onClick={() => onOpenZone(zone.id)}
-                  >
-                    <div className={styles.zoneMapThumb}>
-                      {zone.mapImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={zone.mapImageUrl}
-                          alt={zone.name}
-                          className={styles.zoneThumbImg}
-                        />
-                      ) : (
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.4"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
-                          <line x1="9" y1="3" x2="9" y2="18" />
-                          <line x1="15" y1="6" x2="15" y2="21" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className={styles.zoneInfo}>
-                      <span className={styles.zoneName}>{zone.name}</span>
-                      <span className={styles.zoneCount}>
-                        {zone.anchors.length} anchor
-                        {zone.anchors.length !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className={styles.zoneChevron}
-                    >
-                      <polyline points="9 18 15 12 9 6" />
-                    </svg>
-                  </button>
-                  <button
-                    className={styles.zoneDelete}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (
-                        confirm(
-                          `Delete zone "${zone.name}" and all its anchors?`,
-                        )
-                      ) {
-                        onDeleteZone(zone.id);
-                      }
-                    }}
-                    title="Delete zone"
-                  >
-                    <svg
-                      width="13"
-                      height="13"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-                      <path d="M10 11v6M14 11v6" />
-                      <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
       </div>
-    </div>
+    </aside>
   );
 }

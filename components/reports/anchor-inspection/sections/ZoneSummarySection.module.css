@@ -1,103 +1,128 @@
-/* sections/ZoneSummarySection.module.css */
+/* components/reports/anchor-inspection/sections/ZoneSummarySection.module.css */
 
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
+
+/* ── Page shell (mirrors SummarySection) ─────────────────────────────────── */
 .page {
   width: 794px;
   min-height: 1123px;
   background: #fff;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.1),
+    0 1px 4px rgba(0, 0, 0, 0.06);
   border-radius: 4px;
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  font-family: "Inter", Arial, sans-serif;
+  color: #1a1a2e;
   flex-shrink: 0;
-  position: relative;
-  overflow: hidden;
-  font-family: var(--font-family, "Inter", sans-serif);
 }
 
-/* ── Page header ─────────────────────────────────────────────────────────── */
-.pageHeader {
+/* ── Top bar (mirrors SummarySection) ────────────────────────────────────── */
+.topBar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 0.875rem 1.75rem;
-  border-bottom: 2px solid #1e3a5f;
+  padding: 2.75rem 2.75rem 0;
   flex-shrink: 0;
 }
 
-.pageHeaderLeft {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.brandMark {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.orgName {
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #1e3a5f;
+.title {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 3rem;
+  font-weight: 400;
   letter-spacing: 0.04em;
+  color: #0d1c45;
+  line-height: 1;
+  margin: 0;
   text-transform: uppercase;
 }
 
-.pageHeaderRight {
-  text-align: right;
-}
-
-.sectionLabel {
+.topBarLink {
+  height: 22px;
+  width: auto;
   display: block;
-  font-size: 0.62rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #8a9bb0;
+  margin-top: 0.5rem;
 }
 
-.sectionTitle {
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.body {
+  padding: 2rem 2.75rem 2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Section label (Bebas Neue, mirrors SummarySection sectionLabel) ──────── */
+.sectionLabel {
+  font-family: "Bebas Neue", Arial, sans-serif;
   font-size: 1.05rem;
-  font-weight: 700;
-  color: #1e3a5f;
-  margin: 0.1rem 0 0;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: #0d1c45;
+  text-transform: uppercase;
+  line-height: 1;
+  margin-bottom: 0.625rem;
 }
 
 /* ── Map section ─────────────────────────────────────────────────────────── */
 .mapSection {
-  padding: 1.25rem 1.75rem;
-  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .mapWrap {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+  gap: 0.5rem;
 }
 
 .mapCanvas {
   position: relative;
+  width: 100%;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #e8edf2;
+  border: 1px solid #e5e7eb;
 }
 
 .mapImg {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 400px;
+  max-height: 340px;
   object-fit: cover;
 }
 
-/* ── Pins on printed map ─────────────────────────────────────────────────── */
+.mapEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 180px;
+  border: 1.5px dashed #d1d5db;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.mapEmptyBtn {
+  font-size: 0.85rem;
+  color: #0d1c45;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mapEmptyText {
+  font-size: 0.82rem;
+  color: #9ca3af;
+}
+
+/* ── Anchor pins (print view) ────────────────────────────────────────────── */
 .pin {
   position: absolute;
   transform: translate(-50%, -100%);
@@ -107,24 +132,14 @@
   pointer-events: none;
 }
 
-.pin::after {
-  content: "";
-  display: block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: inherit;
-  margin-top: -2px;
-}
-
 .pinLabel {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 24px;
-  height: 18px;
+  min-width: 20px;
+  height: 16px;
   padding: 0 4px;
-  border-radius: 4px;
+  border-radius: 3px;
   font-size: 0.55rem;
   font-weight: 700;
   color: #fff;
@@ -133,41 +148,15 @@
   letter-spacing: 0.02em;
 }
 
-/* ── Map empty ───────────────────────────────────────────────────────────── */
-.mapEmpty {
-  background: #fafbfc;
-  border: 1.5px dashed #c9d4db;
-  border-radius: 8px;
-  height: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.mapEmptyBtn {
-  font-size: 0.845rem;
-  font-weight: 500;
-  color: #4a6fa5;
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: color 0.15s;
-}
-
-.mapEmptyBtn:hover {
-  color: #1e3a5f;
-}
-
 /* ── Stats banner ────────────────────────────────────────────────────────── */
 .statsBanner {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1.75rem;
   gap: 2rem;
-  background: #f5f8fc;
-  border-top: 1px solid #e8edf2;
-  border-bottom: 1px solid #e8edf2;
-  flex-shrink: 0;
+  padding: 0.875rem 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
 }
 
 .statItem {
@@ -179,7 +168,7 @@
 .statVal {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #1e3a5f;
+  color: #0d1c45;
 }
 
 .statPass {
@@ -195,30 +184,19 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #8a9bb0;
+  color: #6b7280;
 }
 
 .statDivider {
   width: 1px;
   height: 20px;
-  background: #c9d4db;
+  background: #d1d5db;
 }
 
 /* ── Table section ───────────────────────────────────────────────────────── */
 .tableSection {
-  padding: 1.25rem 1.75rem;
-  flex: 1;
-}
-
-.tableSectionLabel {
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #8a9bb0;
-  padding-bottom: 0.625rem;
-  border-bottom: 1px solid #e8edf2;
-  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .tableWrap {
@@ -228,18 +206,17 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.72rem;
 }
 
 .th {
-  padding: 0.45rem 0.625rem;
-  background: #f5f8fc;
-  border: 1px solid #e8edf2;
-  font-size: 0.65rem;
+  padding: 0.45rem 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #4a6fa5;
+  color: #374151;
   text-align: left;
   white-space: nowrap;
 }
@@ -253,28 +230,27 @@
 }
 
 .td {
-  padding: 0.4rem 0.625rem;
-  border: 1px solid #e8edf2;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #e5e7eb;
   color: #374151;
   vertical-align: middle;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
 }
 
 .tdMono {
-  padding: 0.4rem 0.625rem;
-  border: 1px solid #e8edf2;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #e5e7eb;
   color: #374151;
   vertical-align: middle;
-  font-size: 0.68rem;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.7rem;
+  font-family: ui-monospace, monospace;
 }
 
 .assetLabel {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-weight: 700;
-  color: #1e3a5f;
+  gap: 0.375rem;
+  font-weight: 600;
 }
 
 .labelDot {
@@ -285,17 +261,19 @@
 }
 
 .badge {
-  display: inline-block;
-  font-size: 0.62rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.05em;
-  padding: 0.15rem 0.45rem;
+  padding: 0.15rem 0.4rem;
   border-radius: 4px;
 }
 
 .badgePass {
-  background: #e6fffa;
-  color: #047857;
+  background: #d1fae5;
+  color: #065f46;
 }
 
 .badgeFail {
@@ -303,47 +281,38 @@
   color: #900c40;
 }
 
-/* ── Edit button (screen only) ───────────────────────────────────────────── */
-.editBtn {
-  position: absolute;
-  top: 0.75rem;
-  right: 1.75rem;
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.775rem;
-  font-weight: 500;
-  color: #4a6fa5;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #c9d4db;
-  border-radius: 6px;
-  padding: 0.3rem 0.625rem;
-  cursor: pointer;
-  transition: all 0.15s;
-  backdrop-filter: blur(4px);
+.badgeNA {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
-.editBtn:hover {
-  background: #fff;
-  border-color: #1e3a5f;
-  color: #1e3a5f;
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.emptyState {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  padding: 2rem 0;
+  text-align: center;
 }
 
-@media print {
-  .editBtn {
-    display: none;
-  }
-}
-
-/* ── Footer ──────────────────────────────────────────────────────────────── */
+/* ── Footer (mirrors SummarySection) ─────────────────────────────────────── */
 .footer {
-  padding: 0.625rem 1.75rem;
-  border-top: 1px solid #e8edf2;
   margin-top: auto;
+  padding: 1.5rem 2.75rem 2rem;
+  border-top: 1px solid #ebebeb;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: nowrap;
   flex-shrink: 0;
 }
 
-.footerText {
-  font-size: 0.65rem;
-  color: #8a9bb0;
+.assocLogo {
+  height: 36px;
+  width: auto;
+  max-width: 80px;
+  object-fit: contain;
+  display: block;
+  opacity: 0.85;
 }

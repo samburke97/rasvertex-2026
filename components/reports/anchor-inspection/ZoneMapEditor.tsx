@@ -15,7 +15,6 @@ import {
   type Zone,
 } from "@/lib/reports/anchor.types";
 
-// mapbox-gl is client-only — dynamic import to avoid SSR issues
 import type mapboxgl from "mapbox-gl";
 
 interface ZoneMapEditorProps {
@@ -26,38 +25,18 @@ interface ZoneMapEditorProps {
   onDelete: () => void;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Style ─────────────────────────────────────────────────────────────────────
+// Mapbox satellite-streets: clearer satellite imagery with road/label overlay.
+// Using the standard Mapbox style (not the custom Studio one) so Static API
+// isn't needed — we capture via canvas instead.
 //
-// DO NOT do: const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
-//
-// Next.js performs a literal string replacement of NEXT_PUBLIC_ vars at build
-// time. When this module is evaluated on the server during SSR the replacement
-// hasn't happened yet and you get "". Reading inside a function call ensures
-// we always get the live value after hydration.
-//
-const STYLE_URL = "mapbox://styles/samisbord/cmmcyrsb1000f01sq8kzy0g9z";
-const STYLE_ID = "samisbord/cmmcyrsb1000f01sq8kzy0g9z";
+// DO NOT hoist TOKEN — Next.js replaces NEXT_PUBLIC_ at build time, so reading
+// inside a function ensures the live client-side value after hydration.
+
+const STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
 
 function getToken(): string {
   return process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildStaticUrl(
-  lng: number,
-  lat: number,
-  zoom: number,
-  bearing = 0,
-  pitch = 0,
-  w = 1280,
-  h = 720,
-): string {
-  return (
-    `https://api.mapbox.com/styles/v1/${STYLE_ID}/static/` +
-    `${lng},${lat},${zoom},${bearing},${pitch}/` +
-    `${w}x${h}@2x?access_token=${getToken()}`
-  );
 }
 
 async function geocodeAddress(
@@ -74,8 +53,6 @@ async function geocodeAddress(
   return { lng, lat };
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export default function ZoneMapEditor({
   zone,
   jobAddress,
@@ -90,7 +67,6 @@ export default function ZoneMapEditor({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
-
   const [capturing, setCapturing] = useState(false);
   const [captured, setCaptured] = useState<boolean>(!!zone.mapImageUrl);
 
@@ -100,22 +76,23 @@ export default function ZoneMapEditor({
     null,
   );
   const [editingAnchor, setEditingAnchor] = useState<AnchorPoint | null>(null);
-
+  const [draggingId, setDraggingId] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
 
-  // ── Save ─────────────────────────────────────────────────────────────────
+  // Track drag state in a ref so pointer-move handler always sees fresh values
+  // without needing to be re-created on every render.
+  const dragState = useRef<{
+    anchorId: string;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
 
-  const save = useCallback(
-    (updated: Zone) => {
-      onUpdate(updated);
-    },
-    [onUpdate],
-  );
+  const save = useCallback((updated: Zone) => onUpdate(updated), [onUpdate]);
 
   // ── Init map ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    // Read token HERE — inside the effect, always client-side, always live value
     const token = getToken();
     if (!token) return;
     if (captured) return;
@@ -131,7 +108,6 @@ export default function ZoneMapEditor({
 
       if (cancelled) return;
 
-      // Set token right before constructing the Map instance
       mb.accessToken = token;
 
       let lng = 151.2093;
@@ -163,6 +139,10 @@ export default function ZoneMapEditor({
         zoom,
         bearing: 0,
         pitch: 0,
+        // ── CRITICAL: required for map.getCanvas().toDataURL() to work.
+        // Without this, WebGL clears its buffer after every frame render
+        // and toDataURL() returns a blank/transparent image.
+        preserveDrawingBuffer: true,
       });
 
       map.addControl(new mb.NavigationControl(), "top-right");
@@ -188,31 +168,48 @@ export default function ZoneMapEditor({
   }, [captured]);
 
   // ── Capture ───────────────────────────────────────────────────────────────
+  //
+  // Capture the WebGL canvas directly via map.getCanvas().toDataURL().
+  // This is pixel-perfect — what you see is exactly what gets stored.
+  // No Mapbox Static API call, no auth issues, no size mismatch.
+  //
+  // We wait for map.once("idle") to ensure all tiles have finished loading
+  // before we snapshot.
 
   const handleCapture = useCallback(async () => {
-    if (!mapRef.current) return;
     const map = mapRef.current;
-    const center = map.getCenter();
-    const zoom = map.getZoom();
-    const bearing = map.getBearing();
-    const pitch = map.getPitch();
+    if (!map) return;
 
     setCapturing(true);
 
-    const imgUrl = buildStaticUrl(center.lng, center.lat, zoom, bearing, pitch);
+    // Wait until the map is fully idle (all tiles rendered)
+    await new Promise<void>((resolve) => {
+      if (map.isStyleLoaded() && map.areTilesLoaded()) {
+        resolve();
+      } else {
+        map.once("idle", () => resolve());
+      }
+    });
+
+    // Read the GL canvas as a JPEG data URL
+    const canvas = map.getCanvas();
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+
+    const center = map.getCenter();
     const updated: Zone = {
       ...localZone,
       name: zoneName,
-      mapImageUrl: imgUrl,
+      mapImageUrl: dataUrl,
       mapLat: center.lat,
       mapLng: center.lng,
-      mapZoom: zoom,
+      mapZoom: map.getZoom(),
     };
 
     setLocalZone(updated);
     save(updated);
     setCaptured(true);
     setCapturing(false);
+
     map.remove();
     mapRef.current = null;
   }, [localZone, zoneName, save]);
@@ -248,6 +245,8 @@ export default function ZoneMapEditor({
 
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isPlacingPin) return;
+    // Don't place a pin if we just finished dragging one
+    if (dragState.current?.moved) return;
     const rect = frozenMapRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = ((e.clientX - rect.left) / rect.width) * 100;
@@ -280,20 +279,91 @@ export default function ZoneMapEditor({
     setEditingAnchor(null);
   };
 
-  // ── Zone name ─────────────────────────────────────────────────────────────
-
   const handleNameBlur = () => {
     const updated = { ...localZone, name: zoneName };
     setLocalZone(updated);
     save(updated);
   };
 
+  // ── Drag handlers ─────────────────────────────────────────────────────────
+  //
+  // Pointer events give us a single unified API for mouse + touch.
+  // We capture the pointer on down so moves outside the element still register.
+  // A drag is only committed if the pointer moved >5px; otherwise it's a click
+  // and the modal opens normally.
+
+  const handlePinPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>, anchorId: string) => {
+      if (isPlacingPin) return;
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      dragState.current = {
+        anchorId,
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false,
+      };
+      setDraggingId(anchorId);
+    },
+    [isPlacingPin],
+  );
+
+  const handlePinPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      const ds = dragState.current;
+      if (!ds) return;
+      const rect = frozenMapRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const dx = e.clientX - ds.startX;
+      const dy = e.clientY - ds.startY;
+      if (!ds.moved && Math.hypot(dx, dy) < 5) return;
+      ds.moved = true;
+
+      const x = Math.min(
+        100,
+        Math.max(0, ((e.clientX - rect.left) / rect.width) * 100),
+      );
+      const y = Math.min(
+        100,
+        Math.max(0, ((e.clientY - rect.top) / rect.height) * 100),
+      );
+
+      setLocalZone((prev) => ({
+        ...prev,
+        anchors: prev.anchors.map((a) =>
+          a.id === ds.anchorId ? { ...a, x, y } : a,
+        ),
+      }));
+    },
+    [],
+  );
+
+  const handlePinPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>, anchor: AnchorPoint) => {
+      const ds = dragState.current;
+      dragState.current = null;
+      setDraggingId(null);
+      if (!ds) return;
+
+      if (ds.moved) {
+        // Commit final dropped position to parent
+        setLocalZone((prev) => {
+          save(prev);
+          return prev;
+        });
+      } else {
+        // No movement — treat as click, open modal
+        setEditingAnchor(anchor);
+      }
+    },
+    [save],
+  );
+
   const activeTypes = [
     ...new Set(localZone.anchors.map((a) => a.type)),
   ] as AnchorType[];
   const hasToken = !!getToken();
-
-  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className={styles.page}>
@@ -363,7 +433,7 @@ export default function ZoneMapEditor({
         </div>
       </div>
 
-      {/* Status bar — live map phase only */}
+      {/* Status bar */}
       {!captured && (
         <div className={styles.statusBar}>
           {!hasToken ? (
@@ -384,14 +454,12 @@ export default function ZoneMapEditor({
       )}
 
       <div className={styles.layout}>
-        {/* Map / image area */}
+        {/* Map area */}
         <div className={styles.mapArea}>
-          {/* Phase 1 — live interactive map */}
           {!captured && hasToken && (
             <div ref={mapContainerRef} className={styles.liveMap} />
           )}
 
-          {/* No-token fallback */}
           {!captured && !hasToken && (
             <div className={styles.mapSetup}>
               <div className={styles.mapSetupIcon}>
@@ -425,7 +493,6 @@ export default function ZoneMapEditor({
             </div>
           )}
 
-          {/* Phase 2 — frozen image with pins */}
           {captured && localZone.mapImageUrl && (
             <div className={styles.mapContainer}>
               <div
@@ -444,19 +511,23 @@ export default function ZoneMapEditor({
                 {localZone.anchors.map((anchor) => (
                   <button
                     key={anchor.id}
-                    className={styles.pin}
+                    className={`${styles.pin} ${draggingId === anchor.id ? styles.pinDragging : ""}`}
                     style={{
                       left: `${anchor.x}%`,
                       top: `${anchor.y}%`,
-                      background: ANCHOR_TYPE_COLOURS[anchor.type],
+                      cursor: draggingId === anchor.id ? "grabbing" : "grab",
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingAnchor(anchor);
-                    }}
+                    onPointerDown={(e) => handlePinPointerDown(e, anchor.id)}
+                    onPointerMove={handlePinPointerMove}
+                    onPointerUp={(e) => handlePinPointerUp(e, anchor)}
                     title={`${anchor.label} — ${ANCHOR_TYPE_LABELS[anchor.type]}`}
                   >
-                    <span className={styles.pinLabel}>{anchor.label}</span>
+                    <span
+                      className={styles.pinLabel}
+                      style={{ background: ANCHOR_TYPE_COLOURS[anchor.type] }}
+                    >
+                      {anchor.label}
+                    </span>
                   </button>
                 ))}
 
@@ -521,7 +592,6 @@ export default function ZoneMapEditor({
         </div>
       </div>
 
-      {/* Pin modal */}
       {(pendingPin || editingAnchor) && (
         <AnchorPinModal
           anchor={

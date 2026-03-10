@@ -1,7 +1,7 @@
 "use client";
 // components/reports/anchor-inspection/AnchorInspectionPage.tsx
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import styles from "./AnchorInspectionPage.module.css";
 import Button from "@/components/ui/Button";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
@@ -15,6 +15,7 @@ import {
   type AnchorReportJob,
   type Zone,
 } from "@/lib/reports/anchor.types";
+import type { EnrichedJob } from "@/lib/simpro/types";
 
 interface AnchorInspectionPageProps {
   onBack: () => void;
@@ -22,13 +23,22 @@ interface AnchorInspectionPageProps {
 
 type View = "editor" | "zone-map";
 
+export type AnchorImportStatus =
+  | { phase: "idle" }
+  | { phase: "fetching-job" }
+  | { phase: "done" }
+  | { phase: "error"; message: string };
+
 export default function AnchorInspectionPage({
   onBack,
 }: AnchorInspectionPageProps) {
   const [report, setReport] = useState<AnchorReportData>(DEFAULT_ANCHOR_REPORT);
-  const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
   const [view, setView] = useState<View>("editor");
   const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
+  const [importStatus, setImportStatus] = useState<AnchorImportStatus>({
+    phase: "idle",
+  });
+  const currentLoadId = useRef(0);
 
   // ── Job detail handlers ────────────────────────────────────────────────
   const updateJob = useCallback(
@@ -37,6 +47,42 @@ export default function AnchorInspectionPage({
     },
     [],
   );
+
+  // ── Load job from SimPRO ───────────────────────────────────────────────
+  const handleImport = useCallback(async (jobNumber: string) => {
+    const loadId = ++currentLoadId.current;
+    const isStale = () => currentLoadId.current !== loadId;
+
+    setImportStatus({ phase: "fetching-job" });
+
+    try {
+      const jobRes = await fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
+      if (isStale()) return;
+      if (!jobRes.ok)
+        throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
+
+      const jobData: EnrichedJob = await jobRes.json();
+      if (isStale()) return;
+
+      setReport((prev) => ({
+        ...prev,
+        job: {
+          ...prev.job,
+          preparedFor: jobData.preparedFor || prev.job.preparedFor,
+          address: jobData.siteAddress || prev.job.address,
+          date: jobData.date || prev.job.date,
+        },
+      }));
+
+      setImportStatus({ phase: "done" });
+    } catch (err) {
+      if (isStale()) return;
+      setImportStatus({
+        phase: "error",
+        message: err instanceof Error ? err.message : "Failed to fetch job",
+      });
+    }
+  }, []);
 
   // ── Zone handlers ──────────────────────────────────────────────────────
   const addZone = useCallback(() => {
@@ -78,11 +124,6 @@ export default function AnchorInspectionPage({
     setView("editor");
   }, []);
 
-  // ── Export handler (placeholder) ───────────────────────────────────────
-  const handleExport = useCallback(() => {
-    window.print();
-  }, []);
-
   const totalAnchors = report.zones.reduce(
     (sum, z) => sum + z.anchors.length,
     0,
@@ -110,20 +151,30 @@ export default function AnchorInspectionPage({
   // ── Main editor view ───────────────────────────────────────────────────
   return (
     <div className={styles.page}>
-      {/* ── Top bar ── */}
+      {/* ── Top bar — same as ConditionReportPage ── */}
       <div className={styles.topBar}>
         <button className={styles.backBtn} onClick={onBack}>
           ← Report types
         </button>
+        <div className={styles.topMeta}>
+          <span className={styles.photoCount}>
+            {report.zones.length} zone{report.zones.length !== 1 ? "s" : ""}
+          </span>
+          {totalAnchors > 0 && (
+            <span className={styles.photoCount}>
+              {totalAnchors} anchor{totalAnchors !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
         <div className={styles.topActions}>
-          <Button variant="secondary" size="sm" onClick={handleExport}>
+          <Button variant="primary" size="sm" onClick={() => window.print()}>
             Export PDF
           </Button>
         </div>
       </div>
 
-      <div className={styles.layout}>
-        {/* ── Left panel: options ── */}
+      {/* ── Body ── */}
+      <div className={styles.editorBody}>
         <AnchorOptionsPanel
           job={report.job}
           zones={report.zones}
@@ -133,52 +184,30 @@ export default function AnchorInspectionPage({
           onDeleteZone={deleteZone}
           totalAnchors={totalAnchors}
           totalPassed={totalPassed}
+          importStatus={importStatus}
+          onImport={handleImport}
         />
 
-        {/* ── Right panel: live preview ── */}
-        <div className={styles.previewPane}>
-          <div className={styles.previewInner}>
-            {/* Cover page */}
-            <AnchorCoverSection job={report.job} onUpdate={updateJob} />
+        {/* ── Canvas — same as ConditionReportPage ── */}
+        <div className={styles.canvas}>
+          <div className={styles.pageLabel}>Cover Page</div>
+          <AnchorCoverSection job={report.job} onUpdate={updateJob} />
 
-            {/* Zone summary pages */}
-            {report.zones.map((zone) => (
-              <ZoneSummarySection
-                key={zone.id}
-                zone={zone}
-                onEditZone={() => openZoneMap(zone.id)}
-              />
-            ))}
-
-            {/* Empty state */}
-            {report.zones.length === 0 && (
-              <div className={styles.emptyZones}>
-                <div className={styles.emptyZonesIcon}>
-                  <svg
-                    width="32"
-                    height="32"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
-                    <line x1="9" y1="3" x2="9" y2="18" />
-                    <line x1="15" y1="6" x2="15" y2="21" />
-                  </svg>
-                </div>
-                <p className={styles.emptyZonesTitle}>No zones added yet</p>
-                <p className={styles.emptyZonesSub}>
-                  Add a zone to begin placing anchors on the map
-                </p>
-                <Button variant="primary" size="sm" onClick={addZone}>
-                  + Add First Zone
-                </Button>
+          {report.zones.length > 0 && (
+            <>
+              <div className={styles.pageLabel}>
+                Zones &middot; {report.zones.length} zone
+                {report.zones.length !== 1 ? "s" : ""}
               </div>
-            )}
-          </div>
+              {report.zones.map((zone) => (
+                <ZoneSummarySection
+                  key={zone.id}
+                  zone={zone}
+                  onEditZone={() => openZoneMap(zone.id)}
+                />
+              ))}
+            </>
+          )}
         </div>
       </div>
     </div>
