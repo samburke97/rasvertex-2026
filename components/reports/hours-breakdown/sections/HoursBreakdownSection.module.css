@@ -1,8 +1,8 @@
-/* components/reports/condition/sections/ScheduleSection.module.css */
+/* components/reports/hours-breakdown/sections/HoursBreakdownSection.module.css */
 
 @import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
 
-/* ── Page shell ──────────────────────────────────────────────────────────── */
+/* ── Page shell ── */
 .page {
   width: 794px;
   height: 1123px;
@@ -19,7 +19,7 @@
   color: #1a1a2e;
 }
 
-/* ── Top bar ─────────────────────────────────────────────────────────────── */
+/* ── Top bar ── */
 .topBar {
   display: flex;
   align-items: flex-start;
@@ -46,48 +46,19 @@
   margin-top: 0.5rem;
 }
 
-/* ── Body ────────────────────────────────────────────────────────────────── */
-/*
- * min-height: 0 is critical — without it, a flex child ignores the parent's
- * fixed height and grows to fit its content, pushing the footer off the page.
- * overflow: hidden clips any content that genuinely exceeds the available space.
- */
+/* ── Body ── */
 .body {
   padding: 2rem 2.75rem 2rem;
   flex: 1;
-  min-height: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-/* ── Section heading ─────────────────────────────────────────────────────── */
-.heading {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
-  flex-shrink: 0;
-}
-
-.headingTitle {
-  font-family: "Bebas Neue", Arial, sans-serif;
-  font-size: 1.15rem;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  color: #0d1c45;
-  text-transform: uppercase;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.headingRule {
+.tableWrap {
   flex: 1;
-  height: 2px;
-  background: #0d1c45;
 }
 
-/* ── Table ───────────────────────────────────────────────────────────────── */
+/* ── Table ── */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -150,7 +121,7 @@
   vertical-align: middle;
 }
 
-/* ── Totals row ──────────────────────────────────────────────────────────── */
+/* ── Totals row ── */
 .totalsRow {
   border-top: 2px solid #e5e7eb;
   background: #f9f9f9;
@@ -176,7 +147,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Empty state ─────────────────────────────────────────────────────────── */
+/* ── Empty state ── */
 .emptyCell {
   padding: 2rem 0.875rem;
   font-family: "Inter", Arial, sans-serif;
@@ -186,7 +157,7 @@
   text-align: center;
 }
 
-/* ── Add row button ──────────────────────────────────────────────────────── */
+/* ── Add row button ── */
 .addRow {
   display: flex;
   align-items: center;
@@ -211,7 +182,7 @@
   color: #6b7280;
 }
 
-/* ── Inline cell editing ─────────────────────────────────────────────────── */
+/* ── Inline cell editing ── */
 .cellDisplay {
   cursor: pointer;
   display: inline-block;
@@ -232,72 +203,40 @@
   color: #111827;
   border: 1px solid #6b7280;
   border-radius: 3px;
-  padding: 0.1rem 0.25rem;
-  width: 100%;
+  padding: 0.1rem 0.3rem;
   outline: none;
   background: #fff;
+  width: 100%;
 }
 
-.cellInput:focus {
-  border-color: #0d1c45;
-}
-
-/* ── Delete button ───────────────────────────────────────────────────────── */
+/* ── Delete button ── */
 .deleteBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: none;
   border: none;
   cursor: pointer;
   color: #d1d5db;
-  border-radius: 4px;
   padding: 0.25rem;
-  transition:
-    color 0.15s,
-    background 0.15s;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.12s;
 }
 
 .deleteBtn:hover {
   color: #ef4444;
-  background: #fef2f2;
 }
 
-/* ── Loading / state ─────────────────────────────────────────────────────── */
-.stateWrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: 1;
-  gap: 1rem;
-}
-
-.stateText {
+/* ── Loading ── */
+.loading {
   font-family: "Inter", Arial, sans-serif;
   font-size: 0.82rem;
-  font-weight: 300;
   color: #9ca3af;
+  padding: 2rem 0;
 }
 
-.spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid #e5e7eb;
-  border-top-color: #0d1c45;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ── Footer ──────────────────────────────────────────────────────────────── */
+/* ── Footer ── */
 .footer {
-  margin-top: auto;
   padding: 1.5rem 2.75rem 2rem;
   border-top: 1px solid #ebebeb;
   display: flex;

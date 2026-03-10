@@ -10,6 +10,9 @@ interface ScheduleSectionProps {
   rows: ScheduleRow[];
   isLoading: boolean;
   onChange: (rows: ScheduleRow[]) => void;
+  /** Optional custom heading. When provided, replaces "Hours Schedule" text
+   *  and the extending rule is hidden. Used by the Hours Breakdown report. */
+  heading?: string;
 }
 
 const ASSOCIATIONS = [
@@ -22,8 +25,8 @@ const ASSOCIATIONS = [
 ];
 
 // Pagination — must match condition.print.ts
-const ROWS_PER_FIRST_PAGE = 16;
-const ROWS_PER_CONTINUATION = 22;
+const ROWS_PER_FIRST_PAGE = 25;
+const ROWS_PER_CONTINUATION = 28;
 
 // ── Editable cell ─────────────────────────────────────────────────────────────
 
@@ -142,7 +145,6 @@ function ScheduleTable({
           {rows.map((row) => (
             <tr key={row.id} className={styles.dataRow}>
               <td className={styles.td}>
-                {/* Display formatted date to match PDF; edit raw ISO value */}
                 <EditableCell
                   value={row.date}
                   displayValue={formatScheduleDate(row.date)}
@@ -221,6 +223,7 @@ export default function ScheduleSection({
   rows,
   isLoading,
   onChange,
+  heading,
 }: ScheduleSectionProps) {
   const updateRow = useCallback(
     (id: string, patch: Partial<ScheduleRow>) => {
@@ -314,8 +317,11 @@ export default function ScheduleSection({
             <div className={styles.body}>
               {isFirst && (
                 <div className={styles.heading}>
-                  <div className={styles.headingTitle}>Hours Schedule</div>
-                  <div className={styles.headingRule} />
+                  <div className={styles.headingTitle}>
+                    {heading ?? "Hours Schedule"}
+                  </div>
+                  {/* Only show the extending rule when using the default heading */}
+                  {!heading && <div className={styles.headingRule} />}
                 </div>
               )}
 

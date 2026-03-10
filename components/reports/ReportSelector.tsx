@@ -4,15 +4,14 @@ import { useState, useRef, useEffect } from "react";
 import ConditionReportPage from "./condition/ConditionReportPage";
 import WorksAgreementPage from "./works-agreement/WorksAgreementPage";
 import AnchorInspectionPage from "./anchor-inspection/AnchorInspectionPage";
+import HoursBreakdownPage from "./hours-breakdown/HoursBreakdownPage";
 import styles from "./ReportSelector.module.css";
 
 type ReportTypeId =
   | "condition"
   | "anchor-inspection"
-  | "waterproofing"
-  | "building"
   | "finance-summary"
-  | "invoice";
+  | "hours-breakdown";
 
 interface ReportType {
   id: ReportTypeId;
@@ -43,12 +42,6 @@ const PREVIOUSLY_SENT: SentReport[] = [
     report: "Anchor Inspection",
     file: "anchor-inspection-grammar-school.pdf",
     date: "08 Jan 2026",
-  },
-  {
-    id: "3",
-    report: "Building Inspection",
-    file: "building-inspection-marina.pdf",
-    date: "05 Feb 2025",
   },
   {
     id: "4",
@@ -110,51 +103,6 @@ const REPORT_TYPES: ReportType[] = [
     ),
   },
   {
-    id: "building",
-    label: "Building Inspection",
-    description:
-      "Full building inspection covering all structural and cosmetic elements.",
-    available: false,
-    category: "inspection",
-    icon: (
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <path d="M3 9h18M9 21V9" />
-      </svg>
-    ),
-  },
-  {
-    id: "waterproofing",
-    label: "Waterproofing Report",
-    description:
-      "Detailed waterproofing inspection and defect documentation report.",
-    available: false,
-    category: "inspection",
-    icon: (
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z" />
-      </svg>
-    ),
-  },
-  {
     id: "finance-summary",
     label: "Works Agreement",
     description:
@@ -179,11 +127,11 @@ const REPORT_TYPES: ReportType[] = [
     ),
   },
   {
-    id: "invoice",
-    label: "Invoice",
+    id: "hours-breakdown",
+    label: "Hours Breakdown",
     description:
-      "Generate a professional invoice directly from SimPRO job data.",
-    available: false,
+      "Labour hours report by employee and date, filterable by date range.",
+    available: true,
     category: "finance",
     icon: (
       <svg
@@ -196,8 +144,8 @@ const REPORT_TYPES: ReportType[] = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <rect x="2" y="5" width="20" height="14" rx="2" />
-        <line x1="2" y1="10" x2="22" y2="10" />
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
       </svg>
     ),
   },
@@ -243,35 +191,33 @@ function PreviouslySentDropdown() {
         </svg>
         Previously Sent
         <svg
-          className={`${styles.chevron} ${open ? styles.chevronUp : ""}`}
+          className={`${styles.chevron} ${open ? styles.chevronOpen : ""}`}
           width="14"
           height="14"
-          viewBox="0 0 12 12"
+          viewBox="0 0 24 24"
           fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          <path
-            d="M3 4.5L6 7.5L9 4.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          />
+          <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
 
       {open && (
-        <>
-          <div
-            className={styles.dropdownOverlay}
-            onClick={() => setOpen(false)}
-          />
-          <div className={styles.dropdownPanel}>
-            <div className={styles.dropdownHeader}>
-              <span className={styles.dropdownHeaderCell}>Report</span>
-              <span className={styles.dropdownHeaderCell}>File</span>
-              <span className={styles.dropdownHeaderCell}>Date</span>
-            </div>
+        <div className={styles.dropdownMenu}>
+          <div className={styles.dropdownHeader}>
+            <span className={styles.dropdownHeaderCell}>Report</span>
+            <span className={styles.dropdownHeaderCell}>File</span>
+            <span className={styles.dropdownHeaderCell}>Date</span>
+          </div>
+          <div className={styles.dropdownBody}>
             {PREVIOUSLY_SENT.map((item) => (
               <div key={item.id} className={styles.dropdownRow}>
-                <span className={styles.dropdownCell}>
+                <span
+                  className={`${styles.dropdownCell} ${styles.dropdownReport}`}
+                >
                   <svg
                     width="13"
                     height="13"
@@ -332,7 +278,7 @@ function PreviouslySentDropdown() {
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -392,6 +338,10 @@ export default function ReportSelector() {
 
   if (active === "finance-summary") {
     return <WorksAgreementPage onBack={() => setActive(null)} />;
+  }
+
+  if (active === "hours-breakdown") {
+    return <HoursBreakdownPage onBack={() => setActive(null)} />;
   }
 
   return (
