@@ -94,41 +94,31 @@
 }
 
 .signature {
-  /* Constrain both dimensions — the image itself is wide/landscape */
-  height: 56px;
+  height: 36px;
   width: auto;
-  max-width: 220px;
+  max-width: 160px;
   display: block;
   margin-bottom: 0.5rem;
 }
 
 .sigName {
   font-family: "Inter", Arial, sans-serif !important;
-  font-size: 0.85rem !important;
-  font-weight: 400 !important;
-  color: #1a1a2e !important;
-  line-height: 1.4 !important;
+  font-size: 0.82rem !important;
+  font-weight: 300 !important;
+  color: #374151 !important;
+  line-height: 1.5 !important;
   margin: 0;
 }
 
 .sigTitle {
   font-family: "Bebas Neue", Arial, sans-serif !important;
-  font-size: 0.95rem !important;
+  font-size: 1.05rem !important;
   font-weight: 400 !important;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.08em !important;
   color: #0d1c45 !important;
-  text-transform: uppercase;
-  line-height: 1.2 !important;
+  text-transform: uppercase !important;
+  line-height: 1 !important;
   margin: 0;
-  font-family: "Bebas Neue", Arial, sans-serif;
-  font-size: 0.95rem;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  color: #0d1c45;
-  text-transform: uppercase;
-  margin: 0;
-  /* Reset globals.css bleed for this element too */
-  line-height: 1.2;
 }
 
 /* ── Footer ── */

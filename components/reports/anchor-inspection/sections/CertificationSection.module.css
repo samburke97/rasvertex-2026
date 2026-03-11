@@ -105,7 +105,7 @@
 /* Bebas label column */
 .dtLabel {
   font-family: "Bebas Neue", Arial, sans-serif !important;
-  font-size: 0.82rem !important;
+  font-size: 1.05rem !important;
   font-weight: 400 !important;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -114,14 +114,14 @@
   padding: 0.55rem 1.25rem 0.55rem 0;
   border-bottom: 1px solid #f0f0f0;
   white-space: nowrap;
-  width: 190px;
+  width: 220px;
   vertical-align: middle;
 }
 
 /* Inter 300 value column */
 .dtValue {
   font-family: "Inter", Arial, sans-serif !important;
-  font-size: 0.85rem !important;
+  font-size: 0.82rem !important;
   font-weight: 300 !important;
   color: #374151 !important;
   line-height: 1.5 !important;

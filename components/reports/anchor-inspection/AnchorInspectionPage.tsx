@@ -3,6 +3,7 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import styles from "../shared/ReportPage.module.css";
+import { buildAnchorPrintHTML } from "@/lib/reports/anchor.print";
 import Button from "@/components/ui/Button";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
@@ -31,9 +32,9 @@ export type AnchorImportStatus =
   | { phase: "done" }
   | { phase: "error"; message: string };
 
-// Format a JS Date as "5th March 2026"
-function formatOrdinalDate(date: Date): string {
-  const day = date.getDate();
+// "11th March 2026" from a Date
+function formatOrdinalDate(d: Date): string {
+  const day = d.getDate();
   const suffix =
     day % 10 === 1 && day !== 11
       ? "st"
@@ -42,19 +43,15 @@ function formatOrdinalDate(date: Date): string {
         : day % 10 === 3 && day !== 13
           ? "rd"
           : "th";
-  const month = date.toLocaleDateString("en-AU", { month: "long" });
-  return `${day}${suffix} ${month} ${date.getFullYear()}`;
+  const month = d.toLocaleDateString("en-AU", { month: "long" });
+  return `${day}${suffix} ${month} ${d.getFullYear()}`;
 }
 
-// Parse en-AU date string "DD/MM/YYYY" → Date
-function parseAuDate(auDate: string): Date | null {
-  const parts = auDate.split("/");
-  if (parts.length !== 3) return null;
-  const d = new Date(
-    parseInt(parts[2], 10),
-    parseInt(parts[1], 10) - 1,
-    parseInt(parts[0], 10),
-  );
+// Parse en-AU "DD/MM/YYYY" → Date
+function parseAuDate(s: string): Date | null {
+  const p = s.split("/");
+  if (p.length !== 3) return null;
+  const d = new Date(+p[2], +p[1] - 1, +p[0]);
   return isNaN(d.getTime()) ? null : d;
 }
 
@@ -68,6 +65,30 @@ export default function AnchorInspectionPage({
     phase: "idle",
   });
   const currentLoadId = useRef(0);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // ── Export PDF — builds clean print HTML via anchor.print.ts ──────────────
+  const handleExport = useCallback(() => {
+    setIsExporting(true);
+    const win = window.open("", "_blank");
+    if (!win) {
+      setIsExporting(false);
+      return;
+    }
+
+    win.document.write(buildAnchorPrintHTML(report));
+    win.document.close();
+
+    win.onload = () => {
+      setTimeout(() => {
+        win.print();
+        win.close();
+        setIsExporting(false);
+      }, 800);
+    };
+    // Fallback
+    setTimeout(() => setIsExporting(false), 6000);
+  }, [report]);
 
   // ── Job detail handlers ────────────────────────────────────────────────
   const updateJob = useCallback(
@@ -93,16 +114,15 @@ export default function AnchorInspectionPage({
       const jobData: EnrichedJob = await jobRes.json();
       if (isStale()) return;
 
-      // Inspection date = CompletedDate (jobData.date is en-AU "DD/MM/YYYY")
-      // Next inspection = exactly 1 year later
+      // Inspection date = job completed date; next = +1 year
       let inspectionDate = "";
       let nextInspectionDate = "";
-      const parsed = parseAuDate(jobData.date);
-      if (parsed) {
-        inspectionDate = formatOrdinalDate(parsed);
-        const nextYear = new Date(parsed);
-        nextYear.setFullYear(nextYear.getFullYear() + 1);
-        nextInspectionDate = formatOrdinalDate(nextYear);
+      const d = parseAuDate(jobData.date);
+      if (d) {
+        inspectionDate = formatOrdinalDate(d);
+        const ny = new Date(d);
+        ny.setFullYear(ny.getFullYear() + 1);
+        nextInspectionDate = formatOrdinalDate(ny);
       }
 
       setReport((prev) => ({
@@ -114,7 +134,7 @@ export default function AnchorInspectionPage({
           address: jobData.siteAddress || prev.job.address,
           date: jobData.date || prev.job.date,
           // Certification page
-          certNumber: jobData.jobNo || prev.job.certNumber,
+          certNumber: jobData.jobNo?.replace(/^#/, "") || prev.job.certNumber,
           buildingName: jobData.siteName || prev.job.buildingName,
           inspectionDate: inspectionDate || prev.job.inspectionDate,
           nextInspectionDate: nextInspectionDate || prev.job.nextInspectionDate,
@@ -210,8 +230,13 @@ export default function AnchorInspectionPage({
               {totalAnchors} anchor{totalAnchors !== 1 ? "s" : ""}
             </span>
           )}
-          <Button variant="primary" size="sm" onClick={() => window.print()}>
-            Export PDF
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            {isExporting ? "Exporting…" : "Export PDF"}
           </Button>
         </div>
       </div>
