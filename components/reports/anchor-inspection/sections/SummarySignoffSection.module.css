@@ -1,0 +1,154 @@
+/* components/reports/anchor-inspection/sections/SummarySignoffSection.module.css */
+
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
+
+/* ── Page shell — identical to all other report pages ───────────────────── */
+.page {
+  width: 794px;
+  min-height: 1123px;
+  background: #fff;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.1),
+    0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: "Inter", Arial, sans-serif;
+  color: #1a1a2e;
+  flex-shrink: 0;
+}
+
+/* Suppress globals.css bleed */
+.page p,
+.page span {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+}
+
+/* ── Top area — title left, diagonal photo right ─────────────────────────── */
+.topArea {
+  position: relative;
+  height: 260px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: 2.75rem 2.75rem 2rem;
+  overflow: hidden;
+}
+
+/* The diagonal hero photo — clips to the right portion ── */
+.heroDiagonal {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 55%;
+  height: 100%;
+  /* Diagonal clip: left edge cuts diagonally from top-left to bottom-left */
+  clip-path: polygon(18% 0%, 100% 0%, 100% 100%, 0% 100%);
+  overflow: hidden;
+}
+
+.heroImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* Slight navy overlay via mix-blend */
+  filter: brightness(0.75) saturate(0.85);
+}
+
+.title {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 4rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #0d1c45;
+  line-height: 1;
+  margin: 0;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 2;
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.body {
+  padding: 2.5rem 2.75rem 2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.para {
+  font-size: 0.875rem;
+  font-weight: 300;
+  color: #374151;
+  line-height: 1.75;
+  margin: 0;
+}
+
+/* ── Signoff block ───────────────────────────────────────────────────────── */
+.signoff {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 1rem;
+}
+
+.sincerely {
+  font-size: 0.875rem;
+  font-weight: 300;
+  color: #374151;
+  margin: 0 0 0.5rem;
+}
+
+.signature {
+  height: 64px;
+  width: auto;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.sigName {
+  font-size: 0.82rem;
+  font-weight: 400;
+  color: #374151;
+  margin: 0;
+}
+
+.sigTitle {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: #0d1c45;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* ── Footer — identical to all other pages ───────────────────────────────── */
+.footer {
+  margin-top: auto;
+  padding: 1.5rem 2.75rem 2rem;
+  border-top: 1px solid #ebebeb;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.assocLogo {
+  height: 36px;
+  width: auto;
+  max-width: 80px;
+  object-fit: contain;
+  display: block;
+  opacity: 0.85;
+}

@@ -6,8 +6,10 @@ import styles from "../shared/ReportPage.module.css";
 import Button from "@/components/ui/Button";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
-import CoverSection from "../shared/CoverSection";
+import AnchorCoverSection from "./sections/AnchorCoverSection";
 import ZoneSummarySection from "./sections/ZoneSummarySection";
+import CertificationSection from "./sections/CertificationSection";
+import SummarySignoffSection from "./sections/SummarySignoffSection";
 import {
   DEFAULT_ANCHOR_REPORT,
   generateId,
@@ -90,8 +92,6 @@ export default function AnchorInspectionPage({
       id: generateId(),
       name: `Zone ${report.zones.length + 1}`,
       mapImageUrl: null,
-      mapCenter: null,
-      mapZoom: null,
       anchors: [],
     };
     setReport((prev) => ({ ...prev, zones: [...prev.zones, newZone] }));
@@ -107,15 +107,15 @@ export default function AnchorInspectionPage({
       ...prev,
       zones: prev.zones.filter((z) => z.id !== zoneId),
     }));
+    setView("editor");
+    setEditingZoneId(null);
   }, []);
 
-  const handleZoneSave = useCallback((updatedZone: Zone) => {
+  const handleZoneUpdate = useCallback((updatedZone: Zone) => {
     setReport((prev) => ({
       ...prev,
       zones: prev.zones.map((z) => (z.id === updatedZone.id ? updatedZone : z)),
     }));
-    setView("editor");
-    setEditingZoneId(null);
   }, []);
 
   // ── Derived ────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ export default function AnchorInspectionPage({
     0,
   );
   const totalPassed = report.zones.reduce(
-    (sum, z) => sum + z.anchors.filter((a) => a.status === "pass").length,
+    (sum, z) => sum + z.anchors.filter((a) => a.result === "PASSED").length,
     0,
   );
 
@@ -135,11 +135,13 @@ export default function AnchorInspectionPage({
       return (
         <ZoneMapEditor
           zone={zone}
-          onSave={handleZoneSave}
+          jobAddress={report.job.address}
+          onUpdate={handleZoneUpdate}
           onBack={() => {
             setView("editor");
             setEditingZoneId(null);
           }}
+          onDelete={() => deleteZone(editingZoneId)}
         />
       );
     }
@@ -186,33 +188,7 @@ export default function AnchorInspectionPage({
         {/* ── Canvas ── */}
         <div className={styles.canvas}>
           <div className={styles.pageLabel}>Cover Page</div>
-          <CoverSection
-            coverPhoto={report.job.coverPhoto}
-            reportType={report.job.reportType}
-            onReportTypeChange={(v) => updateJob("reportType", v)}
-            metaRows={[
-              {
-                label: "Prepared For",
-                value: report.job.preparedFor,
-                onChange: (v) => updateJob("preparedFor", v),
-              },
-              {
-                label: "Prepared By",
-                value: report.job.preparedBy,
-                onChange: (v) => updateJob("preparedBy", v),
-              },
-              {
-                label: "Address",
-                value: report.job.address,
-                onChange: (v) => updateJob("address", v),
-              },
-              {
-                label: "Date",
-                value: report.job.date,
-                onChange: (v) => updateJob("date", v),
-              },
-            ]}
-          />
+          <AnchorCoverSection job={report.job} onUpdate={updateJob} />
 
           {report.zones.length > 0 && (
             <>
@@ -229,6 +205,16 @@ export default function AnchorInspectionPage({
               ))}
             </>
           )}
+
+          <div className={styles.pageLabel}>Certification</div>
+          <CertificationSection
+            job={report.job}
+            zones={report.zones}
+            onUpdate={updateJob}
+          />
+
+          <div className={styles.pageLabel}>Summary &amp; Sign-off</div>
+          <SummarySignoffSection />
         </div>
       </div>
     </div>

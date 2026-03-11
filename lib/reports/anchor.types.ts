@@ -15,7 +15,7 @@ export type PassFail = "PASSED" | "FAILED" | "N/A";
 
 export interface AnchorPoint {
   id: string;
-  label: string; // e.g. "A.26"
+  label: string;
   type: AnchorType;
   description: string;
   model?: string;
@@ -27,15 +27,14 @@ export interface AnchorPoint {
   nextInspection: string;
   result: PassFail;
   notes?: string;
-  // Map pin position as % of container dimensions
-  x: number; // 0–100
-  y: number; // 0–100
+  x: number;
+  y: number;
 }
 
 export interface Zone {
   id: string;
   name: string;
-  mapImageUrl: string | null; // Mapbox satellite screenshot or user upload
+  mapImageUrl: string | null;
   mapLat?: number;
   mapLng?: number;
   mapZoom?: number;
@@ -43,6 +42,7 @@ export interface Zone {
 }
 
 export interface AnchorReportJob {
+  // Cover page
   preparedFor: string;
   preparedBy: string;
   address: string;
@@ -50,6 +50,12 @@ export interface AnchorReportJob {
   date: string;
   coverPhoto: string | null;
   description: string;
+  // Certification page
+  certNumber: string;
+  buildingName: string;
+  inspectionDate: string;
+  nextInspectionDate: string;
+  authorisedBy: string;
 }
 
 export interface AnchorReportData {
@@ -57,7 +63,6 @@ export interface AnchorReportData {
   zones: Zone[];
 }
 
-// ── Colour map for anchor types ────────────────────────────────────────────
 export const ANCHOR_TYPE_COLOURS: Record<AnchorType, string> = {
   "fall-arrest-anchor": "#10b981",
   "ladder-bracket": "#3b82f6",
@@ -95,13 +100,18 @@ export function generateId(): string {
 export const DEFAULT_ANCHOR_REPORT: AnchorReportData = {
   job: {
     preparedFor: "",
-    preparedBy: "",
+    preparedBy: "Archer Dutch",
     address: "",
     reportType: "Roof Access & Fall Prevention Systems Inspection Report",
     date: new Date().toLocaleDateString("en-AU"),
     coverPhoto: null,
     description:
       "This report relates to existing Height Safety and Roof Access Systems. All systems were visually inspected in accordance with AS/NZS 1891.4:2009, AS/NZS 1891.2 and AS 1657:2018.",
+    certNumber: "",
+    buildingName: "",
+    inspectionDate: "",
+    nextInspectionDate: "",
+    authorisedBy: "",
   },
   zones: [],
 };

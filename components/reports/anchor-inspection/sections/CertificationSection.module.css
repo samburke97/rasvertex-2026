@@ -1,0 +1,248 @@
+/* components/reports/anchor-inspection/sections/CertificationSection.module.css */
+
+@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
+
+/* ── Page shell — identical to ZoneSummarySection ────────────────────────── */
+.page {
+  width: 794px;
+  min-height: 1123px;
+  background: #fff;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.1),
+    0 1px 4px rgba(0, 0, 0, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-family: "Inter", Arial, sans-serif;
+  color: #1a1a2e;
+  flex-shrink: 0;
+}
+
+/* Suppress globals.css bleed */
+.page p,
+.page span,
+.page td,
+.page th {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+}
+
+/* ── Top bar — identical to ZoneSummarySection ───────────────────────────── */
+.topBar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 2.75rem 2.75rem 0;
+  flex-shrink: 0;
+}
+
+.title {
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 3rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #0d1c45;
+  line-height: 1;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.topBarLink {
+  height: 22px;
+  width: auto;
+  display: block;
+  margin-top: 0.5rem;
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.body {
+  padding: 2rem 2.75rem 2rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* ── Cert heading line ───────────────────────────────────────────────────── */
+.certHeading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.certTitle {
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0d1c45;
+}
+
+.certNum {
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0d1c45;
+}
+
+/* ── Details table — matches ScheduleSection header + row pattern ────────── */
+.detailsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.dtLabel {
+  padding: 0.55rem 0.875rem;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #374151;
+  background: #f9f9f9;
+  border-bottom: 1px solid #f0f0f0;
+  white-space: nowrap;
+  width: 220px;
+  vertical-align: middle;
+}
+
+.dtValue {
+  padding: 0.48rem 0.875rem;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 300;
+  color: #111827;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+/* Last row — no bottom border */
+.detailsTable tr:last-child .dtLabel,
+.detailsTable tr:last-child .dtValue {
+  border-bottom: none;
+}
+
+/* EditableField overrides inside dtValue */
+.dtValue :global(.wrap) {
+  display: inline;
+}
+.dtValue :global(.display),
+.dtValue :global(.input) {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  font-style: normal;
+  text-transform: none;
+  display: inline;
+}
+.dtValue :global(.placeholder) {
+  font-style: normal;
+  color: #bbb;
+}
+
+/* ── Standards block ─────────────────────────────────────────────────────── */
+.standardsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.standardsIntro {
+  font-size: 0.875rem;
+  font-weight: 300;
+  color: #374151;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.standardsList {
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.standardsList li {
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: #374151;
+  line-height: 1.6;
+  list-style-type: disc;
+}
+
+/* ── Anchor type summary table — matches ScheduleSection exactly ─────────── */
+.anchorTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.atHead {
+  padding: 0.55rem 0.875rem;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #374151;
+  background: #f9f9f9;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.atRow {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.atRow:last-child {
+  border-bottom: none;
+}
+
+.atCell {
+  padding: 0.48rem 0.875rem;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 300;
+  color: #111827;
+  vertical-align: middle;
+  line-height: 1.2;
+}
+
+.atPass {
+  color: #065f46;
+  font-weight: 600;
+}
+
+.atFail {
+  color: #900c40;
+  font-weight: 600;
+}
+
+/* ── Footer — identical to ZoneSummarySection ────────────────────────────── */
+.footer {
+  margin-top: auto;
+  padding: 1.5rem 2.75rem 2rem;
+  border-top: 1px solid #ebebeb;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.assocLogo {
+  height: 36px;
+  width: auto;
+  max-width: 80px;
+  object-fit: contain;
+  display: block;
+  opacity: 0.85;
+}

@@ -1,9 +1,10 @@
 /* components/reports/anchor-inspection/ZoneMapEditor.module.css */
 
 .page {
+  margin: -1.5rem;
+  height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
-  height: 100vh;
   background: var(--bg-standard, #fff);
   overflow: hidden;
 }
@@ -231,7 +232,6 @@
     transform 0.1s,
     filter 0.1s;
   z-index: 10;
-  /* Prevent text selection while dragging */
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
@@ -242,12 +242,11 @@
   z-index: 20;
 }
 
-/* Active drag — applied via className when draggingId matches */
 .pinDragging {
   transform: translate(-50%, -100%) scale(1.2) !important;
   z-index: 30;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4));
-  transition: none; /* no transition while dragging — instant follow */
+  transition: none;
 }
 
 .pinLabel {
@@ -401,6 +400,11 @@
 .anchorBadgeFail {
   background: #fdf2f8;
   color: var(--red-wine-300, #900c40);
+}
+
+.anchorBadgeNone {
+  background: var(--con-light, #fafafa);
+  color: var(--for-medium, #7e807f);
 }
 
 .hiddenInput {
