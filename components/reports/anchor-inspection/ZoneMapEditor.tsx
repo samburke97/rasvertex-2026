@@ -25,14 +25,6 @@ interface ZoneMapEditorProps {
   onDelete: () => void;
 }
 
-// ── Style ─────────────────────────────────────────────────────────────────────
-// Mapbox satellite-streets: clearer satellite imagery with road/label overlay.
-// Using the standard Mapbox style (not the custom Studio one) so Static API
-// isn't needed — we capture via canvas instead.
-//
-// DO NOT hoist TOKEN — Next.js replaces NEXT_PUBLIC_ at build time, so reading
-// inside a function ensures the live client-side value after hydration.
-
 const STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
 
 function getToken(): string {
@@ -79,8 +71,6 @@ export default function ZoneMapEditor({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
 
-  // Track drag state in a ref so pointer-move handler always sees fresh values
-  // without needing to be re-created on every render.
   const dragState = useRef<{
     anchorId: string;
     startX: number;
@@ -90,7 +80,7 @@ export default function ZoneMapEditor({
 
   const save = useCallback((updated: Zone) => onUpdate(updated), [onUpdate]);
 
-  // ── Init map ─────────────────────────────────────────────────────────────
+  // ── Init map ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const token = getToken();
@@ -118,7 +108,7 @@ export default function ZoneMapEditor({
         lat = zone.mapLat;
         lng = zone.mapLng;
         zoom = zone.mapZoom ?? 18;
-      } else if (jobAddress.trim()) {
+      } else if (jobAddress?.trim()) {
         try {
           const coords = await geocodeAddress(jobAddress);
           if (coords && !cancelled) {
@@ -139,9 +129,6 @@ export default function ZoneMapEditor({
         zoom,
         bearing: 0,
         pitch: 0,
-        // ── CRITICAL: required for map.getCanvas().toDataURL() to work.
-        // Without this, WebGL clears its buffer after every frame render
-        // and toDataURL() returns a blank/transparent image.
         preserveDrawingBuffer: true,
       });
 
@@ -168,13 +155,6 @@ export default function ZoneMapEditor({
   }, [captured]);
 
   // ── Capture ───────────────────────────────────────────────────────────────
-  //
-  // Capture the WebGL canvas directly via map.getCanvas().toDataURL().
-  // This is pixel-perfect — what you see is exactly what gets stored.
-  // No Mapbox Static API call, no auth issues, no size mismatch.
-  //
-  // We wait for map.once("idle") to ensure all tiles have finished loading
-  // before we snapshot.
 
   const handleCapture = useCallback(async () => {
     const map = mapRef.current;
@@ -182,7 +162,6 @@ export default function ZoneMapEditor({
 
     setCapturing(true);
 
-    // Wait until the map is fully idle (all tiles rendered)
     await new Promise<void>((resolve) => {
       if (map.isStyleLoaded() && map.areTilesLoaded()) {
         resolve();
@@ -191,7 +170,6 @@ export default function ZoneMapEditor({
       }
     });
 
-    // Read the GL canvas as a JPEG data URL
     const canvas = map.getCanvas();
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
 
@@ -245,7 +223,6 @@ export default function ZoneMapEditor({
 
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isPlacingPin) return;
-    // Don't place a pin if we just finished dragging one
     if (dragState.current?.moved) return;
     const rect = frozenMapRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -286,11 +263,6 @@ export default function ZoneMapEditor({
   };
 
   // ── Drag handlers ─────────────────────────────────────────────────────────
-  //
-  // Pointer events give us a single unified API for mouse + touch.
-  // We capture the pointer on down so moves outside the element still register.
-  // A drag is only committed if the pointer moved >5px; otherwise it's a click
-  // and the modal opens normally.
 
   const handlePinPointerDown = useCallback(
     (e: React.PointerEvent<HTMLButtonElement>, anchorId: string) => {
@@ -347,13 +319,11 @@ export default function ZoneMapEditor({
       if (!ds) return;
 
       if (ds.moved) {
-        // Commit final dropped position to parent
         setLocalZone((prev) => {
           save(prev);
           return prev;
         });
       } else {
-        // No movement — treat as click, open modal
         setEditingAnchor(anchor);
       }
     },
@@ -581,9 +551,15 @@ export default function ZoneMapEditor({
                     </span>
                   </div>
                   <span
-                    className={`${styles.anchorBadge} ${anchor.result === "PASSED" ? styles.anchorBadgePass : styles.anchorBadgeFail}`}
+                    className={`${styles.anchorBadge} ${
+                      anchor.result === "PASSED"
+                        ? styles.anchorBadgePass
+                        : anchor.result === "FAILED"
+                          ? styles.anchorBadgeFail
+                          : styles.anchorBadgeNone
+                    }`}
                   >
-                    {anchor.result}
+                    {anchor.result ?? "—"}
                   </span>
                 </button>
               ))}
@@ -592,40 +568,44 @@ export default function ZoneMapEditor({
         </div>
       </div>
 
-      {(pendingPin || editingAnchor) && (
-        <AnchorPinModal
-          anchor={
-            editingAnchor ?? {
-              id: generateId(),
-              label: `A.${localZone.anchors.length + 1}`,
-              type: "fall-arrest-anchor",
-              description: "Fall Arrest Anchor Point Surface Mount",
-              inspectionDate: new Date().toLocaleDateString("en-AU"),
-              nextInspection: new Date(
-                Date.now() + 365 * 24 * 60 * 60 * 1000,
-              ).toLocaleDateString("en-AU"),
-              result: "PASSED",
-              x: pendingPin!.x,
-              y: pendingPin!.y,
-            }
-          }
-          isNew={!editingAnchor}
-          onSave={handlePinSave}
-          onDelete={handlePinDelete}
-          onClose={() => {
-            setPendingPin(null);
-            setEditingAnchor(null);
-          }}
-        />
-      )}
-
+      {/* Hidden file input */}
       <input
         ref={uploadRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        className={styles.hiddenInput}
+        style={{ display: "none" }}
         onChange={handleUploadMap}
       />
+
+      {/* Pin modal — new pin */}
+      {pendingPin && (
+        <AnchorPinModal
+          anchor={{
+            id: generateId(),
+            x: pendingPin.x,
+            y: pendingPin.y,
+            label: `A${localZone.anchors.length + 1}`,
+            type: "single-anchor",
+            result: null,
+            notes: "",
+          }}
+          onSave={handlePinSave}
+          onDelete={handlePinDelete}
+          onClose={() => setPendingPin(null)}
+          isNew
+        />
+      )}
+
+      {/* Pin modal — edit existing */}
+      {editingAnchor && (
+        <AnchorPinModal
+          anchor={editingAnchor}
+          onSave={handlePinSave}
+          onDelete={handlePinDelete}
+          onClose={() => setEditingAnchor(null)}
+          isNew={false}
+        />
+      )}
     </div>
   );
 }

@@ -1,7 +1,5 @@
 "use client";
 // components/reports/shared/JobImportInput.tsx
-// Job number input + Load button + status message.
-// Used in all three report options panels.
 
 import React, { useState } from "react";
 import styles from "./JobImportInput.module.css";
@@ -9,6 +7,8 @@ import styles from "./JobImportInput.module.css";
 interface ImportStatus {
   phase: string;
   message?: string;
+  loaded?: number;
+  total?: number;
 }
 
 interface JobImportInputProps {
@@ -26,7 +26,11 @@ export default function JobImportInput({
 
   const isLoading =
     importStatus.phase === "fetching-job" ||
-    importStatus.phase === "fetching-schedule";
+    importStatus.phase === "fetching-schedule" ||
+    importStatus.phase === "fetching-photos";
+
+  const isDone = importStatus.phase === "done";
+  const isError = importStatus.phase === "error";
 
   const handleSubmit = () => {
     if (jobNumber.trim()) onImport(jobNumber.trim());
@@ -37,7 +41,7 @@ export default function JobImportInput({
       <div className={styles.row}>
         <input
           type="text"
-          className={styles.input}
+          className={`${styles.input} ${isDone ? styles.inputDone : ""} ${isError ? styles.inputError : ""}`}
           placeholder={placeholder}
           value={jobNumber}
           onChange={(e) => setJobNumber(e.target.value)}
@@ -49,17 +53,9 @@ export default function JobImportInput({
           onClick={handleSubmit}
           disabled={isLoading || !jobNumber.trim()}
         >
-          {isLoading ? "…" : "Load"}
+          {isLoading ? <span className={styles.spinner} /> : "Load"}
         </button>
       </div>
-      {importStatus.phase === "error" && (
-        <p className={styles.error}>
-          {importStatus.message ?? "Failed to load job."}
-        </p>
-      )}
-      {importStatus.phase === "done" && (
-        <p className={styles.success}>✓ Schedule loaded</p>
-      )}
     </div>
   );
 }

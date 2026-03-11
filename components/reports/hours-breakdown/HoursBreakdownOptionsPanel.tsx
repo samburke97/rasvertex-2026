@@ -1,8 +1,10 @@
 "use client";
 // components/reports/hours-breakdown/HoursBreakdownOptionsPanel.tsx
 
-import React, { useId } from "react";
-import styles from "./HoursBreakdownOptionsPanel.module.css";
+import React from "react";
+import styles from "../shared/OptionsPanel.module.css";
+import ToggleRow from "../shared/ToggleRow";
+import JobImportInput from "../shared/JobImportInput";
 import type {
   HoursBreakdownSettings,
   HoursImportStatus,
@@ -15,46 +17,6 @@ interface Props {
   importStatus: HoursImportStatus;
   onSettings: (patch: Partial<HoursBreakdownSettings>) => void;
   onImport: (jobNumber: string) => void;
-}
-
-// ── Toggle row ────────────────────────────────────────────────────────────────
-
-function ToggleRow({
-  label,
-  sub,
-  checked,
-  onChange,
-  disabled = false,
-}: {
-  label: string;
-  sub: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  const id = useId();
-  return (
-    <div
-      className={`${styles.toggleRow} ${disabled ? styles.toggleRowDisabled : ""}`}
-    >
-      <div className={styles.toggleText}>
-        <div className={styles.toggleLabel}>{label}</div>
-        <div className={styles.toggleSub}>{sub}</div>
-      </div>
-      <label className={styles.toggle}>
-        <input
-          id={id}
-          type="checkbox"
-          className={styles.toggleInput}
-          checked={checked}
-          onChange={(e) => !disabled && onChange(e.target.checked)}
-          disabled={disabled}
-        />
-        <span className={styles.toggleTrack} />
-        <span className={styles.toggleThumb} />
-      </label>
-    </div>
-  );
 }
 
 // ── Date preset helpers ───────────────────────────────────────────────────────
@@ -114,13 +76,7 @@ export default function HoursBreakdownOptionsPanel({
   onSettings,
   onImport,
 }: Props) {
-  const [jobNumber, setJobNumber] = React.useState("");
-
   const set = (patch: Partial<HoursBreakdownSettings>) => onSettings(patch);
-
-  const isLoading =
-    importStatus.phase === "fetching-job" ||
-    importStatus.phase === "fetching-schedule";
 
   const activePreset = detectPreset(settings.dateFrom, settings.dateTo);
   const isActivelyFiltered =
@@ -131,34 +87,7 @@ export default function HoursBreakdownOptionsPanel({
       {/* ── Import ── */}
       <div className={styles.group}>
         <div className={styles.groupLabel}>Import</div>
-        <div className={styles.jobRow}>
-          <input
-            className={styles.jobInput}
-            type="text"
-            placeholder="Job number"
-            value={jobNumber}
-            onChange={(e) => setJobNumber(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && jobNumber.trim()) {
-                onImport(jobNumber.trim());
-              }
-            }}
-            disabled={isLoading}
-          />
-          <button
-            className={styles.importBtn}
-            onClick={() => jobNumber.trim() && onImport(jobNumber.trim())}
-            disabled={isLoading || !jobNumber.trim()}
-          >
-            {isLoading ? "…" : "Load"}
-          </button>
-        </div>
-        {importStatus.phase === "error" && (
-          <p className={styles.errorText}>{importStatus.message}</p>
-        )}
-        {importStatus.phase === "done" && (
-          <p className={styles.successText}>Schedule loaded</p>
-        )}
+        <JobImportInput onImport={onImport} importStatus={importStatus} />
       </div>
 
       {/* ── Date filter ── */}

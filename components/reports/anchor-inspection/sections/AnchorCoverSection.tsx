@@ -1,14 +1,11 @@
 "use client";
 // components/reports/anchor-inspection/sections/AnchorCoverSection.tsx
-//
-// Identical design to CoverSection — navy hero, RAS logo, Bebas Neue title,
-// associations footer. Only difference: no "Project" row, no rich-text intro
-// (description is plain text), and fields map to AnchorReportJob.
 
 import React from "react";
 import styles from "./AnchorCoverSection.module.css";
 import EditableField from "../../shared/EditableField";
 import type { AnchorReportJob } from "@/lib/reports/anchor.types";
+import { ASSOCIATIONS } from "@/lib/reports/constants";
 
 interface AnchorCoverSectionProps {
   job: AnchorReportJob;
@@ -20,15 +17,6 @@ const META_ROWS: { label: string; field: keyof AnchorReportJob }[] = [
   { label: "Prepared By", field: "preparedBy" },
   { label: "Address", field: "address" },
   { label: "Date", field: "date" },
-];
-
-const ASSOCIATIONS = [
-  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
-  { src: "/reports/associations/dulux.png", alt: "Dulux" },
-  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
-  { src: "/reports/associations/mpa.png", alt: "MPA" },
-  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
-  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
 ];
 
 export default function AnchorCoverSection({
@@ -67,7 +55,6 @@ export default function AnchorCoverSection({
 
       {/* ── White body ─────────────────────────────────────────────── */}
       <div className={styles.body}>
-        {/* Title + description */}
         <div className={styles.titleGroup}>
           <div className={styles.reportTitle}>
             <EditableField
@@ -77,18 +64,8 @@ export default function AnchorCoverSection({
               label="Report Title"
             />
           </div>
-          <div className={styles.intro}>
-            <EditableField
-              value={job.description}
-              onChange={(v) => onUpdate("description", v)}
-              placeholder="Enter report description…"
-              label="Report Description"
-              multiline
-            />
-          </div>
         </div>
 
-        {/* Meta fields */}
         <div className={styles.metaWrap}>
           <table className={styles.meta}>
             <tbody>

@@ -1,14 +1,9 @@
 "use client";
 // components/reports/anchor-inspection/AnchorOptionsPanel.tsx
-//
-// Same structure/styling as condition report OptionsPanel:
-//   - Job Number + Load
-//   - Cover Photo
-//   - Zones list (replaces Photos/Settings)
 
-import React, { useRef, useState } from "react";
-import styles from "./AnchorOptionsPanel.module.css";
-import Button from "@/components/ui/Button";
+import React, { useRef } from "react";
+import styles from "../shared/OptionsPanel.module.css";
+import JobImportInput from "../shared/JobImportInput";
 import type { AnchorReportJob, Zone } from "@/lib/reports/anchor.types";
 import type { AnchorImportStatus } from "./AnchorInspectionPage";
 
@@ -37,14 +32,7 @@ export default function AnchorOptionsPanel({
   importStatus,
   onImport,
 }: AnchorOptionsPanelProps) {
-  const [jobNumber, setJobNumber] = useState("");
   const coverInputRef = useRef<HTMLInputElement>(null);
-
-  const isLoading = importStatus.phase === "fetching-job";
-
-  const handleSubmit = () => {
-    if (jobNumber.trim()) onImport(jobNumber.trim());
-  };
 
   const handleCoverPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -63,31 +51,11 @@ export default function AnchorOptionsPanel({
       {/* ── Job Number ───────────────────────────────────────────────────── */}
       <div className={styles.group}>
         <div className={styles.groupLabel}>Job Number</div>
-        <div className={styles.jobRow}>
-          <input
-            type="text"
-            placeholder="e.g. 10737"
-            value={jobNumber}
-            onChange={(e) => setJobNumber(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            className={styles.jobInput}
-            disabled={isLoading}
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleSubmit}
-            disabled={isLoading || !jobNumber.trim()}
-          >
-            {isLoading ? "Loading…" : "Load"}
-          </Button>
-        </div>
-        {importStatus.phase === "done" && (
-          <div className={styles.successMsg}>✓ Job loaded successfully</div>
-        )}
-        {importStatus.phase === "error" && (
-          <div className={styles.errorMsg}>{importStatus.message}</div>
-        )}
+        <JobImportInput
+          onImport={onImport}
+          importStatus={importStatus}
+          placeholder="e.g. 10737"
+        />
       </div>
 
       {/* ── Cover Photo ──────────────────────────────────────────────────── */}

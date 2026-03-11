@@ -2,11 +2,11 @@
 // components/reports/anchor-inspection/AnchorInspectionPage.tsx
 
 import React, { useState, useCallback, useRef } from "react";
-import styles from "./AnchorInspectionPage.module.css";
+import styles from "../shared/ReportPage.module.css";
 import Button from "@/components/ui/Button";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
-import AnchorCoverSection from "./sections/AnchorCoverSection";
+import CoverSection from "../shared/CoverSection";
 import ZoneSummarySection from "./sections/ZoneSummarySection";
 import {
   DEFAULT_ANCHOR_REPORT,
@@ -86,23 +86,20 @@ export default function AnchorInspectionPage({
 
   // ── Zone handlers ──────────────────────────────────────────────────────
   const addZone = useCallback(() => {
-    const id = generateId();
     const newZone: Zone = {
-      id,
+      id: generateId(),
       name: `Zone ${report.zones.length + 1}`,
       mapImageUrl: null,
+      mapCenter: null,
+      mapZoom: null,
       anchors: [],
     };
     setReport((prev) => ({ ...prev, zones: [...prev.zones, newZone] }));
-    setEditingZoneId(id);
-    setView("zone-map");
   }, [report.zones.length]);
 
-  const updateZone = useCallback((updated: Zone) => {
-    setReport((prev) => ({
-      ...prev,
-      zones: prev.zones.map((z) => (z.id === updated.id ? updated : z)),
-    }));
+  const openZoneMap = useCallback((zoneId: string) => {
+    setEditingZoneId(zoneId);
+    setView("zone-map");
   }, []);
 
   const deleteZone = useCallback((zoneId: string) => {
@@ -110,63 +107,61 @@ export default function AnchorInspectionPage({
       ...prev,
       zones: prev.zones.filter((z) => z.id !== zoneId),
     }));
-    setEditingZoneId(null);
+  }, []);
+
+  const handleZoneSave = useCallback((updatedZone: Zone) => {
+    setReport((prev) => ({
+      ...prev,
+      zones: prev.zones.map((z) => (z.id === updatedZone.id ? updatedZone : z)),
+    }));
     setView("editor");
-  }, []);
-
-  const openZoneMap = useCallback((zoneId: string) => {
-    setEditingZoneId(zoneId);
-    setView("zone-map");
-  }, []);
-
-  const closeZoneMap = useCallback(() => {
     setEditingZoneId(null);
-    setView("editor");
   }, []);
 
+  // ── Derived ────────────────────────────────────────────────────────────
   const totalAnchors = report.zones.reduce(
     (sum, z) => sum + z.anchors.length,
     0,
   );
   const totalPassed = report.zones.reduce(
-    (sum, z) => sum + z.anchors.filter((a) => a.result === "PASSED").length,
+    (sum, z) => sum + z.anchors.filter((a) => a.status === "pass").length,
     0,
   );
 
-  // ── Zone-map editing view ──────────────────────────────────────────────
+  // ── Zone map view ──────────────────────────────────────────────────────
   if (view === "zone-map" && editingZoneId) {
     const zone = report.zones.find((z) => z.id === editingZoneId);
-    if (!zone) return null;
-    return (
-      <ZoneMapEditor
-        zone={zone}
-        jobAddress={report.job.address}
-        onUpdate={updateZone}
-        onBack={closeZoneMap}
-        onDelete={() => deleteZone(editingZoneId)}
-      />
-    );
+    if (zone) {
+      return (
+        <ZoneMapEditor
+          zone={zone}
+          onSave={handleZoneSave}
+          onBack={() => {
+            setView("editor");
+            setEditingZoneId(null);
+          }}
+        />
+      );
+    }
   }
 
-  // ── Main editor view ───────────────────────────────────────────────────
   return (
     <div className={styles.page}>
-      {/* ── Top bar — same as ConditionReportPage ── */}
+      {/* ── Top bar ── */}
       <div className={styles.topBar}>
         <button className={styles.backBtn} onClick={onBack}>
           ← Report types
         </button>
-        <div className={styles.topMeta}>
-          <span className={styles.photoCount}>
+        <div className={styles.topBarRight}>
+          <span className={styles.topBarTitle}>Anchor Inspection</span>
+          <span className={styles.badge}>
             {report.zones.length} zone{report.zones.length !== 1 ? "s" : ""}
           </span>
           {totalAnchors > 0 && (
-            <span className={styles.photoCount}>
+            <span className={styles.badge}>
               {totalAnchors} anchor{totalAnchors !== 1 ? "s" : ""}
             </span>
           )}
-        </div>
-        <div className={styles.topActions}>
           <Button variant="primary" size="sm" onClick={() => window.print()}>
             Export PDF
           </Button>
@@ -188,10 +183,36 @@ export default function AnchorInspectionPage({
           onImport={handleImport}
         />
 
-        {/* ── Canvas — same as ConditionReportPage ── */}
+        {/* ── Canvas ── */}
         <div className={styles.canvas}>
           <div className={styles.pageLabel}>Cover Page</div>
-          <AnchorCoverSection job={report.job} onUpdate={updateJob} />
+          <CoverSection
+            coverPhoto={report.job.coverPhoto}
+            reportType={report.job.reportType}
+            onReportTypeChange={(v) => updateJob("reportType", v)}
+            metaRows={[
+              {
+                label: "Prepared For",
+                value: report.job.preparedFor,
+                onChange: (v) => updateJob("preparedFor", v),
+              },
+              {
+                label: "Prepared By",
+                value: report.job.preparedBy,
+                onChange: (v) => updateJob("preparedBy", v),
+              },
+              {
+                label: "Address",
+                value: report.job.address,
+                onChange: (v) => updateJob("address", v),
+              },
+              {
+                label: "Date",
+                value: report.job.date,
+                onChange: (v) => updateJob("date", v),
+              },
+            ]}
+          />
 
           {report.zones.length > 0 && (
             <>

@@ -5,6 +5,7 @@ import React, { useState, useCallback } from "react";
 import styles from "./ScheduleSection.module.css";
 import type { ScheduleRow } from "@/lib/reports/condition.types";
 import { formatScheduleDate } from "@/lib/reports/condition.types";
+import { ASSOCIATIONS } from "@/lib/reports/constants";
 
 interface ScheduleSectionProps {
   rows: ScheduleRow[];
@@ -14,15 +15,6 @@ interface ScheduleSectionProps {
    *  and the extending rule is hidden. Used by the Hours Breakdown report. */
   heading?: string;
 }
-
-const ASSOCIATIONS = [
-  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
-  { src: "/reports/associations/dulux.png", alt: "Dulux" },
-  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
-  { src: "/reports/associations/mpa.png", alt: "MPA" },
-  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
-  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
-];
 
 // Pagination — must match condition.print.ts
 const ROWS_PER_FIRST_PAGE = 25;

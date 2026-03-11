@@ -2,13 +2,14 @@
 
 import React, { useState, useCallback, useRef } from "react";
 import styles from "../shared/ReportPage.module.css";
-import CoverSection from "./sections/CoverSection";
+import CoverSection from "../shared/CoverSection";
+import RichTextEditor from "../shared/RichTextEditor";
 import PhotoSection from "./sections/PhotoSection";
 import ScheduleSection from "./sections/ScheduleSection";
 import SummarySection from "./sections/SummarySection";
 import OptionsPanel from "./OptionsPanel";
 import Button from "@/components/ui/Button";
-import SaveToJobModal from "./SaveToJobModal";
+import SaveToJobModal from "../shared/SaveToJobModal";
 import {
   mapJobToReportDetails,
   filterPhotosByDateRange,
@@ -266,7 +267,6 @@ export default function ConditionReportPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Export PDF — generates server-side via Puppeteer, downloads directly
   const handleExportPDF = useCallback(async () => {
     setIsExporting(true);
     try {
@@ -340,11 +340,11 @@ export default function ConditionReportPage({
         </button>
         <div className={styles.topBarRight}>
           <span className={styles.topBarTitle}>Condition Report</span>
-          <span className={styles.photoCount}>
+          <span className={styles.badge}>
             {report.photos.length} photo{report.photos.length !== 1 ? "s" : ""}
           </span>
           {report.settings.showSchedule && (
-            <span className={styles.photoCount}>
+            <span className={styles.badge}>
               {filteredSchedule.length} schedule row
               {filteredSchedule.length !== 1 ? "s" : ""}
             </span>
@@ -405,7 +405,46 @@ export default function ConditionReportPage({
 
         <div className={styles.canvas}>
           <div className={styles.pageLabel}>Cover Page</div>
-          <CoverSection job={report.job} onChange={updateJobField} />
+          <CoverSection
+            coverPhoto={report.job.coverPhoto}
+            reportType={report.job.reportType}
+            onReportTypeChange={(v) => updateJobField("reportType", v)}
+            metaRows={[
+              {
+                label: "Prepared For",
+                value: report.job.preparedFor,
+                onChange: (v) => updateJobField("preparedFor", v),
+              },
+              {
+                label: "Prepared By",
+                value: report.job.preparedBy,
+                onChange: (v) => updateJobField("preparedBy", v),
+              },
+              {
+                label: "Address",
+                value: report.job.address,
+                onChange: (v) => updateJobField("address", v),
+              },
+              {
+                label: "Project",
+                value: report.job.project,
+                onChange: (v) => updateJobField("project", v),
+              },
+              {
+                label: "Date",
+                value: report.job.date,
+                onChange: (v) => updateJobField("date", v),
+              },
+            ]}
+            intro={
+              <RichTextEditor
+                value={report.job.intro}
+                onChange={(v) => updateJobField("intro", v)}
+                placeholder="Enter report description…"
+                label="Report Description"
+              />
+            }
+          />
 
           <div className={styles.pageLabel}>
             Photos &middot; {filteredPhotos.length} image
@@ -453,7 +492,25 @@ export default function ConditionReportPage({
           jobId={loadedJobId}
           jobNo={`#${loadedJobId}`}
           companyId={0}
-          report={report}
+          defaultFilename={`Condition Report - ${report.job.address || "Draft"}`}
+          saveEndpoint="/api/simpro/jobs/save-report"
+          prepareBody={(filename, companyId) => ({
+            filename,
+            companyId,
+            jobId: loadedJobId,
+            report: {
+              ...report,
+              photos: report.photos.map(
+                ({ id, name, url, size, dateAdded }) => ({
+                  id,
+                  name,
+                  url,
+                  size,
+                  dateAdded,
+                }),
+              ),
+            },
+          })}
           onClose={() => setShowSaveModal(false)}
           onSuccess={(filename) => {
             setSavedFilename(filename);

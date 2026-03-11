@@ -2,7 +2,7 @@
 // components/reports/hours-breakdown/HoursBreakdownPage.tsx
 
 import React, { useState, useCallback, useRef } from "react";
-import styles from "./HoursBreakdownPage.module.css";
+import styles from "../shared/ReportPage.module.css";
 import ScheduleSection from "../condition/sections/ScheduleSection";
 import HoursBreakdownOptionsPanel from "./HoursBreakdownOptionsPanel";
 import HoursSaveToJobModal from "./HoursSaveToJobModal";

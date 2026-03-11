@@ -1,9 +1,10 @@
 "use client";
 // components/reports/condition/OptionsPanel.tsx
 
-import React, { useId, useRef, useState, useMemo } from "react";
-import styles from "./OptionsPanel.module.css";
-import Button from "@/components/ui/Button";
+import React, { useRef, useState, useMemo } from "react";
+import styles from "../shared/OptionsPanel.module.css";
+import ToggleRow from "../shared/ToggleRow";
+import JobImportInput from "../shared/JobImportInput";
 import type {
   ImportStatus,
   ReportJobDetails,
@@ -19,46 +20,6 @@ interface OptionsPanelProps {
   onSettings: (s: ReportSettings) => void;
   onImport: (jobNumber: string) => void;
   onCoverPhoto: (dataUrl: string | null) => void;
-}
-
-// ── Toggle row ────────────────────────────────────────────────────────────────
-
-function ToggleRow({
-  label,
-  sub,
-  checked,
-  onChange,
-  disabled = false,
-}: {
-  label: string;
-  sub: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  const id = useId();
-  return (
-    <div
-      className={`${styles.toggleRow} ${disabled ? styles.toggleRowDisabled : ""}`}
-    >
-      <div className={styles.toggleText}>
-        <div className={styles.toggleLabel}>{label}</div>
-        <div className={styles.toggleSub}>{sub}</div>
-      </div>
-      <label className={styles.toggle}>
-        <input
-          id={id}
-          type="checkbox"
-          className={styles.toggleInput}
-          checked={checked}
-          onChange={(e) => !disabled && onChange(e.target.checked)}
-          disabled={disabled}
-        />
-        <span className={styles.toggleTrack} />
-        <span className={styles.toggleThumb} />
-      </label>
-    </div>
-  );
 }
 
 // ── Date preset helpers ───────────────────────────────────────────────────────
@@ -118,7 +79,6 @@ export default function OptionsPanel({
   onImport,
   onCoverPhoto,
 }: OptionsPanelProps) {
-  const [jobNumber, setJobNumber] = useState("");
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const isLoading =
@@ -131,33 +91,26 @@ export default function OptionsPanel({
   const progressPct =
     importStatus.phase === "fetching-photos" && importStatus.total > 0
       ? Math.round((importStatus.loaded / importStatus.total) * 100)
-      : 0;
+      : null;
 
   const set = (patch: Partial<ReportSettings>) =>
     onSettings({ ...settings, ...patch });
 
-  const handleSubmit = () => {
-    if (jobNumber.trim()) onImport(jobNumber.trim());
-  };
-
   const activePreset = detectPreset(settings.dateFrom, settings.dateTo);
+  const isActivelyFiltered =
+    settings.filterByDate && (settings.dateFrom || settings.dateTo);
 
   const filteredCount = useMemo(() => {
-    if (!settings.filterByDate || (!settings.dateFrom && !settings.dateTo))
-      return photos.length;
+    if (!settings.filterByDate) return photos.length;
     return photos.filter((p) => {
       if (!p.dateAdded) return true;
-      const day = p.dateAdded.slice(0, 10);
-      if (settings.dateFrom && day < settings.dateFrom) return false;
-      if (settings.dateTo && day > settings.dateTo) return false;
+      const d = p.dateAdded.slice(0, 10);
+      if (settings.dateFrom && d < settings.dateFrom) return false;
+      if (settings.dateTo && d > settings.dateTo) return false;
       return true;
     }).length;
   }, [photos, settings.filterByDate, settings.dateFrom, settings.dateTo]);
 
-  const isActivelyFiltered =
-    settings.filterByDate && (!!settings.dateFrom || !!settings.dateTo);
-
-  // ── Cover photo handler ─────────────────────────────────────────────────
   const handleCoverPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -172,52 +125,17 @@ export default function OptionsPanel({
 
   return (
     <aside className={styles.panel}>
-      {/* ── Job Number ───────────────────────────────────────────────────── */}
+      {/* ── Import ───────────────────────────────────────────────────────── */}
       <div className={styles.group}>
-        <div className={styles.groupLabel}>Job Number</div>
-        <div className={styles.jobRow}>
-          <input
-            type="text"
-            placeholder="e.g. 10737"
-            value={jobNumber}
-            onChange={(e) => setJobNumber(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            className={styles.jobInput}
-            disabled={isLoading}
-          />
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleSubmit}
-            disabled={isLoading || !jobNumber.trim()}
-          >
-            {isLoading ? "Loading…" : "Load"}
-          </Button>
-        </div>
-
-        {/* Progress bar */}
-        {importStatus.phase === "fetching-photos" && (
-          <div className={styles.progressOuter}>
+        <div className={styles.groupLabel}>Import</div>
+        <JobImportInput onImport={onImport} importStatus={importStatus} />
+        {importStatus.phase === "fetching-photos" && progressPct !== null && (
+          <div className={styles.progressWrap}>
             <div
               className={styles.progressBar}
               style={{ width: `${progressPct}%` }}
             />
-            <span className={styles.progressLabel}>
-              {importStatus.loaded} / {importStatus.total} photos
-            </span>
           </div>
-        )}
-        {importStatus.phase === "fetching-schedule" && (
-          <div className={styles.progressOuter}>
-            <div
-              className={styles.progressBar}
-              style={{ width: "100%", opacity: 0.5 }}
-            />
-            <span className={styles.progressLabel}>Loading schedule…</span>
-          </div>
-        )}
-        {importStatus.phase === "error" && (
-          <div className={styles.errorMsg}>{importStatus.message}</div>
         )}
       </div>
 

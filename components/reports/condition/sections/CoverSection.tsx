@@ -6,6 +6,7 @@ import styles from "./CoverSection.module.css";
 import EditableField from "../../shared/EditableField";
 import RichTextEditor from "../../shared/RichTextEditor";
 import type { ReportJobDetails } from "@/lib/reports/condition.types";
+import { ASSOCIATIONS } from "@/lib/reports/constants";
 
 interface CoverSectionProps {
   job: ReportJobDetails;
@@ -18,15 +19,6 @@ const META_ROWS: { label: string; field: keyof ReportJobDetails }[] = [
   { label: "Address", field: "address" },
   { label: "Project", field: "project" },
   { label: "Date", field: "date" },
-];
-
-const ASSOCIATIONS = [
-  { src: "/reports/associations/communityselect.png", alt: "Community Select" },
-  { src: "/reports/associations/dulux.png", alt: "Dulux" },
-  { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
-  { src: "/reports/associations/mpa.png", alt: "MPA" },
-  { src: "/reports/associations/qbcc.png", alt: "QBCC" },
-  { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
 ];
 
 export default function CoverSection({ job, onChange }: CoverSectionProps) {
