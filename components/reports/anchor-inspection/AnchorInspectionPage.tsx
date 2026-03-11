@@ -31,6 +31,33 @@ export type AnchorImportStatus =
   | { phase: "done" }
   | { phase: "error"; message: string };
 
+// Format a JS Date as "5th March 2026"
+function formatOrdinalDate(date: Date): string {
+  const day = date.getDate();
+  const suffix =
+    day % 10 === 1 && day !== 11
+      ? "st"
+      : day % 10 === 2 && day !== 12
+        ? "nd"
+        : day % 10 === 3 && day !== 13
+          ? "rd"
+          : "th";
+  const month = date.toLocaleDateString("en-AU", { month: "long" });
+  return `${day}${suffix} ${month} ${date.getFullYear()}`;
+}
+
+// Parse en-AU date string "DD/MM/YYYY" → Date
+function parseAuDate(auDate: string): Date | null {
+  const parts = auDate.split("/");
+  if (parts.length !== 3) return null;
+  const d = new Date(
+    parseInt(parts[2], 10),
+    parseInt(parts[1], 10) - 1,
+    parseInt(parts[0], 10),
+  );
+  return isNaN(d.getTime()) ? null : d;
+}
+
 export default function AnchorInspectionPage({
   onBack,
 }: AnchorInspectionPageProps) {
@@ -66,13 +93,32 @@ export default function AnchorInspectionPage({
       const jobData: EnrichedJob = await jobRes.json();
       if (isStale()) return;
 
+      // Inspection date = CompletedDate (jobData.date is en-AU "DD/MM/YYYY")
+      // Next inspection = exactly 1 year later
+      let inspectionDate = "";
+      let nextInspectionDate = "";
+      const parsed = parseAuDate(jobData.date);
+      if (parsed) {
+        inspectionDate = formatOrdinalDate(parsed);
+        const nextYear = new Date(parsed);
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        nextInspectionDate = formatOrdinalDate(nextYear);
+      }
+
       setReport((prev) => ({
         ...prev,
         job: {
           ...prev.job,
+          // Cover page
           preparedFor: jobData.preparedFor || prev.job.preparedFor,
           address: jobData.siteAddress || prev.job.address,
           date: jobData.date || prev.job.date,
+          // Certification page
+          certNumber: jobData.jobNo || prev.job.certNumber,
+          buildingName: jobData.siteName || prev.job.buildingName,
+          inspectionDate: inspectionDate || prev.job.inspectionDate,
+          nextInspectionDate: nextInspectionDate || prev.job.nextInspectionDate,
+          authorisedBy: "Archer Dutch",
         },
       }));
 

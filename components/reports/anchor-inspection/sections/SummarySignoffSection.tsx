@@ -19,17 +19,15 @@ function SignoffFooter() {
 export default function SummarySignoffSection() {
   return (
     <div className={styles.page}>
-      {/* ── Top area — Bebas SUMMARY title + diagonal photo ── */}
-      <div className={styles.topArea}>
+      {/* ── Top bar — identical chrome to all other pages ── */}
+      <div className={styles.topBar}>
         <h1 className={styles.title}>Summary</h1>
-        <div className={styles.heroDiagonal}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/reports/anchor-summary-hero.jpg"
-            alt="Height safety inspection"
-            className={styles.heroImg}
-          />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/reports/link_blue.png"
+          alt="rasvertex.com.au"
+          className={styles.topBarLink}
+        />
       </div>
 
       {/* ── Body text ── */}
@@ -59,7 +57,7 @@ export default function SummarySignoffSection() {
           <p className={styles.sincerely}>Sincerely,</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/reports/signature-philclark.png"
+            src="/reports/signature.png"
             alt="Phil Clark signature"
             className={styles.signature}
           />
