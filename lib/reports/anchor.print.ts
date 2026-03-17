@@ -6,7 +6,7 @@
 // Server path (future): Puppeteer with base64 assets
 
 import type { AnchorReportData, Zone } from "./anchor.types";
-import { ANCHOR_TYPE_LABELS } from "./anchor.types";
+import { ANCHOR_TYPE_LABELS, ANCHOR_TYPE_COLOURS } from "./anchor.types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -206,12 +206,44 @@ const PRINT_STYLES = `
     gap: 1.5rem;
     overflow: hidden;
   }
+  .zone-map-wrap {
+    position: relative;
+    width: 100%;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
   .zone-map-img {
+    display: block;
     width: 100%;
     max-height: 340px;
     object-fit: cover;
-    display: block;
-    border-radius: 4px;
+  }
+  .zone-pin {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+  }
+  .zone-pin-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 0.55rem;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+    letter-spacing: 0.02em;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   .zone-table { width: 100%; border-collapse: collapse; }
   .zone-th {
@@ -233,7 +265,85 @@ const PRINT_STYLES = `
     vertical-align: middle;
     font-size: 0.72rem;
   }
-  .badge-pass {
+  /* ── Zone legend ── */
+  .zone-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.75rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  .zone-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .zone-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .zone-legend-label {
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: #374151;
+    flex: 1;
+  }
+  .zone-legend-count {
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: #6b7280;
+  }
+
+  /* ── Zone stats banner ── */
+  .zone-stats {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 0.875rem 1.5rem;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .zone-stat { display: flex; align-items: baseline; gap: 0.5rem; }
+  .zone-stat-val {
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0d1c45;
+  }
+  .zone-stat-pass { color: #059669 !important; }
+  .zone-stat-fail { color: #900c40 !important; }
+  .zone-stat-key {
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #6b7280;
+  }
+  .zone-stat-divider { width: 1px; height: 20px; background: #d1d5db; }
+
+  /* ── Asset register label ── */
+  .zone-register-label {
+    font-family: 'Bebas Neue', Arial, sans-serif;
+    font-size: 1.05rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #0d1c45;
+    line-height: 1;
+  }
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 0.6rem; font-weight: 700; letter-spacing: 0.05em;
     padding: 0.15rem 0.4rem; border-radius: 4px;
@@ -446,45 +556,118 @@ function buildCoverPage(job: AnchorReportData["job"]): string {
 }
 
 function buildZonePage(zone: Zone): string {
-  const mapImg = zone.mapImageUrl
-    ? `<img class="zone-map-img" src="${esc(zone.mapImageUrl)}" alt="Zone aerial" />`
+  // Map image + pin overlay
+  const pinOverlays = zone.anchors
+    .filter((a) => typeof a.x === "number" && typeof a.y === "number")
+    .map((a) => {
+      const colour = ANCHOR_TYPE_COLOURS[a.type] ?? "#10b981";
+      return `<div class="zone-pin" style="left:${a.x}%;top:${a.y}%;">
+        <span class="zone-pin-label" style="background:${colour};">${esc(a.label)}</span>
+      </div>`;
+    })
+    .join("");
+
+  const mapBlock = zone.mapImageUrl
+    ? `<div class="zone-map-wrap">
+        <img class="zone-map-img" src="${esc(zone.mapImageUrl)}" alt="Zone aerial" />
+        ${pinOverlays}
+      </div>`
     : "";
 
-  const rows = zone.anchors
+  // Type legend — deduplicated, one row per type present
+  const typesSeen = new Map<
+    string,
+    { colour: string; label: string; total: number; passed: number }
+  >();
+  for (const a of zone.anchors) {
+    const colour = ANCHOR_TYPE_COLOURS[a.type] ?? "#10b981";
+    const label = ANCHOR_TYPE_LABELS[a.type] ?? a.type;
+    const existing = typesSeen.get(a.type);
+    if (existing) {
+      existing.total++;
+      if (a.result === "PASSED") existing.passed++;
+    } else {
+      typesSeen.set(a.type, {
+        colour,
+        label,
+        total: 1,
+        passed: a.result === "PASSED" ? 1 : 0,
+      });
+    }
+  }
+  const legendHTML =
+    typesSeen.size > 0
+      ? `<div class="zone-legend">
+        ${[...typesSeen.values()]
+          .map(
+            (t) => `
+          <div class="zone-legend-item">
+            <span class="zone-legend-dot" style="background:${t.colour};"></span>
+            <span class="zone-legend-label">${esc(t.label)}</span>
+            <span class="zone-legend-count">${t.passed}/${t.total}</span>
+          </div>`,
+          )
+          .join("")}
+      </div>`
+      : "";
+
+  // Stats banner
+  const total = zone.anchors.length;
+  const passed = zone.anchors.filter((a) => a.result === "PASSED").length;
+  const failed = zone.anchors.filter((a) => a.result === "FAILED").length;
+  const statsHTML =
+    total > 0
+      ? `<div class="zone-stats">
+        <div class="zone-stat"><span class="zone-stat-val">${total}</span><span class="zone-stat-key">Total Assets</span></div>
+        <div class="zone-stat-divider"></div>
+        <div class="zone-stat"><span class="zone-stat-val zone-stat-pass">${passed}</span><span class="zone-stat-key">Passed</span></div>
+        <div class="zone-stat-divider"></div>
+        <div class="zone-stat"><span class="zone-stat-val${failed > 0 ? " zone-stat-fail" : ""}">${failed}</span><span class="zone-stat-key">Failed</span></div>
+      </div>`
+      : "";
+
+  // Asset register table
+  const assetRows = zone.anchors
     .map((a, i) => {
-      const badge =
+      const colour = ANCHOR_TYPE_COLOURS[a.type] ?? "#10b981";
+      const passFail =
         a.result === "PASSED"
           ? `<span class="badge-pass">PASSED</span>`
           : a.result === "FAILED"
             ? `<span class="badge-fail">FAILED</span>`
             : `<span class="badge-na">—</span>`;
-      return `
-      <tr style="${i % 2 === 1 ? "background:#fafbfc;" : ""}">
-        <td class="zone-td"><strong>${esc(a.label)}</strong></td>
-        <td class="zone-td">${esc(ANCHOR_TYPE_LABELS[a.type])}</td>
-        <td class="zone-td">${esc(a.model ?? "")}</td>
-        <td class="zone-td">${esc(a.manufacturer ?? "")}</td>
-        <td class="zone-td">${esc(a.inspectionDate)}</td>
-        <td class="zone-td">${esc(a.nextInspection)}</td>
-        <td class="zone-td">${badge}</td>
-      </tr>`;
+      return `<tr style="${i % 2 === 0 ? "" : "background:#fafbfc;"}">
+      <td class="zone-td">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${colour};flex-shrink:0;display:inline-block;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>
+          <strong>${esc(a.label)}</strong>
+        </div>
+      </td>
+      <td class="zone-td">${esc(ANCHOR_TYPE_LABELS[a.type])}</td>
+      <td class="zone-td">${esc(a.model ?? "—")}</td>
+      <td class="zone-td">${esc(a.manufacturer ?? "—")}</td>
+      <td class="zone-td">${esc(a.inspectionDate || "")}</td>
+      <td class="zone-td">${esc(a.nextInspection || "")}</td>
+      <td class="zone-td">${passFail}</td>
+    </tr>`;
     })
     .join("");
 
-  const table =
-    zone.anchors.length > 0
-      ? `<table class="zone-table">
-          <thead><tr>
-            <th class="zone-th">Label</th>
-            <th class="zone-th">Type</th>
-            <th class="zone-th">Model / Serial</th>
-            <th class="zone-th">Manufacturer</th>
-            <th class="zone-th">Inspection Date</th>
-            <th class="zone-th">Next Inspection</th>
-            <th class="zone-th">Result</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`
+  const assetTable =
+    total > 0
+      ? `<div class="zone-register-label">Asset Register</div>
+       <table class="zone-table">
+         <thead><tr>
+           <th class="zone-th">Asset No.</th>
+           <th class="zone-th">Description</th>
+           <th class="zone-th">Model</th>
+           <th class="zone-th">Manufacturer</th>
+           <th class="zone-th">Inspection</th>
+           <th class="zone-th">Next Inspection</th>
+           <th class="zone-th">Pass/Fail</th>
+         </tr></thead>
+         <tbody>${assetRows}</tbody>
+       </table>`
       : `<p style="font-size:0.85rem;color:#9ca3af;text-align:center;padding:2rem 0;">No anchors recorded for this zone.</p>`;
 
   return `
@@ -494,8 +677,10 @@ function buildZonePage(zone: Zone): string {
     <img src="${ASSETS.linkBlue}" alt="rasvertex.com.au" class="top-link" />
   </div>
   <div class="zone-body">
-    ${mapImg}
-    ${table}
+    ${mapBlock}
+    ${legendHTML}
+    ${statsHTML}
+    ${assetTable}
   </div>
   <div class="footer">${assocHTML}</div>
 </div>`;
@@ -625,6 +810,7 @@ export function buildAnchorPrintHTML(report: AnchorReportData): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <base href="${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}" />
   <title>${esc(report.job.reportType || "Anchor Inspection Report")}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

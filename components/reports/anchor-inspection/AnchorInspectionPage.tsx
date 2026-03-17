@@ -5,6 +5,7 @@ import React, { useState, useCallback, useRef } from "react";
 import styles from "../shared/ReportPage.module.css";
 import { buildAnchorPrintHTML } from "@/lib/reports/anchor.print";
 import Button from "@/components/ui/Button";
+import SaveToJobModal from "../shared/SaveToJobModal";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
 import AnchorCoverSection from "./sections/AnchorCoverSection";
@@ -64,30 +65,40 @@ export default function AnchorInspectionPage({
   const [importStatus, setImportStatus] = useState<AnchorImportStatus>({
     phase: "idle",
   });
+  const [loadedJobId, setLoadedJobId] = useState<string>("");
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [savedFilename, setSavedFilename] = useState<string | null>(null);
   const currentLoadId = useRef(0);
   const [isExporting, setIsExporting] = useState(false);
 
   // ── Export PDF — builds clean print HTML via anchor.print.ts ──────────────
   const handleExport = useCallback(() => {
     setIsExporting(true);
-    const win = window.open("", "_blank");
+
+    const html = buildAnchorPrintHTML(report);
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+
     if (!win) {
+      URL.revokeObjectURL(url);
       setIsExporting(false);
       return;
     }
-
-    win.document.write(buildAnchorPrintHTML(report));
-    win.document.close();
 
     win.onload = () => {
       setTimeout(() => {
         win.print();
         win.close();
+        URL.revokeObjectURL(url);
         setIsExporting(false);
       }, 800);
     };
-    // Fallback
-    setTimeout(() => setIsExporting(false), 6000);
+    // Fallback in case onload doesn't fire
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      setIsExporting(false);
+    }, 8000);
   }, [report]);
 
   // ── Job detail handlers ────────────────────────────────────────────────
@@ -142,6 +153,7 @@ export default function AnchorInspectionPage({
         },
       }));
 
+      setLoadedJobId(jobNumber);
       setImportStatus({ phase: "done" });
     } catch (err) {
       if (isStale()) return;
@@ -230,6 +242,34 @@ export default function AnchorInspectionPage({
               {totalAnchors} anchor{totalAnchors !== 1 ? "s" : ""}
             </span>
           )}
+          {savedFilename && (
+            <span className={styles.savedBadge}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <circle
+                  cx="6"
+                  cy="6"
+                  r="6"
+                  fill="var(--primary-400, #10b981)"
+                />
+                <path
+                  d="M3.5 6l2 2 3-3"
+                  stroke="#fff"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Saved
+            </span>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowSaveModal(true)}
+            disabled={!loadedJobId}
+          >
+            Save to Job
+          </Button>
           <Button
             variant="primary"
             size="sm"
@@ -288,6 +328,27 @@ export default function AnchorInspectionPage({
           <SummarySignoffSection />
         </div>
       </div>
+
+      {/* Save to Job Modal */}
+      {showSaveModal && (
+        <SaveToJobModal
+          jobId={loadedJobId}
+          jobNo={`#${loadedJobId}`}
+          companyId={0}
+          defaultFilename={`Anchor Inspection Report - ${report.job.address || "Draft"}`}
+          saveEndpoint={`/api/simpro/jobs/${loadedJobId}/save-anchor-report`}
+          prepareBody={(filename, companyId) => ({
+            filename,
+            companyId,
+            report,
+          })}
+          onClose={() => setShowSaveModal(false)}
+          onSuccess={(filename) => {
+            setSavedFilename(filename);
+            setShowSaveModal(false);
+          }}
+        />
+      )}
     </div>
   );
 }
