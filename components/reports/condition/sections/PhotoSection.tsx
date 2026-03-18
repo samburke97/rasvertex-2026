@@ -14,6 +14,25 @@ interface PhotoSectionProps {
   onPhotoRename: (id: string, name: string) => void;
 }
 
+// ── Natural sort — handles filenames like "01 Anchor.jpg", "2 Roof.jpg" etc. ─
+function naturalSort(a: string, b: string): number {
+  const chunkify = (s: string) => s.split(/(\d+)/).filter(Boolean);
+  const ca = chunkify(a);
+  const cb = chunkify(b);
+  for (let i = 0; i < Math.max(ca.length, cb.length); i++) {
+    const x = ca[i] ?? "";
+    const y = cb[i] ?? "";
+    if (/^\d+$/.test(x) && /^\d+$/.test(y)) {
+      const diff = parseInt(x, 10) - parseInt(y, 10);
+      if (diff !== 0) return diff;
+    } else {
+      const r = x.localeCompare(y);
+      if (r !== 0) return r;
+    }
+  }
+  return 0;
+}
+
 function formatGroupDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString("en-AU", {
@@ -49,11 +68,14 @@ function groupByDate(photos: ReportPhoto[]): PhotoGroup[] {
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(p);
   }
-  return Array.from(map.entries()).map(([key, group]) => ({
-    key,
-    label: key === "undated" ? null : formatGroupDate(group[0].dateAdded!),
-    photos: group,
-  }));
+  return Array.from(map.entries()).map(([key, group]) => {
+    const sorted = [...group].sort((a, b) => naturalSort(a.name, b.name));
+    return {
+      key,
+      label: key === "undated" ? null : formatGroupDate(sorted[0].dateAdded!),
+      photos: sorted,
+    };
+  });
 }
 
 // ── Pagination constants ──────────────────────────────────────────────────────
@@ -148,14 +170,17 @@ export default function PhotoSection({
       ? (importStatus as { phase: string; loaded: number; total: number })
       : null;
 
+  // When not grouping by date, still sort the flat list by filename
+  const sortedPhotos = showDates
+    ? photos
+    : [...photos].sort((a, b) => naturalSort(a.name, b.name));
+
   const groups: PhotoGroup[] = showDates
     ? groupByDate(photos)
-    : [{ key: "all", label: null, photos }];
+    : [{ key: "all", label: null, photos: sortedPhotos }];
 
   const pages = paginateGroups(groups, showDates);
   const totalPages = pages.length;
-
-  let photoIndex = 0;
 
   return (
     <>
@@ -201,21 +226,16 @@ export default function PhotoSection({
                 }
                 return (
                   <div key={"row-" + itemIdx} className={styles.photoRow}>
-                    {item.photos.map((photo) => {
-                      photoIndex++;
-                      const idx = photoIndex;
-                      return (
-                        <div key={photo.id} className={styles.photoCell}>
-                          <PhotoCard
-                            photo={photo}
-                            index={idx}
-                            showDate={false}
-                            onRemove={onPhotoRemove}
-                            onRename={onPhotoRename}
-                          />
-                        </div>
-                      );
-                    })}
+                    {item.photos.map((photo) => (
+                      <div key={photo.id} className={styles.photoCell}>
+                        <PhotoCard
+                          photo={photo}
+                          showDate={false}
+                          onRemove={onPhotoRemove}
+                          onRename={onPhotoRename}
+                        />
+                      </div>
+                    ))}
                   </div>
                 );
               })}

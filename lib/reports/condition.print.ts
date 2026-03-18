@@ -95,6 +95,25 @@ function getDayKey(iso: string | null | undefined): string {
   }
 }
 
+// Natural sort — mirrors PhotoSection.tsx, handles "01 Anchor.jpg", "2 Roof.jpg" etc.
+function naturalSort(a: string, b: string): number {
+  const chunkify = (s: string) => s.split(/(\d+)/).filter(Boolean);
+  const ca = chunkify(a);
+  const cb = chunkify(b);
+  for (let i = 0; i < Math.max(ca.length, cb.length); i++) {
+    const x = ca[i] ?? "";
+    const y = cb[i] ?? "";
+    if (/^\d+$/.test(x) && /^\d+$/.test(y)) {
+      const diff = parseInt(x, 10) - parseInt(y, 10);
+      if (diff !== 0) return diff;
+    } else {
+      const r = x.localeCompare(y);
+      if (r !== 0) return r;
+    }
+  }
+  return 0;
+}
+
 type Photo = ConditionReportData["photos"][0];
 interface PhotoGroup {
   key: string;
@@ -109,11 +128,14 @@ function groupPhotosByDate(photos: Photo[]): PhotoGroup[] {
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(p);
   }
-  return Array.from(map.entries()).map(([key, group]) => ({
-    key,
-    label: key === "undated" ? null : formatGroupDate(group[0].dateAdded!),
-    photos: group,
-  }));
+  return Array.from(map.entries()).map(([key, group]) => {
+    const sorted = [...group].sort((a, b) => naturalSort(a.name, b.name));
+    return {
+      key,
+      label: key === "undated" ? null : formatGroupDate(sorted[0].dateAdded!),
+      photos: sorted,
+    };
+  });
 }
 
 // ── Photo paginator ───────────────────────────────────────────────────────────
@@ -170,44 +192,36 @@ const D = "#e5e7eb";
 // Every rule here must exactly match the corresponding .module.css files.
 
 const PRINT_STYLES = `
-  @page { size: A4; margin: 0; }
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body {
-    font-family: 'Inter', Arial, sans-serif;
-    font-weight: 300;
-    background: white;
-    color: #1a1a2e;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; font-family: 'Inter', Arial, sans-serif; }
+
+  @media print {
+    @page { size: A4; margin: 0; }
+    body { margin: 0; }
   }
 
   /* ─────────────────────────────────────────────────────────────────────────
      COVER PAGE — mirrors CoverSection.tsx / CoverSection.module.css
   ───────────────────────────────────────────────────────────────────────── */
-  .cover { width:210mm; height:297mm; display:flex; flex-direction:column; page-break-after:always; break-after:page; overflow:hidden; }
-  .cover-hero { position:relative; height:580px; flex-shrink:0; overflow:hidden; }
-  .cover-hero-navy { position:absolute; inset:0; background:#0d1c45; }
-  .cover-hero-photo { position:absolute; inset:0; background-size:cover; background-position:center; }
-  .cover-hero-overlay { position:absolute; inset:0; background:rgba(10,22,60,0.68); }
-  .cover-logo { position:absolute; top:2.5rem; left:2.75rem; z-index:5; }
-  .cover-logo img { height:41px; width:auto; display:block; }
-  .cover-web { position:absolute; top:2.6rem; right:2.75rem; z-index:5; }
-  .cover-web img { height:22px; width:auto; display:block; }
-  .cover-body { flex:1; display:flex; flex-direction:column; padding:0 2.75rem 0; }
-  .cover-title-group { flex:1; display:flex; flex-direction:column; justify-content:center; }
-  .cover-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:2.75rem; letter-spacing:0.04em; color:#0d1c45; line-height:1.05; text-transform:uppercase; margin-bottom:1.25rem; }
-  .cover-intro { font-family:'Inter',Arial,sans-serif; font-size:0.82rem; font-weight:300; color:#666; line-height:1.8; overflow-wrap:break-word; word-break:break-word; }
-  .cover-intro p { margin:0 0 0.35em; min-height:1.476em; }
-  .cover-intro p:last-child { margin-bottom:0; }
-  .cover-intro strong { font-weight:600; }
-  .cover-intro em { font-style:italic; }
-  .cover-intro ul { list-style-type:disc; padding-left:1.4em; margin:0.2em 0 0.35em; }
-  .cover-intro ol { list-style-type:decimal; padding-left:1.4em; margin:0.2em 0 0.35em; }
-  .cover-intro li { margin-bottom:0.15em; }
-  .cover-meta-wrap { padding-bottom:2rem; }
-  .cover-meta { border-collapse:collapse; width:1px; }
+  .cover { width:210mm; height:297mm; display:flex; flex-direction:column; overflow:hidden; break-before:auto; page-break-before:auto; }
+  .cover-hero { position:relative; width:100%; height:55%; flex-shrink:0; overflow:hidden; }
+  .cover-hero-navy { position:absolute; inset:0; background:#0d1c45; z-index:0; }
+  .cover-hero-photo { position:absolute; inset:0; background-size:cover; background-position:center; z-index:1; }
+  .cover-hero-overlay { position:absolute; inset:0; background:rgba(13,28,69,0.45); z-index:2; }
+  .cover-logo { position:absolute; top:2.5rem; left:2.75rem; z-index:3; }
+  .cover-logo img { height:48px; width:auto; display:block; }
+  .cover-web { position:absolute; bottom:2rem; right:2.75rem; z-index:3; }
+  .cover-web img { height:18px; width:auto; display:block; opacity:0.85; }
+  .cover-body { flex:1; display:flex; flex-direction:column; padding:2.5rem 2.75rem 0; overflow:hidden; }
+  .cover-title-group { flex-shrink:0; margin-bottom:1.5rem; }
+  .cover-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3.4rem; letter-spacing:0.04em; line-height:0.95; color:#0d1c45; text-transform:uppercase; margin-bottom:0.75rem; }
+  .cover-intro { font-family:'Inter',Arial,sans-serif; font-size:0.82rem; font-weight:300; color:#555; line-height:1.65; max-width:480px; }
+  .cover-intro p { margin:0; }
+  .cover-intro p+p { margin-top:0.35em; }
   .lbl { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.05rem; letter-spacing:0.08em; line-height:1; color:#0d1c45; padding:0.4rem 1.25rem 0.4rem 0; white-space:nowrap; vertical-align:middle; }
   .val { font-family:'Inter',Arial,sans-serif; font-size:0.82rem; font-weight:300; color:#333; padding:0.4rem 0; vertical-align:middle; white-space:nowrap; }
+  .cover-meta-wrap { padding-bottom:2rem; }
+  .cover-meta { border-collapse:collapse; width:1px; }
   .cover-footer { margin-top:auto; padding:1.5rem 0 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
   .cover-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
 
@@ -217,14 +231,14 @@ const PRINT_STYLES = `
   .photo-page { width:210mm; min-height:297mm; break-before:page; page-break-before:always; display:flex; flex-direction:column; justify-content:space-between; padding:2.75rem; }
   .photo-page:first-of-type { break-before:auto; page-break-before:auto; }
   .photo-page-inner { display:flex; flex-direction:column; gap:0.875rem; flex:1; }
-  .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.875rem; }
-  .photo-item { display:flex; flex-direction:column; gap:0; }
-  .photo-thumb { width:100%; aspect-ratio:1/1; background:#f3f4f6; border-radius:6px; overflow:hidden; }
+  .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.875rem; align-items:start; }
+  .photo-item { display:flex; flex-direction:column; gap:0; min-width:0; width:100%; }
+  .photo-thumb { width:100%; aspect-ratio:1/1; border-radius:6px; overflow:hidden; }
   .photo-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
-  .photo-caption { background:#f3f4f6; border-radius:0 0 6px 6px; padding:0.35rem 0.6rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:400; color:#374151; text-align:center; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .photo-caption { padding:0.35rem 0.25rem 0; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:400; color:#374151; text-align:center; }
   .date-header { display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem; }
   .date-line { flex:1; height:1px; background:#e5e7eb; }
-  .date-text { font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#6b7280; white-space:nowrap; }
+  .date-text { font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#6b7280; white-space:nowrap; padding:0 0.25rem; }
   .page-num { text-align:right; font-family:'Inter',Arial,sans-serif; font-size:0.68rem; font-weight:400; letter-spacing:0.1em; text-transform:uppercase; color:#9ca3af; padding-top:1rem; }
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -244,28 +258,27 @@ const PRINT_STYLES = `
   .sch-th-num { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:right; white-space:nowrap; width:100px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .sch-row { border-bottom:1px solid #f0f0f0; }
   .sch-row:last-child { border-bottom:none; }
-  .sch-td { padding:0.48rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:300; color:#111827; vertical-align:middle; }
-  .sch-td-num { padding:0.48rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:300; color:#111827; text-align:right; font-variant-numeric:tabular-nums; vertical-align:middle; width:100px; }
-  .sch-totals { border-top:2px solid ${D}; background:#f9f9f9; }
-  .sch-totals-label { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; text-align:left; }
-  .sch-totals-cell { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:600; color:#111827; text-align:right; font-variant-numeric:tabular-nums; }
-  .sch-footer { margin-top:auto; padding:1.5rem 2.75rem 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
+  .sch-td { padding:0.48rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:300; color:#374151; }
+  .sch-td-num { padding:0.48rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:300; color:#374151; text-align:right; white-space:nowrap; }
+  .sch-totals { background:#f9f9f9; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sch-totals-label { padding:0.55rem 0.875rem; font-family:'Bebas Neue',Arial,sans-serif; font-size:0.85rem; letter-spacing:0.08em; color:#0d1c45; }
+  .sch-totals-cell { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:600; color:#0d1c45; text-align:right; }
+  .sch-footer { padding:1.5rem 2.75rem 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
   .sch-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
 
   /* ─────────────────────────────────────────────────────────────────────────
      SUMMARY PAGE — mirrors SummarySection.tsx / SummarySection.module.css
   ───────────────────────────────────────────────────────────────────────── */
   .summary-page { width:210mm; min-height:297mm; break-before:page; page-break-before:always; display:flex; flex-direction:column; }
-  .summary-topbar { display:flex; align-items:flex-start; justify-content:space-between; padding:2.75rem 2.75rem 0; }
+  .summary-topbar { display:flex; align-items:flex-start; justify-content:space-between; padding:2.75rem 2.75rem 0; flex-shrink:0; }
   .summary-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3rem; font-weight:400; letter-spacing:0.04em; color:#0d1c45; line-height:1; text-transform:uppercase; }
   .summary-link { height:22px; width:auto; display:block; margin-top:0.5rem; }
-  .summary-body { padding:2.5rem 2.75rem 2rem; flex:1; display:flex; flex-direction:column; gap:2.25rem; }
-  .summary-section { display:flex; flex-direction:column; gap:0.75rem; }
-  .summary-label { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.05rem; font-weight:400; letter-spacing:0.08em; color:#0d1c45; text-transform:uppercase; line-height:1; }
-
-  /* FIX 1: overflow-wrap + word-break prevent text escaping the page edge    */
-  /* FIX 2: p min-height preserves blank lines (empty <p> from Tiptap)        */
-  /* FIX 3: margins/spacing aligned exactly with RichTextEditor.module.css    */
+  .summary-body { padding:2rem 2.75rem; flex:1; display:flex; flex-direction:column; gap:2rem; }
+  .summary-section { display:flex; flex-direction:column; gap:0.5rem; }
+  .summary-label { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.15rem; letter-spacing:0.08em; color:#0d1c45; line-height:1; margin-bottom:0.15em; }
+  /* FIX 1: white-space:pre-wrap preserves line breaks from Tiptap HTML        */
+  /* FIX 2: overflow-wrap + word-break prevents caption overflow               */
+  /* FIX 3: min-height on <p> preserves blank lines (empty <p> from Tiptap)   */
   .summary-text { font-family:'Inter',Arial,sans-serif; font-size:0.85rem; font-weight:300; color:#444; line-height:1.85; overflow-wrap:break-word; word-break:break-word; }
   .summary-text p { margin:0 0 0.35em; min-height:1.572em; }
   .summary-text p:last-child { margin-bottom:0; }
@@ -281,7 +294,7 @@ const PRINT_STYLES = `
 
 // ── Schedule pages HTML builder ───────────────────────────────────────────────
 // Mirrors ScheduleSection.tsx exactly:
-//   - Paginates at ROWS_PER_FIRST_PAGE (16) then ROWS_PER_CONTINUATION (22)
+//   - Paginates at ROWS_PER_FIRST_PAGE (22) then ROWS_PER_CONTINUATION (22)
 //   - topBar + sub-heading only on first page
 //   - Association footer on every page
 //   - Total row on last page only
@@ -408,13 +421,16 @@ export function buildPrintHTML(
   ).join("");
 
   // ── Photo pages ───────────────────────────────────────────────────────────
+  // When not grouping by date, still sort the flat list by filename
+  const flatSorted = [...report.photos].sort((a, b) =>
+    naturalSort(a.name, b.name),
+  );
   const groups = showDates
     ? groupPhotosByDate(report.photos)
-    : [{ key: "all", label: null, photos: report.photos }];
+    : [{ key: "all", label: null, photos: flatSorted }];
 
   const photoPages = paginatePhotos(groups, showDates);
   const totalPhotoPages = photoPages.length;
-  let globalIndex = 0;
 
   const photoPageHTML = photoPages
     .map((items, pageIdx) => {
@@ -425,10 +441,9 @@ export function buildPrintHTML(
           }
           const cells = item.photos
             .map((photo) => {
-              globalIndex++;
               return `<div class="photo-item">
   <div class="photo-thumb"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div>
-  <div class="photo-caption">${globalIndex}. ${esc(stripExt(photo.name))}</div>
+  <div class="photo-caption">${esc(stripExt(photo.name))}</div>
 </div>`;
             })
             .join("\n");
@@ -436,7 +451,6 @@ export function buildPrintHTML(
         })
         .join("\n");
 
-      // Page number — mirrors .pageNumber in PhotoSection.module.css
       const pageLabel =
         totalPhotoPages > 1
           ? `PAGE ${pageIdx + 1} / ${totalPhotoPages}`

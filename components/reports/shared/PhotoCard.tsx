@@ -7,7 +7,6 @@ import type { ReportPhoto } from "@/lib/reports/condition.types";
 
 interface PhotoCardProps {
   photo: ReportPhoto;
-  index: number;
   showDate?: boolean;
   onRemove: (id: string) => void;
   onRename: (id: string, name: string) => void;
@@ -15,7 +14,6 @@ interface PhotoCardProps {
 
 export default function PhotoCard({
   photo,
-  index,
   showDate = false,
   onRemove,
   onRename,
@@ -50,7 +48,6 @@ export default function PhotoCard({
       <div className={styles.thumb}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={photo.url} alt={displayName} />
-        <span className={styles.index}>{index}</span>
         <button
           className={styles.removeBtn}
           onClick={() => onRemove(photo.id)}
@@ -85,7 +82,6 @@ export default function PhotoCard({
         </p>
       )}
 
-      {/* Date sub-caption — only shown when showDate is true */}
       {formattedDate && <p className={styles.date}>{formattedDate}</p>}
     </div>
   );

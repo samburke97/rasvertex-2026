@@ -3,6 +3,8 @@
 .card {
   display: flex;
   flex-direction: column;
+  width: 100%; /* lock to grid cell — never grow beyond its 1fr column */
+  min-width: 0; /* prevent flex/grid blowout */
 }
 
 .thumb {
