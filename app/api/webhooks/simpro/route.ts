@@ -14,7 +14,15 @@ import {
 import { Resend } from "resend";
 
 const THRESHOLD = 20000;
-const resend = new Resend(process.env.RESEND_API_KEY);
+
+// ── Lazy initialise Resend so the constructor never runs at build time ────────
+// process.env.RESEND_API_KEY is only available at runtime on Vercel, not during
+// `next build`'s static page-data collection phase.
+function getResend(): Resend {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY environment variable is not set");
+  return new Resend(key);
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -83,6 +91,7 @@ export async function POST(request: NextRequest) {
     const totalExTax = job.totalIncGst / 1.1;
 
     try {
+      const resend = getResend();
       await resend.emails.send({
         from: "RAS Admin <onboarding@resend.dev>",
         to: ["samueljamesburke@gmail.com"],
