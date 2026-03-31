@@ -170,7 +170,7 @@ export default function RichTextEditor({
     if (focusedRef.current) return; // ← key fix: don't reset while typing
     const current = editor.isEmpty ? "" : editor.getHTML();
     if (value !== current) {
-      editor.commands.setContent(value || "", false);
+      editor.commands.setContent(value || "");
     }
   }, [value, editor]);
 

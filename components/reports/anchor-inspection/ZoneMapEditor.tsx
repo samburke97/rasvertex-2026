@@ -60,7 +60,7 @@ export default function ZoneMapEditor({
   const [mapReady, setMapReady] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
   const [capturing, setCapturing] = useState(false);
-  const [captured, setCaptured] = useState<boolean>(!!zone.mapImageUrl);
+  const [captured, setCaptured] = useState<boolean>(!zone.mapImageUrl);
 
   const frozenMapRef = useRef<HTMLDivElement>(null);
   const [isPlacingPin, setIsPlacingPin] = useState(false);
@@ -414,8 +414,8 @@ export default function ZoneMapEditor({
             <span className={styles.statusInfo}>📍 Locating address…</span>
           ) : mapReady ? (
             <span className={styles.statusInfo}>
-              🗺 Pan and zoom to frame the rooftop, then click{" "}
-              <strong>Capture View</strong>.
+              <strong>Ready.</strong> Pan and zoom to the roof, then click
+              Capture View.
             </span>
           ) : (
             <span className={styles.statusInfo}>Loading map…</span>
@@ -423,65 +423,60 @@ export default function ZoneMapEditor({
         </div>
       )}
 
+      {/* Main layout */}
       <div className={styles.layout}>
         {/* Map area */}
         <div className={styles.mapArea}>
-          {!captured && hasToken && (
-            <div ref={mapContainerRef} className={styles.liveMap} />
-          )}
-
-          {!captured && !hasToken && (
-            <div className={styles.mapSetup}>
-              <div className={styles.mapSetupIcon}>
-                <svg
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
-                  <line x1="9" y1="3" x2="9" y2="18" />
-                  <line x1="15" y1="6" x2="15" y2="21" />
-                </svg>
+          {!captured ? (
+            hasToken ? (
+              <div ref={mapContainerRef} className={styles.liveMap} />
+            ) : (
+              <div className={styles.mapSetup}>
+                <div className={styles.mapSetupIcon}>
+                  <svg
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                    <circle cx="12" cy="10" r="3" />
+                  </svg>
+                </div>
+                <p className={styles.mapSetupTitle}>
+                  No Mapbox token configured
+                </p>
+                <p className={styles.mapSetupSub}>
+                  Add NEXT_PUBLIC_MAPBOX_TOKEN to your environment, or upload an
+                  aerial screenshot directly.
+                </p>
               </div>
-              <p className={styles.mapSetupTitle}>No Mapbox token configured</p>
-              <p className={styles.mapSetupSub}>
-                Add NEXT_PUBLIC_MAPBOX_TOKEN to .env.local, or upload an aerial
-                screenshot directly.
-              </p>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => uploadRef.current?.click()}
-              >
-                Upload Aerial Image
-              </Button>
-            </div>
-          )}
-
-          {captured && localZone.mapImageUrl && (
+            )
+          ) : (
             <div className={styles.mapContainer}>
               <div
                 ref={frozenMapRef}
-                className={`${styles.mapCanvas} ${isPlacingPin ? styles.mapCanvasPlacing : ""}`}
+                className={styles.mapCanvas}
                 onClick={handleMapClick}
+                style={{ cursor: isPlacingPin ? "crosshair" : "default" }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={localZone.mapImageUrl}
+                  src={localZone.mapImageUrl ?? ""}
                   alt="Zone aerial"
                   className={styles.mapImage}
                   draggable={false}
                 />
 
+                {/* Anchor pins */}
                 {localZone.anchors.map((anchor) => (
                   <button
                     key={anchor.id}
-                    className={`${styles.pin} ${draggingId === anchor.id ? styles.pinDragging : ""}`}
+                    className={`${styles.pin} ${
+                      draggingId === anchor.id ? styles.pinDragging : ""
+                    }`}
                     style={{
                       left: `${anchor.x}%`,
                       top: `${anchor.y}%`,
@@ -585,8 +580,11 @@ export default function ZoneMapEditor({
             x: pendingPin.x,
             y: pendingPin.y,
             label: `A${localZone.anchors.length + 1}`,
-            type: "single-anchor",
-            result: null,
+            type: "fall-arrest-anchor",
+            description: "",
+            inspectionDate: "",
+            nextInspection: "",
+            result: "PASSED",
             notes: "",
           }}
           onSave={handlePinSave}

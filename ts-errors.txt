@@ -1,0 +1,3 @@
+components/reports/anchor-inspection/ZoneMapEditor.tsx(588,13): error TS2322: Type '"single-anchor"' is not assignable to type 'AnchorType'.
+components/reports/anchor-inspection/ZoneMapEditor.tsx(589,13): error TS2322: Type 'null' is not assignable to type 'PassFail'.
+components/reports/shared/RichTextEditor.tsx(173,47): error TS2559: Type 'false' has no properties in common with type 'SetContentOptions'.
