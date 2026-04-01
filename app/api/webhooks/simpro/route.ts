@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     try {
       const resend = getResend();
       await resend.emails.send({
-        from: "RAS Admin <onboarding@resend.dev>",
+        from: "RAS Admin <sam@rasvertex.com.au>",
         to: ["team@rasvertex.com.au"],
         subject: `New Works Agreement — Job ${job.jobNo}`,
         html: `
