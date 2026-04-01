@@ -14,10 +14,9 @@ import {
 import { Resend } from "resend";
 
 const THRESHOLD = 20000;
+const APP_URL = "https://rasvertex-2026.vercel.app";
 
 // ── Lazy initialise Resend so the constructor never runs at build time ────────
-// process.env.RESEND_API_KEY is only available at runtime on Vercel, not during
-// `next build`'s static page-data collection phase.
 function getResend(): Resend {
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new Error("RESEND_API_KEY environment variable is not set");
@@ -44,11 +43,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, skipped: "not a job event" });
     }
 
-    if (action === "created") {
-      const existing = await getAgreement(String(jobId));
-      if (existing) {
-        return NextResponse.json({ received: true, skipped: "already exists" });
-      }
+    // ── Check if agreement already exists ────────────────────────────────────
+    // For both "created" and "updated" events — if we already have a record,
+    // skip entirely. This prevents duplicate emails when the team edits a job.
+    const existing = await getAgreement(String(jobId));
+    if (existing) {
+      console.log(`[Webhook] Job ${jobId} already has an agreement — skipping`);
+      return NextResponse.json({ received: true, skipped: "already exists" });
     }
 
     console.log(`[Webhook] Fetching enriched job ${jobId}...`);
@@ -94,25 +95,23 @@ export async function POST(request: NextRequest) {
       const resend = getResend();
       await resend.emails.send({
         from: "RAS Admin <sam@rasvertex.com.au>",
-        to: ["team@rasvertex.com.au"],
+        to: ["team@rasvertex.com.au", "amanda@rasvertex.com.au"],
         subject: `New Works Agreement — Job ${job.jobNo}`,
         html: `
           <div style="background:#f4f4f0;padding:2rem;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
             <div style="max-width:540px;margin:0 auto;">
 
-              <div style="background:#0f2d4a;border-radius:10px 10px 0 0;padding:24px 32px;display:flex;align-items:center;justify-content:space-between;">
-                <div>
-                  <p style="margin:0 0 2px;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">RAS Vertex</p>
-                  <p style="margin:0;color:#fff;font-size:18px;font-weight:500;">New Works Agreement</p>
-                </div>
+              <div style="background:#0f2d4a;border-radius:10px 10px 0 0;padding:24px 32px;">
+                <p style="margin:0 0 2px;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">RAS Vertex</p>
+                <p style="margin:0;color:#fff;font-size:18px;font-weight:500;">New Works Agreement</p>
               </div>
 
-              <div style="background:#fff;padding:28px 32px 0;">
+              <div style="background:#fff;padding:28px 32px 24px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
                 <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Amanda,</p>
-                <p style="margin:0 0 24px;font-size:15px;color:#444;line-height:1.6;">Please create a work order for the following job.</p>
+                <p style="margin:0 0 0;font-size:15px;color:#444;line-height:1.6;">Please create a work order for the following job.</p>
               </div>
 
-              <div style="background:#fff;padding:0 32px;">
+              <div style="background:#fff;padding:0 32px 24px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
                 <table style="width:100%;border-collapse:collapse;font-size:14px;">
                   <tr style="border-top:1px solid #f0f0f0;">
                     <td style="padding:12px 0;color:#888;width:44%;">Job Number</td>
@@ -127,18 +126,26 @@ export async function POST(request: NextRequest) {
                     <td style="padding:12px 0;color:#1a1a1a;font-weight:500;">${job.siteName}</td>
                   </tr>
                   <tr style="border-top:1px solid #f0f0f0;">
+                    <td style="padding:12px 0;color:#888;">Site Address</td>
+                    <td style="padding:12px 0;color:#1a1a1a;font-weight:500;">${job.siteAddress}</td>
+                  </tr>
+                  <tr style="border-top:1px solid #f0f0f0;">
                     <td style="padding:12px 0;color:#888;">Total Value Ex Tax</td>
                     <td style="padding:12px 0;color:#1a1a1a;font-weight:500;">$${totalExTax.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+                  <tr style="border-top:1px solid #f0f0f0;">
+                    <td style="padding:12px 0;color:#888;">Total Inc GST</td>
+                    <td style="padding:12px 0;color:#1a1a1a;font-weight:600;">$${job.totalIncGst.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   </tr>
                 </table>
               </div>
 
-              <div style="background:#fff;padding:24px 32px 28px;">
-                <a href="${process.env.NEXT_PUBLIC_APP_URL}" style="display:inline-block;background:#0f2d4a;color:#fff;text-decoration:none;padding:11px 22px;border-radius:7px;font-size:14px;font-weight:500;">Review in RAS Admin →</a>
+              <div style="background:#fff;padding:24px 32px 32px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
+                <a href="${APP_URL}/works-agreements" style="display:inline-block;background:#0f2d4a;color:#fff;text-decoration:none;padding:11px 22px;border-radius:7px;font-size:14px;font-weight:500;">Review in RAS Admin →</a>
               </div>
 
               <div style="background:#f9f9f7;border:1px solid #ebebeb;border-top:none;border-radius:0 0 10px 10px;padding:16px 32px;">
-                <p style="margin:0;font-size:12px;color:#aaa;">This is an automated notification from Sammy B</p>
+                <p style="margin:0;font-size:12px;color:#aaa;">This is an automated notification from RAS Vertex</p>
               </div>
 
             </div>
