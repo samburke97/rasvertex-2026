@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
               </div>
 
               <div style="background:#f9f9f7;border:1px solid #ebebeb;border-top:none;border-radius:0 0 10px 10px;padding:16px 32px;">
-                <p style="margin:0;font-size:12px;color:#aaa;">This is an automated notification from RAS Vertex</p>
+                <p style="margin:0;font-size:12px;color:#aaa;">This is an automated notification from Sammy B</p>
               </div>
 
             </div>
