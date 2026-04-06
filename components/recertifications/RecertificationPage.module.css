@@ -1,0 +1,500 @@
+/* components/recertifications/RecertificationPage.module.css */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.title {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--for-darkest, #111827);
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: var(--for-medium, #6b7280);
+  margin: 0;
+}
+
+.refreshBtn {
+  background: var(--white, #fff);
+  border: 1px solid var(--out-medium, #d1d5db);
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  color: var(--for-medium, #6b7280);
+  cursor: pointer;
+  padding: 7px 14px;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.refreshBtn:hover:not(:disabled) {
+  border-color: var(--for-medium, #9ca3af);
+  color: var(--for-darkest, #111827);
+}
+
+.refreshBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Summary cards ───────────────────────────────────────────────────────── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.card {
+  background: var(--white, #fff);
+  border: 1px solid var(--out-light, #e5e7eb);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cardCount {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cardLabel {
+  font-size: 0.8125rem;
+  color: var(--for-medium, #6b7280);
+}
+
+.cardOverdue .cardCount {
+  color: #dc2626;
+}
+.cardDueSoon .cardCount {
+  color: #d97706;
+}
+.cardUpcoming .cardCount {
+  color: #16a34a;
+}
+.cardTotal .cardCount {
+  color: var(--for-darkest, #111827);
+}
+
+.cardOverdue {
+  border-top: 3px solid #fca5a5;
+}
+.cardDueSoon {
+  border-top: 3px solid #fcd34d;
+}
+.cardUpcoming {
+  border-top: 3px solid #86efac;
+}
+.cardTotal {
+  border-top: 3px solid var(--out-medium, #d1d5db);
+}
+
+/* ── Filter tabs ─────────────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--out-medium, #e5e7eb);
+  background: var(--white, #fff);
+  font-size: 0.8125rem;
+  color: var(--for-medium, #6b7280);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filterBtn:hover {
+  border-color: var(--for-light, #9ca3af);
+  color: var(--for-darkest, #111827);
+}
+
+.filterBtnActive {
+  background: var(--for-darkest, #111827);
+  border-color: var(--for-darkest, #111827);
+  color: #fff;
+}
+
+.filterBtnActive .filterCount {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.filterCount {
+  background: var(--con-light, #f3f4f6);
+  color: var(--for-medium, #6b7280);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+.tableWrap {
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid var(--out-light, #e5e7eb);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--white, #fff);
+  font-size: 0.875rem;
+}
+
+.th {
+  text-align: left;
+  padding: 11px 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--for-medium, #6b7280);
+  background: var(--con-lightest, #f9fafb);
+  border-bottom: 1px solid var(--out-light, #e5e7eb);
+}
+
+.tr {
+  border-bottom: 1px solid var(--out-lightest, #f3f4f6);
+  transition: background 0.1s;
+}
+
+.tr:last-child {
+  border-bottom: none;
+}
+
+.tr:hover {
+  background: var(--con-lightest, #fafafa);
+}
+
+.trOverdue {
+  background: #fff5f5;
+}
+
+.trOverdue:hover {
+  background: #fff0f0;
+}
+
+.td {
+  padding: 12px 16px;
+  color: var(--for-darkest, #111827);
+  vertical-align: middle;
+}
+
+.jobName {
+  display: block;
+  font-weight: 500;
+}
+
+.jobId {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--for-light, #9ca3af);
+  margin-top: 1px;
+}
+
+.dateOverdue {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* ── Status pills ────────────────────────────────────────────────────────── */
+.pillOverdue {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.pillDueSoon {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.pillUpcoming {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+/* ── States ──────────────────────────────────────────────────────────────── */
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem;
+  color: var(--for-medium, #6b7280);
+  font-size: 0.875rem;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--out-medium, #e5e7eb);
+  border-top-color: var(--for-darkest, #111827);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  color: var(--for-medium, #6b7280);
+  font-size: 0.875rem;
+  background: var(--white, #fff);
+  border-radius: 10px;
+  border: 1px solid var(--out-light, #e5e7eb);
+}
+
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 4rem;
+  color: #dc2626;
+  font-size: 0.875rem;
+}
+
+.retryBtn {
+  background: var(--for-darkest, #111827);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+/* ── Create quote button ─────────────────────────────────────────────────── */
+.createBtn {
+  background: var(--for-darkest, #111827);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.createBtn:hover {
+  opacity: 0.85;
+}
+
+.createdBadge {
+  font-size: 0.8125rem;
+  color: #16a34a;
+  font-weight: 500;
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 480px;
+  max-width: calc(100vw - 2rem);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--out-light, #e5e7eb);
+}
+
+.modalTitle {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--for-darkest, #111827);
+  margin: 0;
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: var(--for-medium, #6b7280);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.modalBody {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modalWarning {
+  font-size: 0.8125rem;
+  color: #d97706;
+  background: #fef3c7;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0 0 4px;
+}
+
+.modalRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.modalLabel {
+  font-size: 0.8125rem;
+  color: var(--for-medium, #6b7280);
+  flex-shrink: 0;
+}
+
+.modalValue {
+  font-size: 0.8125rem;
+  color: var(--for-darkest, #111827);
+  font-weight: 500;
+  text-align: right;
+}
+
+.modalValueHighlight {
+  color: #16a34a;
+  font-size: 0.9375rem;
+}
+
+.modalDivider {
+  height: 1px;
+  background: var(--out-light, #e5e7eb);
+  margin: 4px 0;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--out-light, #e5e7eb);
+}
+
+.modalCancelBtn {
+  background: none;
+  border: 1px solid var(--out-medium, #d1d5db);
+  border-radius: 7px;
+  padding: 9px 18px;
+  font-size: 0.875rem;
+  color: var(--for-medium, #6b7280);
+  cursor: pointer;
+}
+
+.modalCancelBtn:disabled {
+  opacity: 0.5;
+}
+
+.modalConfirmBtn {
+  background: var(--for-darkest, #111827);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 9px 18px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.modalConfirmBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  background: #111827;
+  color: #fff;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 1100;
+}
+
+.toastIcon {
+  color: #4ade80;
+  font-weight: 700;
+}
+
+.toastClose {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0;
+  margin-left: 4px;
+}
