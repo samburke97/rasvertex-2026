@@ -100,25 +100,24 @@ function ConfirmModal({
   ];
 
   return (
-    <div className={styles.modalOverlay} onClick={onCancel}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div className={styles.modalOverlay}>
+      <div className={styles.modal}>
         <div className={styles.modalHeader}>
           <span className={styles.modalTitle}>Create Quote</span>
           <button className={styles.modalClose} onClick={onCancel}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/icons/utility-outline/close.svg"
-              width={14}
-              height={14}
+              width={16}
+              height={16}
               alt="Close"
-              style={{ opacity: 0.4, display: "block" }}
+              style={{ opacity: 0.4 }}
             />
           </button>
         </div>
         <div className={styles.modalBody}>
-          {rows.map(({ label, value, highlight }, i) => (
+          {rows.map(({ label, value, highlight }) => (
             <React.Fragment key={label}>
-              {i === 3 && <div className={styles.modalDivider} />}
               <div className={styles.modalRow}>
                 <span className={styles.modalLabel}>{label}</span>
                 <span
@@ -213,7 +212,11 @@ export default function RecertificationPage() {
       setIgnoredJobs(data.ignoredJobs ?? []);
       setFromCache(data.fromCache ?? false);
       setCacheAge(data.cacheAge ?? null);
-      if (refresh && data.jobs?.length) {
+
+      // ── Always sync quotes, not just on manual refresh ──────────────────
+      // This ensures newly created/approved quotes in SimPRO are reflected
+      // on every page load, not just after hitting Refresh.
+      if (data.jobs?.length) {
         const siteIds = [
           ...new Set((data.jobs as RecertificationJob[]).map((j) => j.siteId)),
         ];
@@ -249,8 +252,6 @@ export default function RecertificationPage() {
 
   // ── Quote action: verify existence in SimPRO before opening create modal ──
   const handleQuoteAction = async (job: RecertificationJob) => {
-    // If already quoted, verify the quote still exists in SimPRO before
-    // showing the badge (no modal to open). This self-heals stale Neon records.
     if (job.existingQuote) {
       setVerifyingId(job.id);
       try {
@@ -259,7 +260,6 @@ export default function RecertificationPage() {
         );
         const data = await r.json();
         if (!data.exists) {
-          // Quote was deleted in SimPRO — reinstate the row as unquoted
           setJobs((prev) =>
             prev.map((j) =>
               j.id === job.id ? { ...j, existingQuote: null } : j,
@@ -271,11 +271,8 @@ export default function RecertificationPage() {
       } finally {
         setVerifyingId(null);
       }
-      // Quote still exists — nothing to do (badge already showing)
       return;
     }
-
-    // No existing quote — open the create modal
     setConfirmJob(job);
   };
 
@@ -460,44 +457,22 @@ export default function RecertificationPage() {
         ))}
       </div>
 
-      <div className={styles.searchSection}>
-        <label className={styles.searchLabel}>Search</label>
+      <div className={styles.searchRow}>
         <div className={styles.searchWrap}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/icons/utility-outline/search.svg"
-            width={15}
-            height={15}
+            width={14}
+            height={14}
             alt=""
-            style={{
-              position: "absolute",
-              left: 11,
-              opacity: 0.35,
-              pointerEvents: "none",
-            }}
+            className={styles.searchIcon}
           />
           <input
             className={styles.searchInput}
-            type="text"
-            placeholder="Search customer or site…"
+            placeholder="Search customer or site..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {search && (
-            <button
-              className={styles.searchClear}
-              onClick={() => setSearch("")}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/icons/utility-outline/close.svg"
-                width={14}
-                height={14}
-                alt="Clear"
-                style={{ display: "block", opacity: 0.4 }}
-              />
-            </button>
-          )}
         </div>
       </div>
 
@@ -546,7 +521,6 @@ export default function RecertificationPage() {
                       <td className={`${styles.td} ${styles.tdMuted}`}>
                         {formatDate(job.completedDate)}
                       </td>
-                      {/* Next Due — same font size as every other cell, just red when overdue */}
                       <td
                         className={`${styles.td} ${styles.tdMuted} ${job.status === "overdue" && !isHidden ? styles.tdOverdue : ""}`}
                       >
@@ -561,7 +535,6 @@ export default function RecertificationPage() {
                           days={job.daysUntilDue}
                         />
                       </td>
-                      {/* Actions: quote badge OR edit icon, then trash/restore */}
                       <td className={styles.td}>
                         <div className={styles.actionGroup}>
                           {!isHidden &&

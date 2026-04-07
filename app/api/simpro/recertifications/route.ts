@@ -111,51 +111,70 @@ function buildResults(
   today.setHours(0, 0, 0, 0);
   const currentYear = today.getFullYear();
 
-  return jobs
-    .filter((j) => !ignoredIds.has(j.ID))
-    .map((j) => {
-      const completed = new Date(j.CompletedDate);
-      const nextDue = new Date(completed);
-      nextDue.setFullYear(nextDue.getFullYear() + 1);
+  // ── Find the most recent completed job per site ───────────────────────────
+  // If a site had a job done in 2024 AND 2026, we use the 2026 date as the
+  // base for nextDue. This prevents sites showing as overdue when a newer
+  // recertification has already been completed.
+  const latestJobBySite = new Map<number, any>();
+  for (const j of jobs) {
+    const siteId: number = j.Site?.ID;
+    if (!siteId || !j.CompletedDate) continue;
+    const existing = latestJobBySite.get(siteId);
+    if (
+      !existing ||
+      new Date(j.CompletedDate) > new Date(existing.CompletedDate)
+    ) {
+      latestJobBySite.set(siteId, j);
+    }
+  }
 
-      const diffMs = nextDue.getTime() - today.getTime();
-      const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const results: RecertificationJob[] = [];
 
-      let status: RecertificationJob["status"];
-      if (daysUntilDue < 0) status = "overdue";
-      else if (daysUntilDue <= 60) status = "due-soon";
-      else status = "upcoming";
+  for (const [siteId, j] of latestJobBySite) {
+    if (ignoredIds.has(j.ID)) continue;
 
-      const dueYear = nextDue.getFullYear();
-      const quoteYear = Math.max(dueYear, currentYear);
-      const siteId: number = j.Site?.ID;
-      const existing = quoteMap.get(`${siteId}:${quoteYear}`) ?? null;
+    const latestCompleted = new Date(j.CompletedDate);
+    const nextDue = new Date(latestCompleted);
+    nextDue.setFullYear(nextDue.getFullYear() + 1);
 
-      return {
-        id: j.ID,
-        name: j.Name,
-        customer: j.Customer?.CompanyName || "Unknown",
-        customerId: j.Customer?.ID,
-        site: j.Site?.Name || "Unknown",
-        siteId,
-        completedDate: j.CompletedDate,
-        nextDueDate: nextDue.toISOString().split("T")[0],
-        daysUntilDue,
-        status,
-        totalExTax: j.Total?.ExTax ?? 0,
-        totalIncTax: j.Total?.IncTax ?? 0,
-        quoteYear,
-        existingQuote: existing
-          ? {
-              quoteId: existing.quoteId,
-              quoteName: existing.quoteName,
-              quoteStatus: existing.quoteStatus,
-              simproQuoteNo: existing.simproQuoteNo,
-            }
-          : null,
-      };
-    })
-    .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+    const diffMs = nextDue.getTime() - today.getTime();
+    const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    let status: RecertificationJob["status"];
+    if (daysUntilDue < 0) status = "overdue";
+    else if (daysUntilDue <= 60) status = "due-soon";
+    else status = "upcoming";
+
+    const dueYear = nextDue.getFullYear();
+    const quoteYear = Math.max(dueYear, currentYear);
+    const existing = quoteMap.get(`${siteId}:${quoteYear}`) ?? null;
+
+    results.push({
+      id: j.ID,
+      name: j.Name,
+      customer: j.Customer?.CompanyName || "Unknown",
+      customerId: j.Customer?.ID,
+      site: j.Site?.Name || "Unknown",
+      siteId,
+      completedDate: j.CompletedDate,
+      nextDueDate: nextDue.toISOString().split("T")[0],
+      daysUntilDue,
+      status,
+      totalExTax: j.Total?.ExTax ?? 0,
+      totalIncTax: j.Total?.IncTax ?? 0,
+      quoteYear,
+      existingQuote: existing
+        ? {
+            quoteId: existing.quoteId,
+            quoteName: existing.quoteName,
+            quoteStatus: existing.quoteStatus,
+            simproQuoteNo: existing.simproQuoteNo,
+          }
+        : null,
+    });
+  }
+
+  return results.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
 }
 
 export async function GET(request: NextRequest) {
@@ -167,7 +186,6 @@ export async function GET(request: NextRequest) {
   }
 
   const forceRefresh = request.nextUrl.searchParams.get("refresh") === "true";
-  // Pass showIgnored=true to include hidden jobs (for the hidden view)
   const showIgnored =
     request.nextUrl.searchParams.get("showIgnored") === "true";
 
@@ -192,19 +210,28 @@ export async function GET(request: NextRequest) {
       await setCachedJobs(rawJobs);
     }
 
-    // Both quote map and ignored set fetched fresh from Neon (fast)
     const today = new Date();
     const currentYear = today.getFullYear();
-    const pairs = rawJobs!.map((j: any) => {
+
+    // Build quote map pairs using latest completed date per site
+    const latestBySite = new Map<number, Date>();
+    for (const j of rawJobs!) {
+      const siteId: number = j.Site?.ID;
+      if (!siteId || !j.CompletedDate) continue;
       const completed = new Date(j.CompletedDate);
-      const nextDue = new Date(completed);
-      nextDue.setFullYear(nextDue.getFullYear() + 1);
-      const dueYear = nextDue.getFullYear();
-      return {
-        siteId: j.Site?.ID as number,
-        year: Math.max(dueYear, currentYear),
-      };
-    });
+      const existing = latestBySite.get(siteId);
+      if (!existing || completed > existing)
+        latestBySite.set(siteId, completed);
+    }
+
+    const pairs = Array.from(latestBySite.entries()).map(
+      ([siteId, latestCompleted]) => {
+        const nextDue = new Date(latestCompleted);
+        nextDue.setFullYear(nextDue.getFullYear() + 1);
+        const dueYear = nextDue.getFullYear();
+        return { siteId, year: Math.max(dueYear, currentYear) };
+      },
+    );
 
     const [quoteMap, ignoredIds] = await Promise.all([
       getRecertQuoteMap(pairs),
@@ -214,7 +241,6 @@ export async function GET(request: NextRequest) {
     const effectiveIgnored = showIgnored ? new Set<number>() : ignoredIds;
     const results = buildResults(rawJobs!, quoteMap, effectiveIgnored);
 
-    // Also return ignored jobs separately so the page can show them
     const ignoredJobs = showIgnored
       ? []
       : buildResults(rawJobs!, quoteMap, new Set<number>()).filter((j) =>

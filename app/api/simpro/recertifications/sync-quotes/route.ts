@@ -20,7 +20,7 @@ const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
 
 // Normalise name then check against all known recertification name variants.
-// Handles & vs and, extra spaces, case differences.
+// Handles & vs and, extra spaces, case differences, year prefixes.
 function isRecertificationQuote(name: string): boolean {
   const n = name
     .toLowerCase()
@@ -34,7 +34,8 @@ function isRecertificationQuote(name: string): boolean {
     n.includes("annual anchor test") || // "Annual Anchor Test 2026"
     n.includes("anchor test and recertification") || // "Anchor Test & Recertification"
     n.includes("anchor rest and recertification") || // typo variant
-    n.includes("anchor test") // "Anchor Test - 2026"
+    n.includes("anchor test") || // "Anchor Test - 2026" / "2026 Anchor Test..."
+    n.includes("recertification") // catch-all: any quote with "recertification"
   );
 }
 
@@ -115,13 +116,16 @@ export async function POST(request: NextRequest) {
 
       const quoteYear = new Date(quote.DateCreated).getFullYear();
 
+      // Map all SimPRO quote statuses including converted/won quotes
       const statusRaw = (quote.Status || "").toLowerCase();
       const quoteStatus =
         statusRaw === "sent"
           ? "sent"
           : statusRaw === "approved" || statusRaw === "accepted"
             ? "approved"
-            : "created";
+            : statusRaw.includes("won")
+              ? "approved" // Quote : Won — converted to job, treat as approved
+              : "created";
 
       try {
         await saveRecertQuote({
