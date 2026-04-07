@@ -196,6 +196,7 @@ export default function RecertificationPage() {
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ignoringId, setIgnoringId] = useState<number | null>(null);
+  const [verifyingId, setVerifyingId] = useState<number | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     setLoading(true);
@@ -245,6 +246,38 @@ export default function RecertificationPage() {
   useEffect(() => {
     load(false);
   }, [load]);
+
+  // ── Quote action: verify existence in SimPRO before opening create modal ──
+  const handleQuoteAction = async (job: RecertificationJob) => {
+    // If already quoted, verify the quote still exists in SimPRO before
+    // showing the badge (no modal to open). This self-heals stale Neon records.
+    if (job.existingQuote) {
+      setVerifyingId(job.id);
+      try {
+        const r = await fetch(
+          `/api/simpro/recertifications/verify-quote?quoteId=${job.existingQuote.quoteId}&siteId=${job.siteId}&year=${job.quoteYear}`,
+        );
+        const data = await r.json();
+        if (!data.exists) {
+          // Quote was deleted in SimPRO — reinstate the row as unquoted
+          setJobs((prev) =>
+            prev.map((j) =>
+              j.id === job.id ? { ...j, existingQuote: null } : j,
+            ),
+          );
+          setToast(`Quote no longer exists in SimPRO — reinstated`);
+          return;
+        }
+      } finally {
+        setVerifyingId(null);
+      }
+      // Quote still exists — nothing to do (badge already showing)
+      return;
+    }
+
+    // No existing quote — open the create modal
+    setConfirmJob(job);
+  };
 
   const handleCreateQuote = async () => {
     if (!confirmJob) return;
@@ -502,6 +535,7 @@ export default function RecertificationPage() {
                 {filtered.map((job) => {
                   const isHidden = filter === "hidden";
                   const isIgnoring = ignoringId === job.id;
+                  const isVerifying = verifyingId === job.id;
                   return (
                     <tr
                       key={job.id}
@@ -527,16 +561,27 @@ export default function RecertificationPage() {
                           days={job.daysUntilDue}
                         />
                       </td>
-                      {/* Actions: quote badge OR edit icon, then trash/restore — all left-aligned */}
+                      {/* Actions: quote badge OR edit icon, then trash/restore */}
                       <td className={styles.td}>
                         <div className={styles.actionGroup}>
                           {!isHidden &&
                             (job.existingQuote ? (
-                              <QuoteStatusBadge quote={job.existingQuote} />
+                              <button
+                                className={styles.actionBtn}
+                                onClick={() => handleQuoteAction(job)}
+                                disabled={isVerifying}
+                                title="Verify quote"
+                              >
+                                {isVerifying ? (
+                                  <span className={styles.verifyingDot} />
+                                ) : (
+                                  <QuoteStatusBadge quote={job.existingQuote} />
+                                )}
+                              </button>
                             ) : (
                               <button
                                 className={styles.actionBtn}
-                                onClick={() => setConfirmJob(job)}
+                                onClick={() => handleQuoteAction(job)}
                                 title="Create quote"
                               >
                                 <Image

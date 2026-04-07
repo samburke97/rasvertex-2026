@@ -78,6 +78,18 @@ export async function saveRecertQuote(
   `;
 }
 
+export async function deleteRecertQuote(
+  siteId: number,
+  year: number,
+  quoteType = "recertification",
+): Promise<void> {
+  const sql = db();
+  await sql`
+    DELETE FROM recertification_quotes
+    WHERE site_id = ${siteId} AND year = ${year} AND quote_type = ${quoteType}
+  `;
+}
+
 export async function getAllRecertQuotes(): Promise<RecertQuoteRecord[]> {
   const sql = db();
   const rows = await sql`
