@@ -17,34 +17,19 @@ const sidebarItems: SidebarItem[] = [
   { icon: "/icons/menu/home.svg", href: "/dashboard", label: "Home" },
   { icon: "/icons/menu/reports.svg", href: "/reports", label: "Reports" },
   {
+    icon: "/icons/menu/calendar.svg",
     href: "/recertifications",
-    label: "Recertifications",
-    svgIcon: (
-      <svg
-        width="28"
-        height="28"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        <polyline points="9 12 11 14 15 10" />
-      </svg>
-    ),
+    label: "Anchor Recertifications",
   },
-  { icon: "/icons/menu/calendar.svg", href: "/calendar", label: "Calendar" },
-  { icon: "/icons/menu/sales.svg", href: "/sales", label: "Sales" },
-  { icon: "/icons/menu/inventory.svg", href: "/inventory", label: "Inventory" },
-  {
-    icon: "/icons/menu/marketplace.svg",
-    href: "/marketplace",
-    label: "Marketplace",
-  },
-  { icon: "/icons/menu/players.svg", href: "/players", label: "Players" },
-  { icon: "/icons/menu/settings.svg", href: "/settings", label: "Settings" },
+  // { icon: "/icons/menu/sales.svg", href: "/sales", label: "Sales" },
+  // { icon: "/icons/menu/inventory.svg", href: "/inventory", label: "Inventory" },
+  // {
+  //   icon: "/icons/menu/marketplace.svg",
+  //   href: "/marketplace",
+  //   label: "Marketplace",
+  // },
+  // { icon: "/icons/menu/players.svg", href: "/players", label: "Players" },
+  // { icon: "/icons/menu/settings.svg", href: "/settings", label: "Settings" },
 ];
 
 export default function Sidebar() {

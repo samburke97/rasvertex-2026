@@ -4,8 +4,10 @@
 // 2. POST /quotes/{id}/sections/ — create blank section
 // 3. POST /quotes/{id}/sections/{sectionId}/costCenters/ — Height Safety (ID 11)
 // 4. POST /quotes/{id}/sections/{sectionId}/costCenters/{ccId}/oneOffs/ — price line item
+// 5. Save to Neon recertification_quotes (quote_type = 'recertification')
 
 import { NextRequest, NextResponse } from "next/server";
+import { saveRecertQuote } from "@/lib/recertifications/store";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
@@ -32,6 +34,7 @@ export interface CreateQuotePayload {
   customerId: number;
   siteId: number;
   siteName: string;
+  customer: string;
   lastExTax: number;
   nextDueDate: string;
 }
@@ -45,7 +48,8 @@ export async function POST(request: NextRequest) {
   }
 
   const body: CreateQuotePayload = await request.json();
-  const { customerId, siteId, siteName, lastExTax, nextDueDate } = body;
+  const { customerId, siteId, siteName, customer, lastExTax, nextDueDate } =
+    body;
 
   if (!customerId || !siteId || lastExTax === undefined || !nextDueDate) {
     return NextResponse.json(
@@ -54,13 +58,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Quote year = due date year, but never less than current year
-  // e.g. overdue from 2024 → still says 2026 if we're in 2026
   const currentYear = new Date().getFullYear();
   const dueYear = new Date(nextDueDate).getFullYear();
   const quoteYear = Math.max(dueYear, currentYear);
 
-  const quoteName = `Anchor Recertification - ${quoteYear}`;
+  // Canonical naming convention — all new quotes use this format
+  const quoteName = `Annual Anchor Recertification - ${quoteYear}`;
 
   const description = `Height safety recertification at ${siteName}\nProfessional height safety services, including:\n* Carry out annual compliance inspection of existing roof-mounted anchor points.\n* On completion, inspect, tag and supply compliance documentation as per relevant legislation`;
 
@@ -71,7 +74,6 @@ export async function POST(request: NextRequest) {
   const dueDateStr = dueDate.toISOString().split("T")[0];
 
   try {
-    // Step 1 — Create the quote
     console.log(
       `[CreateQuote] Step 1: Creating quote "${quoteName}" for customer ${customerId}`,
     );
@@ -89,27 +91,23 @@ export async function POST(request: NextRequest) {
       },
     );
     const quoteId = quote.ID;
-    console.log(`[CreateQuote] ✓ Quote created: ID ${quoteId}`);
+    const quoteNo = quote.JobNo || null;
+    console.log(`[CreateQuote] ✓ Quote created: ID ${quoteId} No ${quoteNo}`);
 
-    // Step 2 — Create a section
     console.log(`[CreateQuote] Step 2: Creating section`);
     const section = await simproPost<{ ID: number }>(
       `/api/v1.0/companies/0/quotes/${quoteId}/sections/`,
       {},
     );
     const sectionId = section.ID;
-    console.log(`[CreateQuote] ✓ Section created: ID ${sectionId}`);
 
-    // Step 3 — Add Height Safety cost centre
     console.log(`[CreateQuote] Step 3: Adding Height Safety cost centre`);
     const costCentre = await simproPost<{ ID: number }>(
       `/api/v1.0/companies/0/quotes/${quoteId}/sections/${sectionId}/costCenters/`,
       { CostCenter: HEIGHT_SAFETY_COST_CENTRE_ID },
     );
     const costCentreId = costCentre.ID;
-    console.log(`[CreateQuote] ✓ Cost centre created: ID ${costCentreId}`);
 
-    // Step 4 — Add one-off labor item with price
     console.log(
       `[CreateQuote] Step 4: Adding one-off item at $${newExTax} ex tax`,
     );
@@ -117,23 +115,35 @@ export async function POST(request: NextRequest) {
       `/api/v1.0/companies/0/quotes/${quoteId}/sections/${sectionId}/costCenters/${costCentreId}/oneOffs/`,
       {
         Type: "Labor",
-        Description: "Anchor Recertification",
+        Description: "Annual Anchor Recertification",
         SellPriceExDiscount: newExTax,
         Total: { Qty: 1 },
       },
     );
-    console.log(`[CreateQuote] ✓ One-off item added`);
-    console.log(
-      `[CreateQuote] ✅ Complete — Quote ${quoteId} "${quoteName}" created successfully`,
-    );
+
+    console.log(`[CreateQuote] Step 5: Saving to Neon`);
+    await saveRecertQuote({
+      siteId,
+      year: quoteYear,
+      quoteType: "recertification",
+      quoteId,
+      quoteName,
+      quoteStatus: "created",
+      simproQuoteNo: quoteNo,
+      customer: customer || siteName,
+      siteName,
+    });
+
+    console.log(`[CreateQuote] ✅ Complete — Quote ${quoteId} "${quoteName}"`);
 
     return NextResponse.json({
       quoteId,
       quoteName,
-      quoteNo: quote.JobNo || "",
+      quoteNo: quoteNo || "",
       newExTax,
       newIncTax: Math.round(newExTax * 1.1 * 100) / 100,
       dueDate: dueDateStr,
+      quoteYear,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

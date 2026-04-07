@@ -1,9 +1,25 @@
 "use client";
 // components/recertifications/RecertificationPage.tsx
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import Image from "next/image";
 import styles from "./RecertificationPage.module.css";
 import type { RecertificationJob } from "@/app/api/simpro/recertifications/route";
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatCurrency(n: number): string {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+  }).format(n);
+}
 
 function StatusPill({
   status,
@@ -21,116 +37,99 @@ function StatusPill({
   return <span className={styles.pillUpcoming}>{days}d away</span>;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+function QuoteStatusBadge({
+  quote,
+}: {
+  quote: RecertificationJob["existingQuote"];
+}) {
+  if (!quote) return null;
+  const isSent =
+    quote.quoteStatus === "sent" || quote.quoteStatus === "approved";
+  return (
+    <span className={isSent ? styles.quoteBadgeSent : styles.quoteBadgeCreated}>
+      {isSent ? "Sent" : "Created"}
+      {quote.simproQuoteNo && (
+        <span className={styles.quoteBadgeNo}> #{quote.simproQuoteNo}</span>
+      )}
+    </span>
+  );
 }
 
-function formatCurrency(n: number): string {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-  }).format(n);
-}
-
-// ── Confirmation Modal ────────────────────────────────────────────────────
-interface ConfirmModalProps {
-  job: RecertificationJob;
-  onConfirm: () => void;
-  onCancel: () => void;
-  creating: boolean;
-}
-
+// ── Confirm modal ─────────────────────────────────────────────────────────
 function ConfirmModal({
   job,
   onConfirm,
   onCancel,
   creating,
-}: ConfirmModalProps) {
+}: {
+  job: RecertificationJob;
+  onConfirm: () => void;
+  onCancel: () => void;
+  creating: boolean;
+}) {
   const currentYear = new Date().getFullYear();
   const dueYear = new Date(job.nextDueDate).getFullYear();
-  const nextYear = Math.max(dueYear, currentYear);
+  const quoteYear = Math.max(dueYear, currentYear);
   const newExTax = Math.round(job.totalExTax * 1.05 * 100) / 100;
   const newIncTax = Math.round(newExTax * 1.1 * 100) / 100;
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 14);
-  const dueDateStr = dueDate.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+
+  const rows: { label: string; value: string; highlight?: boolean }[] = [
+    {
+      label: "Quote name",
+      value: `Annual Anchor Recertification - ${quoteYear}`,
+    },
+    { label: "Customer", value: job.customer },
+    { label: "Site", value: job.site },
+    { label: "Last price (ex)", value: formatCurrency(job.totalExTax) },
+    {
+      label: "New price +5% (ex)",
+      value: formatCurrency(newExTax),
+      highlight: true,
+    },
+    { label: "Inc GST", value: formatCurrency(newIncTax) },
+    {
+      label: "Due date",
+      value: dueDate.toLocaleDateString("en-AU", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }),
+    },
+  ];
 
   return (
     <div className={styles.modalOverlay} onClick={onCancel}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <h3 className={styles.modalTitle}>Create Recertification Quote</h3>
+          <span className={styles.modalTitle}>Create Quote</span>
           <button className={styles.modalClose} onClick={onCancel}>
-            ✕
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icons/utility-outline/close.svg"
+              width={14}
+              height={14}
+              alt="Close"
+              style={{ opacity: 0.4, display: "block" }}
+            />
           </button>
         </div>
-
         <div className={styles.modalBody}>
-          <p className={styles.modalWarning}>
-            This will create a real quote in SimPRO. Please confirm all details
-            are correct.
-          </p>
-
-          <div className={styles.modalRow}>
-            <span className={styles.modalLabel}>Quote Name</span>
-            <span className={styles.modalValue}>
-              Anchor Recertification - {nextYear}
-            </span>
-          </div>
-          <div className={styles.modalRow}>
-            <span className={styles.modalLabel}>Customer</span>
-            <span className={styles.modalValue}>{job.customer}</span>
-          </div>
-          <div className={styles.modalRow}>
-            <span className={styles.modalLabel}>Site</span>
-            <span className={styles.modalValue}>{job.site}</span>
-          </div>
-          <div className={styles.modalRow}>
-            <span className={styles.modalLabel}>Based on Job</span>
-            <span className={styles.modalValue}>
-              {job.name} #{job.id}
-            </span>
-          </div>
-          <div className={styles.modalDivider} />
-          <div className={styles.modalRow}>
-            <span className={styles.modalLabel}>Last Year Ex Tax</span>
-            <span className={styles.modalValue}>
-              {formatCurrency(job.totalExTax)}
-            </span>
-          </div>
-          <div className={styles.modalRow}>
-            <span className={styles.modalLabel}>New Price Ex Tax (+5%)</span>
-            <span
-              className={`${styles.modalValue} ${styles.modalValueHighlight}`}
-            >
-              {formatCurrency(newExTax)}
-            </span>
-          </div>
-          <div className={styles.modalRow}>
-            <span className={styles.modalLabel}>New Price Inc GST</span>
-            <span className={styles.modalValue}>
-              {formatCurrency(newIncTax)}
-            </span>
-          </div>
-          <div className={styles.modalDivider} />
-          <div className={styles.modalRow}>
-            <span className={styles.modalLabel}>Due Date</span>
-            <span className={styles.modalValue}>{dueDateStr} (14 days)</span>
-          </div>
-          <div className={styles.modalRow}>
-            <span className={styles.modalLabel}>Type</span>
-            <span className={styles.modalValue}>Service</span>
-          </div>
+          {rows.map(({ label, value, highlight }, i) => (
+            <React.Fragment key={label}>
+              {i === 3 && <div className={styles.modalDivider} />}
+              <div className={styles.modalRow}>
+                <span className={styles.modalLabel}>{label}</span>
+                <span
+                  className={`${styles.modalValue} ${highlight ? styles.modalValueGreen : ""}`}
+                >
+                  {value}
+                </span>
+              </div>
+            </React.Fragment>
+          ))}
         </div>
-
         <div className={styles.modalFooter}>
           <button
             className={styles.modalCancelBtn}
@@ -144,7 +143,7 @@ function ConfirmModal({
             onClick={onConfirm}
             disabled={creating}
           >
-            {creating ? "Creating…" : "Create Quote in SimPRO"}
+            {creating ? "Creating…" : "Create in SimPRO"}
           </button>
         </div>
       </div>
@@ -152,59 +151,99 @@ function ConfirmModal({
   );
 }
 
-// ── Success toast ─────────────────────────────────────────────────────────
-interface ToastProps {
-  message: string;
-  onClose: () => void;
-}
-
-function Toast({ message, onClose }: ToastProps) {
+// ── Toast ─────────────────────────────────────────────────────────────────
+function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   useEffect(() => {
-    const t = setTimeout(onClose, 5000);
+    const t = setTimeout(onClose, 4000);
     return () => clearTimeout(t);
   }, [onClose]);
-
   return (
     <div className={styles.toast}>
-      <span className={styles.toastIcon}>✓</span>
       {message}
       <button className={styles.toastClose} onClick={onClose}>
-        ✕
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/utility-outline/close.svg"
+          width={14}
+          height={14}
+          alt="Close"
+          style={{ opacity: 0.5, display: "block" }}
+        />
       </button>
     </div>
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────
+type FilterKey =
+  | "all"
+  | "overdue"
+  | "due-soon"
+  | "upcoming"
+  | "quoted"
+  | "hidden";
+
 export default function RecertificationPage() {
   const [jobs, setJobs] = useState<RecertificationJob[]>([]);
+  const [ignoredJobs, setIgnoredJobs] = useState<RecertificationJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<
-    "all" | "overdue" | "due-soon" | "upcoming"
-  >("all");
+  const [fromCache, setFromCache] = useState(false);
+  const [cacheAge, setCacheAge] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [search, setSearch] = useState("");
   const [confirmJob, setConfirmJob] = useState<RecertificationJob | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [createdIds, setCreatedIds] = useState<Set<number>>(new Set());
+  const [ignoringId, setIgnoringId] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (refresh = false) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/simpro/recertifications");
+      const res = await fetch(
+        refresh
+          ? "/api/simpro/recertifications?refresh=true"
+          : "/api/simpro/recertifications",
+      );
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setJobs(data.jobs ?? []);
+      setIgnoredJobs(data.ignoredJobs ?? []);
+      setFromCache(data.fromCache ?? false);
+      setCacheAge(data.cacheAge ?? null);
+      if (refresh && data.jobs?.length) {
+        const siteIds = [
+          ...new Set((data.jobs as RecertificationJob[]).map((j) => j.siteId)),
+        ];
+        fetch("/api/simpro/recertifications/sync-quotes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ siteIds }),
+        })
+          .then((r) => r.json())
+          .then((s) => {
+            if (s.synced > 0) {
+              fetch("/api/simpro/recertifications")
+                .then((r) => r.json())
+                .then((d) => {
+                  setJobs(d.jobs ?? []);
+                  setIgnoredJobs(d.ignoredJobs ?? []);
+                })
+                .catch(() => {});
+            }
+          })
+          .catch(() => {});
+      }
     } catch {
-      setError("Could not load recertification data. Check SimPRO connection.");
+      setError("Could not load recertification data.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
+    load(false);
   }, [load]);
 
   const handleCreateQuote = async () => {
@@ -218,19 +257,29 @@ export default function RecertificationPage() {
           customerId: confirmJob.customerId,
           siteId: confirmJob.siteId,
           siteName: confirmJob.site,
+          customer: confirmJob.customer,
           lastExTax: confirmJob.totalExTax,
           nextDueDate: confirmJob.nextDueDate,
         }),
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to create quote");
-      }
-
+      if (!res.ok) throw new Error((await res.json()).error || "Failed");
       const result = await res.json();
-      setCreatedIds((prev) => new Set([...prev, confirmJob.id]));
-      setToast(`Quote created in SimPRO — ${result.quoteName}`);
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === confirmJob.id
+            ? {
+                ...j,
+                existingQuote: {
+                  quoteId: result.quoteId,
+                  quoteName: result.quoteName,
+                  quoteStatus: "created",
+                  simproQuoteNo: result.quoteNo || null,
+                },
+              }
+            : j,
+        ),
+      );
+      setToast(`Quote created — ${result.quoteName}`);
       setConfirmJob(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to create quote");
@@ -239,155 +288,303 @@ export default function RecertificationPage() {
     }
   };
 
-  const filtered =
-    filter === "all" ? jobs : jobs.filter((j) => j.status === filter);
-
-  const counts = {
-    all: jobs.length,
-    overdue: jobs.filter((j) => j.status === "overdue").length,
-    "due-soon": jobs.filter((j) => j.status === "due-soon").length,
-    upcoming: jobs.filter((j) => j.status === "upcoming").length,
+  const handleIgnore = async (job: RecertificationJob) => {
+    setIgnoringId(job.id);
+    try {
+      await fetch("/api/simpro/recertifications/ignore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id }),
+      });
+      setJobs((prev) => prev.filter((j) => j.id !== job.id));
+      setIgnoredJobs((prev) => [...prev, job]);
+      setToast(`${job.site} hidden`);
+    } catch {
+      alert("Failed to hide");
+    } finally {
+      setIgnoringId(null);
+    }
   };
+
+  const handleRestore = async (job: RecertificationJob) => {
+    setIgnoringId(job.id);
+    try {
+      await fetch("/api/simpro/recertifications/ignore", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: job.id }),
+      });
+      setIgnoredJobs((prev) => prev.filter((j) => j.id !== job.id));
+      setJobs((prev) =>
+        [...prev, job].sort((a, b) => a.daysUntilDue - b.daysUntilDue),
+      );
+      setToast(`${job.site} restored`);
+    } catch {
+      alert("Failed to restore");
+    } finally {
+      setIgnoringId(null);
+    }
+  };
+
+  const unquoted = useMemo(() => jobs.filter((j) => !j.existingQuote), [jobs]);
+  const quoted = useMemo(() => jobs.filter((j) => !!j.existingQuote), [jobs]);
+  const overdueCt = useMemo(
+    () => unquoted.filter((j) => j.status === "overdue").length,
+    [unquoted],
+  );
+  const dueSoonCt = useMemo(
+    () => unquoted.filter((j) => j.status === "due-soon").length,
+    [unquoted],
+  );
+  const upcomingCt = useMemo(
+    () => unquoted.filter((j) => j.status === "upcoming").length,
+    [unquoted],
+  );
+
+  const filtered = useMemo(() => {
+    let base: RecertificationJob[] =
+      filter === "hidden"
+        ? ignoredJobs
+        : filter === "quoted"
+          ? quoted
+          : filter === "all"
+            ? unquoted
+            : unquoted.filter((j) => j.status === filter);
+    if (!search.trim()) return base;
+    const q = search.toLowerCase();
+    return base.filter(
+      (j) =>
+        j.name.toLowerCase().includes(q) ||
+        j.customer.toLowerCase().includes(q) ||
+        j.site.toLowerCase().includes(q),
+    );
+  }, [filter, search, unquoted, quoted, ignoredJobs]);
+
+  const cards: {
+    key: FilterKey;
+    count: number;
+    label: string;
+    colorClass?: string;
+  }[] = [
+    { key: "all", count: jobs.length, label: "Total" },
+    {
+      key: "overdue",
+      count: overdueCt,
+      label: "Overdue",
+      colorClass: styles.countOverdue,
+    },
+    {
+      key: "due-soon",
+      count: dueSoonCt,
+      label: "Due within 60 days",
+      colorClass: styles.countDueSoon,
+    },
+    {
+      key: "upcoming",
+      count: upcomingCt,
+      label: "Upcoming",
+      colorClass: styles.countUpcoming,
+    },
+    {
+      key: "quoted",
+      count: quoted.length,
+      label: "Quoted",
+      colorClass: styles.countQuoted,
+    },
+    { key: "hidden", count: ignoredJobs.length, label: "Hidden" },
+  ];
 
   return (
     <div className={styles.page}>
-      {/* Header */}
       <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>Anchor Recertifications</h1>
-          <p className={styles.subtitle}>
-            Height Safety jobs due for annual recertification — completed date +
-            1 year
-          </p>
-        </div>
-        <button className={styles.refreshBtn} onClick={load} disabled={loading}>
-          {loading ? "Loading…" : "↻ Refresh"}
-        </button>
-      </div>
-
-      {/* Summary cards */}
-      <div className={styles.cards}>
-        <div className={`${styles.card} ${styles.cardOverdue}`}>
-          <span className={styles.cardCount}>{counts.overdue}</span>
-          <span className={styles.cardLabel}>Overdue</span>
-        </div>
-        <div className={`${styles.card} ${styles.cardDueSoon}`}>
-          <span className={styles.cardCount}>{counts["due-soon"]}</span>
-          <span className={styles.cardLabel}>Due within 60 days</span>
-        </div>
-        <div className={`${styles.card} ${styles.cardUpcoming}`}>
-          <span className={styles.cardCount}>{counts.upcoming}</span>
-          <span className={styles.cardLabel}>Upcoming</span>
-        </div>
-        <div className={`${styles.card} ${styles.cardTotal}`}>
-          <span className={styles.cardCount}>{counts.all}</span>
-          <span className={styles.cardLabel}>Total</span>
-        </div>
-      </div>
-
-      {/* Filter tabs */}
-      <div className={styles.filters}>
-        {(["all", "overdue", "due-soon", "upcoming"] as const).map((f) => (
+        <h1 className={styles.title}>Anchor Recertifications</h1>
+        <div className={styles.headerRight}>
+          {fromCache && cacheAge && (
+            <span className={styles.cacheNote}>Cached {cacheAge}</span>
+          )}
           <button
-            key={f}
-            className={`${styles.filterBtn} ${filter === f ? styles.filterBtnActive : ""}`}
-            onClick={() => setFilter(f)}
+            className={styles.refreshBtn}
+            onClick={() => load(true)}
+            disabled={loading}
           >
-            {f === "all"
-              ? "All"
-              : f === "due-soon"
-                ? "Due Soon"
-                : f.charAt(0).toUpperCase() + f.slice(1)}
-            <span className={styles.filterCount}>{counts[f]}</span>
+            {loading ? "Loading…" : "↺ Refresh"}
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.cards}>
+        {cards.map(({ key, count, label, colorClass }) => (
+          <button
+            key={key}
+            className={`${styles.card} ${filter === key ? styles.cardActive : ""}`}
+            onClick={() => setFilter(key)}
+          >
+            <span className={`${styles.cardCount} ${colorClass ?? ""}`}>
+              {count}
+            </span>
+            <span className={styles.cardLabel}>{label}</span>
           </button>
         ))}
       </div>
 
-      {/* Content */}
-      {error ? (
-        <div className={styles.errorState}>
-          <p>{error}</p>
-          <button className={styles.retryBtn} onClick={load}>
-            Try again
-          </button>
+      <div className={styles.searchSection}>
+        <label className={styles.searchLabel}>Search</label>
+        <div className={styles.searchWrap}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/utility-outline/search.svg"
+            width={15}
+            height={15}
+            alt=""
+            style={{
+              position: "absolute",
+              left: 11,
+              opacity: 0.35,
+              pointerEvents: "none",
+            }}
+          />
+          <input
+            className={styles.searchInput}
+            type="text"
+            placeholder="Search customer or site…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {search && (
+            <button
+              className={styles.searchClear}
+              onClick={() => setSearch("")}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/icons/utility-outline/close.svg"
+                width={14}
+                height={14}
+                alt="Clear"
+                style={{ display: "block", opacity: 0.4 }}
+              />
+            </button>
+          )}
         </div>
-      ) : loading ? (
+      </div>
+
+      {loading ? (
         <div className={styles.loadingState}>
           <div className={styles.spinner} />
-          <p>Fetching from SimPRO…</p>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : error ? (
         <div className={styles.emptyState}>
-          <p>No jobs found{filter !== "all" ? ` for "${filter}"` : ""}.</p>
+          {error}
+          <button className={styles.retryBtn} onClick={() => load(false)}>
+            Retry
+          </button>
         </div>
       ) : (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>Job</th>
-                <th className={styles.th}>Customer</th>
-                <th className={styles.th}>Site</th>
-                <th className={styles.th}>Last Completed</th>
-                <th className={styles.th}>Next Due</th>
-                <th className={styles.th}>Last Price</th>
-                <th className={styles.th}>Status</th>
-                <th className={styles.th}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((job) => {
-                const alreadyCreated = createdIds.has(job.id);
-                return (
-                  <tr
-                    key={job.id}
-                    className={`${styles.tr} ${job.status === "overdue" ? styles.trOverdue : ""}`}
-                  >
-                    <td className={styles.td}>
-                      <span className={styles.jobName}>{job.name}</span>
-                      <span className={styles.jobId}>#{job.id}</span>
-                    </td>
-                    <td className={styles.td}>{job.customer}</td>
-                    <td className={styles.td}>{job.site}</td>
-                    <td className={styles.td}>
-                      {formatDate(job.completedDate)}
-                    </td>
-                    <td className={styles.td}>
-                      <span
-                        className={
-                          job.status === "overdue" ? styles.dateOverdue : ""
-                        }
+        <div className={styles.tableContainer}>
+          {filtered.length === 0 ? (
+            <div className={styles.emptyState}>
+              {search ? `No results for "${search}"` : "Nothing here."}
+            </div>
+          ) : (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.th}>Customer</th>
+                  <th className={styles.th}>Site</th>
+                  <th className={styles.th}>Completed</th>
+                  <th className={styles.th}>Next Due</th>
+                  <th className={styles.th}>Last Price</th>
+                  <th className={styles.th}>Status</th>
+                  <th className={styles.th}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((job) => {
+                  const isHidden = filter === "hidden";
+                  const isIgnoring = ignoringId === job.id;
+                  return (
+                    <tr
+                      key={job.id}
+                      className={`${styles.tr} ${isHidden ? styles.trHidden : ""}`}
+                    >
+                      <td className={styles.td}>{job.customer}</td>
+                      <td className={styles.td}>{job.site}</td>
+                      <td className={`${styles.td} ${styles.tdMuted}`}>
+                        {formatDate(job.completedDate)}
+                      </td>
+                      {/* Next Due — same font size as every other cell, just red when overdue */}
+                      <td
+                        className={`${styles.td} ${styles.tdMuted} ${job.status === "overdue" && !isHidden ? styles.tdOverdue : ""}`}
                       >
                         {formatDate(job.nextDueDate)}
-                      </span>
-                    </td>
-                    <td className={styles.td}>
-                      {formatCurrency(job.totalExTax)} ex
-                    </td>
-                    <td className={styles.td}>
-                      <StatusPill status={job.status} days={job.daysUntilDue} />
-                    </td>
-                    <td className={styles.td}>
-                      {alreadyCreated ? (
-                        <span className={styles.createdBadge}>✓ Created</span>
-                      ) : (
-                        <button
-                          className={styles.createBtn}
-                          onClick={() => setConfirmJob(job)}
-                        >
-                          Create Quote
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className={`${styles.td} ${styles.tdMuted}`}>
+                        {formatCurrency(job.totalExTax)} ex
+                      </td>
+                      <td className={styles.td}>
+                        <StatusPill
+                          status={job.status}
+                          days={job.daysUntilDue}
+                        />
+                      </td>
+                      {/* Actions: quote badge OR edit icon, then trash/restore — all left-aligned */}
+                      <td className={styles.td}>
+                        <div className={styles.actionGroup}>
+                          {!isHidden &&
+                            (job.existingQuote ? (
+                              <QuoteStatusBadge quote={job.existingQuote} />
+                            ) : (
+                              <button
+                                className={styles.actionBtn}
+                                onClick={() => setConfirmJob(job)}
+                                title="Create quote"
+                              >
+                                <Image
+                                  src="/icons/utility-outline/edit.svg"
+                                  width={15}
+                                  height={15}
+                                  alt="Create quote"
+                                  className={styles.actionIcon}
+                                  priority
+                                />
+                              </button>
+                            ))}
+                          {isHidden ? (
+                            <button
+                              className={styles.restoreBtn}
+                              onClick={() => handleRestore(job)}
+                              disabled={isIgnoring}
+                            >
+                              {isIgnoring ? "…" : "Restore"}
+                            </button>
+                          ) : (
+                            <button
+                              className={styles.actionBtn}
+                              onClick={() => handleIgnore(job)}
+                              disabled={isIgnoring}
+                              title="Hide"
+                            >
+                              <Image
+                                src="/icons/utility-outline/trash.svg"
+                                width={15}
+                                height={15}
+                                alt="Hide"
+                                className={styles.actionIcon}
+                                priority
+                              />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
-      {/* Confirmation modal */}
       {confirmJob && (
         <ConfirmModal
           job={confirmJob}
@@ -396,8 +593,6 @@ export default function RecertificationPage() {
           creating={creating}
         />
       )}
-
-      {/* Toast */}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </div>
   );
