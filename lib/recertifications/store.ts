@@ -28,6 +28,13 @@
 //   reason     TEXT,
 //   ignored_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 // );
+//
+// CREATE TABLE IF NOT EXISTS recertification_notified (
+//   job_id      INTEGER NOT NULL,
+//   year        INTEGER NOT NULL,
+//   notified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+//   PRIMARY KEY (job_id, year)
+// );
 // ─────────────────────────────────────────────────────────────────────────
 
 import { neon } from "@neondatabase/serverless";
@@ -209,4 +216,28 @@ export async function setCachedJobs<T>(jobs: T[]): Promise<void> {
       jobs       = EXCLUDED.jobs,
       fetched_at = EXCLUDED.fetched_at
   `;
+}
+
+// ── Notified jobs ─────────────────────────────────────────────────────────
+// Tracks which jobs have already triggered a digest email so we don't
+// re-notify Caro about the same job every day.
+
+export async function getNotifiedKeys(): Promise<Set<string>> {
+  const sql = db();
+  const rows = await sql`SELECT job_id, year FROM recertification_notified`;
+  return new Set(rows.map((r) => `${r.job_id}:${r.year}`));
+}
+
+export async function markAsNotified(
+  jobs: { jobId: number; year: number }[],
+): Promise<void> {
+  if (!jobs.length) return;
+  const sql = db();
+  for (const { jobId, year } of jobs) {
+    await sql`
+      INSERT INTO recertification_notified (job_id, year)
+      VALUES (${jobId}, ${year})
+      ON CONFLICT (job_id, year) DO NOTHING
+    `;
+  }
 }
