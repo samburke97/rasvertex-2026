@@ -20,7 +20,7 @@ import {
 import type { RecertificationJob } from "@/app/api/simpro/recertifications/route";
 
 const APP_URL = "https://rasvertex-2026-lt5c.vercel.app";
-const TO = "admin@rasvertex.com.au";
+const TO = ["admin@rasvertex.com.au", "sam@rasvertex.com.au"];
 const DIGEST_LIMIT = 3;
 
 function getResend(): Resend {
@@ -235,7 +235,7 @@ export async function POST() {
     const resend = getResend();
     await resend.emails.send({
       from: "RAS Admin <team@rasvertex.com.au>",
-      to: [TO],
+      to: TO,
       subject: `Anchor Recertifications Due — ${newJobs.length} job${newJobs.length === 1 ? "" : "s"} need attention`,
       html: buildHtml(displayed, remainder),
     });
