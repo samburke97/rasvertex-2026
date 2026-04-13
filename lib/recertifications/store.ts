@@ -116,19 +116,39 @@ export async function replaceCachedJobs(
   const sql = db();
   await sql`DELETE FROM recertification_cache`;
   if (!jobs.length) return;
-  for (const j of jobs) {
-    await sql`
-      INSERT INTO recertification_cache (
-        site_id, job_id, customer_id, customer, site,
-        completed_date, next_due_date, days_until_due,
-        status, total_ex_tax, total_inc_tax, quote_year, synced_at
-      ) VALUES (
-        ${j.siteId}, ${j.id}, ${j.customerId}, ${j.customer}, ${j.site},
-        ${j.completedDate}, ${j.nextDueDate}, ${j.daysUntilDue},
-        ${j.status}, ${j.totalExTax}, ${j.totalIncTax}, ${j.quoteYear}, NOW()
-      )
-    `;
-  }
+
+  const values = jobs.map((j) => ({
+    site_id: j.siteId,
+    job_id: j.id,
+    customer_id: j.customerId,
+    customer: j.customer,
+    site: j.site,
+    completed_date: j.completedDate,
+    next_due_date: j.nextDueDate,
+    days_until_due: j.daysUntilDue,
+    status: j.status,
+    total_ex_tax: j.totalExTax,
+    total_inc_tax: j.totalIncTax,
+    quote_year: j.quoteYear,
+  }));
+
+  await sql`
+    INSERT INTO recertification_cache ${sql(
+      values,
+      "site_id",
+      "job_id",
+      "customer_id",
+      "customer",
+      "site",
+      "completed_date",
+      "next_due_date",
+      "days_until_due",
+      "status",
+      "total_ex_tax",
+      "total_inc_tax",
+      "quote_year",
+    )}
+  `;
 }
 
 export async function removeSiteFromCache(siteId: number): Promise<void> {

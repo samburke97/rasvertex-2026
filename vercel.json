@@ -7,6 +7,10 @@
     {
       "path": "/api/simpro/recertifications/sync",
       "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/db/ping",
+      "schedule": "*/4 * * * *"
     }
   ]
 }
