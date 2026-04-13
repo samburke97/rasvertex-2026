@@ -25,7 +25,7 @@
   gap: 10px;
 }
 
-.cacheNote {
+.syncedAt {
   font-size: 12px;
   color: var(--for-medium, #7e807f);
 }
@@ -55,7 +55,7 @@
 /* ── Cards ───────────────────────────────────────────────────────────────── */
 .cards {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 10px;
 }
 
@@ -100,9 +100,6 @@
 .countUpcoming {
   color: #3a9e5f;
 }
-.countQuoted {
-  color: #3b82c4;
-}
 
 .cardLabel {
   font-size: 11px;
@@ -110,16 +107,9 @@
 }
 
 /* ── Search ──────────────────────────────────────────────────────────────── */
-.searchSection {
+.searchRow {
   display: flex;
-  flex-direction: column;
-  gap: 8px; /* padding between label and input */
-}
-
-.searchLabel {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--for-darkest, #212121);
+  align-items: center;
 }
 
 .searchWrap {
@@ -127,11 +117,21 @@
   display: flex;
   align-items: center;
   max-width: 400px;
+  width: 100%;
+}
+
+.searchIcon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  opacity: 0.4;
 }
 
 .searchInput {
   width: 100%;
-  padding: 9px 34px 9px 32px;
+  padding: 9px 34px 9px 12px;
   border: 1px solid var(--Outline-Light, #f5f5f5);
   border-radius: 6px;
   font-size: 14px;
@@ -148,23 +148,6 @@
 
 .searchInput:focus {
   border-color: var(--for-medium, #7e807f);
-}
-
-.searchClear {
-  position: absolute;
-  right: 9px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 0;
-}
-
-.searchClear:hover img {
-  opacity: 0.8 !important;
 }
 
 /* ── Table ───────────────────────────────────────────────────────────────── */
@@ -190,7 +173,6 @@
   text-overflow: ellipsis;
 }
 
-/* 7 columns — no Quote column */
 .table th:nth-child(1) {
   width: 22%;
 } /* Customer */
@@ -223,10 +205,9 @@
   opacity: 0.45;
 }
 
-/* Single .td for ALL cells — font-size is set once here, nowhere else */
 .td {
   padding: 14px 16px;
-  font-size: 13px; /* same for every column, no exceptions */
+  font-size: 13px;
   color: var(--for-darkest, #212121);
   border-bottom: 1px solid var(--Outline-Light, #f5f5f5);
   white-space: nowrap;
@@ -240,120 +221,95 @@
   color: var(--for-medium, #7e807f);
 }
 
-/* Next Due overdue — colour only, NO font-size change */
 .tdOverdue {
   color: #e05252;
-  /* font-size intentionally omitted — inherits 13px from .td */
-}
-
-/* Actions group — left aligned */
-.actionGroup {
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 
 /* ── Status pills ────────────────────────────────────────────────────────── */
 .pillOverdue {
-  display: inline-block;
-  background: rgba(224, 82, 82, 0.08);
-  color: #e05252;
+  display: inline-flex;
+  align-items: center;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
   border-radius: 4px;
-  padding: 3px 7px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .pillDueSoon {
-  display: inline-block;
-  background: rgba(212, 136, 26, 0.08);
-  color: #d4881a;
+  display: inline-flex;
+  align-items: center;
+  background: #fff7ed;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
   border-radius: 4px;
-  padding: 3px 7px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .pillUpcoming {
-  display: inline-block;
-  background: rgba(58, 158, 95, 0.08);
-  color: #3a9e5f;
-  border-radius: 4px;
-  padding: 3px 7px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-/* ── Quote badges ────────────────────────────────────────────────────────── */
-.quoteBadgeCreated {
   display: inline-flex;
   align-items: center;
-  background: rgba(58, 158, 95, 0.08);
-  color: #3a9e5f;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
   border-radius: 4px;
-  padding: 3px 7px;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
-.quoteBadgeSent {
-  display: inline-flex;
-  align-items: center;
-  background: rgba(59, 130, 196, 0.08);
-  color: #3b82c4;
-  border-radius: 4px;
-  padding: 3px 7px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.quoteBadgeNo {
-  font-weight: 400;
-  opacity: 0.65;
-}
-
-/* ── Icon buttons ────────────────────────────────────────────────────────── */
-.actionBtn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+.actions {
   display: flex;
   align-items: center;
-  line-height: 0;
+  gap: 6px;
+}
+
+.actionBtn {
+  background: transparent;
+  border: 1px solid var(--Outline-Light, #f5f5f5);
+  border-radius: 5px;
+  padding: 5px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.actionBtn:hover {
+  border-color: var(--for-medium, #7e807f);
+  background: var(--con-light, #fafafa);
+}
+
+.actionBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .actionIcon {
+  opacity: 0.5;
   display: block;
-  opacity: 0.28;
-  transition: opacity 0.15s;
-}
-
-.actionBtn:hover .actionIcon {
-  opacity: 0.65;
-}
-.actionBtn:disabled {
-  cursor: not-allowed;
-}
-.actionBtn:disabled .actionIcon {
-  opacity: 0.1;
 }
 
 .restoreBtn {
-  background: none;
+  background: transparent;
   border: 1px solid var(--Outline-Light, #f5f5f5);
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-size: 11px;
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 12px;
   color: var(--for-medium, #7e807f);
   cursor: pointer;
-  white-space: nowrap;
   transition: all 0.15s;
 }
 
@@ -425,7 +381,7 @@
 .modal {
   background: #fff;
   border-radius: 10px;
-  width: 400px;
+  width: 440px;
   max-width: calc(100vw - 2rem);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--Outline-Light, #f5f5f5);
@@ -449,15 +405,14 @@
   background: none;
   border: none;
   cursor: pointer;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 0;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--for-medium, #7e807f);
+  padding: 0 2px;
 }
 
-.modalClose:hover img {
-  opacity: 0.8 !important;
+.modalClose:hover {
+  color: var(--for-darkest, #212121);
 }
 
 .modalBody {
@@ -469,7 +424,7 @@
 .modalRow {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: flex-start;
   gap: 16px;
   padding: 9px 0;
   border-bottom: 1px solid var(--Outline-Light, #f5f5f5);
@@ -483,6 +438,7 @@
   font-size: 13px;
   color: var(--for-medium, #7e807f);
   flex-shrink: 0;
+  padding-top: 1px;
 }
 
 .modalValue {
@@ -490,21 +446,14 @@
   color: var(--for-darkest, #212121);
   font-weight: 500;
   text-align: right;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 220px;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 260px;
 }
 
 .modalValueGreen {
   color: #3a9e5f;
   font-size: 14px;
-}
-
-.modalDivider {
-  height: 1px;
-  background: var(--Outline-Light, #f5f5f5);
-  margin: 2px 0;
 }
 
 .modalFooter {
@@ -550,6 +499,7 @@
 .modalConfirmBtn:hover {
   opacity: 0.85;
 }
+
 .modalConfirmBtn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
