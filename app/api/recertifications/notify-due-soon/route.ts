@@ -137,20 +137,13 @@ function isRecertificationQuote(name: string): boolean {
   );
 }
 
-async function hasExistingQuote(
-  siteId: number,
-  year: number,
-): Promise<boolean> {
+async function hasExistingQuote(siteId: number): Promise<boolean> {
   try {
-    const yearStart = `${year}-01-01`;
-    const yearEnd = `${year}-12-31`;
     const url =
       `${SIMPRO_BASE_URL}/api/v1.0/companies/0/quotes/` +
       `?pageSize=50&page=1` +
       `&columns=ID,Name,DateCreated,Site` +
-      `&Site=${siteId}` +
-      `&DateCreated=gt(${yearStart})` +
-      `&DateCreated=lt(${yearEnd})`;
+      `&Site=${siteId}`;
 
     const quotes = await simproGet<any[]>(url);
     return quotes.some((q) => isRecertificationQuote(q.Name || ""));
@@ -351,8 +344,8 @@ export async function POST() {
         continue;
       }
 
-      // Quote check — live SimPRO call
-      const quoted = await hasExistingQuote(job.siteId, job.quoteYear);
+      // Quote check — live SimPRO call, any year
+      const quoted = await hasExistingQuote(job.siteId);
       if (quoted) {
         skippedQuoted++;
         continue;

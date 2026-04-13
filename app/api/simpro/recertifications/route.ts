@@ -107,8 +107,10 @@ async function fetchJobDetails(
   return results;
 }
 
-// ── Check SimPRO quotes for a site/year — live, no Neon ───────────────────
-// Returns the first matching recertification quote found, or null.
+// ── Check SimPRO quotes for a site — live, no Neon ───────────────────────
+// Returns the most recent matching recertification quote for the site,
+// regardless of year. A quote from 2024, 2025, 2026 or 2027 all count —
+// if any exists the site does not need action.
 
 function isRecertificationQuote(name: string): boolean {
   const n = name
@@ -129,40 +131,43 @@ function isRecertificationQuote(name: string): boolean {
 
 async function fetchExistingQuote(
   siteId: number,
-  year: number,
 ): Promise<RecertificationJob["existingQuote"]> {
   try {
-    const yearStart = `${year}-01-01`;
-    const yearEnd = `${year}-12-31`;
     const url =
       `${SIMPRO_BASE_URL}/api/v1.0/companies/0/quotes/` +
       `?pageSize=50&page=1` +
       `&columns=ID,Name,JobNo,Status,DateCreated,Site` +
-      `&Site=${siteId}` +
-      `&DateCreated=gt(${yearStart})` +
-      `&DateCreated=lt(${yearEnd})`;
+      `&Site=${siteId}`;
 
     const quotes = await simproGet<any[]>(url);
 
-    for (const q of quotes) {
-      if (!isRecertificationQuote(q.Name || "")) continue;
-      const statusRaw = (q.Status || "").toLowerCase();
-      const quoteStatus =
-        statusRaw === "sent"
-          ? "sent"
-          : statusRaw === "approved" || statusRaw === "accepted"
+    // Filter to recertification quotes then sort most recent first
+    const recertQuotes = quotes
+      .filter((q) => isRecertificationQuote(q.Name || ""))
+      .sort(
+        (a, b) =>
+          new Date(b.DateCreated).getTime() - new Date(a.DateCreated).getTime(),
+      );
+
+    if (!recertQuotes.length) return null;
+
+    const q = recertQuotes[0];
+    const statusRaw = (q.Status || "").toLowerCase();
+    const quoteStatus =
+      statusRaw === "sent"
+        ? "sent"
+        : statusRaw === "approved" || statusRaw === "accepted"
+          ? "approved"
+          : statusRaw.includes("won")
             ? "approved"
-            : statusRaw.includes("won")
-              ? "approved"
-              : "created";
-      return {
-        quoteId: q.ID,
-        quoteName: q.Name,
-        quoteStatus,
-        simproQuoteNo: q.JobNo || null,
-      };
-    }
-    return null;
+            : "created";
+
+    return {
+      quoteId: q.ID,
+      quoteName: q.Name,
+      quoteStatus,
+      simproQuoteNo: q.JobNo || null,
+    };
   } catch {
     // If the quote lookup fails, assume no quote rather than blocking the page
     return null;
@@ -218,7 +223,7 @@ async function buildResults(
       // Only hit SimPRO quotes API for jobs within 90 days (overdue or due-soon)
       // Upcoming jobs don't need quote checks — they're far out enough
       const existingQuote =
-        daysUntilDue <= 90 ? await fetchExistingQuote(siteId, quoteYear) : null;
+        daysUntilDue <= 90 ? await fetchExistingQuote(siteId) : null;
 
       const job: RecertificationJob = {
         id: j.ID,
