@@ -8,12 +8,12 @@
 //   3. If no quote exists, apply cadence rules:
 //      - daysUntilDue > 7  → notify if last notified > 3 days ago (or never)
 //      - daysUntilDue <= 7 → notify if last notified > 1 day ago (or never)
-//   4. Send one email per qualifying job
+//   4. Send one email per qualifying job with a deep link that opens the
+//      create-quote modal pre-filled for that site
 //   5. Update last_notified_at in Neon
 //
 // Natural stop: once a quote is created in SimPRO (by anyone),
-// fetchExistingQuote returns it and the job is skipped automatically.
-// No manual clearing required.
+// hasExistingQuote returns true and the job is skipped automatically.
 
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
@@ -33,6 +33,7 @@ const TO = ["admin@rasvertex.com.au", "sam@rasvertex.com.au"];
 
 interface JobSummary {
   id: number;
+  customerId: number;
   customer: string;
   site: string;
   siteId: number;
@@ -142,17 +143,16 @@ async function hasExistingQuote(siteId: number): Promise<boolean> {
     const url =
       `${SIMPRO_BASE_URL}/api/v1.0/companies/0/quotes/` +
       `?pageSize=50&page=1` +
-      `&columns=ID,Name,DateCreated,Site` +
+      `&columns=ID,Name,DateIssued,Site` +
       `&Site=${siteId}`;
-
     const quotes = await simproGet<any[]>(url);
     return quotes.some((q) => isRecertificationQuote(q.Name || ""));
   } catch {
-    return false; // on error, assume no quote — better to over-notify than miss
+    return false;
   }
 }
 
-// ── Email template — single job ───────────────────────────────────────────
+// ── Email template ────────────────────────────────────────────────────────
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-AU", {
@@ -190,9 +190,23 @@ function urgencyLabel(days: number): {
   };
 }
 
+function buildDeepLink(job: JobSummary): string {
+  const params = new URLSearchParams({
+    action: "quote",
+    jobId: String(job.id),
+    customerId: String(job.customerId),
+    siteId: String(job.siteId),
+    site: job.site,
+    customer: job.customer,
+    nextDueDate: job.nextDueDate,
+    lastExTax: String(job.totalExTax),
+  });
+  return `${APP_URL}/recertifications?${params.toString()}`;
+}
+
 function buildJobEmail(job: JobSummary): string {
   const urgency = urgencyLabel(job.daysUntilDue);
-  const createUrl = `${APP_URL}/recertifications`;
+  const createUrl = buildDeepLink(job);
 
   return `
     <div style="background:#f4f4f0;padding:2rem;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
@@ -234,7 +248,7 @@ function buildJobEmail(job: JobSummary): string {
         </div>
 
         <div style="background:#fff;padding:20px 32px 28px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
-          <a href="${createUrl}" style="display:inline-block;background:#0f2d4a;color:#fff;text-decoration:none;padding:11px 22px;border-radius:7px;font-size:14px;font-weight:500;">Create quote in RAS Admin →</a>
+          <a href="${createUrl}" style="display:inline-block;background:#0f2d4a;color:#fff;text-decoration:none;padding:11px 22px;border-radius:7px;font-size:14px;font-weight:500;">Create quote in RAS Vertex →</a>
         </div>
 
         <div style="background:#f9f9f7;border:1px solid #ebebeb;border-top:none;border-radius:0 0 10px 10px;padding:14px 32px;">
@@ -301,13 +315,14 @@ export async function POST() {
       const diffMs = nextDue.getTime() - today.getTime();
       const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-      if (daysUntilDue < 0 || daysUntilDue > 28) continue;
+      if (daysUntilDue > 28) continue;
 
       const dueYear = nextDue.getFullYear();
       const quoteYear = Math.max(dueYear, currentYear);
 
       candidates.push({
         id: j.ID,
+        customerId: j.Customer?.ID ?? 0,
         customer: j.Customer?.CompanyName || "Unknown",
         site: j.Site?.Name || "Unknown",
         siteId,

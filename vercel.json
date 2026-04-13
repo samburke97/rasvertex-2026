@@ -3,6 +3,10 @@
     {
       "path": "/api/recertifications/notify-due-soon",
       "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/simpro/recertifications/sync",
+      "schedule": "0 */4 * * *"
     }
   ]
 }

@@ -1,57 +1,38 @@
-// app/api/simpro/recertifications/route.ts
+// app/api/simpro/recertifications/sync/route.ts
 //
-// Live route — fetches jobs and quote state directly from SimPRO on every request.
-// No Neon cache required.
-//
-// Quote deduplication strategy:
-//   1. Fetch all recertification quotes in one bulk paginated call upfront
-//      using If-Modified-Since to limit to last 2 years
-//   2. Build a Map<siteId, mostRecentQuoteIssuedDate>
-//   3. A site is considered "quoted" if a recertification quote exists with
-//      DateIssued AFTER the site's most recent completed job date
-//   This avoids N per-site API calls entirely.
+// POST — full SimPRO sync, writes results to Neon cache.
+// Called by:
+//   - Vercel cron every 4 hours
+//   - Manual refresh button in the UI
 
-import { NextRequest, NextResponse } from "next/server";
-import { getIgnoredJobIds } from "@/lib/recertifications/store";
+import { NextResponse } from "next/server";
+import {
+  getIgnoredJobIds,
+  replaceCachedJobs,
+  getCachedJobs,
+} from "@/lib/recertifications/store";
+import type { RecertificationJob } from "@/app/api/simpro/recertifications/route";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
 const HEIGHT_SAFETY_COST_CENTRE_ID = 11;
 const PAGE_SIZE = 250;
 
-export interface RecertificationJob {
-  id: number;
-  name: string;
-  customer: string;
-  customerId: number;
-  site: string;
-  siteId: number;
-  completedDate: string;
-  nextDueDate: string;
-  daysUntilDue: number;
-  status: "overdue" | "due-soon" | "upcoming";
-  totalExTax: number;
-  totalIncTax: number;
-  quoteYear: number;
-}
-
 async function simproGet<T>(
   url: string,
-  headers?: Record<string, string>,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
   const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
       "Content-Type": "application/json",
-      ...headers,
+      ...extraHeaders,
     },
     next: { revalidate: 0 },
   });
   if (!res.ok) throw new Error(`SimPRO ${res.status}: ${res.statusText}`);
   return res.json();
 }
-
-// ── Fetch all Height Safety job IDs via cost centre ───────────────────────
 
 async function fetchHeightSafetyJobIds(): Promise<Set<number>> {
   const jobIds = new Set<number>();
@@ -70,8 +51,6 @@ async function fetchHeightSafetyJobIds(): Promise<Set<number>> {
   }
   return jobIds;
 }
-
-// ── Fetch job details, filtered to last 2 years ───────────────────────────
 
 async function fetchJobDetails(
   heightSafetyJobIds: Set<number>,
@@ -108,10 +87,6 @@ async function fetchJobDetails(
 
   return results;
 }
-
-// ── Fetch all recertification quotes in one bulk call ─────────────────────
-// Uses If-Modified-Since to limit to last 2 years.
-// Returns Map<siteId, mostRecentQuoteDateIssued>
 
 function isRecertificationQuote(name: string): boolean {
   const n = name
@@ -166,20 +141,17 @@ async function fetchQuotedSiteMap(): Promise<Map<number, Date>> {
   return quotedSites;
 }
 
-// ── Build result set ──────────────────────────────────────────────────────
-
-function buildResults(
-  jobs: any[],
-  ignoredIds: Set<number>,
+function buildJobs(
+  rawJobs: any[],
   quotedSiteMap: Map<number, Date>,
-): { active: RecertificationJob[]; ignored: RecertificationJob[] } {
+): RecertificationJob[] {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const currentYear = today.getFullYear();
 
-  // Deduplicate: most recent completed job per site
+  // Deduplicate — most recent completed job per site
   const latestJobBySite = new Map<number, any>();
-  for (const j of jobs) {
+  for (const j of rawJobs) {
     const siteId: number = j.Site?.ID;
     if (!siteId || !j.CompletedDate) continue;
     const existing = latestJobBySite.get(siteId);
@@ -191,8 +163,7 @@ function buildResults(
     }
   }
 
-  const active: RecertificationJob[] = [];
-  const ignored: RecertificationJob[] = [];
+  const jobs: RecertificationJob[] = [];
 
   for (const [siteId, j] of latestJobBySite.entries()) {
     const latestCompleted = new Date(j.CompletedDate);
@@ -202,8 +173,7 @@ function buildResults(
     const diffMs = nextDue.getTime() - today.getTime();
     const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-    // A site is "quoted" if a recertification quote was issued AFTER
-    // the most recent completed job — meaning this cycle is already covered.
+    // Exclude sites with a recertification quote issued after the last job
     const mostRecentQuote = quotedSiteMap.get(siteId);
     if (mostRecentQuote && mostRecentQuote > latestCompleted) continue;
 
@@ -215,7 +185,7 @@ function buildResults(
     const dueYear = nextDue.getFullYear();
     const quoteYear = Math.max(dueYear, currentYear);
 
-    const job: RecertificationJob = {
+    jobs.push({
       id: j.ID,
       name: j.Name,
       customer: j.Customer?.CompanyName || "Unknown",
@@ -229,24 +199,14 @@ function buildResults(
       totalExTax: j.Total?.ExTax ?? 0,
       totalIncTax: j.Total?.IncTax ?? 0,
       quoteYear,
-    };
-
-    if (ignoredIds.has(j.ID)) {
-      ignored.push(job);
-    } else {
-      active.push(job);
-    }
+    });
   }
 
-  active.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
-  ignored.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
-
-  return { active, ignored };
+  jobs.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+  return jobs;
 }
 
-// ── GET handler ───────────────────────────────────────────────────────────
-
-export async function GET(request: NextRequest) {
+export async function POST() {
   if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN) {
     return NextResponse.json(
       { error: "SimPRO configuration missing" },
@@ -255,27 +215,32 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [heightSafetyJobIds, ignoredIds, quotedSiteMap] = await Promise.all([
+    console.log("[Sync] Starting SimPRO recertification sync…");
+
+    const [heightSafetyJobIds, quotedSiteMap] = await Promise.all([
       fetchHeightSafetyJobIds(),
-      getIgnoredJobIds(),
       fetchQuotedSiteMap(),
     ]);
 
     const rawJobs = await fetchJobDetails(heightSafetyJobIds);
-    const { active, ignored } = buildResults(
-      rawJobs,
-      ignoredIds,
-      quotedSiteMap,
-    );
+    const jobs = buildJobs(rawJobs, quotedSiteMap);
+
+    await replaceCachedJobs(jobs);
+    console.log(`[Sync] Done — ${jobs.length} jobs written to cache`);
+
+    // Return fresh data immediately so the UI can update without a second request
+    const ignoredIds = await getIgnoredJobIds();
+    const { active, ignored, syncedAt } = await getCachedJobs(ignoredIds);
 
     return NextResponse.json({
       jobs: active,
       ignoredJobs: ignored,
       total: active.length,
+      syncedAt: syncedAt?.toISOString() ?? null,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[Recertifications]", message);
+    console.error("[Sync]", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

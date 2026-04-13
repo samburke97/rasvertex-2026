@@ -1,15 +1,16 @@
 // app/api/simpro/recertifications/create-quote/route.ts
 //
-// Creates a recertification quote directly in SimPRO.
-// No longer saves to Neon — SimPRO is the source of truth.
+// Creates a recertification quote directly in SimPRO, then removes
+// the site from the Neon cache so it disappears from the UI immediately.
 //
 // Full quote creation flow:
-// 1. POST /quotes/               — create quote with Salesperson/PM = Archer Dutch (ID 20)
+// 1. POST /quotes/               — create quote
 // 2. POST /quotes/{id}/sections/ — create blank section
 // 3. POST /quotes/{id}/sections/{sectionId}/costCenters/ — Height Safety (ID 11)
 // 4. POST /quotes/{id}/sections/{sectionId}/costCenters/{ccId}/oneOffs/ — price line item
 
 import { NextRequest, NextResponse } from "next/server";
+import { removeSiteFromCache } from "@/lib/recertifications/store";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
@@ -63,81 +64,72 @@ export async function POST(request: NextRequest) {
   const currentYear = new Date().getFullYear();
   const dueYear = new Date(nextDueDate).getFullYear();
   const quoteYear = Math.max(dueYear, currentYear);
-
-  // Canonical naming convention
   const quoteName = `Annual Anchor Recertification - ${quoteYear}`;
 
-  const description = `Height safety recertification at ${siteName}\nProfessional height safety services, including:\n* Carry out annual compliance inspection of existing roof-mounted anchor points.\n* On completion, inspect, tag and supply compliance documentation as per relevant legislation`;
-
   const newExTax = Math.round(lastExTax * 1.05 * 100) / 100;
+  const newIncTax = Math.round(newExTax * 1.1 * 100) / 100;
 
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 14);
   const dueDateStr = dueDate.toISOString().split("T")[0];
 
   try {
-    console.log(
-      `[CreateQuote] Step 1: Creating quote "${quoteName}" for customer ${customerId}`,
-    );
+    // 1. Create quote
     const quote = await simproPost<{ ID: number; JobNo: string }>(
       `/api/v1.0/companies/0/quotes/`,
       {
-        Customer: customerId,
-        Site: siteId,
-        Type: "Service",
         Name: quoteName,
-        Description: description,
+        Customer: { ID: customerId },
+        Site: { ID: siteId },
+        Type: "Service",
         DueDate: dueDateStr,
-        Salesperson: ARCHER_DUTCH_ID,
-        ProjectManager: ARCHER_DUTCH_ID,
+        Salesperson: { ID: ARCHER_DUTCH_ID },
+        ProjectManager: { ID: ARCHER_DUTCH_ID },
       },
     );
-    const quoteId = quote.ID;
-    const quoteNo = quote.JobNo || null;
-    console.log(`[CreateQuote] ✓ Quote created: ID ${quoteId} No ${quoteNo}`);
 
-    console.log(`[CreateQuote] Step 2: Creating section`);
+    const quoteId = quote.ID;
+
+    // 2. Create section
     const section = await simproPost<{ ID: number }>(
       `/api/v1.0/companies/0/quotes/${quoteId}/sections/`,
       {},
     );
+
     const sectionId = section.ID;
-    console.log(`[CreateQuote] ✓ Section created: ID ${sectionId}`);
 
-    console.log(`[CreateQuote] Step 3: Adding Height Safety cost centre`);
-    const cc = await simproPost<{ ID: number }>(
+    // 3. Add cost centre
+    const costCenter = await simproPost<{ ID: number }>(
       `/api/v1.0/companies/0/quotes/${quoteId}/sections/${sectionId}/costCenters/`,
-      { CostCenter: HEIGHT_SAFETY_COST_CENTRE_ID },
+      { CostCenter: { ID: HEIGHT_SAFETY_COST_CENTRE_ID } },
     );
-    const ccId = cc.ID;
-    console.log(`[CreateQuote] ✓ Cost centre added: ID ${ccId}`);
 
-    console.log(`[CreateQuote] Step 4: Adding labour line item`);
+    const costCenterId = costCenter.ID;
+
+    // 4. Add one-off labour line
     await simproPost(
-      `/api/v1.0/companies/0/quotes/${quoteId}/sections/${sectionId}/costCenters/${ccId}/oneOffs/`,
+      `/api/v1.0/companies/0/quotes/${quoteId}/sections/${sectionId}/costCenters/${costCenterId}/oneOffs/`,
       {
-        Name: quoteName,
+        Name: `${siteName} — Anchor Recertification ${quoteYear}`,
         Quantity: 1,
-        UnitPrice: newExTax,
-        Unit: "ea",
+        Unit: "each",
+        UnitSellExTax: newExTax,
       },
     );
-    console.log(`[CreateQuote] ✓ Line item added — $${newExTax} ex GST`);
 
-    console.log(
-      `[CreateQuote] ✅ Complete — quote ${quoteNo || quoteId} for ${customer}`,
-    );
+    // Remove from Neon cache — site disappears from UI on next read
+    await removeSiteFromCache(siteId);
 
     return NextResponse.json({
       quoteId,
-      quoteNo,
       quoteName,
-      quoteYear,
-      newExTax,
+      quoteNo: quote.JobNo ?? null,
+      totalExTax: newExTax,
+      totalIncTax: newIncTax,
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[CreateQuote] Error:", message);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[CreateQuote]", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

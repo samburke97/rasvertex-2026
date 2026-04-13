@@ -7,6 +7,7 @@ import styles from "./RecertificationPage.module.css";
 import type { RecertificationJob } from "@/app/api/simpro/recertifications/route";
 
 function formatDate(iso: string): string {
+  if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-AU", {
     day: "numeric",
     month: "short",
@@ -19,6 +20,15 @@ function formatCurrency(n: number): string {
     style: "currency",
     currency: "AUD",
   }).format(n);
+}
+
+function timeAgo(date: Date): string {
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 function StatusPill({
@@ -35,24 +45,6 @@ function StatusPill({
   if (status === "due-soon")
     return <span className={styles.pillDueSoon}>Due in {days}d</span>;
   return <span className={styles.pillUpcoming}>{days}d away</span>;
-}
-
-function QuoteStatusBadge({
-  quote,
-}: {
-  quote: RecertificationJob["existingQuote"];
-}) {
-  if (!quote) return null;
-  const isSent =
-    quote.quoteStatus === "sent" || quote.quoteStatus === "approved";
-  return (
-    <span className={isSent ? styles.quoteBadgeSent : styles.quoteBadgeCreated}>
-      {isSent ? "Sent" : "Created"}
-      {quote.simproQuoteNo && (
-        <span className={styles.quoteBadgeNo}> #{quote.simproQuoteNo}</span>
-      )}
-    </span>
-  );
 }
 
 // ── Confirm modal ─────────────────────────────────────────────────────────
@@ -176,7 +168,9 @@ export default function RecertificationPage() {
   const [jobs, setJobs] = useState<RecertificationJob[]>([]);
   const [ignoredJobs, setIgnoredJobs] = useState<RecertificationJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncedAt, setSyncedAt] = useState<Date | null>(null);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
   const [confirmJob, setConfirmJob] = useState<RecertificationJob | null>(null);
@@ -184,6 +178,7 @@ export default function RecertificationPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [ignoringId, setIgnoringId] = useState<number | null>(null);
 
+  // ── Load from cache — instant ─────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -193,6 +188,7 @@ export default function RecertificationPage() {
       const data = await res.json();
       setJobs(data.jobs ?? []);
       setIgnoredJobs(data.ignoredJobs ?? []);
+      setSyncedAt(data.syncedAt ? new Date(data.syncedAt) : null);
     } catch {
       setError("Could not load recertification data.");
     } finally {
@@ -200,13 +196,74 @@ export default function RecertificationPage() {
     }
   }, []);
 
+  // ── Sync from SimPRO — triggered manually or by cron ─────────────────
+  const sync = useCallback(async () => {
+    setSyncing(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/simpro/recertifications/sync", {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Sync failed");
+      const data = await res.json();
+      setJobs(data.jobs ?? []);
+      setIgnoredJobs(data.ignoredJobs ?? []);
+      setSyncedAt(data.syncedAt ? new Date(data.syncedAt) : null);
+      setToast("Synced with SimPRO");
+    } catch {
+      setError("Sync failed. Try again.");
+    } finally {
+      setSyncing(false);
+    }
+  }, []);
+
   useEffect(() => {
     load();
   }, [load]);
 
-  // ── Quote action ──────────────────────────────────────────────────────────
+  // ── Deep link from email — open confirm modal pre-filled ─────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("action") !== "quote") return;
+
+    const jobId = Number(params.get("jobId"));
+    const customerId = Number(params.get("customerId"));
+    const siteId = Number(params.get("siteId"));
+    const site = params.get("site") || "";
+    const customer = params.get("customer") || "";
+    const nextDueDate = params.get("nextDueDate") || "";
+    const lastExTax = Number(params.get("lastExTax") || 0);
+
+    if (!jobId || !customerId || !siteId) return;
+
+    const currentYear = new Date().getFullYear();
+    const dueYear = nextDueDate
+      ? new Date(nextDueDate).getFullYear()
+      : currentYear;
+    const quoteYear = Math.max(dueYear, currentYear);
+
+    setConfirmJob({
+      id: jobId,
+      name: "",
+      customer,
+      customerId,
+      site,
+      siteId,
+      completedDate: "",
+      nextDueDate,
+      daysUntilDue: 0,
+      status: "overdue",
+      totalExTax: lastExTax,
+      totalIncTax: Math.round(lastExTax * 1.1 * 100) / 100,
+      quoteYear,
+    });
+
+    // Clean URL so refreshing doesn't re-open modal
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
+  // ── Quote action ──────────────────────────────────────────────────────
   const handleQuoteAction = (job: RecertificationJob) => {
-    if (job.existingQuote) return; // already quoted — action button not shown
     setConfirmJob(job);
   };
 
@@ -228,22 +285,8 @@ export default function RecertificationPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error || "Failed");
       const result = await res.json();
-      // Optimistically update local state — next full load will re-verify from SimPRO
-      setJobs((prev) =>
-        prev.map((j) =>
-          j.id === confirmJob.id
-            ? {
-                ...j,
-                existingQuote: {
-                  quoteId: result.quoteId,
-                  quoteName: result.quoteName,
-                  quoteStatus: "created",
-                  simproQuoteNo: result.quoteNo || null,
-                },
-              }
-            : j,
-        ),
-      );
+      // Remove from local state immediately — cache already updated server-side
+      setJobs((prev) => prev.filter((j) => j.id !== confirmJob.id));
       setToast(`Quote created — ${result.quoteName}`);
       setConfirmJob(null);
     } catch (err) {
@@ -291,23 +334,22 @@ export default function RecertificationPage() {
     }
   };
 
-  // ── Derived counts (unquoted jobs only for status buckets) ───────────────
-  const unquoted = useMemo(() => jobs.filter((j) => !j.existingQuote), [jobs]);
+  // ── Derived counts ────────────────────────────────────────────────────
   const overdueCt = useMemo(
-    () => unquoted.filter((j) => j.status === "overdue").length,
-    [unquoted],
+    () => jobs.filter((j) => j.status === "overdue").length,
+    [jobs],
   );
   const dueSoonCt = useMemo(
-    () => unquoted.filter((j) => j.status === "due-soon").length,
-    [unquoted],
+    () => jobs.filter((j) => j.status === "due-soon").length,
+    [jobs],
   );
   const upcomingCt = useMemo(
-    () => unquoted.filter((j) => j.status === "upcoming").length,
-    [unquoted],
+    () => jobs.filter((j) => j.status === "upcoming").length,
+    [jobs],
   );
 
   const filtered = useMemo(() => {
-    let base: RecertificationJob[] =
+    const base: RecertificationJob[] =
       filter === "hidden"
         ? ignoredJobs
         : filter === "all"
@@ -317,7 +359,6 @@ export default function RecertificationPage() {
     const q = search.toLowerCase();
     return base.filter(
       (j) =>
-        j.name.toLowerCase().includes(q) ||
         j.customer.toLowerCase().includes(q) ||
         j.site.toLowerCase().includes(q),
     );
@@ -356,12 +397,15 @@ export default function RecertificationPage() {
       <div className={styles.header}>
         <h1 className={styles.title}>Anchor Recertifications</h1>
         <div className={styles.headerRight}>
+          {syncedAt && (
+            <span className={styles.syncedAt}>Synced {timeAgo(syncedAt)}</span>
+          )}
           <button
             className={styles.refreshBtn}
-            onClick={load}
-            disabled={loading}
+            onClick={sync}
+            disabled={syncing || loading}
           >
-            {loading ? "Loading…" : "↺ Refresh"}
+            {syncing ? "Syncing…" : "↺ Sync"}
           </button>
         </div>
       </div>
@@ -459,26 +503,23 @@ export default function RecertificationPage() {
                         />
                       </td>
                       <td className={styles.td}>
-                        <div className={styles.actionGroup}>
-                          {!isHidden &&
-                            (job.existingQuote ? (
-                              <QuoteStatusBadge quote={job.existingQuote} />
-                            ) : (
-                              <button
-                                className={styles.actionBtn}
-                                onClick={() => handleQuoteAction(job)}
-                                title="Create quote"
-                              >
-                                <Image
-                                  src="/icons/utility-outline/edit.svg"
-                                  width={15}
-                                  height={15}
-                                  alt="Create quote"
-                                  className={styles.actionIcon}
-                                  priority
-                                />
-                              </button>
-                            ))}
+                        <div className={styles.actions}>
+                          {!isHidden && (
+                            <button
+                              className={styles.actionBtn}
+                              onClick={() => handleQuoteAction(job)}
+                              title="Create quote"
+                            >
+                              <Image
+                                src="/icons/utility-outline/edit.svg"
+                                width={15}
+                                height={15}
+                                alt="Create quote"
+                                className={styles.actionIcon}
+                                priority
+                              />
+                            </button>
+                          )}
                           {isHidden ? (
                             <button
                               className={styles.restoreBtn}
