@@ -1,13 +1,14 @@
 // app/api/simpro/recertifications/route.ts
+//
+// Live route — fetches jobs and checks quotes directly from SimPRO on every
+// request. No Neon cache, no quote sync required.
+//
+// Quote existence is determined by querying SimPRO quotes for the site,
+// filtered to the current year and matching recertification name patterns.
+// This means quotes created directly in SimPRO are reflected immediately.
 
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getCachedJobs,
-  setCachedJobs,
-  getRecertQuoteMap,
-  getIgnoredJobIds,
-  type RecertQuoteRecord,
-} from "@/lib/recertifications/store";
+import { getIgnoredJobIds } from "@/lib/recertifications/store";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
@@ -48,6 +49,8 @@ async function simproGet<T>(url: string): Promise<T> {
   return res.json();
 }
 
+// ── Fetch all Height Safety job IDs via cost centre ───────────────────────
+
 async function fetchHeightSafetyJobIds(): Promise<Set<number>> {
   const jobIds = new Set<number>();
   let page = 1;
@@ -65,6 +68,8 @@ async function fetchHeightSafetyJobIds(): Promise<Set<number>> {
   }
   return jobIds;
 }
+
+// ── Fetch job details, filtered to last 2 years ───────────────────────────
 
 async function fetchJobDetails(
   heightSafetyJobIds: Set<number>,
@@ -102,19 +107,80 @@ async function fetchJobDetails(
   return results;
 }
 
-function buildResults(
+// ── Check SimPRO quotes for a site/year — live, no Neon ───────────────────
+// Returns the first matching recertification quote found, or null.
+
+function isRecertificationQuote(name: string): boolean {
+  const n = name
+    .toLowerCase()
+    .replace(/\s*&\s*/g, " and ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (
+    n.includes("anchor recertification") ||
+    n.includes("annual anchor recertification") ||
+    n.includes("annual anchor test") ||
+    n.includes("anchor test and recertification") ||
+    n.includes("anchor rest and recertification") ||
+    n.includes("anchor test") ||
+    n.includes("recertification")
+  );
+}
+
+async function fetchExistingQuote(
+  siteId: number,
+  year: number,
+): Promise<RecertificationJob["existingQuote"]> {
+  try {
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
+    const url =
+      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/quotes/` +
+      `?pageSize=50&page=1` +
+      `&columns=ID,Name,JobNo,Status,DateCreated,Site` +
+      `&Site=${siteId}` +
+      `&DateCreated=gt(${yearStart})` +
+      `&DateCreated=lt(${yearEnd})`;
+
+    const quotes = await simproGet<any[]>(url);
+
+    for (const q of quotes) {
+      if (!isRecertificationQuote(q.Name || "")) continue;
+      const statusRaw = (q.Status || "").toLowerCase();
+      const quoteStatus =
+        statusRaw === "sent"
+          ? "sent"
+          : statusRaw === "approved" || statusRaw === "accepted"
+            ? "approved"
+            : statusRaw.includes("won")
+              ? "approved"
+              : "created";
+      return {
+        quoteId: q.ID,
+        quoteName: q.Name,
+        quoteStatus,
+        simproQuoteNo: q.JobNo || null,
+      };
+    }
+    return null;
+  } catch {
+    // If the quote lookup fails, assume no quote rather than blocking the page
+    return null;
+  }
+}
+
+// ── Build result set ──────────────────────────────────────────────────────
+
+async function buildResults(
   jobs: any[],
-  quoteMap: Map<string, RecertQuoteRecord>,
   ignoredIds: Set<number>,
-): RecertificationJob[] {
+  includeIgnored: boolean,
+): Promise<{ active: RecertificationJob[]; ignored: RecertificationJob[] }> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const currentYear = today.getFullYear();
 
-  // ── Find the most recent completed job per site ───────────────────────────
-  // If a site had a job done in 2024 AND 2026, we use the 2026 date as the
-  // base for nextDue. This prevents sites showing as overdue when a newer
-  // recertification has already been completed.
+  // Deduplicate: most recent completed job per site
   const latestJobBySite = new Map<number, any>();
   for (const j of jobs) {
     const siteId: number = j.Site?.ID;
@@ -128,54 +194,71 @@ function buildResults(
     }
   }
 
-  const results: RecertificationJob[] = [];
+  // Fetch quotes in parallel for all sites in the window (0–90 days)
+  // to avoid N+1 on full dataset. Only fetch for jobs that need it.
+  const siteEntries = Array.from(latestJobBySite.entries());
 
-  for (const [siteId, j] of latestJobBySite) {
-    if (ignoredIds.has(j.ID)) continue;
+  const results = await Promise.all(
+    siteEntries.map(async ([siteId, j]) => {
+      const latestCompleted = new Date(j.CompletedDate);
+      const nextDue = new Date(latestCompleted);
+      nextDue.setFullYear(nextDue.getFullYear() + 1);
 
-    const latestCompleted = new Date(j.CompletedDate);
-    const nextDue = new Date(latestCompleted);
-    nextDue.setFullYear(nextDue.getFullYear() + 1);
+      const diffMs = nextDue.getTime() - today.getTime();
+      const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-    const diffMs = nextDue.getTime() - today.getTime();
-    const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      let status: RecertificationJob["status"];
+      if (daysUntilDue < 0) status = "overdue";
+      else if (daysUntilDue <= 60) status = "due-soon";
+      else status = "upcoming";
 
-    let status: RecertificationJob["status"];
-    if (daysUntilDue < 0) status = "overdue";
-    else if (daysUntilDue <= 60) status = "due-soon";
-    else status = "upcoming";
+      const dueYear = nextDue.getFullYear();
+      const quoteYear = Math.max(dueYear, currentYear);
 
-    const dueYear = nextDue.getFullYear();
-    const quoteYear = Math.max(dueYear, currentYear);
-    const existing = quoteMap.get(`${siteId}:${quoteYear}`) ?? null;
+      // Only hit SimPRO quotes API for jobs within 90 days (overdue or due-soon)
+      // Upcoming jobs don't need quote checks — they're far out enough
+      const existingQuote =
+        daysUntilDue <= 90 ? await fetchExistingQuote(siteId, quoteYear) : null;
 
-    results.push({
-      id: j.ID,
-      name: j.Name,
-      customer: j.Customer?.CompanyName || "Unknown",
-      customerId: j.Customer?.ID,
-      site: j.Site?.Name || "Unknown",
-      siteId,
-      completedDate: j.CompletedDate,
-      nextDueDate: nextDue.toISOString().split("T")[0],
-      daysUntilDue,
-      status,
-      totalExTax: j.Total?.ExTax ?? 0,
-      totalIncTax: j.Total?.IncTax ?? 0,
-      quoteYear,
-      existingQuote: existing
-        ? {
-            quoteId: existing.quoteId,
-            quoteName: existing.quoteName,
-            quoteStatus: existing.quoteStatus,
-            simproQuoteNo: existing.simproQuoteNo,
-          }
-        : null,
-    });
+      const job: RecertificationJob = {
+        id: j.ID,
+        name: j.Name,
+        customer: j.Customer?.CompanyName || "Unknown",
+        customerId: j.Customer?.ID,
+        site: j.Site?.Name || "Unknown",
+        siteId,
+        completedDate: j.CompletedDate,
+        nextDueDate: nextDue.toISOString().split("T")[0],
+        daysUntilDue,
+        status,
+        totalExTax: j.Total?.ExTax ?? 0,
+        totalIncTax: j.Total?.IncTax ?? 0,
+        quoteYear,
+        existingQuote,
+      };
+
+      return { job, isIgnored: ignoredIds.has(j.ID) };
+    }),
+  );
+
+  const active: RecertificationJob[] = [];
+  const ignored: RecertificationJob[] = [];
+
+  for (const { job, isIgnored } of results) {
+    if (isIgnored) {
+      ignored.push(job);
+    } else {
+      active.push(job);
+    }
   }
 
-  return results.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+  active.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+  ignored.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+
+  return { active, ignored };
 }
+
+// ── GET handler ───────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
   if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN) {
@@ -185,74 +268,26 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const forceRefresh = request.nextUrl.searchParams.get("refresh") === "true";
   const showIgnored =
     request.nextUrl.searchParams.get("showIgnored") === "true";
 
   try {
-    let rawJobs: any[];
-    let fromCache = false;
-    let cacheAge: string | null = null;
-
-    if (!forceRefresh) {
-      const cached = await getCachedJobs<any>();
-      if (cached) {
-        rawJobs = cached.jobs;
-        fromCache = true;
-        const ageMs = Date.now() - cached.fetchedAt.getTime();
-        cacheAge = `${Math.floor(ageMs / 60000)}m ago`;
-      }
-    }
-
-    if (!fromCache) {
-      const heightSafetyJobIds = await fetchHeightSafetyJobIds();
-      rawJobs = await fetchJobDetails(heightSafetyJobIds);
-      await setCachedJobs(rawJobs);
-    }
-
-    const today = new Date();
-    const currentYear = today.getFullYear();
-
-    // Build quote map pairs using latest completed date per site
-    const latestBySite = new Map<number, Date>();
-    for (const j of rawJobs!) {
-      const siteId: number = j.Site?.ID;
-      if (!siteId || !j.CompletedDate) continue;
-      const completed = new Date(j.CompletedDate);
-      const existing = latestBySite.get(siteId);
-      if (!existing || completed > existing)
-        latestBySite.set(siteId, completed);
-    }
-
-    const pairs = Array.from(latestBySite.entries()).map(
-      ([siteId, latestCompleted]) => {
-        const nextDue = new Date(latestCompleted);
-        nextDue.setFullYear(nextDue.getFullYear() + 1);
-        const dueYear = nextDue.getFullYear();
-        return { siteId, year: Math.max(dueYear, currentYear) };
-      },
-    );
-
-    const [quoteMap, ignoredIds] = await Promise.all([
-      getRecertQuoteMap(pairs),
+    const [heightSafetyJobIds, ignoredIds] = await Promise.all([
+      fetchHeightSafetyJobIds(),
       getIgnoredJobIds(),
     ]);
 
-    const effectiveIgnored = showIgnored ? new Set<number>() : ignoredIds;
-    const results = buildResults(rawJobs!, quoteMap, effectiveIgnored);
-
-    const ignoredJobs = showIgnored
-      ? []
-      : buildResults(rawJobs!, quoteMap, new Set<number>()).filter((j) =>
-          ignoredIds.has(j.id),
-        );
+    const rawJobs = await fetchJobDetails(heightSafetyJobIds);
+    const { active, ignored } = await buildResults(
+      rawJobs,
+      ignoredIds,
+      showIgnored,
+    );
 
     return NextResponse.json({
-      jobs: results,
-      ignoredJobs,
-      total: results.length,
-      fromCache,
-      cacheAge,
+      jobs: active,
+      ignoredJobs: ignored,
+      total: active.length,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
