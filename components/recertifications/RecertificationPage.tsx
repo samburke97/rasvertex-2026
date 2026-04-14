@@ -1,7 +1,13 @@
 "use client";
 // components/recertifications/RecertificationPage.tsx
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import Image from "next/image";
 import styles from "./RecertificationPage.module.css";
 import type { RecertificationJob } from "@/app/api/simpro/recertifications/route";
@@ -47,6 +53,50 @@ function StatusPill({
   return <span className={styles.pillUpcoming}>{days}d away</span>;
 }
 
+// ── Parse deep link params synchronously ─────────────────────────────────
+// Called once at module level so the result is available before any render.
+function parseDeepLinkParams(): RecertificationJob | null {
+  if (typeof window === "undefined") return null;
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("action") !== "quote") return null;
+
+  const jobId = Number(params.get("jobId"));
+  const customerId = Number(params.get("customerId"));
+  const siteId = Number(params.get("siteId"));
+  const site = params.get("site") || "";
+  const customer = params.get("customer") || "";
+  const nextDueDate = params.get("nextDueDate") || "";
+  const lastExTax = Number(params.get("lastExTax") || 0);
+
+  if (!jobId || !customerId || !siteId) return null;
+
+  const currentYear = new Date().getFullYear();
+  const dueYear = nextDueDate
+    ? new Date(nextDueDate).getFullYear()
+    : currentYear;
+  const quoteYear = Math.max(dueYear, currentYear);
+
+  // Strip params from URL immediately so a refresh doesn't re-open the modal
+  window.history.replaceState({}, "", window.location.pathname);
+
+  return {
+    id: jobId,
+    name: "",
+    customer,
+    customerId,
+    site,
+    siteId,
+    completedDate: "",
+    nextDueDate,
+    daysUntilDue: 0,
+    status: "overdue",
+    totalExTax: lastExTax,
+    totalIncTax: Math.round(lastExTax * 1.1 * 100) / 100,
+    quoteYear,
+  };
+}
+
 // ── Confirm modal ─────────────────────────────────────────────────────────
 function ConfirmModal({
   job,
@@ -76,12 +126,16 @@ function ConfirmModal({
     { label: "Customer", value: job.customer },
     { label: "Site", value: job.site },
     {
-      label: "Value (ex GST)",
+      label: "Last price (ex GST)",
+      value: `$${job.totalExTax.toLocaleString("en-AU", { minimumFractionDigits: 2 })}`,
+    },
+    {
+      label: "New price (ex GST) +5%",
       value: `$${newExTax.toLocaleString("en-AU", { minimumFractionDigits: 2 })}`,
       highlight: true,
     },
     {
-      label: "Value (inc GST)",
+      label: "New price (inc GST)",
       value: `$${newIncTax.toLocaleString("en-AU", { minimumFractionDigits: 2 })}`,
     },
     {
@@ -173,12 +227,20 @@ export default function RecertificationPage() {
   const [syncedAt, setSyncedAt] = useState<Date | null>(null);
   const [filter, setFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
-  const [confirmJob, setConfirmJob] = useState<RecertificationJob | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [ignoringId, setIgnoringId] = useState<number | null>(null);
 
-  // ── Load from cache — instant ─────────────────────────────────────────
+  // Parse deep link params synchronously on first render so the modal opens
+  // immediately — before load() completes. useRef ensures we only parse once.
+  const deepLinkJob = useRef<RecertificationJob | null>(
+    typeof window !== "undefined" ? parseDeepLinkParams() : null,
+  );
+  const [confirmJob, setConfirmJob] = useState<RecertificationJob | null>(
+    deepLinkJob.current,
+  );
+
+  // ── Load from SimPRO ──────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -221,47 +283,6 @@ export default function RecertificationPage() {
     load();
   }, [load]);
 
-  // ── Deep link from email — open confirm modal pre-filled ─────────────
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("action") !== "quote") return;
-
-    const jobId = Number(params.get("jobId"));
-    const customerId = Number(params.get("customerId"));
-    const siteId = Number(params.get("siteId"));
-    const site = params.get("site") || "";
-    const customer = params.get("customer") || "";
-    const nextDueDate = params.get("nextDueDate") || "";
-    const lastExTax = Number(params.get("lastExTax") || 0);
-
-    if (!jobId || !customerId || !siteId) return;
-
-    const currentYear = new Date().getFullYear();
-    const dueYear = nextDueDate
-      ? new Date(nextDueDate).getFullYear()
-      : currentYear;
-    const quoteYear = Math.max(dueYear, currentYear);
-
-    setConfirmJob({
-      id: jobId,
-      name: "",
-      customer,
-      customerId,
-      site,
-      siteId,
-      completedDate: "",
-      nextDueDate,
-      daysUntilDue: 0,
-      status: "overdue",
-      totalExTax: lastExTax,
-      totalIncTax: Math.round(lastExTax * 1.1 * 100) / 100,
-      quoteYear,
-    });
-
-    // Clean URL so refreshing doesn't re-open modal
-    window.history.replaceState({}, "", window.location.pathname);
-  }, []);
-
   // ── Quote action ──────────────────────────────────────────────────────
   const handleQuoteAction = (job: RecertificationJob) => {
     setConfirmJob(job);
@@ -285,8 +306,26 @@ export default function RecertificationPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error || "Failed");
       const result = await res.json();
-      // Remove from local state immediately — cache already updated server-side
-      setJobs((prev) => prev.filter((j) => j.id !== confirmJob.id));
+
+      // Move the job to upcoming locally — shift nextDueDate forward one year
+      setJobs((prev) =>
+        prev.map((j) => {
+          if (j.id !== confirmJob.id) return j;
+          const currentNextDue = new Date(j.nextDueDate);
+          const effectiveNextDue = new Date(currentNextDue);
+          effectiveNextDue.setFullYear(currentNextDue.getFullYear() + 1);
+          const daysUntilDue = Math.ceil(
+            (effectiveNextDue.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+          );
+          return {
+            ...j,
+            nextDueDate: effectiveNextDue.toISOString().split("T")[0],
+            daysUntilDue,
+            status: "upcoming" as const,
+          };
+        }),
+      );
+
       setToast(`Quote created — ${result.quoteName}`);
       setConfirmJob(null);
     } catch (err) {
@@ -441,6 +480,21 @@ export default function RecertificationPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button
+              className={styles.searchClearBtn}
+              onClick={() => setSearch("")}
+              aria-label="Clear search"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/icons/utility-outline/cross.svg"
+                width={12}
+                height={12}
+                alt="Clear"
+              />
+            </button>
+          )}
         </div>
       </div>
 
@@ -535,14 +589,18 @@ export default function RecertificationPage() {
                               disabled={isIgnoring}
                               title="Hide"
                             >
-                              <Image
-                                src="/icons/utility-outline/trash.svg"
-                                width={15}
-                                height={15}
-                                alt="Hide"
-                                className={styles.actionIcon}
-                                priority
-                              />
+                              {isIgnoring ? (
+                                "…"
+                              ) : (
+                                <Image
+                                  src="/icons/utility-outline/trash.svg"
+                                  width={15}
+                                  height={15}
+                                  alt="Hide"
+                                  className={styles.actionIcon}
+                                  priority
+                                />
+                              )}
                             </button>
                           )}
                         </div>

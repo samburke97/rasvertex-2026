@@ -122,7 +122,7 @@
 
 .searchIcon {
   position: absolute;
-  right: 10px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;
@@ -131,7 +131,8 @@
 
 .searchInput {
   width: 100%;
-  padding: 9px 34px 9px 12px;
+  /* left padding accommodates the search icon, right padding accommodates the clear button */
+  padding: 9px 34px 9px 30px;
   border: 1px solid var(--Outline-Light, #f5f5f5);
   border-radius: 6px;
   font-size: 14px;
@@ -148,6 +149,27 @@
 
 .searchInput:focus {
   border-color: var(--for-medium, #7e807f);
+}
+
+.searchClearBtn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+  line-height: 0;
+}
+
+.searchClearBtn:hover {
+  opacity: 0.8;
 }
 
 /* ── Table ───────────────────────────────────────────────────────────────── */
@@ -229,71 +251,61 @@
 .pillOverdue {
   display: inline-flex;
   align-items: center;
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+  padding: 3px 8px;
   border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  font-weight: 500;
+  background: #fef2f2;
+  color: #e05252;
 }
 
 .pillDueSoon {
   display: inline-flex;
   align-items: center;
-  background: #fff7ed;
-  color: #9a3412;
-  border: 1px solid #fed7aa;
+  padding: 3px 8px;
   border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  font-weight: 500;
+  background: #fffbeb;
+  color: #d4881a;
 }
 
 .pillUpcoming {
   display: inline-flex;
   align-items: center;
-  background: #f0fdf4;
-  color: #166534;
-  border: 1px solid #bbf7d0;
+  padding: 3px 8px;
   border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  white-space: nowrap;
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f0fdf4;
+  color: #3a9e5f;
 }
 
 /* ── Actions ─────────────────────────────────────────────────────────────── */
 .actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .actionBtn {
-  background: transparent;
-  border: 1px solid var(--Outline-Light, #f5f5f5);
-  border-radius: 5px;
-  padding: 5px;
+  background: none;
+  border: none;
   cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
+  transition: background 0.15s;
 }
 
 .actionBtn:hover {
-  border-color: var(--for-medium, #7e807f);
-  background: var(--con-light, #fafafa);
+  background: var(--con-light, #f5f5f5);
 }
 
 .actionBtn:disabled {
-  opacity: 0.3;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -302,8 +314,35 @@
   display: block;
 }
 
+.actionBtn:hover .actionIcon {
+  opacity: 0.8;
+}
+
+.ignoreBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+  font-size: 13px;
+  color: var(--for-medium, #7e807f);
+}
+
+.ignoreBtn:hover {
+  background: var(--con-light, #f5f5f5);
+}
+
+.ignoreBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .restoreBtn {
-  background: transparent;
+  background: none;
   border: 1px solid var(--Outline-Light, #f5f5f5);
   border-radius: 5px;
   padding: 4px 10px;
@@ -319,21 +358,20 @@
 }
 
 .restoreBtn:disabled {
-  opacity: 0.3;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 /* ── Loading / empty ─────────────────────────────────────────────────────── */
 .loadingState {
   display: flex;
-  align-items: center;
   justify-content: center;
   padding: 64px;
 }
 
 .spinner {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border: 2px solid var(--Outline-Light, #f5f5f5);
   border-top-color: var(--for-medium, #7e807f);
   border-radius: 50%;
@@ -537,23 +575,3 @@
 .toastClose:hover img {
   opacity: 0.9 !important;
 }
-
-.verifyingDot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 2px solid #d1d1d0;
-  border-top-color: #7e807f;
-  animation: spin 0.6s linear infinite;
-}
-
-/* .verifyingDot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 2px solid #d1d1d0;
-  border-top-color: #7e807f;
-  animation: spin 0.6s linear infinite;
-} */

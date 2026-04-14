@@ -167,22 +167,31 @@ function buildJobs(
 
   for (const [siteId, j] of latestJobBySite.entries()) {
     const latestCompleted = new Date(j.CompletedDate);
+
+    // Base next due date: one year after last completed job
     const nextDue = new Date(latestCompleted);
     nextDue.setFullYear(nextDue.getFullYear() + 1);
 
-    const diffMs = nextDue.getTime() - today.getTime();
-    const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-    // Exclude sites with a recertification quote issued after the last job
+    // If a recertification quote was issued after the last completed job,
+    // this cycle is already covered — shift the effective due date forward
+    // one more year so the site appears as upcoming rather than disappearing.
     const mostRecentQuote = quotedSiteMap.get(siteId);
-    if (mostRecentQuote && mostRecentQuote > latestCompleted) continue;
+    const isQuoted = !!(mostRecentQuote && mostRecentQuote > latestCompleted);
+
+    const effectiveNextDue = isQuoted
+      ? new Date(new Date(nextDue).setFullYear(nextDue.getFullYear() + 1))
+      : nextDue;
+
+    const daysUntilDue = Math.ceil(
+      (effectiveNextDue.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     let status: RecertificationJob["status"];
     if (daysUntilDue < 0) status = "overdue";
     else if (daysUntilDue <= 60) status = "due-soon";
     else status = "upcoming";
 
-    const dueYear = nextDue.getFullYear();
+    const dueYear = effectiveNextDue.getFullYear();
     const quoteYear = Math.max(dueYear, currentYear);
 
     jobs.push({
@@ -193,7 +202,7 @@ function buildJobs(
       site: j.Site?.Name || "Unknown",
       siteId,
       completedDate: j.CompletedDate,
-      nextDueDate: nextDue.toISOString().split("T")[0],
+      nextDueDate: effectiveNextDue.toISOString().split("T")[0],
       daysUntilDue,
       status,
       totalExTax: j.Total?.ExTax ?? 0,
