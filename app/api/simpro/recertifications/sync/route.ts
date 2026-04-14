@@ -126,8 +126,8 @@ async function fetchQuotedSiteMap(): Promise<Map<number, Date>> {
     for (const q of batch) {
       if (!isRecertificationQuote(q.Name || "")) continue;
       const siteId: number = q.Site?.ID;
-      if (!siteId || !q.DateIssued) continue;
-      const issued = new Date(q.DateIssued);
+      if (!siteId) continue;
+      const issued = q.DateIssued ? new Date(q.DateIssued) : new Date();
       const existing = quotedSites.get(siteId);
       if (!existing || issued > existing) {
         quotedSites.set(siteId, issued);

@@ -521,7 +521,7 @@ export default function RecertificationPage() {
                 <tr>
                   <th className={styles.th}>Customer</th>
                   <th className={styles.th}>Site</th>
-                  <th className={styles.th}>Completed</th>
+                  <th className={styles.th}>Last Completed</th>
                   <th className={styles.th}>Next Due</th>
                   <th className={styles.th}>Last Price</th>
                   <th className={styles.th}>Status</th>
