@@ -2,6 +2,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // SimPRO sends: { name: "Job", action: "updated", reference: { companyID: 0, jobID: 10862 } }
 // All job fetching / address resolution delegates to lib/simpro/client.ts
+//
+// Guard logic:
+//  - "created" events → always process (new job)
+//  - "updated" events → only process if job was created within the last 10 min
+//    (covers quote→job conversions which fire "updated", not "created")
+//  - Either way: skip if an agreement already exists for this jobId
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -16,7 +22,10 @@ import { Resend } from "resend";
 const THRESHOLD = 20000;
 const APP_URL = "https://rasvertex-2026.vercel.app";
 
-// ── Lazy initialise Resend so the constructor never runs at build time ────────
+// How recently a job must have been created to process an "updated" event.
+// This filters out old jobs that get touched/visited in SimPRO.
+const NEW_JOB_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+
 function getResend(): Resend {
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new Error("RESEND_API_KEY environment variable is not set");
@@ -44,20 +53,46 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Check if agreement already exists ────────────────────────────────────
-    // For both "created" and "updated" events — if we already have a record,
-    // skip entirely. This prevents duplicate emails when the team edits a job.
     const existing = await getAgreement(String(jobId));
     if (existing) {
       console.log(`[Webhook] Job ${jobId} already has an agreement — skipping`);
       return NextResponse.json({ received: true, skipped: "already exists" });
     }
 
+    // ── Fetch job details ─────────────────────────────────────────────────────
     console.log(`[Webhook] Fetching enriched job ${jobId}...`);
     const job = await fetchEnrichedJob(jobId, companyId);
     console.log(
-      `[Webhook] Job fetched — total: $${job.totalIncGst}, address: "${job.siteAddress}"`,
+      `[Webhook] Job fetched — total: $${job.totalIncGst}, address: "${job.siteAddress}", dateCreated: "${job.dateCreated}"`,
     );
 
+    // ── Age guard for "updated" events ────────────────────────────────────────
+    // "created" events are always new jobs — let them through.
+    // "updated" events fire any time someone opens a job in SimPRO, including
+    // old ones. Only proceed if the job itself was created within the last
+    // NEW_JOB_WINDOW_MS (10 minutes), which covers quote→job conversions.
+    if (action === "updated") {
+      const jobCreatedAt = job.dateCreated
+        ? new Date(job.dateCreated).getTime()
+        : null;
+      const ageMs = jobCreatedAt ? Date.now() - jobCreatedAt : Infinity;
+
+      if (ageMs > NEW_JOB_WINDOW_MS) {
+        console.log(
+          `[Webhook] Skipped — "updated" event but job is ${Math.round(ageMs / 60000)}min old (limit: ${NEW_JOB_WINDOW_MS / 60000}min)`,
+        );
+        return NextResponse.json({
+          received: true,
+          skipped: "updated event on existing job",
+        });
+      }
+
+      console.log(
+        `[Webhook] "updated" event — job is ${Math.round(ageMs / 60000)}min old, within window — proceeding`,
+      );
+    }
+
+    // ── Threshold check ───────────────────────────────────────────────────────
     if (job.totalIncGst < THRESHOLD) {
       console.log(`[Webhook] $${job.totalIncGst} below threshold — skipping`);
       return NextResponse.json({
@@ -88,7 +123,7 @@ export async function POST(request: NextRequest) {
       `[Webhook] ✅ Saved — Job ${job.id} $${job.totalIncGst.toLocaleString()} | Address: "${job.siteAddress}"`,
     );
 
-    // ── Notify via Resend ───────────────────────────────────────────────────
+    // ── Notify via Resend ─────────────────────────────────────────────────────
     const totalExTax = job.totalIncGst / 1.1;
 
     try {
@@ -156,7 +191,6 @@ export async function POST(request: NextRequest) {
     } catch (emailErr) {
       console.error("[Webhook] Email send failed:", emailErr);
     }
-    // ───────────────────────────────────────────────────────────────────────
 
     return NextResponse.json({
       received: true,
