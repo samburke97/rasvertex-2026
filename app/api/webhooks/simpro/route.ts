@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Webhook] Fetching enriched job ${jobId}...`);
     const job = await fetchEnrichedJob(jobId, companyId);
     console.log(
-      `[Webhook] Job fetched — total: $${job.totalIncGst}, address: "${job.siteAddress}", dateCreated: "${job.dateCreated}"`,
+      `[Webhook] Job fetched — total: $${job.totalIncGst}, address: "${job.siteAddress}", date: "${job.date}"`,
     );
 
     // ── Age guard for "updated" events ────────────────────────────────────────
@@ -72,9 +72,7 @@ export async function POST(request: NextRequest) {
     // old ones. Only proceed if the job itself was created within the last
     // NEW_JOB_WINDOW_MS (10 minutes), which covers quote→job conversions.
     if (action === "updated") {
-      const jobCreatedAt = job.dateCreated
-        ? new Date(job.dateCreated).getTime()
-        : null;
+      const jobCreatedAt = job.date ? new Date(job.date).getTime() : null;
       const ageMs = jobCreatedAt ? Date.now() - jobCreatedAt : Infinity;
 
       if (ageMs > NEW_JOB_WINDOW_MS) {
