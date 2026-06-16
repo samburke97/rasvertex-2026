@@ -1,21 +1,16 @@
 // app/api/webhooks/simpro/route.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// SimPRO webhook — fires only when a Quote is moved to "Won"
-//
-// Expected payload:
-//   { name: "Quote", action: "won", reference: { companyID: 0, quoteID: 1234 } }
+// SimPRO sends: { name: "Job", action: "created", reference: { companyID: 0, jobID: 10862 } }
+// Fires when a quote is marked Won and converts to a job.
 //
 // Threshold logic (ex GST):
 //   < $5,000    → skip
 //   $5k–$19,999 → 20% deposit notification email
 //   $20,000+    → save works agreement + works agreement email
-//
-// NOTE: Update your SimPRO webhook config to trigger on Quote → Won,
-//       NOT Job → Created/Updated.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { fetchEnrichedQuote } from "@/lib/simpro/client";
+import { fetchEnrichedJob } from "@/lib/simpro/client";
 import { buildPaymentSchedule } from "@/lib/reports/works-agreement/types";
 import {
   saveAgreement,
@@ -46,7 +41,7 @@ function getResend(): Resend {
   return new Resend(key);
 }
 
-// ── Formatting helpers ────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtAUD(value: number): string {
   return value.toLocaleString("en-AU", {
@@ -54,8 +49,6 @@ function fmtAUD(value: number): string {
     maximumFractionDigits: 2,
   });
 }
-
-// ── Email builders ────────────────────────────────────────────────────────────
 
 function emailShell(
   headerText: string,
@@ -113,48 +106,46 @@ export async function POST(request: NextRequest) {
     const action: string = body.action ?? "";
     const name: string = body.name ?? "";
     const reference = body.reference ?? {};
-    const quoteId: number = reference.quoteID;
+    const jobId: number = reference.jobID;
     const companyId: number = reference.companyID ?? 0;
 
-    // ── Only process Quote → Won ──────────────────────────────────────────────
-    const isQuoteWon =
-      name.toLowerCase() === "quote" && action.toLowerCase() === "won";
+    // ── Only process Job created events ──────────────────────────────────────
+    const isJobCreated = name.toLowerCase() === "job" && action === "created";
 
-    if (!isQuoteWon || !quoteId) {
+    if (!isJobCreated || !jobId) {
       console.log(`[Webhook] Skipped — name: "${name}", action: "${action}"`);
       return NextResponse.json({
         received: true,
-        skipped: "not a quote won event",
+        skipped: "not a job created event",
       });
     }
 
     // ── Duplicate guard ───────────────────────────────────────────────────────
-    const existing = await getAgreement(String(quoteId));
+    const existing = await getAgreement(String(jobId));
     if (existing) {
-      console.log(`[Webhook] Quote ${quoteId} already processed — skipping`);
+      console.log(`[Webhook] Job ${jobId} already processed — skipping`);
       return NextResponse.json({
         received: true,
         skipped: "already processed",
       });
     }
 
-    // ── Fetch quote from SimPRO ───────────────────────────────────────────────
-    console.log(`[Webhook] Fetching quote ${quoteId}...`);
-    const quote = await fetchEnrichedQuote(quoteId, companyId);
+    // ── Fetch job ─────────────────────────────────────────────────────────────
+    console.log(`[Webhook] Fetching job ${jobId}...`);
+    const job = await fetchEnrichedJob(jobId, companyId);
+    const totalExTax = job.totalIncGst / 1.1;
     console.log(
-      `[Webhook] Quote fetched — exTax: $${quote.totalExTax}, client: "${quote.clientName}"`,
+      `[Webhook] Job fetched — exTax: $${totalExTax.toFixed(2)}, client: "${job.clientName}"`,
     );
-
-    const { totalExTax, totalIncGst } = quote;
 
     // ── Below deposit threshold → skip ────────────────────────────────────────
     if (totalExTax < THRESHOLD_DEPOSIT) {
       console.log(
-        `[Webhook] $${totalExTax} ex GST below $${THRESHOLD_DEPOSIT} — skipping`,
+        `[Webhook] $${totalExTax.toFixed(2)} ex GST below $${THRESHOLD_DEPOSIT} — skipping`,
       );
       return NextResponse.json({
         received: true,
-        skipped: `$${totalExTax} ex GST below threshold`,
+        skipped: `$${totalExTax.toFixed(2)} ex GST below threshold`,
       });
     }
 
@@ -163,30 +154,30 @@ export async function POST(request: NextRequest) {
     // ── $20,000+ ex GST → Works Agreement ────────────────────────────────────
     if (totalExTax >= THRESHOLD_WORKS_AGREEMENT) {
       const agreement = {
-        jobId: String(quoteId),
-        jobNo: quote.jobNo,
-        jobName: quote.name,
-        clientName: quote.clientName,
-        siteAddress: quote.siteAddress,
-        siteName: quote.siteName,
-        initialWorks: quote.name,
+        jobId: job.id,
+        jobNo: job.jobNo,
+        jobName: job.name,
+        clientName: job.clientName,
+        siteAddress: job.siteAddress,
+        siteName: job.siteName,
+        initialWorks: job.name,
         colourScheme: "To be advised",
-        totalIncGst,
-        paymentSchedule: buildPaymentSchedule(totalIncGst),
-        date: quote.date,
+        totalIncGst: job.totalIncGst,
+        paymentSchedule: buildPaymentSchedule(job.totalIncGst),
+        date: job.date,
         createdAt: new Date().toISOString(),
         status: "draft" as const,
         triggeredBy: "webhook" as const,
       };
 
       await saveAgreement(agreement);
-      console.log(`[Webhook] ✅ Works agreement saved — Quote ${quoteId}`);
+      console.log(`[Webhook] ✅ Works agreement saved — Job ${jobId}`);
 
       try {
         await resend.emails.send({
           from: "RAS Admin <sam@rasvertex.com.au>",
           to: WORKS_AGREEMENT_RECIPIENTS,
-          subject: `New Works Agreement — ${quote.jobNo} · ${quote.clientName}`,
+          subject: `New Works Agreement — ${job.jobNo} · ${job.clientName}`,
           html: emailShell(
             "New Works Agreement",
             `
@@ -196,12 +187,15 @@ export async function POST(request: NextRequest) {
                   A quote has been accepted over $20,000. Please create a works agreement for the following job.
                 </p>
                 ${jobTable([
-                  { label: "Quote Number", value: quote.jobNo },
-                  { label: "Customer", value: quote.clientName },
-                  { label: "Site", value: quote.siteName },
-                  { label: "Site Address", value: quote.siteAddress },
+                  { label: "Job Number", value: job.jobNo },
+                  { label: "Customer", value: job.clientName },
+                  { label: "Site", value: job.siteName },
+                  { label: "Site Address", value: job.siteAddress },
                   { label: "Total Ex GST", value: `$${fmtAUD(totalExTax)}` },
-                  { label: "Total Inc GST", value: `$${fmtAUD(totalIncGst)}` },
+                  {
+                    label: "Total Inc GST",
+                    value: `$${fmtAUD(job.totalIncGst)}`,
+                  },
                 ])}
               </div>
               <div style="background:#fff;padding:20px 32px 32px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
@@ -211,9 +205,7 @@ export async function POST(request: NextRequest) {
             "Automated notification · RAS Vertex · Quote won over $20,000 ex GST",
           ),
         });
-        console.log(
-          `[Webhook] 📧 Works agreement email sent — Quote ${quoteId}`,
-        );
+        console.log(`[Webhook] 📧 Works agreement email sent — Job ${jobId}`);
       } catch (emailErr) {
         console.error("[Webhook] Works agreement email failed:", emailErr);
       }
@@ -221,19 +213,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         received: true,
         type: "works-agreement",
-        quoteNo: quote.jobNo,
+        jobId: job.jobNo,
         totalExTax,
       });
     }
 
-    // ── $5,000–$19,999 ex GST → 20% Deposit Notification ────────────────────
+    // ── $5,000–$19,999 ex GST → Deposit Notification ─────────────────────────
     const depositAmount = Math.round(totalExTax * 0.2 * 100) / 100;
 
     try {
       await resend.emails.send({
         from: "RAS Admin <sam@rasvertex.com.au>",
         to: DEPOSIT_RECIPIENTS,
-        subject: `Deposit Required — ${quote.jobNo} · ${quote.clientName} · $${fmtAUD(depositAmount)} ex GST`,
+        subject: `Deposit Required — ${job.jobNo} · ${job.clientName} · $${fmtAUD(depositAmount)} ex GST`,
         html: emailShell(
           "20% Deposit Required",
           `
@@ -243,12 +235,15 @@ export async function POST(request: NextRequest) {
                 A quote has been accepted over $5,000. A 20% deposit must be collected before works commence.
               </p>
               ${jobTable([
-                { label: "Quote Number", value: quote.jobNo },
-                { label: "Customer", value: quote.clientName },
-                { label: "Site", value: quote.siteName },
-                { label: "Site Address", value: quote.siteAddress },
+                { label: "Job Number", value: job.jobNo },
+                { label: "Customer", value: job.clientName },
+                { label: "Site", value: job.siteName },
+                { label: "Site Address", value: job.siteAddress },
                 { label: "Total Ex GST", value: `$${fmtAUD(totalExTax)}` },
-                { label: "Total Inc GST", value: `$${fmtAUD(totalIncGst)}` },
+                {
+                  label: "Total Inc GST",
+                  value: `$${fmtAUD(job.totalIncGst)}`,
+                },
                 {
                   label: "20% Deposit Due",
                   value: `$${fmtAUD(depositAmount)} ex GST`,
@@ -260,7 +255,7 @@ export async function POST(request: NextRequest) {
           "Automated notification · RAS Vertex · Quote won over $5,000 ex GST",
         ),
       });
-      console.log(`[Webhook] 📧 Deposit notification sent — Quote ${quoteId}`);
+      console.log(`[Webhook] 📧 Deposit notification sent — Job ${jobId}`);
     } catch (emailErr) {
       console.error("[Webhook] Deposit email failed:", emailErr);
     }
@@ -268,7 +263,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       received: true,
       type: "deposit-notification",
-      quoteNo: quote.jobNo,
+      jobId: job.jobNo,
       totalExTax,
       depositAmount,
     });
@@ -286,7 +281,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    endpoint: "SimPRO Quote Won Webhook",
+    endpoint: "SimPRO Job Created Webhook",
     thresholdDeposit: `$${THRESHOLD_DEPOSIT} ex GST`,
     thresholdWorksAgreement: `$${THRESHOLD_WORKS_AGREEMENT} ex GST`,
   });
