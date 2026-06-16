@@ -270,13 +270,32 @@ export default function ConditionReportPage({
   const handleExportPDF = useCallback(async () => {
     setIsExporting(true);
     try {
+      // Apply the same date filter to photos and schedule that the on-screen
+      // preview uses, so the PDF only contains what the user is seeing.
+      const photosToExport = report.settings.filterByDate
+        ? filterPhotosByDateRange(
+            report.photos,
+            report.settings.dateFrom,
+            report.settings.dateTo,
+          )
+        : report.photos;
+
+      const scheduleToExport = report.settings.filterByDate
+        ? filterScheduleByDateRange(
+            report.schedule,
+            report.settings.dateFrom,
+            report.settings.dateTo,
+          )
+        : report.schedule;
+
       const photoData: Record<string, string> = {};
       const strippedReport: ConditionReportData = {
         ...report,
-        photos: report.photos.map((p) => {
+        photos: photosToExport.map((p) => {
           if (p.url) photoData[p.id] = p.url;
           return { ...p, url: "" };
         }),
+        schedule: scheduleToExport,
       };
 
       const filename = report.job.project
@@ -494,23 +513,43 @@ export default function ConditionReportPage({
           companyId={0}
           defaultFilename={`Condition Report - ${report.job.address || "Draft"}`}
           saveEndpoint="/api/simpro/jobs/save-report"
-          prepareBody={(filename, companyId) => ({
-            filename,
-            companyId,
-            jobId: loadedJobId,
-            report: {
-              ...report,
-              photos: report.photos.map(
-                ({ id, name, url, size, dateAdded }) => ({
-                  id,
-                  name,
-                  url,
-                  size,
-                  dateAdded,
-                }),
-              ),
-            },
-          })}
+          prepareBody={(filename, companyId) => {
+            // Apply the same date filter so the saved PDF matches the preview.
+            const photosToSave = report.settings.filterByDate
+              ? filterPhotosByDateRange(
+                  report.photos,
+                  report.settings.dateFrom,
+                  report.settings.dateTo,
+                )
+              : report.photos;
+
+            const scheduleToSave = report.settings.filterByDate
+              ? filterScheduleByDateRange(
+                  report.schedule,
+                  report.settings.dateFrom,
+                  report.settings.dateTo,
+                )
+              : report.schedule;
+
+            return {
+              filename,
+              companyId,
+              jobId: loadedJobId,
+              report: {
+                ...report,
+                photos: photosToSave.map(
+                  ({ id, name, url, size, dateAdded }) => ({
+                    id,
+                    name,
+                    url,
+                    size,
+                    dateAdded,
+                  }),
+                ),
+                schedule: scheduleToSave,
+              },
+            };
+          }}
           onClose={() => setShowSaveModal(false)}
           onSuccess={(filename) => {
             setSavedFilename(filename);

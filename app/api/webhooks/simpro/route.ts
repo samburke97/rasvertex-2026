@@ -1,17 +1,21 @@
 // app/api/webhooks/simpro/route.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// SimPRO sends: { name: "Job", action: "updated", reference: { companyID: 0, jobID: 10862 } }
-// All job fetching / address resolution delegates to lib/simpro/client.ts
+// SimPRO webhook — fires only when a Quote is moved to "Won"
 //
-// Guard logic:
-//  - "created" events → always process (new job)
-//  - "updated" events → only process if job was created within the last 10 min
-//    (covers quote→job conversions which fire "updated", not "created")
-//  - Either way: skip if an agreement already exists for this jobId
+// Expected payload:
+//   { name: "Quote", action: "won", reference: { companyID: 0, quoteID: 1234 } }
+//
+// Threshold logic (ex GST):
+//   < $5,000    → skip
+//   $5k–$19,999 → 20% deposit notification email
+//   $20,000+    → save works agreement + works agreement email
+//
+// NOTE: Update your SimPRO webhook config to trigger on Quote → Won,
+//       NOT Job → Created/Updated.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { fetchEnrichedJob } from "@/lib/simpro/client";
+import { fetchEnrichedQuote } from "@/lib/simpro/client";
 import { buildPaymentSchedule } from "@/lib/reports/works-agreement/types";
 import {
   saveAgreement,
@@ -19,18 +23,87 @@ import {
 } from "@/lib/reports/works-agreement/store";
 import { Resend } from "resend";
 
-const THRESHOLD = 20000;
+const THRESHOLD_DEPOSIT = 5000; // ex GST
+const THRESHOLD_WORKS_AGREEMENT = 20000; // ex GST
 const APP_URL = "https://rasvertex-2026.vercel.app";
 
-// How recently a job must have been created to process an "updated" event.
-// This filters out old jobs that get touched/visited in SimPRO.
-const NEW_JOB_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const DEPOSIT_RECIPIENTS: string[] = [
+  "team@rasvertex.com.au",
+  "amanda@rasvertex.com.au",
+  "admin@rasvertex.com.au",
+];
+
+const WORKS_AGREEMENT_RECIPIENTS: string[] = [
+  "team@rasvertex.com.au",
+  "amanda@rasvertex.com.au",
+];
+
+// ── Resend ────────────────────────────────────────────────────────────────────
 
 function getResend(): Resend {
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new Error("RESEND_API_KEY environment variable is not set");
   return new Resend(key);
 }
+
+// ── Formatting helpers ────────────────────────────────────────────────────────
+
+function fmtAUD(value: number): string {
+  return value.toLocaleString("en-AU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+// ── Email builders ────────────────────────────────────────────────────────────
+
+function emailShell(
+  headerText: string,
+  bodyHtml: string,
+  footerText: string,
+): string {
+  return `
+    <div style="background:#f4f4f0;padding:2rem;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+      <div style="max-width:540px;margin:0 auto;">
+
+        <div style="background:#0f2d4a;border-radius:10px 10px 0 0;padding:24px 32px;">
+          <p style="margin:0 0 2px;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">RAS Vertex</p>
+          <p style="margin:0;color:#fff;font-size:18px;font-weight:500;">${headerText}</p>
+        </div>
+
+        ${bodyHtml}
+
+        <div style="background:#f9f9f7;border:1px solid #ebebeb;border-top:none;border-radius:0 0 10px 10px;padding:16px 32px;">
+          <p style="margin:0;font-size:12px;color:#aaa;">${footerText}</p>
+        </div>
+
+      </div>
+    </div>
+  `;
+}
+
+interface TableRow {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}
+
+function jobTable(rows: TableRow[]): string {
+  const rowsHtml = rows
+    .map(
+      ({ label, value, highlight = false }) => `
+      <tr style="border-top:1px solid #f0f0f0;">
+        <td style="padding:12px 0;color:${highlight ? "#0f2d4a" : "#888"};width:44%;font-weight:${highlight ? "700" : "400"};">${label}</td>
+        <td style="padding:12px 0;color:${highlight ? "#0f2d4a" : "#1a1a1a"};font-weight:${highlight ? "700" : "500"};font-size:${highlight ? "16px" : "14px"};">${value}</td>
+      </tr>
+    `,
+    )
+    .join("");
+
+  return `<table style="width:100%;border-collapse:collapse;font-size:14px;">${rowsHtml}</table>`;
+}
+
+// ── POST handler ──────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,163 +113,164 @@ export async function POST(request: NextRequest) {
     const action: string = body.action ?? "";
     const name: string = body.name ?? "";
     const reference = body.reference ?? {};
-    const jobId: number = reference.jobID;
+    const quoteId: number = reference.quoteID;
     const companyId: number = reference.companyID ?? 0;
 
-    const isJobEvent =
-      name.toLowerCase() === "job" &&
-      (action === "created" || action === "updated");
+    // ── Only process Quote → Won ──────────────────────────────────────────────
+    const isQuoteWon =
+      name.toLowerCase() === "quote" && action.toLowerCase() === "won";
 
-    if (!isJobEvent || !jobId) {
-      console.log(`[Webhook] Skipped — name: ${name}, action: ${action}`);
-      return NextResponse.json({ received: true, skipped: "not a job event" });
-    }
-
-    // ── Check if agreement already exists ────────────────────────────────────
-    const existing = await getAgreement(String(jobId));
-    if (existing) {
-      console.log(`[Webhook] Job ${jobId} already has an agreement — skipping`);
-      return NextResponse.json({ received: true, skipped: "already exists" });
-    }
-
-    // ── Fetch job details ─────────────────────────────────────────────────────
-    console.log(`[Webhook] Fetching enriched job ${jobId}...`);
-    const job = await fetchEnrichedJob(jobId, companyId);
-    console.log(
-      `[Webhook] Job fetched — total: $${job.totalIncGst}, address: "${job.siteAddress}", date: "${job.date}"`,
-    );
-
-    // ── Age guard for "updated" events ────────────────────────────────────────
-    // "created" events are always new jobs — let them through.
-    // "updated" events fire any time someone opens a job in SimPRO, including
-    // old ones. Only proceed if the job itself was created within the last
-    // NEW_JOB_WINDOW_MS (10 minutes), which covers quote→job conversions.
-    if (action === "updated") {
-      const jobCreatedAt = job.date ? new Date(job.date).getTime() : null;
-      const ageMs = jobCreatedAt ? Date.now() - jobCreatedAt : Infinity;
-
-      if (ageMs > NEW_JOB_WINDOW_MS) {
-        console.log(
-          `[Webhook] Skipped — "updated" event but job is ${Math.round(ageMs / 60000)}min old (limit: ${NEW_JOB_WINDOW_MS / 60000}min)`,
-        );
-        return NextResponse.json({
-          received: true,
-          skipped: "updated event on existing job",
-        });
-      }
-
-      console.log(
-        `[Webhook] "updated" event — job is ${Math.round(ageMs / 60000)}min old, within window — proceeding`,
-      );
-    }
-
-    // ── Threshold check ───────────────────────────────────────────────────────
-    if (job.totalIncGst < THRESHOLD) {
-      console.log(`[Webhook] $${job.totalIncGst} below threshold — skipping`);
+    if (!isQuoteWon || !quoteId) {
+      console.log(`[Webhook] Skipped — name: "${name}", action: "${action}"`);
       return NextResponse.json({
         received: true,
-        skipped: `$${job.totalIncGst} below $${THRESHOLD} threshold`,
+        skipped: "not a quote won event",
       });
     }
 
-    const agreement = {
-      jobId: job.id,
-      jobNo: job.jobNo,
-      jobName: job.name,
-      clientName: job.clientName,
-      siteAddress: job.siteAddress,
-      siteName: job.siteName,
-      initialWorks: job.name,
-      colourScheme: "To be advised",
-      totalIncGst: job.totalIncGst,
-      paymentSchedule: buildPaymentSchedule(job.totalIncGst),
-      date: job.date,
-      createdAt: new Date().toISOString(),
-      status: "draft" as const,
-      triggeredBy: "webhook" as const,
-    };
+    // ── Duplicate guard ───────────────────────────────────────────────────────
+    const existing = await getAgreement(String(quoteId));
+    if (existing) {
+      console.log(`[Webhook] Quote ${quoteId} already processed — skipping`);
+      return NextResponse.json({
+        received: true,
+        skipped: "already processed",
+      });
+    }
 
-    await saveAgreement(agreement);
+    // ── Fetch quote from SimPRO ───────────────────────────────────────────────
+    console.log(`[Webhook] Fetching quote ${quoteId}...`);
+    const quote = await fetchEnrichedQuote(quoteId, companyId);
     console.log(
-      `[Webhook] ✅ Saved — Job ${job.id} $${job.totalIncGst.toLocaleString()} | Address: "${job.siteAddress}"`,
+      `[Webhook] Quote fetched — exTax: $${quote.totalExTax}, client: "${quote.clientName}"`,
     );
 
-    // ── Notify via Resend ─────────────────────────────────────────────────────
-    const totalExTax = job.totalIncGst / 1.1;
+    const { totalExTax, totalIncGst } = quote;
+
+    // ── Below deposit threshold → skip ────────────────────────────────────────
+    if (totalExTax < THRESHOLD_DEPOSIT) {
+      console.log(
+        `[Webhook] $${totalExTax} ex GST below $${THRESHOLD_DEPOSIT} — skipping`,
+      );
+      return NextResponse.json({
+        received: true,
+        skipped: `$${totalExTax} ex GST below threshold`,
+      });
+    }
+
+    const resend = getResend();
+
+    // ── $20,000+ ex GST → Works Agreement ────────────────────────────────────
+    if (totalExTax >= THRESHOLD_WORKS_AGREEMENT) {
+      const agreement = {
+        jobId: String(quoteId),
+        jobNo: quote.jobNo,
+        jobName: quote.name,
+        clientName: quote.clientName,
+        siteAddress: quote.siteAddress,
+        siteName: quote.siteName,
+        initialWorks: quote.name,
+        colourScheme: "To be advised",
+        totalIncGst,
+        paymentSchedule: buildPaymentSchedule(totalIncGst),
+        date: quote.date,
+        createdAt: new Date().toISOString(),
+        status: "draft" as const,
+        triggeredBy: "webhook" as const,
+      };
+
+      await saveAgreement(agreement);
+      console.log(`[Webhook] ✅ Works agreement saved — Quote ${quoteId}`);
+
+      try {
+        await resend.emails.send({
+          from: "RAS Admin <sam@rasvertex.com.au>",
+          to: WORKS_AGREEMENT_RECIPIENTS,
+          subject: `New Works Agreement — ${quote.jobNo} · ${quote.clientName}`,
+          html: emailShell(
+            "New Works Agreement",
+            `
+              <div style="background:#fff;padding:28px 32px 8px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
+                <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Amanda,</p>
+                <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.6;">
+                  A quote has been accepted over $20,000. Please create a works agreement for the following job.
+                </p>
+                ${jobTable([
+                  { label: "Quote Number", value: quote.jobNo },
+                  { label: "Customer", value: quote.clientName },
+                  { label: "Site", value: quote.siteName },
+                  { label: "Site Address", value: quote.siteAddress },
+                  { label: "Total Ex GST", value: `$${fmtAUD(totalExTax)}` },
+                  { label: "Total Inc GST", value: `$${fmtAUD(totalIncGst)}` },
+                ])}
+              </div>
+              <div style="background:#fff;padding:20px 32px 32px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
+                <a href="${APP_URL}/works-agreements" style="display:inline-block;background:#0f2d4a;color:#fff;text-decoration:none;padding:11px 22px;border-radius:7px;font-size:14px;font-weight:500;">Review in RAS Vertex →</a>
+              </div>
+            `,
+            "Automated notification · RAS Vertex · Quote won over $20,000 ex GST",
+          ),
+        });
+        console.log(
+          `[Webhook] 📧 Works agreement email sent — Quote ${quoteId}`,
+        );
+      } catch (emailErr) {
+        console.error("[Webhook] Works agreement email failed:", emailErr);
+      }
+
+      return NextResponse.json({
+        received: true,
+        type: "works-agreement",
+        quoteNo: quote.jobNo,
+        totalExTax,
+      });
+    }
+
+    // ── $5,000–$19,999 ex GST → 20% Deposit Notification ────────────────────
+    const depositAmount = Math.round(totalExTax * 0.2 * 100) / 100;
 
     try {
-      const resend = getResend();
       await resend.emails.send({
         from: "RAS Admin <sam@rasvertex.com.au>",
-        to: ["team@rasvertex.com.au", "amanda@rasvertex.com.au"],
-        subject: `New Works Agreement — Job ${job.jobNo}`,
-        html: `
-          <div style="background:#f4f4f0;padding:2rem;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-            <div style="max-width:540px;margin:0 auto;">
-
-              <div style="background:#0f2d4a;border-radius:10px 10px 0 0;padding:24px 32px;">
-                <p style="margin:0 0 2px;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">RAS Vertex</p>
-                <p style="margin:0;color:#fff;font-size:18px;font-weight:500;">New Works Agreement</p>
-              </div>
-
-              <div style="background:#fff;padding:28px 32px 24px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
-                <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Amanda,</p>
-                <p style="margin:0 0 0;font-size:15px;color:#444;line-height:1.6;">Please create a work order for the following job.</p>
-              </div>
-
-              <div style="background:#fff;padding:0 32px 24px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
-                <table style="width:100%;border-collapse:collapse;font-size:14px;">
-                  <tr style="border-top:1px solid #f0f0f0;">
-                    <td style="padding:12px 0;color:#888;width:44%;">Job Number</td>
-                    <td style="padding:12px 0;color:#1a1a1a;font-weight:500;">${job.jobNo}</td>
-                  </tr>
-                  <tr style="border-top:1px solid #f0f0f0;">
-                    <td style="padding:12px 0;color:#888;">Customer Name</td>
-                    <td style="padding:12px 0;color:#1a1a1a;font-weight:500;">${job.clientName}</td>
-                  </tr>
-                  <tr style="border-top:1px solid #f0f0f0;">
-                    <td style="padding:12px 0;color:#888;">Site Name</td>
-                    <td style="padding:12px 0;color:#1a1a1a;font-weight:500;">${job.siteName}</td>
-                  </tr>
-                  <tr style="border-top:1px solid #f0f0f0;">
-                    <td style="padding:12px 0;color:#888;">Site Address</td>
-                    <td style="padding:12px 0;color:#1a1a1a;font-weight:500;">${job.siteAddress}</td>
-                  </tr>
-                  <tr style="border-top:1px solid #f0f0f0;">
-                    <td style="padding:12px 0;color:#888;">Total Value Ex Tax</td>
-                    <td style="padding:12px 0;color:#1a1a1a;font-weight:500;">$${totalExTax.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  </tr>
-                  <tr style="border-top:1px solid #f0f0f0;">
-                    <td style="padding:12px 0;color:#888;">Total Inc GST</td>
-                    <td style="padding:12px 0;color:#1a1a1a;font-weight:600;">$${job.totalIncGst.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  </tr>
-                </table>
-              </div>
-
-              <div style="background:#fff;padding:24px 32px 32px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
-                <a href="${APP_URL}/works-agreements" style="display:inline-block;background:#0f2d4a;color:#fff;text-decoration:none;padding:11px 22px;border-radius:7px;font-size:14px;font-weight:500;">Review in RAS Admin →</a>
-              </div>
-
-              <div style="background:#f9f9f7;border:1px solid #ebebeb;border-top:none;border-radius:0 0 10px 10px;padding:16px 32px;">
-                <p style="margin:0;font-size:12px;color:#aaa;">This is an automated notification from Sammy B</p>
-              </div>
-
+        to: DEPOSIT_RECIPIENTS,
+        subject: `Deposit Required — ${quote.jobNo} · ${quote.clientName} · $${fmtAUD(depositAmount)} ex GST`,
+        html: emailShell(
+          "20% Deposit Required",
+          `
+            <div style="background:#fff;padding:28px 32px 8px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
+              <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Amanda,</p>
+              <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.6;">
+                A quote has been accepted over $5,000. A 20% deposit must be collected before works commence.
+              </p>
+              ${jobTable([
+                { label: "Quote Number", value: quote.jobNo },
+                { label: "Customer", value: quote.clientName },
+                { label: "Site", value: quote.siteName },
+                { label: "Site Address", value: quote.siteAddress },
+                { label: "Total Ex GST", value: `$${fmtAUD(totalExTax)}` },
+                { label: "Total Inc GST", value: `$${fmtAUD(totalIncGst)}` },
+                {
+                  label: "20% Deposit Due",
+                  value: `$${fmtAUD(depositAmount)} ex GST`,
+                  highlight: true,
+                },
+              ])}
             </div>
-          </div>
-        `,
+          `,
+          "Automated notification · RAS Vertex · Quote won over $5,000 ex GST",
+        ),
       });
-      console.log(`[Webhook] 📧 Email sent for Job ${job.id}`);
+      console.log(`[Webhook] 📧 Deposit notification sent — Quote ${quoteId}`);
     } catch (emailErr) {
-      console.error("[Webhook] Email send failed:", emailErr);
+      console.error("[Webhook] Deposit email failed:", emailErr);
     }
 
     return NextResponse.json({
       received: true,
-      created: true,
-      jobId: job.id,
-      totalIncGst: job.totalIncGst,
-      siteAddress: job.siteAddress,
-      schedulePayments: agreement.paymentSchedule.length,
+      type: "deposit-notification",
+      quoteNo: quote.jobNo,
+      totalExTax,
+      depositAmount,
     });
   } catch (error) {
     console.error("[Webhook] Error:", error);
@@ -207,10 +281,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ── GET — health check ────────────────────────────────────────────────────────
+
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    endpoint: "SimPRO Works Agreement Webhook",
-    threshold: `$${THRESHOLD}`,
+    endpoint: "SimPRO Quote Won Webhook",
+    thresholdDeposit: `$${THRESHOLD_DEPOSIT} ex GST`,
+    thresholdWorksAgreement: `$${THRESHOLD_WORKS_AGREEMENT} ex GST`,
   });
 }

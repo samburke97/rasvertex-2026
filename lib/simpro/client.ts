@@ -1,11 +1,7 @@
 // lib/simpro/client.ts
 // ─────────────────────────────────────────────────────────────────────────────
 // All SimPRO server-side fetching logic lives here.
-// Import fetchEnrichedJob() anywhere you need job data — never duplicate this.
-//
-// Usage:
-//   import { fetchEnrichedJob } from "@/lib/simpro/client"
-//   const job = await fetchEnrichedJob("10737")
+// Import fetchEnrichedJob() or fetchEnrichedQuote() — never duplicate fetch logic.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { EnrichedJob, SimproRawJob, SimproRawSite } from "./types";
@@ -41,8 +37,6 @@ export async function simproGet<T>(url: string): Promise<T> {
  *   - a number              → converted to string
  *   - a nested object       → drills into common address sub-fields
  *   - null / undefined      → returns ""
- *
- * This is the fix for the [object Object] address bug.
  */
 export function extractString(val: unknown): string {
   if (!val) return "";
@@ -114,15 +108,8 @@ export async function fetchSiteAddress(
   }
 }
 
-// ── Main export ───────────────────────────────────────────────────────────────
+// ── EnrichedJob — used by all job-based reports ───────────────────────────────
 
-/**
- * Fetches a job from SimPRO and resolves all nested fields into a clean
- * EnrichedJob. This is the single function every report should call —
- * no report should parse raw SimPRO responses.
- *
- * Runs job fetch and site address fetch in parallel for speed.
- */
 export async function fetchEnrichedJob(
   jobId: string | number,
   companyId = 0,
@@ -134,18 +121,15 @@ export async function fetchEnrichedJob(
 
   const job = await fetchRawJob(parsed, companyId);
 
-  // Resolve site address in parallel (it's a separate API call)
   const siteAddress = job.Site?.ID
     ? await fetchSiteAddress(job.Site.ID, companyId, job.Site.Name)
     : "";
 
-  // Client name: CompanyName → GivenName FamilyName
   const clientName =
     job.Customer?.CompanyName?.trim() ||
     joinName(job.Customer?.GivenName, job.Customer?.FamilyName) ||
     "";
 
-  // preparedFor: SiteContact → CustomerContact → clientName
   const preparedFor =
     joinName(job.SiteContact?.GivenName, job.SiteContact?.FamilyName) ||
     joinName(job.CustomerContact?.GivenName, job.CustomerContact?.FamilyName) ||
@@ -166,5 +150,95 @@ export async function fetchEnrichedJob(
     preparedFor,
     date,
     totalIncGst: job.Total?.IncTax ?? 0,
+  };
+}
+
+// ── EnrichedQuote — used by the quote-won webhook ─────────────────────────────
+
+export interface EnrichedQuote {
+  id: string;
+  jobNo: string;
+  name: string;
+  clientName: string;
+  siteName: string;
+  siteAddress: string;
+  date: string;
+  totalExTax: number;
+  totalIncGst: number;
+}
+
+interface SimproRawQuote {
+  ID: number;
+  JobNo?: string | number;
+  Name?: string;
+  DateApproved?: string | null;
+  DateIssued?: string | null;
+  DateModified?: string | null;
+  Customer?: {
+    ID?: number;
+    CompanyName?: string;
+    GivenName?: string;
+    FamilyName?: string;
+  };
+  Site?: {
+    ID?: number;
+    Name?: string;
+  };
+  Total?: {
+    ExTax?: number;
+    Tax?: number;
+    IncTax?: number;
+  };
+  [key: string]: unknown;
+}
+
+export async function fetchRawQuote(
+  quoteId: number,
+  companyId = 0,
+): Promise<SimproRawQuote> {
+  return simproGet<SimproRawQuote>(
+    `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/quotes/${quoteId}`,
+  );
+}
+
+export async function fetchEnrichedQuote(
+  quoteId: number,
+  companyId = 0,
+): Promise<EnrichedQuote> {
+  if (isNaN(quoteId) || quoteId <= 0) {
+    throw new Error(`Invalid quote ID: ${quoteId}`);
+  }
+
+  const quote = await fetchRawQuote(quoteId, companyId);
+
+  const clientName =
+    quote.Customer?.CompanyName?.trim() ||
+    joinName(quote.Customer?.GivenName, quote.Customer?.FamilyName) ||
+    "";
+
+  const siteName = quote.Site?.Name?.trim() || clientName;
+  const siteAddress = quote.Site?.ID
+    ? await fetchSiteAddress(quote.Site.ID, companyId, siteName)
+    : "";
+
+  const totalExTax = quote.Total?.ExTax ?? 0;
+  const totalIncGst =
+    quote.Total?.IncTax ?? Math.round(totalExTax * 1.1 * 100) / 100;
+
+  const jobNo = quote.JobNo ? `#${quote.JobNo}` : `#${quoteId}`;
+  const date = formatAuDate(
+    quote.DateApproved || quote.DateIssued || quote.DateModified,
+  );
+
+  return {
+    id: String(quoteId),
+    jobNo,
+    name: quote.Name?.trim() || `Quote ${quoteId}`,
+    clientName,
+    siteName,
+    siteAddress,
+    date,
+    totalExTax,
+    totalIncGst,
   };
 }

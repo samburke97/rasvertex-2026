@@ -3,14 +3,20 @@
 //   - photo event now includes dateAdded (ISO string from SimPRO's DateAdded field)
 //   - fixed: removed duplicate controller.close() calls before early returns
 //            (finally block handles close in all cases)
+//   - rate-limit handling: lower concurrency, retry on 429 with exponential
+//     backoff, respect Retry-After header. Prevents SimPRO from rejecting
+//     downloads on jobs with many attachments.
 
 import { NextRequest, NextResponse } from "next/server";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
 
-const CONCURRENCY = 10;
-const REQUEST_TIMEOUT_MS = 8000;
+const CONCURRENCY = 4;
+const REQUEST_TIMEOUT_MS = 15000;
+const MAX_RETRIES = 4;
+const BASE_BACKOFF_MS = 1000;
+const PER_WORKER_DELAY_MS = 100;
 
 interface SimproAttachmentListItem {
   ID: string;
@@ -30,6 +36,14 @@ interface SimproAttachmentDetail {
   Base64Data?: string;
 }
 
+class SimproRateLimitError extends Error {
+  constructor(public retryAfterMs: number) {
+    super("SimPRO rate limit (429)");
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function simproFetch<T>(url: string): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -41,6 +55,13 @@ async function simproFetch<T>(url: string): Promise<T> {
       },
       signal: controller.signal,
     });
+    if (res.status === 429) {
+      const retryAfter = res.headers.get("retry-after");
+      const retryAfterMs = retryAfter
+        ? Math.max(parseInt(retryAfter, 10) * 1000, 1000)
+        : 0;
+      throw new SimproRateLimitError(retryAfterMs);
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       throw new Error(
@@ -50,6 +71,28 @@ async function simproFetch<T>(url: string): Promise<T> {
     return res.json() as Promise<T>;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function simproFetchWithRetry<T>(url: string): Promise<T> {
+  let attempt = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      return await simproFetch<T>(url);
+    } catch (err) {
+      if (err instanceof SimproRateLimitError && attempt < MAX_RETRIES) {
+        const backoff =
+          err.retryAfterMs > 0
+            ? err.retryAfterMs
+            : BASE_BACKOFF_MS * Math.pow(2, attempt) +
+              Math.floor(Math.random() * 250);
+        attempt++;
+        await sleep(backoff);
+        continue;
+      }
+      throw err;
+    }
   }
 }
 
@@ -113,7 +156,7 @@ export async function GET(
         let attachmentsList: SimproAttachmentListItem[];
         try {
           attachmentsList =
-            await simproFetch<SimproAttachmentListItem[]>(listUrl);
+            await simproFetchWithRetry<SimproAttachmentListItem[]>(listUrl);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.includes("404")) {
@@ -161,7 +204,7 @@ export async function GET(
 
             try {
               const detail =
-                await simproFetch<SimproAttachmentDetail>(detailUrl);
+                await simproFetchWithRetry<SimproAttachmentDetail>(detailUrl);
               if (detail.MimeType?.startsWith("image/") && detail.Base64Data) {
                 send("photo", {
                   id: `simpro_${detail.ID}`,
@@ -182,6 +225,10 @@ export async function GET(
             }
 
             send("progress", { loaded, failed, total: candidates.length });
+
+            if (PER_WORKER_DELAY_MS > 0) {
+              await sleep(PER_WORKER_DELAY_MS);
+            }
           }
         }
 
