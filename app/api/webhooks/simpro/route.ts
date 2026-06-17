@@ -1,16 +1,23 @@
 // app/api/webhooks/simpro/route.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// SimPRO sends: { name: "Job", action: "created", reference: { companyID: 0, jobID: 10862 } }
-// Fires when a quote is marked Won and converts to a job.
+// SimPRO webhook — fires when a Job Schedule is created.
 //
-// Threshold logic (ex GST):
-//   < $5,000    → skip
-//   $5k–$19,999 → 20% deposit notification email
-//   $20,000+    → save works agreement + works agreement email
+// Expected payload:
+//   { name: "JobSchedule", action: "created", reference: { companyID: 0, scheduleID: 1234 } }
+//
+// Flow:
+//   1. Receive JobSchedule → created
+//   2. Fetch schedule → parse jobID from Reference field ("jobID-costCenterID")
+//   3. Fetch job → confirm ConvertedFrom.Type === "Quote"
+//   4. Duplicate guard — only fire once per job
+//   5. Check thresholds (ex GST):
+//      < $5,000    → skip
+//      $5k–$19,999 → 20% deposit notification
+//      $20,000+    → works agreement + email
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { fetchEnrichedJob } from "@/lib/simpro/client";
+import { fetchEnrichedJob, simproGet } from "@/lib/simpro/client";
 import { buildPaymentSchedule } from "@/lib/reports/works-agreement/types";
 import {
   saveAgreement,
@@ -18,6 +25,7 @@ import {
 } from "@/lib/reports/works-agreement/store";
 import { Resend } from "resend";
 
+const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const THRESHOLD_DEPOSIT = 5000; // ex GST
 const THRESHOLD_WORKS_AGREEMENT = 20000; // ex GST
 const APP_URL = "https://rasvertex-2026.vercel.app";
@@ -96,6 +104,33 @@ function jobTable(rows: TableRow[]): string {
   return `<table style="width:100%;border-collapse:collapse;font-size:14px;">${rowsHtml}</table>`;
 }
 
+// ── Schedule fetcher ──────────────────────────────────────────────────────────
+
+interface SimproSchedule {
+  ID: number;
+  Type: string;
+  Reference: string; // "jobID-costCenterID" for job schedules
+  Staff?: { ID: number; Name: string };
+  Date?: string;
+  TotalHours?: number;
+}
+
+async function fetchSchedule(
+  scheduleId: number,
+  companyId = 0,
+): Promise<SimproSchedule> {
+  return simproGet<SimproSchedule>(
+    `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/schedules/${scheduleId}`,
+  );
+}
+
+// Parse jobID from Reference field ("jobID-costCenterID")
+function parseJobIdFromReference(reference: string): number | null {
+  const parts = reference.split("-");
+  const parsed = parseInt(parts[0], 10);
+  return isNaN(parsed) ? null : parsed;
+}
+
 // ── POST handler ──────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -106,21 +141,47 @@ export async function POST(request: NextRequest) {
     const action: string = body.action ?? "";
     const name: string = body.name ?? "";
     const reference = body.reference ?? {};
-    const jobId: number = reference.jobID;
+    const scheduleId: number = reference.scheduleID;
     const companyId: number = reference.companyID ?? 0;
 
-    // ── Only process Job created events ──────────────────────────────────────
-    const isJobCreated = name.toLowerCase() === "job" && action === "created";
+    // ── Only process JobSchedule → created ────────────────────────────────────
+    const isJobScheduleCreated =
+      name.toLowerCase() === "jobschedule" && action === "created";
 
-    if (!isJobCreated || !jobId) {
+    if (!isJobScheduleCreated || !scheduleId) {
       console.log(`[Webhook] Skipped — name: "${name}", action: "${action}"`);
       return NextResponse.json({
         received: true,
-        skipped: "not a job created event",
+        skipped: "not a job schedule created event",
       });
     }
 
-    // ── Duplicate guard ───────────────────────────────────────────────────────
+    // ── Fetch schedule → extract jobID ────────────────────────────────────────
+    console.log(`[Webhook] Fetching schedule ${scheduleId}...`);
+    const schedule = await fetchSchedule(scheduleId, companyId);
+
+    if (schedule.Type !== "job") {
+      console.log(`[Webhook] Schedule type is "${schedule.Type}" — skipping`);
+      return NextResponse.json({
+        received: true,
+        skipped: `schedule type is ${schedule.Type}`,
+      });
+    }
+
+    const jobId = parseJobIdFromReference(schedule.Reference);
+    if (!jobId) {
+      console.log(
+        `[Webhook] Could not parse jobID from reference: "${schedule.Reference}"`,
+      );
+      return NextResponse.json({
+        received: true,
+        skipped: "could not parse jobID from schedule reference",
+      });
+    }
+
+    console.log(`[Webhook] Schedule ${scheduleId} → Job ${jobId}`);
+
+    // ── Duplicate guard — only fire once per job ──────────────────────────────
     const existing = await getAgreement(String(jobId));
     if (existing) {
       console.log(`[Webhook] Job ${jobId} already processed — skipping`);
@@ -134,9 +195,25 @@ export async function POST(request: NextRequest) {
     console.log(`[Webhook] Fetching job ${jobId}...`);
     const job = await fetchEnrichedJob(jobId, companyId);
     const totalExTax = job.totalIncGst / 1.1;
+
     console.log(
-      `[Webhook] Job fetched — exTax: $${totalExTax.toFixed(2)}, client: "${job.clientName}"`,
+      `[Webhook] Job ${jobId} — exTax: $${totalExTax.toFixed(2)}, client: "${job.clientName}"`,
     );
+
+    // ── Must be converted from a quote ────────────────────────────────────────
+    const rawJob = await simproGet<any>(
+      `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${jobId}`,
+    );
+
+    if (rawJob.ConvertedFrom?.Type !== "Quote") {
+      console.log(
+        `[Webhook] Job ${jobId} not converted from a quote — skipping`,
+      );
+      return NextResponse.json({
+        received: true,
+        skipped: "job not converted from a quote",
+      });
+    }
 
     // ── Below deposit threshold → skip ────────────────────────────────────────
     if (totalExTax < THRESHOLD_DEPOSIT) {
@@ -184,13 +261,14 @@ export async function POST(request: NextRequest) {
               <div style="background:#fff;padding:28px 32px 8px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
                 <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Amanda,</p>
                 <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.6;">
-                  A quote has been accepted over $20,000. Please create a works agreement for the following job.
+                  A job over $20,000 has been scheduled. Please create a works agreement.
                 </p>
                 ${jobTable([
                   { label: "Job Number", value: job.jobNo },
                   { label: "Customer", value: job.clientName },
                   { label: "Site", value: job.siteName },
                   { label: "Site Address", value: job.siteAddress },
+                  { label: "Scheduled", value: schedule.Date ?? "—" },
                   { label: "Total Ex GST", value: `$${fmtAUD(totalExTax)}` },
                   {
                     label: "Total Inc GST",
@@ -202,7 +280,7 @@ export async function POST(request: NextRequest) {
                 <a href="${APP_URL}/works-agreements" style="display:inline-block;background:#0f2d4a;color:#fff;text-decoration:none;padding:11px 22px;border-radius:7px;font-size:14px;font-weight:500;">Review in RAS Vertex →</a>
               </div>
             `,
-            "Automated notification · RAS Vertex · Quote won over $20,000 ex GST",
+            "Automated notification · RAS Vertex · Job scheduled over $20,000 ex GST",
           ),
         });
         console.log(`[Webhook] 📧 Works agreement email sent — Job ${jobId}`);
@@ -221,6 +299,24 @@ export async function POST(request: NextRequest) {
     // ── $5,000–$19,999 ex GST → Deposit Notification ─────────────────────────
     const depositAmount = Math.round(totalExTax * 0.2 * 100) / 100;
 
+    // Store a record so subsequent schedule entries don't re-trigger
+    await saveAgreement({
+      jobId: job.id,
+      jobNo: job.jobNo,
+      jobName: job.name,
+      clientName: job.clientName,
+      siteAddress: job.siteAddress,
+      siteName: job.siteName,
+      initialWorks: job.name,
+      colourScheme: "",
+      totalIncGst: job.totalIncGst,
+      paymentSchedule: [],
+      date: job.date,
+      createdAt: new Date().toISOString(),
+      status: "draft" as const,
+      triggeredBy: "webhook" as const,
+    });
+
     try {
       await resend.emails.send({
         from: "RAS Admin <sam@rasvertex.com.au>",
@@ -232,13 +328,14 @@ export async function POST(request: NextRequest) {
             <div style="background:#fff;padding:28px 32px 8px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
               <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Amanda,</p>
               <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.6;">
-                A quote has been accepted over $5,000. A 20% deposit must be collected before works commence.
+                A job over $5,000 has been scheduled. A 20% deposit must be collected before works commence.
               </p>
               ${jobTable([
                 { label: "Job Number", value: job.jobNo },
                 { label: "Customer", value: job.clientName },
                 { label: "Site", value: job.siteName },
                 { label: "Site Address", value: job.siteAddress },
+                { label: "Scheduled", value: schedule.Date ?? "—" },
                 { label: "Total Ex GST", value: `$${fmtAUD(totalExTax)}` },
                 {
                   label: "Total Inc GST",
@@ -252,7 +349,7 @@ export async function POST(request: NextRequest) {
               ])}
             </div>
           `,
-          "Automated notification · RAS Vertex · Quote won over $5,000 ex GST",
+          "Automated notification · RAS Vertex · Job scheduled over $5,000 ex GST",
         ),
       });
       console.log(`[Webhook] 📧 Deposit notification sent — Job ${jobId}`);
@@ -281,7 +378,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    endpoint: "SimPRO Job Created Webhook",
+    endpoint: "SimPRO Job Schedule Created Webhook",
     thresholdDeposit: `$${THRESHOLD_DEPOSIT} ex GST`,
     thresholdWorksAgreement: `$${THRESHOLD_WORKS_AGREEMENT} ex GST`,
   });
