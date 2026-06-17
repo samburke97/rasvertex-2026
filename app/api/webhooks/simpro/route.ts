@@ -3,10 +3,10 @@
 // SimPRO webhook — fires when a Job Schedule is created.
 //
 // Expected payload:
-//   { name: "JobSchedule", action: "created", reference: { companyID: 0, scheduleID: 1234 } }
+//   { name: "Job schedule", action: "created", reference: { companyID: 0, scheduleID: 1234 } }
 //
 // Flow:
-//   1. Receive JobSchedule → created
+//   1. Receive Job schedule → created
 //   2. Fetch schedule → parse jobID from Reference field ("jobID-costCenterID")
 //   3. Fetch job → confirm ConvertedFrom.Type === "Quote"
 //   4. Duplicate guard — only fire once per job
@@ -144,9 +144,9 @@ export async function POST(request: NextRequest) {
     const scheduleId: number = reference.scheduleID;
     const companyId: number = reference.companyID ?? 0;
 
-    // ── Only process JobSchedule → created ────────────────────────────────────
+    // ── Only process Job schedule → created ───────────────────────────────────
     const isJobScheduleCreated =
-      name.toLowerCase() === "jobschedule" && action === "created";
+      name.toLowerCase() === "job schedule" && action === "created";
 
     if (!isJobScheduleCreated || !scheduleId) {
       console.log(`[Webhook] Skipped — name: "${name}", action: "${action}"`);
