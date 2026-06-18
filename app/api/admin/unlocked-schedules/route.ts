@@ -28,9 +28,7 @@ function getYesterdayAEST(): string {
   const now = new Date();
   const aestOffset = 10 * 60 * 60 * 1000;
   const aestNow = new Date(now.getTime() + aestOffset);
-  const yesterday = new Date(aestNow);
-  yesterday.setDate(yesterday.getDate() - 1);
-  return yesterday.toISOString().split("T")[0];
+  return aestNow.toISOString().split("T")[0];
 }
 
 function fmtDate(iso: string): string {
