@@ -2,8 +2,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Cron job — runs daily at 23:00 UTC (9:00 AM AEST/Sunshine Coast)
 //
-// Fetches all job schedules from yesterday, filters to unlocked ones,
-// groups by staff member, sends summary email to amanda + team.
+// Flow:
+//   1. Fetch all schedules for yesterday
+//   2. Filter to job type
+//   3. Fetch each individually to get IsLocked
+//   4. Group unlocked by staff member
+//   5. Send summary email to amanda + team
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
@@ -22,13 +26,12 @@ function getResend(): Resend {
 }
 
 function getYesterdayAEST(): string {
-  // Sunshine Coast is UTC+10, no daylight saving
   const now = new Date();
   const aestOffset = 10 * 60 * 60 * 1000;
   const aestNow = new Date(now.getTime() + aestOffset);
   const yesterday = new Date(aestNow);
   yesterday.setDate(yesterday.getDate() - 1);
-  return yesterday.toISOString().split("T")[0]; // YYYY-MM-DD
+  return yesterday.toISOString().split("T")[0];
 }
 
 function fmtDate(iso: string): string {
@@ -40,14 +43,17 @@ function fmtDate(iso: string): string {
   });
 }
 
-interface SimproSchedule {
+interface ScheduleListItem {
   ID: number;
   Type: string;
   Reference: string;
-  IsLocked: boolean;
   TotalHours: number;
   Date: string;
   Staff: { ID: number; Name: string };
+}
+
+interface ScheduleDetail extends ScheduleListItem {
+  IsLocked: boolean;
 }
 
 interface UnlockedEntry {
@@ -68,18 +74,18 @@ export async function GET() {
     const yesterday = getYesterdayAEST();
     console.log(`[UnlockedSchedules] Checking schedules for ${yesterday}...`);
 
-    // ── Fetch all schedules for yesterday ─────────────────────────────────────
-    const allSchedules: SimproSchedule[] = [];
+    // ── 1. Fetch all schedules for yesterday ──────────────────────────────────
+    const allSchedules: ScheduleListItem[] = [];
     let page = 1;
 
     while (true) {
       const url =
         `${SIMPRO_BASE_URL}/api/v1.0/companies/0/schedules/` +
         `?pageSize=${PAGE_SIZE}&page=${page}` +
-        `&columns=ID,Type,Reference,IsLocked,TotalHours,Date,Staff` +
+        `&columns=ID,Type,Reference,TotalHours,Date,Staff` +
         `&Date=${yesterday}`;
 
-      const batch = await simproGet<SimproSchedule[]>(url);
+      const batch = await simproGet<ScheduleListItem[]>(url);
       allSchedules.push(...batch);
       if (batch.length < PAGE_SIZE) break;
       page++;
@@ -89,13 +95,41 @@ export async function GET() {
       `[UnlockedSchedules] Fetched ${allSchedules.length} schedules for ${yesterday}`,
     );
 
-    // ── Filter: job type + not locked ─────────────────────────────────────────
-    const unlocked = allSchedules.filter(
-      (s) => s.Type === "job" && s.IsLocked === false,
+    // ── 2. Filter to job type only ────────────────────────────────────────────
+    const jobSchedules = allSchedules.filter((s) => s.Type === "job");
+    console.log(
+      `[UnlockedSchedules] ${jobSchedules.length} job schedules found`,
     );
 
+    if (jobSchedules.length === 0) {
+      return NextResponse.json({
+        message: "No job schedules for yesterday",
+        date: yesterday,
+        unlocked: 0,
+      });
+    }
+
+    // ── 3. Fetch each individually to get IsLocked ────────────────────────────
+    const detailResults = await Promise.all(
+      jobSchedules.map(async (s) => {
+        try {
+          const detail = await simproGet<ScheduleDetail>(
+            `${SIMPRO_BASE_URL}/api/v1.0/companies/0/schedules/${s.ID}`,
+          );
+          return { ...s, IsLocked: detail.IsLocked ?? false };
+        } catch {
+          console.warn(
+            `[UnlockedSchedules] Could not fetch detail for schedule ${s.ID}`,
+          );
+          return { ...s, IsLocked: true }; // assume locked if fetch fails
+        }
+      }),
+    );
+
+    // ── 4. Filter to unlocked ─────────────────────────────────────────────────
+    const unlocked = detailResults.filter((s) => s.IsLocked === false);
     console.log(
-      `[UnlockedSchedules] ${unlocked.length} unlocked job schedules found`,
+      `[UnlockedSchedules] ${unlocked.length} unlocked job schedules`,
     );
 
     if (unlocked.length === 0) {
@@ -103,12 +137,12 @@ export async function GET() {
       return NextResponse.json({
         message: "All schedules locked",
         date: yesterday,
-        total: allSchedules.length,
+        totalChecked: jobSchedules.length,
         unlocked: 0,
       });
     }
 
-    // ── Group by staff ────────────────────────────────────────────────────────
+    // ── 5. Group by staff ─────────────────────────────────────────────────────
     const byStaff = new Map<
       number,
       { name: string; entries: UnlockedEntry[] }
@@ -131,8 +165,9 @@ export async function GET() {
       });
     }
 
-    // ── Build email ───────────────────────────────────────────────────────────
+    // ── 6. Build email ────────────────────────────────────────────────────────
     const staffSections = Array.from(byStaff.values())
+      .sort((a, b) => a.name.localeCompare(b.name))
       .map(({ name, entries }) => {
         const rows = entries
           .map(
@@ -147,8 +182,8 @@ export async function GET() {
           .join("");
 
         return `
-          <div style="margin-bottom:24px;">
-            <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0f2d4a;">${name}</p>
+          <div style="margin-bottom:28px;">
+            <p style="margin:0 0 8px;font-size:14px;font-weight:600;color:#0f2d4a;border-bottom:2px solid #0f2d4a;padding-bottom:6px;">${name}</p>
             <table style="width:100%;border-collapse:collapse;">
               <thead>
                 <tr style="background:#f0f4f8;">
@@ -193,12 +228,12 @@ export async function GET() {
       </div>
     `;
 
-    // ── Send email ────────────────────────────────────────────────────────────
+    // ── 7. Send email ─────────────────────────────────────────────────────────
     const resend = getResend();
     await resend.emails.send({
       from: "RAS Admin <sam@rasvertex.com.au>",
       to: RECIPIENTS,
-      subject: `Unlocked Schedules — ${unlocked.length} staff · ${yesterday}`,
+      subject: `Unlocked Schedules — ${byStaff.size} staff · ${yesterday}`,
       html,
     });
 
@@ -209,7 +244,7 @@ export async function GET() {
     return NextResponse.json({
       sent: true,
       date: yesterday,
-      totalChecked: allSchedules.length,
+      totalChecked: jobSchedules.length,
       unlocked: unlocked.length,
       staffAffected: byStaff.size,
     });
