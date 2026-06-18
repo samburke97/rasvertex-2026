@@ -6,29 +6,54 @@ import { simproGet } from "@/lib/simpro/client";
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 
 export async function GET() {
-  // Using a known schedule from the logs: job 10816, ref 10816-13301
-  // Reference = jobID-costCenterID, service jobs have sectionID = 1
   const jobId = 10816;
-  const sectionId = 1;
-  const costCenterId = 13301;
 
   try {
-    // 1. Fetch all schedules for this cost centre
-    const schedules = await simproGet<any[]>(
-      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobs/${jobId}/sections/${sectionId}/costCenters/${costCenterId}/schedules/`,
+    // 1. Get sections for this job
+    const sections = await simproGet<any[]>(
+      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobs/${jobId}/sections/`,
     );
 
-    // 2. Fetch detail for first schedule to see full response
-    const detail =
-      schedules.length > 0
-        ? await simproGet<any>(
-            `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobs/${jobId}/sections/${sectionId}/costCenters/${costCenterId}/schedules/${schedules[0].ID}`,
-          )
-        : null;
+    if (sections.length === 0) {
+      return NextResponse.json({ error: "No sections found" });
+    }
+
+    const sectionId = sections[0].ID;
+
+    // 2. Get cost centres for first section
+    const costCentres = await simproGet<any[]>(
+      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobs/${jobId}/sections/${sectionId}/costCenters/`,
+    );
+
+    if (costCentres.length === 0) {
+      return NextResponse.json({ sections, error: "No cost centres found" });
+    }
+
+    const costCentreId = costCentres[0].ID;
+
+    // 3. Get schedules for first cost centre
+    const schedules = await simproGet<any[]>(
+      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobs/${jobId}/sections/${sectionId}/costCenters/${costCentreId}/schedules/`,
+    );
+
+    if (schedules.length === 0) {
+      return NextResponse.json({
+        sections,
+        costCentres,
+        error: "No schedules found",
+      });
+    }
+
+    // 4. Get detail for first schedule
+    const detail = await simproGet<any>(
+      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobs/${jobId}/sections/${sectionId}/costCenters/${costCentreId}/schedules/${schedules[0].ID}`,
+    );
 
     return NextResponse.json({
-      list: schedules,
-      detail,
+      sectionId,
+      costCentreId,
+      scheduleList: schedules,
+      scheduleDetail: detail,
     });
   } catch (err) {
     return NextResponse.json({
