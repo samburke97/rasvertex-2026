@@ -1,9 +1,9 @@
 // app/api/admin/unlocked-schedules/route.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// Cron job — runs daily at 23:00 UTC (9:00 AM AEST/Sunshine Coast)
+// Cron job — runs daily at 21:30 UTC (7:30 AM AEST/Sunshine Coast)
 //
 // Flow:
-//   1. Fetch all job schedules for yesterday via unified endpoint → get IDs + _href
+//   1. Fetch all job schedules for yesterday via unified endpoint
 //   2. For each schedule fetch detail via _href → read top-level IsLocked
 //   3. Flag where IsLocked === false
 //   4. Group by staff, send email
@@ -25,7 +25,12 @@ function getResend(): Resend {
 }
 
 function getYesterdayAEST(): string {
-  return "2026-06-18";
+  const now = new Date();
+  const aestOffset = 10 * 60 * 60 * 1000;
+  const aestNow = new Date(now.getTime() + aestOffset);
+  const yesterday = new Date(aestNow);
+  yesterday.setDate(yesterday.getDate() - 1);
+  return yesterday.toISOString().split("T")[0];
 }
 
 function fmtDate(iso: string): string {
@@ -44,7 +49,6 @@ interface ScheduleListItem {
   TotalHours: number;
   Date: string;
   Staff: { ID: number; Name: string };
-  _href?: string;
 }
 
 interface ScheduleDetail {
@@ -102,8 +106,7 @@ export async function GET() {
       });
     }
 
-    // ── 2. Fetch unified detail for each → get _href ──────────────────────────
-    // Then hit _href to get IsLocked at top level
+    // ── 2. Fetch detail for each via _href → check IsLocked ──────────────────
     const byStaff = new Map<
       number,
       { name: string; entries: UnlockedEntry[] }
@@ -131,7 +134,7 @@ export async function GET() {
             `[UnlockedSchedules] Schedule ${s.ID} — staff: "${s.Staff?.Name}", IsLocked: ${detail.IsLocked}`,
           );
 
-          if (detail.IsLocked === true) {
+          if (detail.IsLocked === false) {
             const staffId = s.Staff?.ID;
             const staffName = s.Staff?.Name ?? "Unknown";
 
@@ -220,7 +223,7 @@ export async function GET() {
 
           <div style="background:#f9f9f7;border:1px solid #ebebeb;border-top:none;border-radius:0 0 10px 10px;padding:16px 32px;">
             <p style="margin:0;font-size:12px;color:#aaa;">
-              Daily automated check · RAS Vertex · Schedules for ${yesterday} · Test mode
+              Daily automated check · RAS Vertex · Schedules for ${yesterday}
             </p>
           </div>
 
