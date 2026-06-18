@@ -46,9 +46,8 @@ export async function GET() {
 
     // 4. Get detail for first schedule
     const detail = await simproGet<any>(
-      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobs/${jobId}/sections/${sectionId}/costCenters/${costCentreId}/schedules/${schedules[0].ID}`,
+      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobs/${jobId}/sections/${sectionId}/costCenters/${costCentreId}/schedules/62256`,
     );
-
     return NextResponse.json({
       sectionId,
       costCentreId,
