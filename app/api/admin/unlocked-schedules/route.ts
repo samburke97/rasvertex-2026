@@ -5,9 +5,10 @@
 // Flow:
 //   1. Fetch all schedules for yesterday
 //   2. Filter to job type
-//   3. Fetch each individually to get IsLocked
-//   4. Group unlocked by staff member
-//   5. Send summary email to amanda + team
+//   3. Fetch each individually to get Blocks + IsLocked per block
+//   4. Flag schedules where ANY block is unlocked
+//   5. Group by staff member
+//   6. Send summary email
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
@@ -17,7 +18,7 @@ import { Resend } from "resend";
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const PAGE_SIZE = 1000;
 
-const RECIPIENTS = ["team@rasvertex.com.au", "amanda@rasvertex.com.au"];
+const RECIPIENTS = ["sam@rasvertex.com.au"];
 
 function getResend(): Resend {
   const key = process.env.RESEND_API_KEY;
@@ -43,6 +44,12 @@ function fmtDate(iso: string): string {
   });
 }
 
+interface ScheduleBlock {
+  StartTime: string;
+  EndTime: string;
+  IsLocked: boolean;
+}
+
 interface ScheduleListItem {
   ID: number;
   Type: string;
@@ -53,13 +60,15 @@ interface ScheduleListItem {
 }
 
 interface ScheduleDetail extends ScheduleListItem {
-  IsLocked: boolean;
+  Blocks: ScheduleBlock[];
 }
 
 interface UnlockedEntry {
   scheduleId: number;
   jobRef: string;
   hours: number;
+  unlockedBlocks: number;
+  totalBlocks: number;
 }
 
 export async function GET() {
@@ -109,33 +118,36 @@ export async function GET() {
       });
     }
 
-    // ── 3. Fetch each individually to get IsLocked ────────────────────────────
+    // ── 3. Fetch each individually to get Blocks ──────────────────────────────
     const detailResults = await Promise.all(
       jobSchedules.map(async (s) => {
         try {
           const detail = await simproGet<ScheduleDetail>(
             `${SIMPRO_BASE_URL}/api/v1.0/companies/0/schedules/${s.ID}`,
           );
-          return { ...s, IsLocked: detail.IsLocked ?? false };
+          return { ...s, Blocks: detail.Blocks ?? [] };
         } catch {
           console.warn(
             `[UnlockedSchedules] Could not fetch detail for schedule ${s.ID}`,
           );
-          return { ...s, IsLocked: true }; // assume locked if fetch fails
+          return { ...s, Blocks: [] };
         }
       }),
     );
 
-    // ── 4. Filter to unlocked ─────────────────────────────────────────────────
-    const unlocked = detailResults.filter((s) => s.IsLocked === false);
+    // ── 4. Filter to schedules with at least one unlocked block ───────────────
+    const unlocked = detailResults.filter((s) =>
+      s.Blocks.some((b) => b.IsLocked === false),
+    );
+
     console.log(
-      `[UnlockedSchedules] ${unlocked.length} unlocked job schedules`,
+      `[UnlockedSchedules] ${unlocked.length} schedules with unlocked blocks`,
     );
 
     if (unlocked.length === 0) {
-      console.log(`[UnlockedSchedules] All schedules locked — no email needed`);
+      console.log(`[UnlockedSchedules] All blocks locked — no email needed`);
       return NextResponse.json({
-        message: "All schedules locked",
+        message: "All schedule blocks locked",
         date: yesterday,
         totalChecked: jobSchedules.length,
         unlocked: 0,
@@ -151,6 +163,10 @@ export async function GET() {
     for (const s of unlocked) {
       const staffId = s.Staff?.ID;
       const staffName = s.Staff?.Name ?? "Unknown";
+      const unlockedBlocks = s.Blocks.filter(
+        (b) => b.IsLocked === false,
+      ).length;
+      const totalBlocks = s.Blocks.length;
 
       if (!staffId) continue;
 
@@ -162,6 +178,8 @@ export async function GET() {
         scheduleId: s.ID,
         jobRef: s.Reference ?? "—",
         hours: s.TotalHours ?? 0,
+        unlockedBlocks,
+        totalBlocks,
       });
     }
 
@@ -174,7 +192,9 @@ export async function GET() {
             (e) => `
             <tr style="border-top:1px solid #f0f0f0;">
               <td style="padding:10px 12px;font-size:13px;color:#1a1a1a;">${e.jobRef}</td>
-              <td style="padding:10px 12px;font-size:13px;color:#e53e3e;font-weight:600;">Not locked</td>
+              <td style="padding:10px 12px;font-size:13px;color:#e53e3e;font-weight:600;">
+                ${e.unlockedBlocks} of ${e.totalBlocks} block${e.totalBlocks === 1 ? "" : "s"} unlocked
+              </td>
               <td style="padding:10px 12px;font-size:13px;color:#888;text-align:right;">${e.hours.toFixed(2)} hrs</td>
             </tr>
           `,
@@ -209,9 +229,9 @@ export async function GET() {
           </div>
 
           <div style="background:#fff;padding:28px 32px 24px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
-            <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Amanda,</p>
+            <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Sam,</p>
             <p style="margin:0 0 24px;font-size:15px;color:#444;line-height:1.6;">
-              The following staff had job schedules yesterday that were <strong>not locked</strong>.
+              The following staff had job schedules yesterday with <strong>unlocked blocks</strong>.
               Please follow up with them to confirm their job cards.
             </p>
 
@@ -220,7 +240,7 @@ export async function GET() {
 
           <div style="background:#f9f9f7;border:1px solid #ebebeb;border-top:none;border-radius:0 0 10px 10px;padding:16px 32px;">
             <p style="margin:0;font-size:12px;color:#aaa;">
-              Daily automated check · RAS Vertex · Schedules for ${yesterday}
+              Daily automated check · RAS Vertex · Schedules for ${yesterday} · Test mode
             </p>
           </div>
 
