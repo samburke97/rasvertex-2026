@@ -30,12 +30,9 @@ function getCheckDateAEST(): string {
   const now = new Date();
   const aestOffset = 10 * 60 * 60 * 1000;
   const aestNow = new Date(now.getTime() + aestOffset);
-  // TEMP: today for testing — revert to yesterday for production
-  return aestNow.toISOString().split("T")[0];
-  // PRODUCTION:
-  // const yesterday = new Date(aestNow);
-  // yesterday.setDate(yesterday.getDate() - 1);
-  // return yesterday.toISOString().split("T")[0];
+  const yesterday = new Date(aestNow);
+  yesterday.setDate(yesterday.getDate() - 1);
+  return yesterday.toISOString().split("T")[0];
 }
 
 function fmtDate(iso: string): string {
