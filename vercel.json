@@ -1,16 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/recertifications/notify-due-soon",
-      "schedule": "0 22 * * *"
-    },
-    {
-      "path": "/api/simpro/recertifications/sync",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/db/ping",
-      "schedule": "0 3 * * *"
+      "path": "/api/admin/unlocked-schedules",
+      "schedule": "0 23 * * *"
     }
   ]
 }
