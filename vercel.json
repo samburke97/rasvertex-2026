@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/admin/unlocked-schedules",
-      "schedule": "0 23 * * *"
+      "schedule": "30 21 * * *"
     }
   ]
 }
