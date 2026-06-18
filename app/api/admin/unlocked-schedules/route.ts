@@ -6,7 +6,7 @@
 //   1. Fetch all schedules for yesterday
 //   2. Filter to job type
 //   3. Fetch each individually to get Blocks + IsLocked per block
-//   4. Flag schedules where ANY block is unlocked
+//   4. Flag schedules where ANY block is not explicitly locked (IsLocked !== true)
 //   5. Group by staff member
 //   6. Send summary email
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,9 +45,9 @@ function fmtDate(iso: string): string {
 }
 
 interface ScheduleBlock {
-  StartTime: string;
-  EndTime: string;
-  IsLocked: boolean;
+  StartTime?: string;
+  EndTime?: string;
+  IsLocked?: boolean;
 }
 
 interface ScheduleListItem {
@@ -125,6 +125,10 @@ export async function GET() {
           const detail = await simproGet<ScheduleDetail>(
             `${SIMPRO_BASE_URL}/api/v1.0/companies/0/schedules/${s.ID}`,
           );
+          console.log(
+            `[UnlockedSchedules] Schedule ${s.ID} blocks:`,
+            JSON.stringify(detail.Blocks),
+          );
           return { ...s, Blocks: detail.Blocks ?? [] };
         } catch {
           console.warn(
@@ -135,9 +139,9 @@ export async function GET() {
       }),
     );
 
-    // ── 4. Filter to schedules with at least one unlocked block ───────────────
-    const unlocked = detailResults.filter((s) =>
-      s.Blocks.some((b) => b.IsLocked === false),
+    // ── 4. Filter: any block not explicitly locked (IsLocked !== true) ────────
+    const unlocked = detailResults.filter(
+      (s) => s.Blocks.length === 0 || s.Blocks.some((b) => b.IsLocked !== true),
     );
 
     console.log(
@@ -163,9 +167,7 @@ export async function GET() {
     for (const s of unlocked) {
       const staffId = s.Staff?.ID;
       const staffName = s.Staff?.Name ?? "Unknown";
-      const unlockedBlocks = s.Blocks.filter(
-        (b) => b.IsLocked === false,
-      ).length;
+      const unlockedBlocks = s.Blocks.filter((b) => b.IsLocked !== true).length;
       const totalBlocks = s.Blocks.length;
 
       if (!staffId) continue;
@@ -267,6 +269,12 @@ export async function GET() {
       totalChecked: jobSchedules.length,
       unlocked: unlocked.length,
       staffAffected: byStaff.size,
+      debug: detailResults.map((s) => ({
+        id: s.ID,
+        ref: s.Reference,
+        staff: s.Staff?.Name,
+        blocks: s.Blocks.map((b) => ({ IsLocked: b.IsLocked })),
+      })),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
