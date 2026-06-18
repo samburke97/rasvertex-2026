@@ -25,10 +25,7 @@ function getResend(): Resend {
 }
 
 function getYesterdayAEST(): string {
-  const now = new Date();
-  const aestOffset = 10 * 60 * 60 * 1000;
-  const aestNow = new Date(now.getTime() + aestOffset);
-  return aestNow.toISOString().split("T")[0];
+  return "2026-06-18";
 }
 
 function fmtDate(iso: string): string {
@@ -134,7 +131,7 @@ export async function GET() {
             `[UnlockedSchedules] Schedule ${s.ID} — staff: "${s.Staff?.Name}", IsLocked: ${detail.IsLocked}`,
           );
 
-          if (detail.IsLocked === false) {
+          if (detail.IsLocked === true) {
             const staffId = s.Staff?.ID;
             const staffName = s.Staff?.Name ?? "Unknown";
 
