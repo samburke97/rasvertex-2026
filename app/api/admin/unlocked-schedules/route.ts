@@ -16,7 +16,12 @@ import { Resend } from "resend";
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const PAGE_SIZE = 1000;
 
-const RECIPIENTS = ["sam@rasvertex.com.au"];
+const RECIPIENTS = [
+  "sam@rasvertex.com.au",
+  "amanda@rasvertex.com.au",
+  "phil@rasvertex.com.au",
+  "admin@rasvertex.com.au",
+];
 
 function getResend(): Resend {
   const key = process.env.RESEND_API_KEY;
@@ -213,7 +218,7 @@ export async function GET() {
           </div>
 
           <div style="background:#fff;padding:28px 32px 24px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
-            <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Amanda,</p>
+            <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Team,</p>
             <p style="margin:0 0 24px;font-size:15px;color:#444;line-height:1.6;">
               The following staff had job schedules yesterday that were <strong>not locked</strong>.
               Please follow up with them to confirm their job cards.
