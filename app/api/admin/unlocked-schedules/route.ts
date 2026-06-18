@@ -6,7 +6,7 @@
 //   1. Fetch all job schedules for yesterday → collect staff IDs
 //   2. For each staff member fetch their timesheets for yesterday
 //   3. Use _href from timesheet to hit nested job cost center schedule endpoint
-//   4. Check IsLocked on blocks
+//   4. Check IsLocked === false explicitly on blocks
 //   5. Group unlocked by staff, send email
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -67,12 +67,14 @@ interface ScheduleBlock {
   StartTime?: string;
   EndTime?: string;
   IsLocked?: boolean;
+  [key: string]: unknown;
 }
 
 interface NestedScheduleDetail {
   ID: number;
   IsLocked?: boolean;
   Blocks: ScheduleBlock[];
+  [key: string]: unknown;
 }
 
 interface UnlockedEntry {
@@ -124,26 +126,20 @@ export async function GET() {
       });
     }
 
-    // ── 2. Collect unique staff from schedules ────────────────────────────────
-    const staffMap = new Map<
-      number,
-      { name: string; scheduleRefs: Set<string> }
-    >();
-
+    // ── 2. Collect unique staff ───────────────────────────────────────────────
+    const staffMap = new Map<number, { name: string }>();
     for (const s of jobSchedules) {
       const staffId = s.Staff?.ID;
       const staffName = s.Staff?.Name ?? "Unknown";
       if (!staffId) continue;
-
       if (!staffMap.has(staffId)) {
-        staffMap.set(staffId, { name: staffName, scheduleRefs: new Set() });
+        staffMap.set(staffId, { name: staffName });
       }
-      staffMap.get(staffId)!.scheduleRefs.add(s.Reference);
     }
 
     console.log(`[UnlockedSchedules] ${staffMap.size} unique staff found`);
 
-    // ── 3. For each staff, fetch timesheets → use _href to get IsLocked ───────
+    // ── 3. For each staff fetch timesheets → hit _href → check IsLocked ───────
     const byStaff = new Map<
       number,
       { name: string; entries: UnlockedEntry[] }
@@ -167,20 +163,22 @@ export async function GET() {
                 `${SIMPRO_BASE_URL}${ts._href}`,
               );
 
+              // Log the full raw response so we can see exactly what's returned
               console.log(
-                `[UnlockedSchedules] Staff ${name} _href ${ts._href} blocks:`,
-                JSON.stringify(nested.Blocks),
+                `[UnlockedSchedules] Staff "${name}" _href "${ts._href}" raw:`,
+                JSON.stringify(nested),
               );
 
-              const hasUnlocked = nested.Blocks?.some(
-                (b) => b.IsLocked !== true,
-              );
+              const blocks = nested.Blocks ?? [];
 
+              // Only flag if IsLocked is EXPLICITLY false
+              const hasUnlocked = blocks.some((b) => b.IsLocked === false);
               if (!hasUnlocked) continue;
 
-              const unlockedBlocks =
-                nested.Blocks?.filter((b) => b.IsLocked !== true).length ?? 0;
-              const totalBlocks = nested.Blocks?.length ?? 0;
+              const unlockedBlocks = blocks.filter(
+                (b) => b.IsLocked === false,
+              ).length;
+              const totalBlocks = blocks.length;
 
               if (!byStaff.has(staffId)) {
                 byStaff.set(staffId, { name, entries: [] });
@@ -194,7 +192,7 @@ export async function GET() {
               });
             } catch (err) {
               console.warn(
-                `[UnlockedSchedules] Could not fetch nested schedule for ${ts._href}:`,
+                `[UnlockedSchedules] Could not fetch nested for ${ts._href}:`,
                 err,
               );
             }
