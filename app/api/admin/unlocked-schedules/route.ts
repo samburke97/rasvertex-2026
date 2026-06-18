@@ -3,12 +3,11 @@
 // Cron job — runs daily at 23:00 UTC (9:00 AM AEST/Sunshine Coast)
 //
 // Flow:
-//   1. Fetch all schedules for yesterday
-//   2. Filter to job type
-//   3. Fetch each individually to get Blocks + IsLocked per block
-//   4. Flag schedules where ANY block is not explicitly locked (IsLocked !== true)
-//   5. Group by staff member
-//   6. Send summary email
+//   1. Fetch all job schedules for yesterday → collect staff IDs
+//   2. For each staff member fetch their timesheets for yesterday
+//   3. Use _href from timesheet to hit nested job cost center schedule endpoint
+//   4. Check IsLocked on blocks
+//   5. Group unlocked by staff, send email
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse } from "next/server";
@@ -44,12 +43,6 @@ function fmtDate(iso: string): string {
   });
 }
 
-interface ScheduleBlock {
-  StartTime?: string;
-  EndTime?: string;
-  IsLocked?: boolean;
-}
-
 interface ScheduleListItem {
   ID: number;
   Type: string;
@@ -59,12 +52,30 @@ interface ScheduleListItem {
   Staff: { ID: number; Name: string };
 }
 
-interface ScheduleDetail extends ScheduleListItem {
+interface TimesheetEntry {
+  UID: string;
+  ScheduleType: string;
+  Reference: string;
+  _href: string;
+  Date: string;
+  StartTime: string;
+  EndTime: string;
+  TotalHrs: number;
+}
+
+interface ScheduleBlock {
+  StartTime?: string;
+  EndTime?: string;
+  IsLocked?: boolean;
+}
+
+interface NestedScheduleDetail {
+  ID: number;
+  IsLocked?: boolean;
   Blocks: ScheduleBlock[];
 }
 
 interface UnlockedEntry {
-  scheduleId: number;
   jobRef: string;
   hours: number;
   unlockedBlocks: number;
@@ -83,7 +94,7 @@ export async function GET() {
     const yesterday = getYesterdayAEST();
     console.log(`[UnlockedSchedules] Checking schedules for ${yesterday}...`);
 
-    // ── 1. Fetch all schedules for yesterday ──────────────────────────────────
+    // ── 1. Fetch all job schedules for yesterday ──────────────────────────────
     const allSchedules: ScheduleListItem[] = [];
     let page = 1;
 
@@ -100,14 +111,9 @@ export async function GET() {
       page++;
     }
 
-    console.log(
-      `[UnlockedSchedules] Fetched ${allSchedules.length} schedules for ${yesterday}`,
-    );
-
-    // ── 2. Filter to job type only ────────────────────────────────────────────
     const jobSchedules = allSchedules.filter((s) => s.Type === "job");
     console.log(
-      `[UnlockedSchedules] ${jobSchedules.length} job schedules found`,
+      `[UnlockedSchedules] ${jobSchedules.length} job schedules for ${yesterday}`,
     );
 
     if (jobSchedules.length === 0) {
@@ -118,37 +124,95 @@ export async function GET() {
       });
     }
 
-    // ── 3. Fetch each individually to get Blocks ──────────────────────────────
-    const detailResults = await Promise.all(
-      jobSchedules.map(async (s) => {
+    // ── 2. Collect unique staff from schedules ────────────────────────────────
+    const staffMap = new Map<
+      number,
+      { name: string; scheduleRefs: Set<string> }
+    >();
+
+    for (const s of jobSchedules) {
+      const staffId = s.Staff?.ID;
+      const staffName = s.Staff?.Name ?? "Unknown";
+      if (!staffId) continue;
+
+      if (!staffMap.has(staffId)) {
+        staffMap.set(staffId, { name: staffName, scheduleRefs: new Set() });
+      }
+      staffMap.get(staffId)!.scheduleRefs.add(s.Reference);
+    }
+
+    console.log(`[UnlockedSchedules] ${staffMap.size} unique staff found`);
+
+    // ── 3. For each staff, fetch timesheets → use _href to get IsLocked ───────
+    const byStaff = new Map<
+      number,
+      { name: string; entries: UnlockedEntry[] }
+    >();
+
+    await Promise.all(
+      Array.from(staffMap.entries()).map(async ([staffId, { name }]) => {
         try {
-          const detail = await simproGet<ScheduleDetail>(
-            `${SIMPRO_BASE_URL}/api/v1.0/companies/0/schedules/${s.ID}`,
+          const timesheets = await simproGet<TimesheetEntry[]>(
+            `${SIMPRO_BASE_URL}/api/v1.0/companies/0/employees/${staffId}/timesheets/` +
+              `?StartDate=${yesterday}&EndDate=${yesterday}&Includes=Job`,
           );
-          console.log(
-            `[UnlockedSchedules] Schedule ${s.ID} blocks:`,
-            JSON.stringify(detail.Blocks),
+
+          const jobTimesheets = timesheets.filter(
+            (t) => t.ScheduleType === "Job" && t._href,
           );
-          return { ...s, Blocks: detail.Blocks ?? [] };
-        } catch {
+
+          for (const ts of jobTimesheets) {
+            try {
+              const nested = await simproGet<NestedScheduleDetail>(
+                `${SIMPRO_BASE_URL}${ts._href}`,
+              );
+
+              console.log(
+                `[UnlockedSchedules] Staff ${name} _href ${ts._href} blocks:`,
+                JSON.stringify(nested.Blocks),
+              );
+
+              const hasUnlocked = nested.Blocks?.some(
+                (b) => b.IsLocked !== true,
+              );
+
+              if (!hasUnlocked) continue;
+
+              const unlockedBlocks =
+                nested.Blocks?.filter((b) => b.IsLocked !== true).length ?? 0;
+              const totalBlocks = nested.Blocks?.length ?? 0;
+
+              if (!byStaff.has(staffId)) {
+                byStaff.set(staffId, { name, entries: [] });
+              }
+
+              byStaff.get(staffId)!.entries.push({
+                jobRef: ts.Reference ?? "—",
+                hours: ts.TotalHrs ?? 0,
+                unlockedBlocks,
+                totalBlocks,
+              });
+            } catch (err) {
+              console.warn(
+                `[UnlockedSchedules] Could not fetch nested schedule for ${ts._href}:`,
+                err,
+              );
+            }
+          }
+        } catch (err) {
           console.warn(
-            `[UnlockedSchedules] Could not fetch detail for schedule ${s.ID}`,
+            `[UnlockedSchedules] Could not fetch timesheets for staff ${staffId}:`,
+            err,
           );
-          return { ...s, Blocks: [] };
         }
       }),
     );
 
-    // ── 4. Filter: any block not explicitly locked (IsLocked !== true) ────────
-    const unlocked = detailResults.filter(
-      (s) => s.Blocks.length === 0 || s.Blocks.some((b) => b.IsLocked !== true),
-    );
-
     console.log(
-      `[UnlockedSchedules] ${unlocked.length} schedules with unlocked blocks`,
+      `[UnlockedSchedules] ${byStaff.size} staff with unlocked blocks`,
     );
 
-    if (unlocked.length === 0) {
+    if (byStaff.size === 0) {
       console.log(`[UnlockedSchedules] All blocks locked — no email needed`);
       return NextResponse.json({
         message: "All schedule blocks locked",
@@ -158,34 +222,7 @@ export async function GET() {
       });
     }
 
-    // ── 5. Group by staff ─────────────────────────────────────────────────────
-    const byStaff = new Map<
-      number,
-      { name: string; entries: UnlockedEntry[] }
-    >();
-
-    for (const s of unlocked) {
-      const staffId = s.Staff?.ID;
-      const staffName = s.Staff?.Name ?? "Unknown";
-      const unlockedBlocks = s.Blocks.filter((b) => b.IsLocked !== true).length;
-      const totalBlocks = s.Blocks.length;
-
-      if (!staffId) continue;
-
-      if (!byStaff.has(staffId)) {
-        byStaff.set(staffId, { name: staffName, entries: [] });
-      }
-
-      byStaff.get(staffId)!.entries.push({
-        scheduleId: s.ID,
-        jobRef: s.Reference ?? "—",
-        hours: s.TotalHours ?? 0,
-        unlockedBlocks,
-        totalBlocks,
-      });
-    }
-
-    // ── 6. Build email ────────────────────────────────────────────────────────
+    // ── 4. Build email ────────────────────────────────────────────────────────
     const staffSections = Array.from(byStaff.values())
       .sort((a, b) => a.name.localeCompare(b.name))
       .map(({ name, entries }) => {
@@ -250,7 +287,7 @@ export async function GET() {
       </div>
     `;
 
-    // ── 7. Send email ─────────────────────────────────────────────────────────
+    // ── 5. Send email ─────────────────────────────────────────────────────────
     const resend = getResend();
     await resend.emails.send({
       from: "RAS Admin <sam@rasvertex.com.au>",
@@ -260,21 +297,14 @@ export async function GET() {
     });
 
     console.log(
-      `[UnlockedSchedules] 📧 Email sent — ${unlocked.length} unlocked across ${byStaff.size} staff`,
+      `[UnlockedSchedules] 📧 Email sent — ${byStaff.size} staff with unlocked blocks`,
     );
 
     return NextResponse.json({
       sent: true,
       date: yesterday,
       totalChecked: jobSchedules.length,
-      unlocked: unlocked.length,
       staffAffected: byStaff.size,
-      debug: detailResults.map((s) => ({
-        id: s.ID,
-        ref: s.Reference,
-        staff: s.Staff?.Name,
-        blocks: s.Blocks.map((b) => ({ IsLocked: b.IsLocked })),
-      })),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
