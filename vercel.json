@@ -3,6 +3,10 @@
     {
       "path": "/api/admin/unlocked-schedules",
       "schedule": "30 21 * * *"
+    },
+    {
+      "path": "/api/deposit-notifications/check",
+      "schedule": "30 22 * * *"
     }
   ]
 }

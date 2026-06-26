@@ -3,6 +3,8 @@
 // Two triggers:
 //   1. Job → created       → works agreement email ($20k+ ex GST)
 //   2. Job schedule → created → deposit notification ($5k–$19,999 ex GST)
+//                               Email is scheduled 1 month before the job's
+//                               scheduled date (sent immediately if within 1 month)
 //
 // Both require ConvertedFrom.Type === "Quote"
 // ─────────────────────────────────────────────────────────────────────────────
@@ -14,6 +16,7 @@ import {
   saveAgreement,
   getAgreement,
 } from "@/lib/reports/works-agreement/store";
+import { upsertDepositNotification } from "@/lib/deposit-notifications/store";
 import { Resend } from "resend";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
@@ -272,6 +275,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Job schedule → created: Deposit Notification ($5k–$19,999) ───────────
+    // Email fires 1 month before the scheduled date (immediately if within 1 month).
+    // The cron at /api/deposit-notifications/check handles the actual send.
     if (isJobScheduleCreated) {
       const scheduleId: number = reference.scheduleID;
       if (!scheduleId)
@@ -303,13 +308,9 @@ export async function POST(request: NextRequest) {
 
       console.log(`[Webhook] Schedule ${scheduleId} → Job ${jobId}`);
 
-      const existing = await getAgreement(String(jobId));
-      if (existing) {
-        console.log(`[Webhook] Job ${jobId} already processed — skipping`);
-        return NextResponse.json({
-          received: true,
-          skipped: "already processed",
-        });
+      if (!schedule.Date) {
+        console.log(`[Webhook] Schedule ${scheduleId} has no date — skipping`);
+        return NextResponse.json({ received: true, skipped: "no schedule date" });
       }
 
       const result = await fetchJobAndValidate(jobId, companyId);
@@ -335,70 +336,30 @@ export async function POST(request: NextRequest) {
       }
 
       const depositAmount = Math.round(totalExTax * 0.2 * 100) / 100;
+      const scheduledDate = schedule.Date.split("T")[0]; // normalise to YYYY-MM-DD
 
-      // Save record to prevent re-triggering on subsequent schedule entries
-      await saveAgreement({
-        jobId: job.id,
+      await upsertDepositNotification({
+        jobId: Number(job.id),
         jobNo: job.jobNo,
         jobName: job.name,
         clientName: job.clientName,
-        siteAddress: job.siteAddress,
         siteName: job.siteName,
-        initialWorks: job.name,
-        colourScheme: "",
+        siteAddress: job.siteAddress,
+        scheduledDate,
+        totalExTax,
         totalIncGst: job.totalIncGst,
-        paymentSchedule: [],
-        date: job.date,
-        createdAt: new Date().toISOString(),
-        status: "draft" as const,
-        triggeredBy: "webhook" as const,
+        depositAmount,
       });
 
-      const resend = getResend();
-      try {
-        await resend.emails.send({
-          from: "RAS Admin <sam@rasvertex.com.au>",
-          to: DEPOSIT_RECIPIENTS,
-          subject: `Deposit Required — ${job.jobNo} · ${job.clientName} · $${fmtAUD(depositAmount)} ex GST`,
-          html: emailShell(
-            "20% Deposit Required",
-            `
-              <div style="background:#fff;padding:28px 32px 8px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
-                <p style="margin:0 0 6px;font-size:15px;color:#1a1a1a;">Hi Amanda,</p>
-                <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.6;">
-                  A job over $5,000 has been scheduled. A 20% deposit must be collected before works commence.
-                </p>
-                ${jobTable([
-                  { label: "Job Number", value: job.jobNo },
-                  { label: "Customer", value: job.clientName },
-                  { label: "Site", value: job.siteName },
-                  { label: "Site Address", value: job.siteAddress },
-                  { label: "Scheduled", value: schedule.Date ?? "—" },
-                  { label: "Total Ex GST", value: `$${fmtAUD(totalExTax)}` },
-                  {
-                    label: "Total Inc GST",
-                    value: `$${fmtAUD(job.totalIncGst)}`,
-                  },
-                  {
-                    label: "20% Deposit Due",
-                    value: `$${fmtAUD(depositAmount)} ex GST`,
-                    highlight: true,
-                  },
-                ])}
-              </div>
-            `,
-            "Automated notification · RAS Vertex · Job scheduled over $5,000 ex GST",
-          ),
-        });
-        console.log(`[Webhook] 📧 Deposit notification sent — Job ${jobId}`);
-      } catch (emailErr) {
-        console.error("[Webhook] Deposit email failed:", emailErr);
-      }
+      console.log(
+        `[Webhook] ✅ Deposit notification queued — Job ${job.jobNo} scheduled ${scheduledDate}`,
+      );
 
       return NextResponse.json({
         received: true,
-        type: "deposit-notification",
+        type: "deposit-notification-queued",
         jobId: job.jobNo,
+        scheduledDate,
         totalExTax,
         depositAmount,
       });
