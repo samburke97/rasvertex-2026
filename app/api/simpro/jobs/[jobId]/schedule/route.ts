@@ -79,46 +79,61 @@ export async function GET(
   const companyId = parseInt(searchParams.get("companyId") || "0", 10);
   const dateFrom = searchParams.get("dateFrom") ?? null;
   const dateTo = searchParams.get("dateTo") ?? null;
+  const sectionIdParam = searchParams.get("sectionId");
+  const costCentreIdParam = searchParams.get("costCentreId");
+  const scopedSectionId = sectionIdParam ? parseInt(sectionIdParam, 10) : null;
+  const scopedCostCentreId = costCentreIdParam
+    ? parseInt(costCentreIdParam, 10)
+    : null;
 
   const base = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}`;
 
   try {
-    // ── Step 1: Get sections ──────────────────────────────────────────────────
-    console.log(`[Schedule] Fetching sections for job ${parsedJobId}`);
-    const sections = await simproFetch<SimproSection[]>(
-      `${base}/sections/?pageSize=250`,
-    );
-    console.log(`[Schedule] ${sections.length} sections`);
+    // ── Scoped to a single section/cost centre — skip enumerating everything ──
+    let pairs: Array<{ sectionId: number; costCentreId: number }>;
+    if (scopedSectionId != null && scopedCostCentreId != null) {
+      pairs = [
+        { sectionId: scopedSectionId, costCentreId: scopedCostCentreId },
+      ];
+    } else {
+      // ── Step 1: Get sections ────────────────────────────────────────────────
+      console.log(`[Schedule] Fetching sections for job ${parsedJobId}`);
+      const sections = await simproFetch<SimproSection[]>(
+        `${base}/sections/?pageSize=250`,
+      );
+      console.log(`[Schedule] ${sections.length} sections`);
 
-    if (sections.length === 0) {
-      return NextResponse.json({ rows: [] });
-    }
+      if (sections.length === 0) {
+        return NextResponse.json({ rows: [] });
+      }
 
-    // ── Step 2: Get cost centres for all sections (parallel) ──────────────────
-    const costCentreResults = await Promise.all(
-      sections.map(async (section) => {
-        try {
-          const ccs = await simproFetch<SimproCostCentre[]>(
-            `${base}/sections/${section.ID}/costCenters/?pageSize=250`,
-          );
-          return { sectionId: section.ID, costCentres: ccs };
-        } catch (err) {
-          console.warn(
-            `[Schedule] Section ${section.ID} costCenters failed:`,
-            err instanceof Error ? err.message : err,
-          );
-          return { sectionId: section.ID, costCentres: [] };
+      // ── Step 2: Get cost centres for all sections (parallel) ───────────────
+      const costCentreResults = await Promise.all(
+        sections.map(async (section) => {
+          try {
+            const ccs = await simproFetch<SimproCostCentre[]>(
+              `${base}/sections/${section.ID}/costCenters/?pageSize=250`,
+            );
+            return { sectionId: section.ID, costCentres: ccs };
+          } catch (err) {
+            console.warn(
+              `[Schedule] Section ${section.ID} costCenters failed:`,
+              err instanceof Error ? err.message : err,
+            );
+            return { sectionId: section.ID, costCentres: [] };
+          }
+        }),
+      );
+
+      // Flatten to array of { sectionId, costCentreId }
+      pairs = [];
+      for (const { sectionId, costCentres } of costCentreResults) {
+        for (const cc of costCentres) {
+          pairs.push({ sectionId, costCentreId: cc.ID });
         }
-      }),
-    );
-
-    // Flatten to array of { sectionId, costCentreId }
-    const pairs: Array<{ sectionId: number; costCentreId: number }> = [];
-    for (const { sectionId, costCentres } of costCentreResults) {
-      for (const cc of costCentres) {
-        pairs.push({ sectionId, costCentreId: cc.ID });
       }
     }
+
     console.log(
       `[Schedule] ${pairs.length} cost centre(s) to fetch schedules for`,
     );

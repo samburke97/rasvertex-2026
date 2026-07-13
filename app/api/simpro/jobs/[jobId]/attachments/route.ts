@@ -21,6 +21,7 @@ const PER_WORKER_DELAY_MS = 100;
 interface SimproAttachmentListItem {
   ID: string;
   Filename: string;
+  Folder?: { ID: number; Name: string } | null;
 }
 
 interface SimproAttachmentDetail {
@@ -107,6 +108,9 @@ export async function GET(
   const { jobId } = await params;
   const { searchParams } = new URL(request.url);
   const companyId = parseInt(searchParams.get("companyId") || "0", 10);
+  const folderIdParam = searchParams.get("folderId");
+  const folderId =
+    folderIdParam && folderIdParam !== "all" ? parseInt(folderIdParam, 10) : null;
 
   if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN) {
     return NextResponse.json(
@@ -151,7 +155,7 @@ export async function GET(
       };
 
       try {
-        const listUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}/attachments/files/?pageSize=250`;
+        const listUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}/attachments/files/?pageSize=250&columns=ID,Filename,Folder`;
 
         let attachmentsList: SimproAttachmentListItem[];
         try {
@@ -181,8 +185,10 @@ export async function GET(
 
         const imageExtensions =
           /\.(jpg|jpeg|png|gif|webp|bmp|tiff|heic|heif)$/i;
-        const candidates = attachmentsList.filter((a) =>
-          imageExtensions.test(a.Filename),
+        const candidates = attachmentsList.filter(
+          (a) =>
+            imageExtensions.test(a.Filename) &&
+            (folderId == null || a.Folder?.ID === folderId),
         );
 
         send("start", { total: candidates.length, jobId: parsedJobId });

@@ -8,6 +8,8 @@ import type { ReportPhoto } from "@/lib/reports/condition.types";
 interface PhotoCardProps {
   photo: ReportPhoto;
   showDate?: boolean;
+  /** CSS aspect-ratio value for the thumbnail (e.g. "1 / 1"). Defaults to square. */
+  aspectRatio?: string;
   onRemove: (id: string) => void;
   onRename: (id: string, name: string) => void;
 }
@@ -15,6 +17,7 @@ interface PhotoCardProps {
 export default function PhotoCard({
   photo,
   showDate = false,
+  aspectRatio,
   onRemove,
   onRename,
 }: PhotoCardProps) {
@@ -45,7 +48,10 @@ export default function PhotoCard({
 
   return (
     <div className={styles.card}>
-      <div className={styles.thumb}>
+      <div
+        className={styles.thumb}
+        style={aspectRatio ? { aspectRatio } : undefined}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={photo.url} alt={displayName} />
         <button

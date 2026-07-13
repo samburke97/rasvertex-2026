@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/reports/zztestphotos)",
+      "Bash(npx tsx *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/reports/zztestoptions)",
+      "Bash(rm -f /Users/burke/Desktop/RAS-VERTEX/rasvertex-2026/.tmp-*)",
+      "Bash(git -C /Users/burke/Desktop/RAS-VERTEX/rasvertex-2026 status --short)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3001/reports/zztestcc)"
+    ],
+    "additionalDirectories": [
+      "/Users/burke/Desktop/RAS-VERTEX/rasvertex-2026"
+    ]
+  }
+}

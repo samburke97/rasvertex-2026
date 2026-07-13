@@ -11,20 +11,38 @@
 // The Save to Job path uses Puppeteer to render this HTML server-side.
 // Both must produce identical output — do not diverge these two paths.
 
-import type { ConditionReportData, ScheduleRow } from "./condition.types";
+import type {
+  ConditionReportData,
+  PhotoLayout,
+  ScheduleRow,
+} from "./condition.types";
 import { formatScheduleDate } from "./condition.types";
 
 // ── Shared pagination constants (also used by PhotoSection.tsx) ───────────────
 // A4 at 96dpi: 794 x 1123px; padding 2.75rem = 44px each side
 // Available height: 1123 - (44 * 2) = 1035px
 export const PAGE_AVAILABLE_H = 1035;
-export const ROW_H = 270;
 export const DATE_HEADER_H = 34;
 export const GROUP_GAP = 36;
+
+// Photo grid density — must match PHOTO_LAYOUTS in PhotoSection.tsx.
+const PHOTO_LAYOUTS: Record<
+  PhotoLayout,
+  { columns: number; rowH: number; aspectRatio: string }
+> = {
+  large: { columns: 2, rowH: 390, aspectRatio: "1 / 1" },
+  medium: { columns: 2, rowH: 345, aspectRatio: "346 / 301" },
+  small: { columns: 3, rowH: 270, aspectRatio: "1 / 1" },
+};
 
 // Schedule rows per page — must match ScheduleSection.tsx
 const ROWS_PER_FIRST_PAGE = 22;
 const ROWS_PER_CONTINUATION = 22;
+
+// Rows are taller when the Notes column is active (room to write on the
+// printed page), so fewer of them fit per page — must match ScheduleSection.tsx
+const ROWS_PER_FIRST_PAGE_NOTES = 18;
+const ROWS_PER_CONTINUATION_NOTES = 20;
 
 // ── Static asset map ──────────────────────────────────────────────────────────
 // Browser path: omit — relative /public paths resolve normally.
@@ -147,7 +165,9 @@ type PrintItem =
 function paginatePhotos(
   groups: PhotoGroup[],
   showDates: boolean,
+  layout: PhotoLayout,
 ): PrintItem[][] {
+  const { columns, rowH } = PHOTO_LAYOUTS[layout] ?? PHOTO_LAYOUTS.small;
   const pages: PrintItem[][] = [];
   let current: PrintItem[] = [];
   let usedH = 0;
@@ -163,18 +183,18 @@ function paginatePhotos(
   for (let g = 0; g < groups.length; g++) {
     const group = groups[g];
     if (showDates && group.label) {
-      const neededH = DATE_HEADER_H + ROW_H;
+      const neededH = DATE_HEADER_H + rowH;
       if (usedH > 0 && usedH + neededH > PAGE_AVAILABLE_H) flush();
       current.push({ type: "dateHeader", label: group.label });
       usedH += DATE_HEADER_H;
     }
     const rows: Photo[][] = [];
-    for (let i = 0; i < group.photos.length; i += 3)
-      rows.push(group.photos.slice(i, i + 3));
+    for (let i = 0; i < group.photos.length; i += columns)
+      rows.push(group.photos.slice(i, i + columns));
     for (const row of rows) {
-      if (usedH > 0 && usedH + ROW_H > PAGE_AVAILABLE_H) flush();
+      if (usedH > 0 && usedH + rowH > PAGE_AVAILABLE_H) flush();
       current.push({ type: "photoRow", photos: row });
-      usedH += ROW_H;
+      usedH += rowH;
     }
     const isLastGroup = g === groups.length - 1;
     if (!isLastGroup && usedH > 0 && usedH + GROUP_GAP < PAGE_AVAILABLE_H)
@@ -254,12 +274,19 @@ const PRINT_STYLES = `
   .sch-heading-rule { flex:1; height:2px; background:#0d1c45; }
   .sch-table-wrap { flex:1; }
   .sch-table { width:100%; border-collapse:collapse; }
-  .sch-th { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:left; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .sch-th-num { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:right; white-space:nowrap; width:100px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sch-th { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:left; width:20%; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sch-th-num { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:right; white-space:nowrap; width:10%; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sch-th-note { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:left; width:46%; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sch-th-wide { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:left; width:35%; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sch-th-num-wide { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:right; white-space:nowrap; width:25%; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .sch-row { border-bottom:1px solid #f0f0f0; }
   .sch-row:last-child { border-bottom:none; }
-  .sch-td { padding:0.48rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:300; color:#374151; }
-  .sch-td-num { padding:0.48rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:300; color:#374151; text-align:right; white-space:nowrap; }
+  .sch-row:nth-child(even) { background:#f9f9f9; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sch-td, .sch-td-num, .sch-td-note { padding:0.48rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:300; color:#374151; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sch-td-num { text-align:right; }
+  .sch-table.tall .sch-td, .sch-table.tall .sch-td-num, .sch-table.tall .sch-td-note { padding-top:0.95rem; padding-bottom:0.95rem; }
+  .sch-section-row { background:#eef1f6; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sch-section-cell { padding:0.5rem 0.875rem; font-family:'Bebas Neue',Arial,sans-serif; font-size:1.15rem; font-weight:400; letter-spacing:0.08em; color:#0d1c45; text-transform:uppercase; line-height:1; border-bottom:1px solid #e0e4ee; }
   .sch-totals { background:#f9f9f9; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .sch-totals-label { padding:0.55rem 0.875rem; font-family:'Bebas Neue',Arial,sans-serif; font-size:0.85rem; letter-spacing:0.08em; color:#0d1c45; }
   .sch-totals-cell { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:600; color:#0d1c45; text-align:right; }
@@ -294,36 +321,126 @@ const PRINT_STYLES = `
 
 // ── Schedule pages HTML builder ───────────────────────────────────────────────
 // Mirrors ScheduleSection.tsx exactly:
-//   - Paginates at ROWS_PER_FIRST_PAGE (22) then ROWS_PER_CONTINUATION (22)
+//   - Paginates at ROWS_PER_FIRST_PAGE (22) then ROWS_PER_CONTINUATION (22),
+//     or the *_NOTES variants when the Notes column is active (taller rows)
 //   - topBar + sub-heading only on first page
 //   - Association footer on every page
 //   - Total row on last page only
-//   - 3 columns: Date, Employee, Hours (matches React component)
+//   - Columns: Date, Employee, Hours, (Notes — optional, left blank for pen
+//     notes; matches React component)
+
+// Mirrors the item model in ScheduleSection.tsx: when sectioned, rows are
+// expanded into header/row/subtotal items so a per-section tally can be
+// inserted right after the last row of each section.
+type ScheduleItem =
+  | { kind: "header"; sectionId: string; title: string }
+  | { kind: "row"; row: ScheduleRow }
+  | { kind: "subtotal"; sectionId: string; title: string; hours: number };
+
+const DEFAULT_LEADING_SECTION_TITLE = "Section 1";
+
+// Once any row has a named break, every row must belong to a named section —
+// including the rows before the first break, which get an auto-named header.
+function buildScheduleItems(
+  rows: ScheduleRow[],
+  sectioned: boolean,
+): ScheduleItem[] {
+  if (!sectioned) return rows.map((row) => ({ kind: "row", row }));
+
+  const hasAnyBreak = rows.some((r) => r.sectionTitle);
+
+  const items: ScheduleItem[] = [];
+  let sectionId: string | null = null;
+  let title = "";
+  let hours = 0;
+  let inSection = false;
+
+  const flush = () => {
+    if (inSection) {
+      items.push({ kind: "subtotal", sectionId: sectionId!, title, hours });
+    }
+  };
+
+  rows.forEach((row, idx) => {
+    const isImplicitLeadingHeader =
+      idx === 0 && hasAnyBreak && !row.sectionTitle;
+
+    if (row.sectionTitle || isImplicitLeadingHeader) {
+      flush();
+      sectionId = row.id;
+      title = row.sectionTitle || DEFAULT_LEADING_SECTION_TITLE;
+      hours = 0;
+      inSection = true;
+      items.push({ kind: "header", sectionId: row.id, title });
+    }
+    items.push({ kind: "row", row });
+    if (inSection) hours += row.actualHours;
+  });
+  flush();
+  return items;
+}
+
+// Identical slotting rule to ScheduleSection.tsx's paginateScheduleItems:
+// header/row/subtotal each take one slot, and every new section starts on a
+// fresh page (unless it's already the first item on one).
+function paginateScheduleItems(
+  items: ScheduleItem[],
+  perFirst: number,
+  perCont: number,
+): ScheduleItem[][] {
+  const pages: ScheduleItem[][] = [];
+  let current: ScheduleItem[] = [];
+  let limit = perFirst;
+
+  for (const item of items) {
+    const startsNewSection = item.kind === "header" && current.length > 0;
+    if (current.length >= limit || startsNewSection) {
+      pages.push(current);
+      current = [];
+      limit = perCont;
+    }
+    current.push(item);
+  }
+  pages.push(current);
+  return pages;
+}
 
 function buildSchedulePagesHTML(
   rows: ScheduleRow[],
   assocHTML: string,
   linkBlue: string,
+  showNotes: boolean,
+  sectioned: boolean,
 ): string {
   if (rows.length === 0) return "";
 
   const totalHours = rows.reduce((s, r) => s + r.actualHours, 0);
 
-  // Paginate — identical logic to ScheduleSection.tsx
-  const pages: ScheduleRow[][] = [];
-  if (rows.length <= ROWS_PER_FIRST_PAGE) {
-    pages.push(rows);
-  } else {
-    pages.push(rows.slice(0, ROWS_PER_FIRST_PAGE));
-    let offset = ROWS_PER_FIRST_PAGE;
-    while (offset < rows.length) {
-      pages.push(rows.slice(offset, offset + ROWS_PER_CONTINUATION));
-      offset += ROWS_PER_CONTINUATION;
-    }
-  }
+  const rowsPerFirstPage = showNotes
+    ? ROWS_PER_FIRST_PAGE_NOTES
+    : ROWS_PER_FIRST_PAGE;
+  const rowsPerContinuation = showNotes
+    ? ROWS_PER_CONTINUATION_NOTES
+    : ROWS_PER_CONTINUATION;
+
+  const items = buildScheduleItems(rows, sectioned);
+  const pages = paginateScheduleItems(
+    items,
+    rowsPerFirstPage,
+    rowsPerContinuation,
+  );
+
+  const noteCell = (row: ScheduleRow) =>
+    showNotes ? `<td class="sch-td-note">${esc(row.note)}</td>` : "";
+
+  // No Notes column — give Date/Employee/Hours a wider, evenly-distributed
+  // share so Hours doesn't strand itself far from Employee. Must match
+  // .thEvenWide/.thNumWide (and td equivalents) in ScheduleSection.tsx.
+  const thEvenClass = showNotes ? "sch-th" : "sch-th-wide";
+  const thNumClass = showNotes ? "sch-th-num" : "sch-th-num-wide";
 
   return pages
-    .map((pageRows, pageIdx) => {
+    .map((pageItems, pageIdx) => {
       const isFirst = pageIdx === 0;
       const isLast = pageIdx === pages.length - 1;
 
@@ -341,15 +458,35 @@ function buildSchedulePagesHTML(
           </div>`
         : "";
 
-      const dataRows = pageRows
-        .map(
-          (row) => `
+      const bodyRows = pageItems
+        .map((item) => {
+          if (item.kind === "header") {
+            const colCount = showNotes ? 4 : 3;
+            return `
+        <tr class="sch-section-row">
+          <td class="sch-section-cell" colspan="${colCount}">${esc(item.title || "Untitled section")}</td>
+        </tr>`;
+          }
+
+          if (item.kind === "subtotal") {
+            return `
+        <tr class="sch-totals">
+          <td class="sch-totals-label">${esc((item.title || "Section") + " subtotal")}</td>
+          <td class="sch-td"></td>
+          <td class="sch-totals-cell">${item.hours > 0 ? item.hours.toFixed(2) : "—"}</td>
+          ${showNotes ? '<td class="sch-td"></td>' : ""}
+        </tr>`;
+          }
+
+          const row = item.row;
+          return `
         <tr class="sch-row">
           <td class="sch-td">${esc(formatScheduleDate(row.date))}</td>
           <td class="sch-td">${esc(row.employeeName)}</td>
           <td class="sch-td-num">${row.actualHours > 0 ? row.actualHours.toFixed(2) : "—"}</td>
-        </tr>`,
-        )
+          ${noteCell(row)}
+        </tr>`;
+        })
         .join("\n");
 
       const totalsRow =
@@ -359,6 +496,7 @@ function buildSchedulePagesHTML(
                 <td class="sch-totals-label">Total</td>
                 <td class="sch-td"></td>
                 <td class="sch-totals-cell">${totalHours > 0 ? totalHours.toFixed(2) : "—"}</td>
+                ${showNotes ? '<td class="sch-td"></td>' : ""}
               </tr>
             </tfoot>`
           : "";
@@ -369,15 +507,16 @@ function buildSchedulePagesHTML(
   <div class="sch-body">
     ${subHeading}
     <div class="sch-table-wrap">
-      <table class="sch-table">
+      <table class="sch-table${showNotes ? " tall" : ""}">
         <thead>
           <tr>
-            <th class="sch-th">Date</th>
-            <th class="sch-th">Employee</th>
-            <th class="sch-th-num">Hours</th>
+            <th class="${thEvenClass}">Date</th>
+            <th class="${thEvenClass}">Employee</th>
+            <th class="${thNumClass}">Hours</th>
+            ${showNotes ? '<th class="sch-th-note">Notes</th>' : ""}
           </tr>
         </thead>
-        <tbody>${dataRows}</tbody>
+        <tbody>${bodyRows}</tbody>
         ${totalsRow}
       </table>
     </div>
@@ -404,8 +543,11 @@ export function buildPrintHTML(
   report: ConditionReportData,
   assets?: StaticAssets,
 ): string {
-  const { showDates, showSchedule } = report.settings;
+  const { showDates, photoLayout, showSchedule, showScheduleNotes, scheduleSections } =
+    report.settings;
   const a = assets ?? DEFAULT_ASSETS;
+  const { columns: photoColumns, aspectRatio: photoAspectRatio } =
+    PHOTO_LAYOUTS[photoLayout] ?? PHOTO_LAYOUTS.small;
 
   // ── Association logos fragment (reused in cover, schedule, summary footers) ─
   const ASSOC_LOGOS = [
@@ -429,7 +571,7 @@ export function buildPrintHTML(
     ? groupPhotosByDate(report.photos)
     : [{ key: "all", label: null, photos: flatSorted }];
 
-  const photoPages = paginatePhotos(groups, showDates);
+  const photoPages = paginatePhotos(groups, showDates, photoLayout);
   const totalPhotoPages = photoPages.length;
 
   const photoPageHTML = photoPages
@@ -442,12 +584,12 @@ export function buildPrintHTML(
           const cells = item.photos
             .map((photo) => {
               return `<div class="photo-item">
-  <div class="photo-thumb"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div>
+  <div class="photo-thumb" style="aspect-ratio:${photoAspectRatio}"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div>
   <div class="photo-caption">${esc(stripExt(photo.name))}</div>
 </div>`;
             })
             .join("\n");
-          return `<div class="photo-grid">${cells}</div>`;
+          return `<div class="photo-grid" style="grid-template-columns:repeat(${photoColumns}, 1fr)">${cells}</div>`;
         })
         .join("\n");
 
@@ -466,7 +608,13 @@ export function buildPrintHTML(
   // ── Schedule pages ────────────────────────────────────────────────────────
   const scheduleHTML =
     showSchedule && report.schedule.length > 0
-      ? buildSchedulePagesHTML(report.schedule, assocHTML, a.linkBlue)
+      ? buildSchedulePagesHTML(
+          report.schedule,
+          assocHTML,
+          a.linkBlue,
+          showScheduleNotes,
+          scheduleSections,
+        )
       : "";
 
   // ── Cover page ────────────────────────────────────────────────────────────

@@ -10,6 +10,13 @@ export interface ReportPhoto {
   dateAdded?: string | null;
 }
 
+// ── Attachment folders ────────────────────────────────────────────────────────
+
+export interface PhotoFolder {
+  id: number;
+  name: string;
+}
+
 // ── Schedule ──────────────────────────────────────────────────────────────────
 
 export interface ScheduleRow {
@@ -20,7 +27,22 @@ export interface ScheduleRow {
   scheduledHours: number;
   actualHours: number;
   note: string;
+  /** When set, this row begins a new named section (see ReportSettings.scheduleSections). */
+  sectionTitle?: string;
 }
+
+export interface ScheduleCostCenter {
+  id: number;
+  sectionId: number;
+  name: string;
+}
+
+export type ScheduleImportStatus =
+  | { phase: "idle" }
+  | { phase: "loading" }
+  /** Job has more than one cost centre — paused, waiting for the user to pick one (or "all") and confirm. */
+  | { phase: "choosing-cost-center"; costCenters: ScheduleCostCenter[] }
+  | { phase: "done" };
 
 // ── Job details ───────────────────────────────────────────────────────────────
 
@@ -37,13 +59,20 @@ export interface ReportJobDetails {
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
+/** Photo grid density: large = 4/page, medium = 6/page, small = 9/page. */
+export type PhotoLayout = "large" | "medium" | "small";
+
 export interface ReportSettings {
   showDates: boolean;
   filterByDate: boolean;
   dateFrom: string | null; // "YYYY-MM-DD"
   dateTo: string | null; // "YYYY-MM-DD"
+  photoLayout: PhotoLayout;
   showSchedule: boolean;
   scheduleLoaded: boolean;
+  showScheduleNotes: boolean;
+  /** Break the schedule table into named sections with per-section subtotals. */
+  scheduleSections: boolean;
 }
 
 // ── Root data ─────────────────────────────────────────────────────────────────
@@ -62,6 +91,8 @@ export interface ConditionReportData {
 export type ImportStatus =
   | { phase: "idle" }
   | { phase: "fetching-job" }
+  /** Job has attachment folders — paused, waiting for the user to pick one (or "all") and confirm. */
+  | { phase: "choosing-folder"; folders: PhotoFolder[] }
   | { phase: "fetching-photos"; loaded: number; total: number }
   | { phase: "fetching-schedule" }
   | { phase: "done" }

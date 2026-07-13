@@ -1,15 +1,18 @@
 "use client";
 // components/reports/condition/OptionsPanel.tsx
 
-import React, { useRef, useState, useMemo } from "react";
+import React, { useRef, useState, useMemo, useEffect } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import ToggleRow from "../shared/ToggleRow";
 import JobImportInput from "../shared/JobImportInput";
+import Button from "@/components/ui/Button";
 import type {
   ImportStatus,
   ReportJobDetails,
   ReportPhoto,
   ReportSettings,
+  ScheduleCostCenter,
+  ScheduleImportStatus,
 } from "@/lib/reports/condition.types";
 
 interface OptionsPanelProps {
@@ -17,8 +20,11 @@ interface OptionsPanelProps {
   photos: ReportPhoto[];
   job: ReportJobDetails;
   importStatus: ImportStatus;
+  scheduleStatus: ScheduleImportStatus;
   onSettings: (s: ReportSettings) => void;
   onImport: (jobNumber: string) => void;
+  onConfirmFolder: (folderId: number | null) => void;
+  onConfirmCostCenter: (costCenter: ScheduleCostCenter | null) => void;
   onCoverPhoto: (dataUrl: string | null) => void;
 }
 
@@ -55,6 +61,14 @@ const PRESETS = [
 
 type PresetKey = (typeof PRESETS)[number]["key"];
 
+// ── Photo layout options ──────────────────────────────────────────────────────
+
+const PHOTO_LAYOUTS = [
+  { key: "large", label: "Large", sub: "4 per page" },
+  { key: "medium", label: "Medium", sub: "6 per page" },
+  { key: "small", label: "Small", sub: "9 per page" },
+] as const;
+
 function detectPreset(
   from: string | null,
   to: string | null,
@@ -75,11 +89,37 @@ export default function OptionsPanel({
   photos,
   job,
   importStatus,
+  scheduleStatus,
   onSettings,
   onImport,
+  onConfirmFolder,
+  onConfirmCostCenter,
   onCoverPhoto,
 }: OptionsPanelProps) {
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(
+    null,
+  );
+  const [selectedCostCenter, setSelectedCostCenter] =
+    useState<ScheduleCostCenter | null>(null);
+
+  const folderChoices =
+    importStatus.phase === "choosing-folder" ? importStatus.folders : null;
+
+  // Reset back to "All photos" each time a fresh folder list arrives.
+  useEffect(() => {
+    if (folderChoices) setSelectedFolderId(null);
+  }, [folderChoices]);
+
+  const costCenterChoices =
+    scheduleStatus.phase === "choosing-cost-center"
+      ? scheduleStatus.costCenters
+      : null;
+
+  // Reset back to "All hours" each time a fresh cost centre list arrives.
+  useEffect(() => {
+    if (costCenterChoices) setSelectedCostCenter(null);
+  }, [costCenterChoices]);
 
   const isLoading =
     importStatus.phase === "fetching-job" ||
@@ -135,6 +175,39 @@ export default function OptionsPanel({
               className={styles.progressBar}
               style={{ width: `${progressPct}%` }}
             />
+          </div>
+        )}
+
+        {folderChoices && (
+          <div className={styles.folderPicker}>
+            <div className={styles.subLabel}>
+              This job has {folderChoices.length} attachment folder
+              {folderChoices.length !== 1 ? "s" : ""} — choose what to import
+            </div>
+            <div className={styles.presetRow}>
+              <button
+                className={`${styles.presetBtn} ${selectedFolderId === null ? styles.presetBtnActive : ""}`}
+                onClick={() => setSelectedFolderId(null)}
+              >
+                All photos
+              </button>
+              {folderChoices.map((f) => (
+                <button
+                  key={f.id}
+                  className={`${styles.presetBtn} ${selectedFolderId === f.id ? styles.presetBtnActive : ""}`}
+                  onClick={() => setSelectedFolderId(f.id)}
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onConfirmFolder(selectedFolderId)}
+            >
+              Import photos
+            </Button>
           </div>
         )}
       </div>
@@ -202,6 +275,21 @@ export default function OptionsPanel({
           disabled={!hasPhotos}
         />
 
+        <div className={styles.subLabel}>Grid size</div>
+        <div className={styles.presetRow}>
+          {PHOTO_LAYOUTS.map((l) => (
+            <button
+              key={l.key}
+              className={`${styles.presetBtn} ${settings.photoLayout === l.key ? styles.presetBtnActive : ""}`}
+              onClick={() => set({ photoLayout: l.key })}
+              disabled={!hasPhotos}
+              title={l.sub}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+
         <ToggleRow
           label="Filter by date"
           sub={
@@ -254,6 +342,39 @@ export default function OptionsPanel({
       <div className={styles.group}>
         <div className={styles.groupLabel}>Schedule</div>
 
+        {costCenterChoices && (
+          <div className={styles.folderPicker}>
+            <div className={styles.subLabel}>
+              This job has {costCenterChoices.length} cost centres — choose
+              which hours to import
+            </div>
+            <div className={styles.presetRow}>
+              <button
+                className={`${styles.presetBtn} ${selectedCostCenter === null ? styles.presetBtnActive : ""}`}
+                onClick={() => setSelectedCostCenter(null)}
+              >
+                All hours
+              </button>
+              {costCenterChoices.map((cc) => (
+                <button
+                  key={cc.id}
+                  className={`${styles.presetBtn} ${selectedCostCenter?.id === cc.id ? styles.presetBtnActive : ""}`}
+                  onClick={() => setSelectedCostCenter(cc)}
+                >
+                  {cc.name}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onConfirmCostCenter(selectedCostCenter)}
+            >
+              Import hours
+            </Button>
+          </div>
+        )}
+
         <ToggleRow
           label="Include schedule"
           sub={
@@ -267,9 +388,25 @@ export default function OptionsPanel({
         />
 
         {settings.showSchedule && settings.scheduleLoaded && (
-          <p className={styles.scheduleSub}>
-            Schedule uses the same date filter as photos above.
-          </p>
+          <>
+            <ToggleRow
+              label="Show notes column"
+              sub="Reference a photo or note where hours were worked"
+              checked={settings.showScheduleNotes}
+              onChange={(v) => set({ showScheduleNotes: v })}
+            />
+
+            <ToggleRow
+              label="Break into sections"
+              sub="Mark rows in the table to start named sections, each with its own subtotal"
+              checked={settings.scheduleSections}
+              onChange={(v) => set({ scheduleSections: v })}
+            />
+
+            <p className={styles.scheduleSub}>
+              Schedule uses the same date filter as photos above.
+            </p>
+          </>
         )}
       </div>
     </aside>

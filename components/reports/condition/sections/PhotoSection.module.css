@@ -121,10 +121,9 @@
   padding: 0 0.25rem;
 }
 
-/* ── Photo row — 3 columns ──────────────────────────────────────────────── */
+/* ── Photo row — column count set inline per photoLayout setting ─────────── */
 .photoRow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 0.875rem;
   margin-bottom: 0.875rem;
   flex-shrink: 0;

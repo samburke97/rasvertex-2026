@@ -16,9 +16,12 @@ import {
   filterScheduleByDateRange,
   type ConditionReportData,
   type ImportStatus,
+  type PhotoFolder,
   type ReportJobDetails,
   type ReportPhoto,
   type ReportSettings,
+  type ScheduleCostCenter,
+  type ScheduleImportStatus,
   type ScheduleRow,
 } from "@/lib/reports/condition.types";
 import type { EnrichedJob } from "@/lib/simpro/types";
@@ -32,8 +35,11 @@ const DEFAULT_SETTINGS: ReportSettings = {
   filterByDate: false,
   dateFrom: null,
   dateTo: null,
+  photoLayout: "small",
   showSchedule: false,
   scheduleLoaded: false,
+  showScheduleNotes: false,
+  scheduleSections: false,
 };
 
 const DEFAULT_REPORT: ConditionReportData = {
@@ -65,8 +71,21 @@ export default function ConditionReportPage({
     phase: "idle",
   });
   const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleStatus, setScheduleStatus] = useState<ScheduleImportStatus>({
+    phase: "idle",
+  });
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [savedFilename, setSavedFilename] = useState<string | null>(null);
+  // Job number + load id waiting on a folder choice before photos are fetched.
+  const [pendingImport, setPendingImport] = useState<{
+    jobNumber: string;
+    loadId: number;
+  } | null>(null);
+  // Job number + load id waiting on a cost centre choice before hours are fetched.
+  const [pendingSchedule, setPendingSchedule] = useState<{
+    jobNumber: string;
+    loadId: number;
+  } | null>(null);
   const [loadedJobId, setLoadedJobId] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
   const currentLoadId = useRef(0);
@@ -107,48 +126,21 @@ export default function ConditionReportPage({
     setReport((prev) => ({ ...prev, schedule: rows }));
   }, []);
 
-  const handleImport = useCallback(async (jobNumber: string) => {
-    const loadId = ++currentLoadId.current;
-    const isStale = () => currentLoadId.current !== loadId;
+  const isStaleFor = useCallback(
+    (loadId: number) => currentLoadId.current !== loadId,
+    [],
+  );
 
-    setReport({
-      ...DEFAULT_REPORT,
-      job: {
-        ...DEFAULT_REPORT.job,
-        date: new Date().toLocaleDateString("en-AU"),
-      },
-    });
-    setSavedFilename(null);
-    setImportStatus({ phase: "fetching-job" });
-    setScheduleLoading(false);
-
-    // 1. Fetch job details
-    try {
-      const jobRes = await fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
-      if (isStale()) return;
-      if (!jobRes.ok)
-        throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
-      const jobData: EnrichedJob = await jobRes.json();
-      if (isStale()) return;
-      setReport((prev) => ({ ...prev, job: mapJobToReportDetails(jobData) }));
-    } catch (err) {
-      if (isStale()) return;
-      setImportStatus({
-        phase: "error",
-        message: err instanceof Error ? err.message : "Failed to fetch job",
-      });
-      return;
-    }
-
-    // 2. Photos + schedule in parallel
-    await Promise.all([
-      // Photos via SSE
-      (async () => {
+  const fetchPhotos = useCallback(
+    (jobNumber: string, loadId: number, folderId: number | null) => {
+      const isStale = () => isStaleFor(loadId);
+      return (async () => {
         if (isStale()) return;
         setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
         try {
+          const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
           const response = await fetch(
-            `/api/simpro/jobs/${jobNumber}/attachments?companyId=0`,
+            `/api/simpro/jobs/${jobNumber}/attachments?companyId=0${folderQuery}`,
           );
           if (isStale()) return;
           if (!response.ok || !response.body)
@@ -225,22 +217,37 @@ export default function ConditionReportPage({
             message: err instanceof Error ? err.message : "Photo import failed",
           });
         }
-      })(),
+      })();
+    },
+    [isStaleFor],
+  );
 
-      // Schedule (silent)
-      (async () => {
+  const fetchSchedule = useCallback(
+    (
+      jobNumber: string,
+      loadId: number,
+      costCenter: ScheduleCostCenter | null,
+    ) => {
+      const isStale = () => isStaleFor(loadId);
+      return (async () => {
         if (isStale()) return;
+        setScheduleStatus({ phase: "loading" });
         try {
+          const scopeQuery = costCenter
+            ? `&sectionId=${costCenter.sectionId}&costCentreId=${costCenter.id}`
+            : "";
           const res = await fetch(
-            `/api/simpro/jobs/${jobNumber}/schedule?companyId=0`,
+            `/api/simpro/jobs/${jobNumber}/schedule?companyId=0${scopeQuery}`,
           );
           if (isStale()) return;
           if (!res.ok) {
-            if (!isStale())
+            if (!isStale()) {
               setReport((prev) => ({
                 ...prev,
                 settings: { ...prev.settings, scheduleLoaded: true },
               }));
+              setScheduleStatus({ phase: "done" });
+            }
             return;
           }
           const data = await res.json();
@@ -255,17 +262,148 @@ export default function ConditionReportPage({
               showSchedule: rows.length > 0,
             },
           }));
+          setScheduleStatus({ phase: "done" });
         } catch {
-          if (!isStale())
+          if (!isStale()) {
             setReport((prev) => ({
               ...prev,
               settings: { ...prev.settings, scheduleLoaded: true },
             }));
+            setScheduleStatus({ phase: "done" });
+          }
         }
-      })(),
-    ]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      })();
+    },
+    [isStaleFor],
+  );
+
+  const fetchCostCenters = useCallback(
+    (jobNumber: string, loadId: number) => {
+      const isStale = () => isStaleFor(loadId);
+      return (async () => {
+        if (isStale()) return;
+        let costCenters: ScheduleCostCenter[] = [];
+        try {
+          const res = await fetch(
+            `/api/simpro/jobs/${jobNumber}/schedule/cost-centers?companyId=0`,
+          );
+          if (isStale()) return;
+          if (res.ok) {
+            const data = await res.json();
+            costCenters = data.costCenters ?? [];
+          }
+        } catch {
+          // Treat as "no cost centres to choose from" — import everything.
+        }
+        if (isStale()) return;
+
+        if (costCenters.length > 1) {
+          setPendingSchedule({ jobNumber, loadId });
+          setScheduleStatus({ phase: "choosing-cost-center", costCenters });
+          return;
+        }
+
+        // 0 or 1 cost centre — nothing meaningful to choose, import everything.
+        fetchSchedule(jobNumber, loadId, null);
+      })();
+    },
+    [fetchSchedule, isStaleFor],
+  );
+
+  const handleImport = useCallback(
+    async (jobNumber: string) => {
+      const loadId = ++currentLoadId.current;
+      const isStale = () => isStaleFor(loadId);
+
+      setReport({
+        ...DEFAULT_REPORT,
+        job: {
+          ...DEFAULT_REPORT.job,
+          date: new Date().toLocaleDateString("en-AU"),
+        },
+      });
+      setSavedFilename(null);
+      setPendingImport(null);
+      setPendingSchedule(null);
+      setImportStatus({ phase: "fetching-job" });
+      setScheduleStatus({ phase: "idle" });
+      setScheduleLoading(false);
+
+      // 1. Fetch job details
+      try {
+        const jobRes = await fetch(
+          `/api/simpro/jobs/${jobNumber}?companyId=0`,
+        );
+        if (isStale()) return;
+        if (!jobRes.ok)
+          throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
+        const jobData: EnrichedJob = await jobRes.json();
+        if (isStale()) return;
+        setReport((prev) => ({
+          ...prev,
+          job: mapJobToReportDetails(jobData),
+        }));
+      } catch (err) {
+        if (isStale()) return;
+        setImportStatus({
+          phase: "error",
+          message: err instanceof Error ? err.message : "Failed to fetch job",
+        });
+        return;
+      }
+
+      // 2. Schedule loads in the background, independent of photos — pausing
+      // for a cost centre choice if the job has more than one.
+      fetchCostCenters(jobNumber, loadId);
+
+      // 3. Check for attachment folders — if the job has any, pause and let
+      // the user pick "all photos" or a specific folder before downloading.
+      let folders: PhotoFolder[] = [];
+      try {
+        const foldersRes = await fetch(
+          `/api/simpro/jobs/${jobNumber}/attachments/folders?companyId=0`,
+        );
+        if (isStale()) return;
+        if (foldersRes.ok) {
+          const data = await foldersRes.json();
+          folders = data.folders ?? [];
+        }
+      } catch {
+        // Treat as "no folders" — fall through to importing everything.
+      }
+      if (isStale()) return;
+
+      if (folders.length > 0) {
+        setPendingImport({ jobNumber, loadId });
+        setImportStatus({ phase: "choosing-folder", folders });
+        return;
+      }
+
+      // No folders — import everything immediately, same as before.
+      await fetchPhotos(jobNumber, loadId, null);
+    },
+    [fetchCostCenters, fetchPhotos, isStaleFor],
+  );
+
+  const confirmPhotoImport = useCallback(
+    (folderId: number | null) => {
+      if (!pendingImport) return;
+      const { jobNumber, loadId } = pendingImport;
+      setPendingImport(null);
+      fetchPhotos(jobNumber, loadId, folderId);
+    },
+    [pendingImport, fetchPhotos],
+  );
+
+  const confirmScheduleImport = useCallback(
+    (costCenter: ScheduleCostCenter | null) => {
+      if (!pendingSchedule) return;
+      const { jobNumber, loadId } = pendingSchedule;
+      setPendingSchedule(null);
+      fetchSchedule(jobNumber, loadId, costCenter);
+    },
+    [pendingSchedule, fetchSchedule],
+  );
 
   const handleExportPDF = useCallback(async () => {
     setIsExporting(true);
@@ -414,11 +552,14 @@ export default function ConditionReportPage({
           photos={report.photos}
           job={report.job}
           importStatus={importStatus}
+          scheduleStatus={scheduleStatus}
           onSettings={updateSettings}
           onImport={(jobNumber) => {
             setLoadedJobId(jobNumber);
             handleImport(jobNumber);
           }}
+          onConfirmFolder={confirmPhotoImport}
+          onConfirmCostCenter={confirmScheduleImport}
           onCoverPhoto={updateCoverPhoto}
         />
 
@@ -473,6 +614,7 @@ export default function ConditionReportPage({
             photos={filteredPhotos}
             importStatus={importStatus}
             showDates={report.settings.showDates}
+            layout={report.settings.photoLayout}
             onPhotoRemove={removePhoto}
             onPhotoRename={renamePhoto}
           />
@@ -487,6 +629,8 @@ export default function ConditionReportPage({
                 rows={filteredSchedule}
                 isLoading={scheduleLoading}
                 onChange={updateSchedule}
+                showNotes={report.settings.showScheduleNotes}
+                sectioned={report.settings.scheduleSections}
               />
             </>
           )}

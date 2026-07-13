@@ -116,10 +116,33 @@
   white-space: nowrap;
 }
 
+/* Date and Employee share equal width (20%, kept in sync with .tdEven below
+   — composes can't chain through another composed class here). Hours only
+   needs room for a short number, so it stays narrow. Notes gets the rest —
+   it needs room for a longer note or a photo reference. */
+.thEven {
+  composes: th;
+  width: 20%;
+}
+
 .thNum {
   composes: th;
   text-align: right;
-  width: 100px;
+  width: 10%;
+}
+
+/* No Notes column to soak up the remaining width — give Date/Employee/Hours
+   a wider, evenly-distributed share so Hours doesn't strand itself far from
+   Employee with a wide dead gap. */
+.thEvenWide {
+  composes: th;
+  width: 35%;
+}
+
+.thNumWide {
+  composes: th;
+  text-align: right;
+  width: 25%;
 }
 
 .thAction {
@@ -128,12 +151,27 @@
   padding: 0.55rem 0.5rem;
 }
 
+/* Wider action column when the per-row section toggle is also present. */
+.thActionWide {
+  composes: thAction;
+  width: 58px;
+}
+
+.thNote {
+  composes: th;
+  width: 46%;
+}
+
 .dataRow {
   border-bottom: 1px solid #f0f0f0;
 }
 
 .dataRow:last-child {
   border-bottom: none;
+}
+
+.dataRow:nth-child(even) {
+  background: #f9f9f9;
 }
 
 .td {
@@ -146,11 +184,29 @@
   vertical-align: middle;
 }
 
+.tdEven {
+  composes: td;
+  width: 20%;
+}
+
 .tdNum {
   composes: td;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  width: 100px;
+  width: 10%;
+}
+
+/* No Notes column — matches .thEvenWide/.thNumWide above. */
+.tdEvenWide {
+  composes: td;
+  width: 35%;
+}
+
+.tdNumWide {
+  composes: td;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  width: 25%;
 }
 
 .tdAction {
@@ -158,6 +214,136 @@
   width: 36px;
   text-align: center;
   vertical-align: middle;
+}
+
+.tdActionWide {
+  composes: tdAction;
+  width: 58px;
+}
+
+.actionGroup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+}
+
+.tdNote {
+  composes: td;
+  width: 46%;
+}
+
+/* Keep every cell on a single line so row height stays predictable for
+   pagination, and the grid reads clean regardless of content length. */
+.table .cellDisplay {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Extra vertical room to handwrite notes on the printed page — must match
+   the ".tall" variant in condition.print.ts. */
+.tableTall .td,
+.tableTall .tdNum,
+.tableTall .tdNote {
+  padding-top: 0.95rem;
+  padding-bottom: 0.95rem;
+}
+
+/* ── Section header row ──────────────────────────────────────────────────── */
+.sectionRow {
+  background: #eef1f6;
+}
+
+.sectionCell {
+  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid #e0e4ee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sectionCellDisplay {
+  composes: cellDisplay;
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: #0d1c45;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.sectionCellInput {
+  composes: cellInput;
+  font-family: "Bebas Neue", Arial, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: #0d1c45;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.sectionRemoveBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9aa3bb;
+  border-radius: 4px;
+  padding: 0.25rem;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.sectionRemoveBtn:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+/* ── Section break toggle ────────────────────────────────────────────────── */
+.sectionToggleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #d1d5db;
+  border-radius: 4px;
+  padding: 0.25rem;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+
+.sectionToggleBtn:hover {
+  color: #0d1c45;
+  background: #eef1f6;
+}
+
+.sectionToggleBtnActive {
+  color: #0d1c45;
+}
+
+.sectionToggleBtnActive:hover {
+  color: #0d1c45;
+  background: #eef1f6;
+}
+
+.sectionToggleBtn:disabled {
+  cursor: not-allowed;
+}
+
+.sectionToggleBtn:disabled:hover {
+  background: none;
 }
 
 /* ── Totals row ──────────────────────────────────────────────────────────── */

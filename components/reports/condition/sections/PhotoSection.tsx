@@ -4,15 +4,34 @@
 import React from "react";
 import styles from "./PhotoSection.module.css";
 import PhotoCard from "../../shared/PhotoCard";
-import type { ReportPhoto, ImportStatus } from "@/lib/reports/condition.types";
+import type {
+  ReportPhoto,
+  ImportStatus,
+  PhotoLayout,
+} from "@/lib/reports/condition.types";
 
 interface PhotoSectionProps {
   photos: ReportPhoto[];
   importStatus: ImportStatus;
   showDates: boolean;
+  layout: PhotoLayout;
   onPhotoRemove: (id: string) => void;
   onPhotoRename: (id: string, name: string) => void;
 }
+
+// ── Grid density presets ──────────────────────────────────────────────────────
+// Content width is fixed (706px), so column count sets the thumbnail width.
+// large/small use square thumbs, sized so whole rows fit the 1035px page
+// exactly; medium uses a mild landscape crop so 3 rows fill the page exactly
+// with no leftover gap. Must match PHOTO_LAYOUTS in condition.print.ts.
+export const PHOTO_LAYOUTS: Record<
+  PhotoLayout,
+  { columns: number; rowH: number; aspectRatio: string }
+> = {
+  large: { columns: 2, rowH: 390, aspectRatio: "1 / 1" },
+  medium: { columns: 2, rowH: 345, aspectRatio: "346 / 301" },
+  small: { columns: 3, rowH: 270, aspectRatio: "1 / 1" },
+};
 
 // ── Natural sort — handles filenames like "01 Anchor.jpg", "2 Roof.jpg" etc. ─
 function naturalSort(a: string, b: string): number {
@@ -84,13 +103,10 @@ function groupByDate(photos: ReportPhoto[]): PhotoGroup[] {
 // Available vertical space: 1123 - (44 * 2) = 1035px
 // Grid gap: 0.875rem = 14px
 // Content width: 794 - (44 * 2) = 706px
-// Cell width: (706 - 14 * 2) / 3 = 226px
-// Cell height: 226px thumb + 30px caption = 256px
-// Row height (incl. gap below): 256 + 14 = 270px
+// Row height varies by layout — see PHOTO_LAYOUTS above.
 // Date header height (incl. 1rem margin-bottom): 18 + 16 = 34px
 // Group gap between groups: 2.25rem = 36px
 export const PAGE_AVAILABLE_H = 1035;
-export const ROW_H = 270;
 export const DATE_HEADER_H = 34;
 export const GROUP_GAP = 36;
 
@@ -105,7 +121,9 @@ export interface PreviewPage {
 export function paginateGroups(
   groups: PhotoGroup[],
   showDates: boolean,
+  layout: PhotoLayout,
 ): PreviewPage[] {
+  const { columns, rowH } = PHOTO_LAYOUTS[layout] ?? PHOTO_LAYOUTS.small;
   const pages: PreviewPage[] = [];
   let current: PageItem[] = [];
   let usedH = 0;
@@ -122,7 +140,7 @@ export function paginateGroups(
     const group = groups[g];
 
     if (showDates && group.label) {
-      const neededH = DATE_HEADER_H + ROW_H;
+      const neededH = DATE_HEADER_H + rowH;
       if (usedH > 0 && usedH + neededH > PAGE_AVAILABLE_H) {
         flush();
       }
@@ -131,16 +149,16 @@ export function paginateGroups(
     }
 
     const rows: ReportPhoto[][] = [];
-    for (let i = 0; i < group.photos.length; i += 3) {
-      rows.push(group.photos.slice(i, i + 3));
+    for (let i = 0; i < group.photos.length; i += columns) {
+      rows.push(group.photos.slice(i, i + columns));
     }
 
     for (const row of rows) {
-      if (usedH > 0 && usedH + ROW_H > PAGE_AVAILABLE_H) {
+      if (usedH > 0 && usedH + rowH > PAGE_AVAILABLE_H) {
         flush();
       }
       current.push({ type: "photoRow", photos: row });
-      usedH += ROW_H;
+      usedH += rowH;
     }
 
     const isLastGroup = g === groups.length - 1;
@@ -159,6 +177,7 @@ export default function PhotoSection({
   photos,
   importStatus,
   showDates,
+  layout,
   onPhotoRemove,
   onPhotoRename,
 }: PhotoSectionProps) {
@@ -170,6 +189,8 @@ export default function PhotoSection({
       ? (importStatus as { phase: string; loaded: number; total: number })
       : null;
 
+  const { columns, aspectRatio } = PHOTO_LAYOUTS[layout] ?? PHOTO_LAYOUTS.small;
+
   // When not grouping by date, still sort the flat list by filename
   const sortedPhotos = showDates
     ? photos
@@ -179,7 +200,7 @@ export default function PhotoSection({
     ? groupByDate(photos)
     : [{ key: "all", label: null, photos: sortedPhotos }];
 
-  const pages = paginateGroups(groups, showDates);
+  const pages = paginateGroups(groups, showDates, layout);
   const totalPages = pages.length;
 
   return (
@@ -225,12 +246,17 @@ export default function PhotoSection({
                   );
                 }
                 return (
-                  <div key={"row-" + itemIdx} className={styles.photoRow}>
+                  <div
+                    key={"row-" + itemIdx}
+                    className={styles.photoRow}
+                    style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
+                  >
                     {item.photos.map((photo) => (
                       <div key={photo.id} className={styles.photoCell}>
                         <PhotoCard
                           photo={photo}
                           showDate={false}
+                          aspectRatio={aspectRatio}
                           onRemove={onPhotoRemove}
                           onRename={onPhotoRename}
                         />
