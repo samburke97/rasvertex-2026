@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { buildAnchorPrintHTML } from "@/lib/reports/anchor.print";
-import { renderPDF } from "@/lib/server/pdf-utils";
+import { loadReportAssets, renderPDF } from "@/lib/server/pdf-utils";
 import {
   checkDuplicateAttachment,
   uploadPDFToJob,
@@ -87,7 +87,7 @@ export async function POST(
   // Build + render PDF
   let buffer: Buffer;
   try {
-    const html = buildAnchorPrintHTML(report);
+    const html = buildAnchorPrintHTML(report, loadReportAssets());
     buffer = await renderPDF(html);
   } catch (err) {
     console.error("[SaveAnchorReport] PDF failed:", err);

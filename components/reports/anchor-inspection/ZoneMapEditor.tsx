@@ -1,4 +1,5 @@
 "use client";
+/// <reference types="google.maps" />
 // components/reports/anchor-inspection/ZoneMapEditor.tsx
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
@@ -6,48 +7,76 @@ import styles from "./ZoneMapEditor.module.css";
 import Button from "@/components/ui/Button";
 import AnchorPinModal from "./AnchorPinModal";
 import MapLegend from "./MapLegend";
+import { loadGoogleMaps } from "@/lib/reports/googleMapsLoader";
 import {
   ANCHOR_TYPE_COLOURS,
   ANCHOR_TYPE_LABELS,
+  ANCHOR_TYPE_OPTIONS,
   generateId,
   type AnchorPoint,
   type AnchorType,
   type Zone,
 } from "@/lib/reports/anchor.types";
 
-import type mapboxgl from "mapbox-gl";
-
 interface ZoneMapEditorProps {
   zone: Zone;
   jobAddress: string;
+  defaultInspectionDate: string;
+  defaultNextInspection: string;
   onUpdate: (zone: Zone) => void;
   onBack: () => void;
   onDelete: () => void;
 }
 
-const STYLE_URL = "mapbox://styles/mapbox/satellite-streets-v12";
+const DEFAULT_ZOOM = 19;
+const PREVIEW_SIZE = "640x400";
+const DEFAULT_TYPE: AnchorType = "fall-arrest-anchor";
 
-function getToken(): string {
-  return process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? "";
+// Live, pannable/zoomable Google Maps embed — used whenever a client-side
+// JS Maps key is configured. Falls back to a static image with a discrete
+// zoom stepper (no continuous zoom, but works with only the server-side
+// key) when it isn't.
+const HAS_LIVE_MAPS = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_JS_KEY;
+
+// Static-fallback-only zoom bounds.
+const MIN_ZOOM = 17;
+const MAX_ZOOM = 21;
+
+function buildStaticUrl(opts: {
+  address?: string;
+  lat?: number;
+  lng?: number;
+  zoom: number;
+}): string {
+  const params = new URLSearchParams();
+  if (opts.lat != null && opts.lng != null) {
+    params.set("lat", String(opts.lat));
+    params.set("lng", String(opts.lng));
+  } else if (opts.address) {
+    params.set("address", opts.address);
+  }
+  params.set("zoom", String(opts.zoom));
+  params.set("size", PREVIEW_SIZE);
+  return `/api/maps/static-map?${params.toString()}`;
 }
 
-async function geocodeAddress(
-  address: string,
-): Promise<{ lng: number; lat: number } | null> {
-  const encoded = encodeURIComponent(address);
-  const res = await fetch(
-    `https://api.mapbox.com/geocoding/v5/mapbox.places/${encoded}.json` +
-      `?access_token=${getToken()}&limit=1&country=AU`,
-  );
-  const data = await res.json();
-  if (!data.features?.length) return null;
-  const [lng, lat] = data.features[0].center as [number, number];
-  return { lng, lat };
+async function urlToDataUrl(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Aerial fetch failed: HTTP ${res.status}`);
+  const blob = await res.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 }
 
 export default function ZoneMapEditor({
   zone,
   jobAddress,
+  defaultInspectionDate,
+  defaultNextInspection,
   onUpdate,
   onBack,
   onDelete,
@@ -55,18 +84,24 @@ export default function ZoneMapEditor({
   const [localZone, setLocalZone] = useState<Zone>({ ...zone });
   const [zoneName, setZoneName] = useState(zone.name);
 
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const [mapReady, setMapReady] = useState(false);
-  const [geocoding, setGeocoding] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
   const [capturing, setCapturing] = useState(false);
-  const [captured, setCaptured] = useState<boolean>(!zone.mapImageUrl);
+  const [captured, setCaptured] = useState<boolean>(!!zone.mapImageUrl);
+
+  // ── Live map (Google Maps JS API) ────────────────────────────────────────
+  const liveMapContainerRef = useRef<HTMLDivElement>(null);
+  const liveMapRef = useRef<google.maps.Map | null>(null);
+  const [liveMapReady, setLiveMapReady] = useState(false);
+  const [liveMapError, setLiveMapError] = useState<string | null>(null);
+
+  // ── Static fallback (no JS Maps key configured) ──────────────────────────
+  const [zoomLevel, setZoomLevel] = useState(zone.mapZoom ?? DEFAULT_ZOOM);
+  const previewWrapRef = useRef<HTMLDivElement>(null);
 
   const frozenMapRef = useRef<HTMLDivElement>(null);
-  const [isPlacingPin, setIsPlacingPin] = useState(false);
-  const [pendingPin, setPendingPin] = useState<{ x: number; y: number } | null>(
-    null,
-  );
+  // Stamp mode: whichever type is selected here places instantly on tap —
+  // no modal per pin, since techs place many of the same type in a row.
+  const [selectedType, setSelectedType] = useState<AnchorType>(DEFAULT_TYPE);
   const [editingAnchor, setEditingAnchor] = useState<AnchorPoint | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
@@ -80,117 +115,152 @@ export default function ZoneMapEditor({
 
   const save = useCallback((updated: Zone) => onUpdate(updated), [onUpdate]);
 
-  // ── Init map ──────────────────────────────────────────────────────────────
+  const hasAddress = !!jobAddress?.trim();
 
+  // Reset preview error whenever the zoom (and therefore the request) changes.
   useEffect(() => {
-    const token = getToken();
-    if (!token) return;
-    if (captured) return;
-    if (!mapContainerRef.current) return;
+    setPreviewError(false);
+  }, [zoomLevel]);
+
+  // ── Live map init — geocode once, then hand off to native pan/zoom ──────
+  useEffect(() => {
+    if (!HAS_LIVE_MAPS || captured || !hasAddress) return;
+    const container = liveMapContainerRef.current;
+    if (!container) return;
 
     let cancelled = false;
+    setLiveMapReady(false);
+    setLiveMapError(null);
 
-    async function initMap() {
-      setGeocoding(true);
+    (async () => {
+      try {
+        const g = await loadGoogleMaps();
+        if (cancelled || !container) return;
 
-      const mb = (await import("mapbox-gl")).default;
-      await import("mapbox-gl/dist/mapbox-gl.css");
+        const map = new g.maps.Map(container, {
+          center: { lat: zone.mapLat ?? -26.65, lng: zone.mapLng ?? 153.09 },
+          zoom: zone.mapZoom ?? DEFAULT_ZOOM,
+          mapTypeId: "satellite",
+          gestureHandling: "greedy",
+          streetViewControl: false,
+          fullscreenControl: false,
+          mapTypeControl: false,
+        });
+        liveMapRef.current = map;
 
-      if (cancelled) return;
+        // Already have a precise position from a previous capture — reuse
+        // it directly instead of re-geocoding the address string.
+        if (zone.mapLat != null && zone.mapLng != null) {
+          map.setCenter({ lat: zone.mapLat, lng: zone.mapLng });
+          setLiveMapReady(true);
+          return;
+        }
 
-      mb.accessToken = token;
-
-      let lng = 151.2093;
-      let lat = -33.8688;
-      let zoom = 18;
-
-      if (zone.mapLat && zone.mapLng) {
-        lat = zone.mapLat;
-        lng = zone.mapLng;
-        zoom = zone.mapZoom ?? 18;
-      } else if (jobAddress?.trim()) {
-        try {
-          const coords = await geocodeAddress(jobAddress);
-          if (coords && !cancelled) {
-            lat = coords.lat;
-            lng = coords.lng;
-          }
-        } catch {
-          /* fall back to Sydney CBD */
+        const geocoder = new g.maps.Geocoder();
+        geocoder.geocode(
+          { address: jobAddress, region: "au" },
+          (results, status) => {
+            if (cancelled) return;
+            if (status === "OK" && results?.[0]) {
+              map.setCenter(results[0].geometry.location);
+              setLiveMapReady(true);
+            } else {
+              setLiveMapError(`Couldn't locate that address (${status})`);
+            }
+          },
+        );
+      } catch (err) {
+        if (!cancelled) {
+          setLiveMapError(
+            err instanceof Error ? err.message : "Failed to load Google Maps",
+          );
         }
       }
-
-      if (cancelled || !mapContainerRef.current) return;
-
-      const map = new mb.Map({
-        container: mapContainerRef.current,
-        style: STYLE_URL,
-        center: [lng, lat],
-        zoom,
-        bearing: 0,
-        pitch: 0,
-        preserveDrawingBuffer: true,
-      });
-
-      map.addControl(new mb.NavigationControl(), "top-right");
-      map.on("load", () => {
-        if (!cancelled) {
-          setMapReady(true);
-          setGeocoding(false);
-        }
-      });
-
-      mapRef.current = map;
-    }
-
-    initMap();
+    })();
 
     return () => {
       cancelled = true;
-      mapRef.current?.remove();
-      mapRef.current = null;
-      setMapReady(false);
+      liveMapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [captured]);
+  }, [captured, hasAddress, jobAddress]);
+
+  // Scroll/trackpad zoom over the static-fallback preview — Static Maps only
+  // takes a fixed integer zoom per request (no continuous zoom), so this
+  // steps one level per gesture rather than fetching on every wheel tick.
+  // No-ops when the live map (which handles its own native zoom) is active.
+  useEffect(() => {
+    const el = previewWrapRef.current;
+    if (!el) return;
+
+    let accumulated = 0;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      accumulated += e.deltaY;
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        const direction = accumulated > 0 ? -1 : 1;
+        accumulated = 0;
+        setZoomLevel((z) =>
+          Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z + direction)),
+        );
+      }, 150);
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      if (settleTimer) clearTimeout(settleTimer);
+    };
+  }, [captured, hasAddress]);
 
   // ── Capture ───────────────────────────────────────────────────────────────
 
   const handleCapture = useCallback(async () => {
-    const map = mapRef.current;
-    if (!map) return;
-
+    if (!hasAddress) return;
     setCapturing(true);
+    try {
+      let url: string;
+      let capturedLat: number | undefined;
+      let capturedLng: number | undefined;
+      let capturedZoom: number;
 
-    await new Promise<void>((resolve) => {
-      if (map.isStyleLoaded() && map.areTilesLoaded()) {
-        resolve();
+      if (HAS_LIVE_MAPS && liveMapRef.current) {
+        const center = liveMapRef.current.getCenter();
+        if (!center) throw new Error("Map not ready");
+        capturedZoom = liveMapRef.current.getZoom() ?? DEFAULT_ZOOM;
+        capturedLat = center.lat();
+        capturedLng = center.lng();
+        url = buildStaticUrl({
+          lat: capturedLat,
+          lng: capturedLng,
+          zoom: capturedZoom,
+        });
       } else {
-        map.once("idle", () => resolve());
+        capturedZoom = zoomLevel;
+        url = buildStaticUrl({ address: jobAddress.trim(), zoom: capturedZoom });
       }
-    });
 
-    const canvas = map.getCanvas();
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-
-    const center = map.getCenter();
-    const updated: Zone = {
-      ...localZone,
-      name: zoneName,
-      mapImageUrl: dataUrl,
-      mapLat: center.lat,
-      mapLng: center.lng,
-      mapZoom: map.getZoom(),
-    };
-
-    setLocalZone(updated);
-    save(updated);
-    setCaptured(true);
-    setCapturing(false);
-
-    map.remove();
-    mapRef.current = null;
-  }, [localZone, zoneName, save]);
+      const dataUrl = await urlToDataUrl(url);
+      const updated: Zone = {
+        ...localZone,
+        name: zoneName,
+        mapImageUrl: dataUrl,
+        mapZoom: capturedZoom,
+        mapLat: capturedLat ?? localZone.mapLat,
+        mapLng: capturedLng ?? localZone.mapLng,
+      };
+      setLocalZone(updated);
+      save(updated);
+      setCaptured(true);
+    } catch {
+      setPreviewError(true);
+    } finally {
+      setCapturing(false);
+    }
+  }, [hasAddress, jobAddress, zoomLevel, localZone, zoneName, save]);
 
   // ── Re-capture ────────────────────────────────────────────────────────────
 
@@ -199,8 +269,6 @@ export default function ZoneMapEditor({
     setLocalZone(updated);
     save(updated);
     setCaptured(false);
-    setIsPlacingPin(false);
-    setPendingPin(null);
   }, [localZone, save]);
 
   // ── Upload fallback ───────────────────────────────────────────────────────
@@ -219,30 +287,53 @@ export default function ZoneMapEditor({
     reader.readAsDataURL(file);
   };
 
-  // ── Pin placement ─────────────────────────────────────────────────────────
+  // ── Stamp placement ──────────────────────────────────────────────────────
+  // Tapping the aerial drops a pin of the selected type immediately — the
+  // common case is 15-20 of the same type in a row, so there's no modal in
+  // the way. Tap an existing pin to correct/delete it instead.
+
+  const placePin = useCallback(
+    (x: number, y: number) => {
+      const anchor: AnchorPoint = {
+        id: generateId(),
+        x,
+        y,
+        label: `A${localZone.anchors.length + 1}`,
+        type: selectedType,
+        commissionDate: "",
+        inspectionDate: defaultInspectionDate,
+        nextInspection: defaultNextInspection,
+        result: "PASSED",
+      };
+      const updated: Zone = {
+        ...localZone,
+        anchors: [...localZone.anchors, anchor],
+      };
+      setLocalZone(updated);
+      save(updated);
+    },
+    [localZone, selectedType, defaultInspectionDate, defaultNextInspection, save],
+  );
 
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isPlacingPin) return;
     if (dragState.current?.moved) return;
+    // Clicks bubble up from pin buttons too — ignore those, they're handled
+    // by the pin's own pointer handlers (drag vs. tap-to-edit).
+    if ((e.target as HTMLElement).closest(`.${styles.pin}`)) return;
     const rect = frozenMapRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setPendingPin({ x, y });
-    setIsPlacingPin(false);
+    placePin(x, y);
   };
 
   const handlePinSave = (anchor: AnchorPoint) => {
-    const isNew = !localZone.anchors.find((a) => a.id === anchor.id);
     const updated: Zone = {
       ...localZone,
-      anchors: isNew
-        ? [...localZone.anchors, anchor]
-        : localZone.anchors.map((a) => (a.id === anchor.id ? anchor : a)),
+      anchors: localZone.anchors.map((a) => (a.id === anchor.id ? anchor : a)),
     };
     setLocalZone(updated);
     save(updated);
-    setPendingPin(null);
     setEditingAnchor(null);
   };
 
@@ -266,7 +357,6 @@ export default function ZoneMapEditor({
 
   const handlePinPointerDown = useCallback(
     (e: React.PointerEvent<HTMLButtonElement>, anchorId: string) => {
-      if (isPlacingPin) return;
       e.stopPropagation();
       e.currentTarget.setPointerCapture(e.pointerId);
       dragState.current = {
@@ -277,7 +367,7 @@ export default function ZoneMapEditor({
       };
       setDraggingId(anchorId);
     },
-    [isPlacingPin],
+    [],
   );
 
   const handlePinPointerMove = useCallback(
@@ -333,7 +423,6 @@ export default function ZoneMapEditor({
   const activeTypes = [
     ...new Set(localZone.anchors.map((a) => a.type)),
   ] as AnchorType[];
-  const hasToken = !!getToken();
 
   return (
     <div className={styles.page}>
@@ -362,31 +451,25 @@ export default function ZoneMapEditor({
             Upload Aerial
           </Button>
 
-          {!captured && hasToken && (
+          {!captured && hasAddress && (
             <Button
               variant="primary"
               size="sm"
               onClick={handleCapture}
-              disabled={!mapReady || capturing}
+              disabled={
+                capturing ||
+                previewError ||
+                (HAS_LIVE_MAPS && (!liveMapReady || !!liveMapError))
+              }
             >
-              {capturing ? "Capturing…" : "Capture View"}
+              {capturing ? "Capturing…" : "Use This View"}
             </Button>
           )}
 
           {captured && (
-            <>
-              <Button variant="secondary" size="sm" onClick={handleRecapture}>
-                Re-capture Map
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setIsPlacingPin(true)}
-                disabled={isPlacingPin}
-              >
-                {isPlacingPin ? "Click map to place…" : "+ Add Anchor"}
-              </Button>
-            </>
+            <Button variant="secondary" size="sm" onClick={handleRecapture}>
+              Re-capture Map
+            </Button>
           )}
 
           <button
@@ -406,20 +489,64 @@ export default function ZoneMapEditor({
       {/* Status bar */}
       {!captured && (
         <div className={styles.statusBar}>
-          {!hasToken ? (
+          {!hasAddress ? (
             <span className={styles.statusError}>
-              ⚠ NEXT_PUBLIC_MAPBOX_TOKEN not set — use Upload Aerial instead.
+              ⚠ No job address set — use Upload Aerial instead.
             </span>
-          ) : geocoding ? (
-            <span className={styles.statusInfo}>📍 Locating address…</span>
-          ) : mapReady ? (
-            <span className={styles.statusInfo}>
-              <strong>Ready.</strong> Pan and zoom to the roof, then click
-              Capture View.
+          ) : HAS_LIVE_MAPS ? (
+            liveMapError ? (
+              <span className={styles.statusError}>
+                ⚠ {liveMapError} — use Upload Aerial instead.
+              </span>
+            ) : !liveMapReady ? (
+              <span className={styles.statusInfo}>📍 Locating address…</span>
+            ) : (
+              <span className={styles.statusInfo}>
+                <strong>Drag and scroll to frame the roof</strong>, then click
+                Use This View.
+              </span>
+            )
+          ) : previewError ? (
+            <span className={styles.statusError}>
+              ⚠ Couldn&apos;t load satellite imagery for this address — use
+              Upload Aerial instead.
             </span>
           ) : (
-            <span className={styles.statusInfo}>Loading map…</span>
+            <span className={styles.statusInfo}>
+              <strong>Scroll to zoom</strong> and frame the roof, then click
+              Use This View.
+            </span>
           )}
+        </div>
+      )}
+
+      {/* Type stamp toolbar — pick a type, then tap the map to place it */}
+      {captured && (
+        <div className={styles.stampBar}>
+          {ANCHOR_TYPE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              className={`${styles.stampChip} ${
+                selectedType === opt.value ? styles.stampChipActive : ""
+              }`}
+              style={
+                selectedType === opt.value
+                  ? {
+                      borderColor: ANCHOR_TYPE_COLOURS[opt.value],
+                      background: ANCHOR_TYPE_COLOURS[opt.value] + "18",
+                      color: ANCHOR_TYPE_COLOURS[opt.value],
+                    }
+                  : {}
+              }
+              onClick={() => setSelectedType(opt.value)}
+            >
+              <span
+                className={styles.stampDot}
+                style={{ background: ANCHOR_TYPE_COLOURS[opt.value] }}
+              />
+              {opt.label}
+            </button>
+          ))}
         </div>
       )}
 
@@ -428,8 +555,49 @@ export default function ZoneMapEditor({
         {/* Map area */}
         <div className={styles.mapArea}>
           {!captured ? (
-            hasToken ? (
-              <div ref={mapContainerRef} className={styles.liveMap} />
+            hasAddress ? (
+              HAS_LIVE_MAPS ? (
+                <div className={styles.liveMapContainer} ref={liveMapContainerRef} />
+              ) : (
+                <div className={styles.previewWrap} ref={previewWrapRef}>
+                  {!previewError && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={zoomLevel}
+                      src={buildStaticUrl({
+                        address: jobAddress.trim(),
+                        zoom: zoomLevel,
+                      })}
+                      alt="Satellite preview"
+                      className={styles.previewImage}
+                      onError={() => setPreviewError(true)}
+                    />
+                  )}
+                  <div className={styles.zoomControls}>
+                    <button
+                      className={styles.zoomBtn}
+                      onClick={() =>
+                        setZoomLevel((z) => Math.max(MIN_ZOOM, z - 1))
+                      }
+                      disabled={zoomLevel <= MIN_ZOOM}
+                      aria-label="Zoom out"
+                    >
+                      −
+                    </button>
+                    <span className={styles.zoomLevel}>{zoomLevel}</span>
+                    <button
+                      className={styles.zoomBtn}
+                      onClick={() =>
+                        setZoomLevel((z) => Math.min(MAX_ZOOM, z + 1))
+                      }
+                      disabled={zoomLevel >= MAX_ZOOM}
+                      aria-label="Zoom in"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              )
             ) : (
               <div className={styles.mapSetup}>
                 <div className={styles.mapSetupIcon}>
@@ -445,12 +613,10 @@ export default function ZoneMapEditor({
                     <circle cx="12" cy="10" r="3" />
                   </svg>
                 </div>
-                <p className={styles.mapSetupTitle}>
-                  No Mapbox token configured
-                </p>
+                <p className={styles.mapSetupTitle}>No job address set</p>
                 <p className={styles.mapSetupSub}>
-                  Add NEXT_PUBLIC_MAPBOX_TOKEN to your environment, or upload an
-                  aerial screenshot directly.
+                  Load a job to fetch its address, or upload an aerial
+                  screenshot directly.
                 </p>
               </div>
             )
@@ -460,7 +626,6 @@ export default function ZoneMapEditor({
                 ref={frozenMapRef}
                 className={styles.mapCanvas}
                 onClick={handleMapClick}
-                style={{ cursor: isPlacingPin ? "crosshair" : "default" }}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -495,12 +660,6 @@ export default function ZoneMapEditor({
                     </span>
                   </button>
                 ))}
-
-                {isPlacingPin && (
-                  <div className={styles.placingOverlay}>
-                    <span>Click to place anchor point</span>
-                  </div>
-                )}
               </div>
 
               {activeTypes.length > 0 && (
@@ -522,7 +681,7 @@ export default function ZoneMapEditor({
           {localZone.anchors.length === 0 ? (
             <p className={styles.noAnchors}>
               {captured
-                ? 'Click "+ Add Anchor" then click the map to place pins'
+                ? "Pick a type above, then tap the map to place pins"
                 : "Capture the aerial view first, then add anchors"}
             </p>
           ) : (
@@ -571,28 +730,6 @@ export default function ZoneMapEditor({
         style={{ display: "none" }}
         onChange={handleUploadMap}
       />
-
-      {/* Pin modal — new pin */}
-      {pendingPin && (
-        <AnchorPinModal
-          anchor={{
-            id: generateId(),
-            x: pendingPin.x,
-            y: pendingPin.y,
-            label: `A${localZone.anchors.length + 1}`,
-            type: "fall-arrest-anchor",
-            description: "",
-            inspectionDate: "",
-            nextInspection: "",
-            result: "PASSED",
-            notes: "",
-          }}
-          onSave={handlePinSave}
-          onDelete={handlePinDelete}
-          onClose={() => setPendingPin(null)}
-          isNew
-        />
-      )}
 
       {/* Pin modal — edit existing */}
       {editingAnchor && (

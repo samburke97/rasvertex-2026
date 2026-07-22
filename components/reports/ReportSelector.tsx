@@ -2,16 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import ConditionReportPage from "./condition/ConditionReportPage";
-import WorksAgreementPage from "./works-agreement/WorksAgreementPage";
 import AnchorInspectionPage from "./anchor-inspection/AnchorInspectionPage";
 import HoursBreakdownPage from "./hours-breakdown/HoursBreakdownPage";
 import styles from "./ReportSelector.module.css";
 
-type ReportTypeId =
-  | "condition"
-  | "anchor-inspection"
-  | "finance-summary"
-  | "hours-breakdown";
+type ReportTypeId = "condition" | "anchor-inspection" | "hours-breakdown";
 
 interface ReportType {
   id: ReportTypeId;
@@ -42,12 +37,6 @@ const PREVIOUSLY_SENT: SentReport[] = [
     report: "Anchor Inspection",
     file: "anchor-inspection-grammar-school.pdf",
     date: "08 Jan 2026",
-  },
-  {
-    id: "4",
-    report: "Works Agreement",
-    file: "works-agreement-hilton-arcade.pdf",
-    date: "28 Jan 2025",
   },
 ];
 
@@ -99,30 +88,6 @@ const REPORT_TYPES: ReportType[] = [
       >
         <circle cx="12" cy="10" r="3" />
         <path d="M12 2a8 8 0 00-8 8c0 5.25 8 14 8 14s8-8.75 8-14a8 8 0 00-8-8z" />
-      </svg>
-    ),
-  },
-  {
-    id: "finance-summary",
-    label: "Works Agreement",
-    description:
-      "Formal works agreement outlining scope, terms, and sign-off for approved jobs.",
-    available: true,
-    category: "finance",
-    icon: (
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <path d="M9 15l2 2 4-4" />
       </svg>
     ),
   },
@@ -334,10 +299,6 @@ export default function ReportSelector() {
 
   if (active === "anchor-inspection") {
     return <AnchorInspectionPage onBack={() => setActive(null)} />;
-  }
-
-  if (active === "finance-summary") {
-    return <WorksAgreementPage onBack={() => setActive(null)} />;
   }
 
   if (active === "hours-breakdown") {

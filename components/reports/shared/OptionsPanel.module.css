@@ -12,6 +12,16 @@
   min-height: 0;
 }
 
+@media (max-width: 1024px) {
+  .panel {
+    width: 100%;
+    min-width: 0;
+    max-height: 45vh;
+    border-right: none;
+    border-bottom: 1px solid var(--out-light, #f0f0f0);
+  }
+}
+
 /* ── Group ───────────────────────────────────────────────────────────────── */
 .group {
   display: flex;
@@ -40,23 +50,6 @@
   font-weight: 500;
   color: var(--for-dark, #374151);
   margin-top: -0.25rem;
-}
-
-/* ── Attachment folder picker (shown when a job has folders) ─────────────── */
-.folderPicker {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  padding: 0.75rem;
-  background: var(--con-light, #fafafa);
-  border: 1px solid var(--out-light, #f0f0f0);
-  border-radius: 8px;
-}
-
-.folderPicker .subLabel {
-  margin-top: 0;
-  line-height: 1.4;
 }
 
 /* ── Cover photo upload ──────────────────────────────────────────────────── */
@@ -162,11 +155,12 @@
 }
 
 .presetBtn {
-  height: 26px;
-  padding: 0 0.625rem;
+  min-height: 26px;
+  padding: 0.25rem 0.625rem;
   border-radius: 6px;
   font-size: 0.72rem;
   font-weight: 500;
+  line-height: 1.35;
   cursor: pointer;
   border: 1px solid var(--out-darkest, #c9cbcb);
   background: var(--white, #fff);
@@ -175,6 +169,16 @@
     border-color 0.15s,
     background 0.15s;
   font-family: inherit;
+}
+
+/* Touch input (iPad, phone) gets bigger tap targets — mouse layouts are
+   unaffected since `pointer: coarse` never matches a mouse/trackpad. */
+@media (pointer: coarse) {
+  .presetBtn {
+    min-height: 44px;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.8rem;
+  }
 }
 
 .presetBtn:hover {

@@ -102,7 +102,7 @@ export default function AnchorPinModal({
           {/* Two column grid */}
           <div className={styles.grid2}>
             <div className={styles.fieldGroup}>
-              <label className={styles.label}>Asset Label</label>
+              <label className={styles.label}>Asset #</label>
               <input
                 className={styles.input}
                 value={form.label}
@@ -133,42 +133,12 @@ export default function AnchorPinModal({
             </div>
 
             <div className={styles.fieldGroup}>
-              <label className={styles.label}>Model / Serial</label>
-              <input
-                className={styles.input}
-                value={form.model ?? ""}
-                onChange={(e) => set("model", e.target.value)}
-                placeholder="ASSAN001038"
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.label}>Manufacturer</label>
-              <input
-                className={styles.input}
-                value={form.manufacturer ?? ""}
-                onChange={(e) => set("manufacturer", e.target.value)}
-                placeholder="e.g. Safetylyne"
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
               <label className={styles.label}>Commission Date</label>
               <input
                 className={styles.input}
                 value={form.commissionDate ?? ""}
                 onChange={(e) => set("commissionDate", e.target.value)}
                 placeholder="01 Jul 2017"
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.label}>Major Service Date</label>
-              <input
-                className={styles.input}
-                value={form.majorServiceDate ?? ""}
-                onChange={(e) => set("majorServiceDate", e.target.value)}
-                placeholder="01 Jul 2027"
               />
             </div>
 
@@ -191,18 +161,6 @@ export default function AnchorPinModal({
                 placeholder="07 Jan 2027"
               />
             </div>
-          </div>
-
-          {/* Notes */}
-          <div className={styles.fieldGroup}>
-            <label className={styles.label}>Notes</label>
-            <textarea
-              className={styles.textarea}
-              value={form.notes ?? ""}
-              onChange={(e) => set("notes", e.target.value)}
-              placeholder="Any observations or remarks…"
-              rows={2}
-            />
           </div>
         </div>
 

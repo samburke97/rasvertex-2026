@@ -1,9 +1,8 @@
 "use client";
 // components/reports/anchor-inspection/AnchorInspectionPage.tsx
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import styles from "../shared/ReportPage.module.css";
-import { buildAnchorPrintHTML } from "@/lib/reports/anchor.print";
 import Button from "@/components/ui/Button";
 import SaveToJobModal from "../shared/SaveToJobModal";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
@@ -26,12 +25,16 @@ interface AnchorInspectionPageProps {
 }
 
 type View = "editor" | "zone-map";
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export type AnchorImportStatus =
   | { phase: "idle" }
   | { phase: "fetching-job" }
   | { phase: "done" }
   | { phase: "error"; message: string };
+
+const AUTOSAVE_DEBOUNCE_MS = 1500;
+const AUTOSAVE_RETRY_MS = 5000;
 
 // "11th March 2026" from a Date
 function formatOrdinalDate(d: Date): string {
@@ -70,35 +73,45 @@ export default function AnchorInspectionPage({
   const [savedFilename, setSavedFilename] = useState<string | null>(null);
   const currentLoadId = useRef(0);
   const [isExporting, setIsExporting] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Export PDF — builds clean print HTML via anchor.print.ts ──────────────
-  const handleExport = useCallback(() => {
+  const handleExport = useCallback(async () => {
     setIsExporting(true);
+    try {
+      const filename = report.job.address
+        ? `Anchor Inspection Report - ${report.job.address}`
+        : "Anchor Inspection Report";
 
-    const html = buildAnchorPrintHTML(report);
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const win = window.open(url, "_blank");
+      const res = await fetch("/api/reports/export-anchor-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename, report }),
+      });
 
-    if (!win) {
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? "Export failed");
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename + ".pdf";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[ExportPDF]", err);
+      alert(
+        err instanceof Error ? err.message : "Export failed. Please try again.",
+      );
+    } finally {
       setIsExporting(false);
-      return;
     }
-
-    win.onload = () => {
-      setTimeout(() => {
-        win.print();
-        win.close();
-        URL.revokeObjectURL(url);
-        setIsExporting(false);
-      }, 800);
-    };
-    // Fallback in case onload doesn't fire
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-      setIsExporting(false);
-    }, 8000);
   }, [report]);
 
   // ── Job detail handlers ────────────────────────────────────────────────
@@ -109,19 +122,38 @@ export default function AnchorInspectionPage({
     [],
   );
 
-  // ── Load job from SimPRO ───────────────────────────────────────────────
+  // ── Load job from SimPRO — resuming an existing draft if one exists ───────
   const handleImport = useCallback(async (jobNumber: string) => {
     const loadId = ++currentLoadId.current;
     const isStale = () => currentLoadId.current !== loadId;
 
     setImportStatus({ phase: "fetching-job" });
+    setSaveStatus("idle");
+    setSavedFilename(null);
 
     try {
-      const jobRes = await fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
+      // Fetch the SimPRO job details and check for an in-progress draft in
+      // parallel — typing the same job number a tech already started is the
+      // entire "resume" UX, no extra list/search UI needed.
+      const [jobRes, draftRes] = await Promise.all([
+        fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`),
+        fetch(`/api/anchor-inspection-reports/${jobNumber}`),
+      ]);
       if (isStale()) return;
+
+      if (draftRes.ok) {
+        const { report: draft } = (await draftRes.json()) as {
+          report: AnchorReportData;
+        };
+        if (isStale()) return;
+        setReport(draft);
+        setLoadedJobId(jobNumber);
+        setImportStatus({ phase: "done" });
+        return;
+      }
+
       if (!jobRes.ok)
         throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
-
       const jobData: EnrichedJob = await jobRes.json();
       if (isStale()) return;
 
@@ -136,22 +168,22 @@ export default function AnchorInspectionPage({
         nextInspectionDate = formatOrdinalDate(ny);
       }
 
-      setReport((prev) => ({
-        ...prev,
+      // Start from a clean report (not the previous job's zones/anchors —
+      // only merge job fields on top of a fresh draft).
+      setReport({
+        ...DEFAULT_ANCHOR_REPORT,
         job: {
-          ...prev.job,
-          // Cover page
-          preparedFor: jobData.preparedFor || prev.job.preparedFor,
-          address: jobData.siteAddress || prev.job.address,
-          date: jobData.date || prev.job.date,
-          // Certification page
-          certNumber: jobData.jobNo?.replace(/^#/, "") || prev.job.certNumber,
-          buildingName: jobData.siteName || prev.job.buildingName,
-          inspectionDate: inspectionDate || prev.job.inspectionDate,
-          nextInspectionDate: nextInspectionDate || prev.job.nextInspectionDate,
+          ...DEFAULT_ANCHOR_REPORT.job,
+          preparedFor: jobData.preparedFor || "",
+          address: jobData.siteAddress || "",
+          date: jobData.date || DEFAULT_ANCHOR_REPORT.job.date,
+          certNumber: jobData.jobNo?.replace(/^#/, "") || "",
+          buildingName: jobData.siteName || "",
+          inspectionDate,
+          nextInspectionDate,
           authorisedBy: "Archer Dutch",
         },
-      }));
+      });
 
       setLoadedJobId(jobNumber);
       setImportStatus({ phase: "done" });
@@ -163,6 +195,35 @@ export default function AnchorInspectionPage({
       });
     }
   }, []);
+
+  // ── Autosave the draft, debounced, whenever the report changes ───────────
+  useEffect(() => {
+    if (!loadedJobId) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+    const delay = saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
+    autosaveTimer.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      try {
+        const res = await fetch(
+          `/api/anchor-inspection-reports/${loadedJobId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(report),
+          },
+        );
+        setSaveStatus(res.ok ? "saved" : "error");
+      } catch {
+        setSaveStatus("error");
+      }
+    }, delay);
+
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report, loadedJobId]);
 
   // ── Zone handlers ──────────────────────────────────────────────────────
   const addZone = useCallback(() => {
@@ -214,6 +275,8 @@ export default function AnchorInspectionPage({
         <ZoneMapEditor
           zone={zone}
           jobAddress={report.job.address}
+          defaultInspectionDate={report.job.inspectionDate}
+          defaultNextInspection={report.job.nextInspectionDate}
           onUpdate={handleZoneUpdate}
           onBack={() => {
             setView("editor");
@@ -260,6 +323,19 @@ export default function AnchorInspectionPage({
                 />
               </svg>
               Saved
+            </span>
+          )}
+          {loadedJobId && saveStatus !== "idle" && (
+            <span
+              className={`${styles.draftStatus} ${
+                saveStatus === "error" ? styles.draftStatusError : ""
+              }`}
+            >
+              {saveStatus === "saving"
+                ? "Saving draft…"
+                : saveStatus === "error"
+                  ? "Draft save failed — retrying"
+                  : "Draft saved"}
             </span>
           )}
           <Button

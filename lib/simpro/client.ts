@@ -91,13 +91,35 @@ export async function fetchSiteAddress(
       `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/sites/${siteId}`,
     );
 
+    // SimPRO nests the actual address fields under `site.Address` as an
+    // object ({ Address, City, State, PostalCode, Country }) — city/state/
+    // postcode are NOT top-level fields on the site record itself. Fall
+    // back to the top-level fields too in case another SimPRO instance
+    // shapes this differently.
+    const addressObj =
+      site.Address && typeof site.Address === "object"
+        ? (site.Address as Record<string, unknown>)
+        : {};
+
     const addr = extractString(
-      site.Address ?? site.Street ?? site.StreetAddress ?? "",
+      addressObj.Address ??
+        site.Address ??
+        site.Street ??
+        site.StreetAddress ??
+        "",
     );
-    const city = extractString(site.City ?? site.Suburb ?? "");
-    const state = extractString(site.State ?? "");
+    const city = extractString(
+      addressObj.City ?? addressObj.Suburb ?? site.City ?? site.Suburb ?? "",
+    );
+    const state = extractString(addressObj.State ?? site.State ?? "");
     const postcode = extractString(
-      site.PostCode ?? site.PostalCode ?? site.Postcode ?? "",
+      addressObj.PostalCode ??
+        addressObj.PostCode ??
+        addressObj.Postcode ??
+        site.PostCode ??
+        site.PostalCode ??
+        site.Postcode ??
+        "",
     );
 
     const parts = [addr, city, state, postcode].filter(Boolean);

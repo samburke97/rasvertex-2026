@@ -40,8 +40,6 @@ export interface ScheduleCostCenter {
 export type ScheduleImportStatus =
   | { phase: "idle" }
   | { phase: "loading" }
-  /** Job has more than one cost centre — paused, waiting for the user to pick one (or "all") and confirm. */
-  | { phase: "choosing-cost-center"; costCenters: ScheduleCostCenter[] }
   | { phase: "done" };
 
 // ── Job details ───────────────────────────────────────────────────────────────
@@ -91,8 +89,6 @@ export interface ConditionReportData {
 export type ImportStatus =
   | { phase: "idle" }
   | { phase: "fetching-job" }
-  /** Job has attachment folders — paused, waiting for the user to pick one (or "all") and confirm. */
-  | { phase: "choosing-folder"; folders: PhotoFolder[] }
   | { phase: "fetching-photos"; loaded: number; total: number }
   | { phase: "fetching-schedule" }
   | { phase: "done" }

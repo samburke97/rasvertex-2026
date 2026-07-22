@@ -2,11 +2,21 @@
 //
 // Self-contained print/PDF HTML builder for the Anchor Inspection Report.
 // Mirrors the React components exactly so output is WYSIWYG.
-// Browser path: window.open + print()
-// Server path (future): Puppeteer with base64 assets
+// Rendered server-side via Puppeteer (see lib/server/pdf-utils.ts) — pass
+// loadReportAssets() via `assets` so headless Chrome needs zero outbound
+// requests and images always appear in the rendered PDF.
 
 import type { AnchorReportData, Zone } from "./anchor.types";
 import { ANCHOR_TYPE_LABELS, ANCHOR_TYPE_COLOURS } from "./anchor.types";
+import {
+  BRAND_NAVY,
+  DEFAULT_PRINT_ASSETS,
+  PRINT_FONT_LINKS,
+  PRINT_RESET_CSS,
+  ASSOC_LOGO_CSS,
+  buildAssocLogosHTML,
+  type ReportAssets,
+} from "./print-shared";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -18,41 +28,17 @@ function esc(str: string | number | null | undefined): string {
     .replace(/"/g, "&quot;");
 }
 
-// ── Static assets ─────────────────────────────────────────────────────────────
-
-const ASSETS = {
-  rasLogo: "/reports/ras-logo.png",
-  linkWhite: "/reports/link_white.png",
-  linkBlue: "/reports/link_blue.png",
-  signature: "/reports/signature.png",
-  associations: [
-    {
-      src: "/reports/associations/communityselect.png",
-      alt: "Community Select",
-    },
-    { src: "/reports/associations/dulux.png", alt: "Dulux" },
-    { src: "/reports/associations/haymes.svg", alt: "Haymes Paint" },
-    { src: "/reports/associations/mpa.png", alt: "MPA" },
-    { src: "/reports/associations/qbcc.png", alt: "QBCC" },
-    { src: "/reports/associations/smartstrata.png", alt: "Smart Strata" },
-  ],
-};
-
-const assocHTML = ASSETS.associations
-  .map(
-    (a) => `<img src="${esc(a.src)}" alt="${esc(a.alt)}" class="assoc-logo" />`,
-  )
-  .join("");
+function assocLogosHTML(assets: ReportAssets): string {
+  return buildAssocLogosHTML(assets, "assoc-logo");
+}
 
 // ── Shared print CSS ──────────────────────────────────────────────────────────
 
 const PRINT_STYLES = `
   @page { size: A4 portrait; margin: 0; }
-  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  ${PRINT_RESET_CSS}
   html, body {
-    font-family: 'Inter', Arial, sans-serif;
     font-weight: 300;
-    background: white;
     color: #1a1a2e;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -84,7 +70,7 @@ const PRINT_STYLES = `
     font-size: 3rem;
     font-weight: 400;
     letter-spacing: 0.04em;
-    color: #0d1c45;
+    color: ${BRAND_NAVY};
     line-height: 1;
     text-transform: uppercase;
   }
@@ -103,14 +89,7 @@ const PRINT_STYLES = `
     flex-wrap: nowrap;
     flex-shrink: 0;
   }
-  .assoc-logo {
-    height: 36px;
-    width: auto;
-    max-width: 80px;
-    object-fit: contain;
-    display: block;
-    opacity: 0.85;
-  }
+  .assoc-logo { ${ASSOC_LOGO_CSS} }
 
   /* ─────────────────────────────────────────────────────────────
      COVER PAGE
@@ -124,7 +103,7 @@ const PRINT_STYLES = `
   .cover-hero-navy {
     position: absolute;
     inset: 0;
-    background: #0d1c45;
+    background: ${BRAND_NAVY};
   }
   .cover-hero-photo {
     position: absolute;
@@ -168,7 +147,7 @@ const PRINT_STYLES = `
     font-size: 2.75rem;
     font-weight: 400;
     letter-spacing: 0.04em;
-    color: #0d1c45;
+    color: ${BRAND_NAVY};
     line-height: 1.05;
     text-transform: uppercase;
     margin-bottom: 1.25rem;
@@ -180,7 +159,7 @@ const PRINT_STYLES = `
     font-size: 1.05rem;
     letter-spacing: 0.08em;
     line-height: 1;
-    color: #0d1c45;
+    color: ${BRAND_NAVY};
     padding: 0.4rem 1.25rem 0.4rem 0;
     white-space: nowrap;
     vertical-align: middle;
@@ -320,7 +299,7 @@ const PRINT_STYLES = `
     font-family: 'Inter', Arial, sans-serif;
     font-size: 1.1rem;
     font-weight: 700;
-    color: #0d1c45;
+    color: ${BRAND_NAVY};
   }
   .zone-stat-pass { color: #059669 !important; }
   .zone-stat-fail { color: #900c40 !important; }
@@ -341,9 +320,10 @@ const PRINT_STYLES = `
     font-weight: 400;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #0d1c45;
+    color: ${BRAND_NAVY};
     line-height: 1;
   }
+  .badge-pass {
     display: inline-flex; align-items: center; justify-content: center;
     font-size: 0.6rem; font-weight: 700; letter-spacing: 0.05em;
     padding: 0.15rem 0.4rem; border-radius: 4px;
@@ -388,7 +368,7 @@ const PRINT_STYLES = `
     font-family: 'Inter', Arial, sans-serif;
     font-size: 0.85rem;
     font-weight: 600;
-    color: #0d1c45;
+    color: ${BRAND_NAVY};
   }
   .cert-details { width: 100%; border-collapse: collapse; }
   .cert-lbl {
@@ -397,7 +377,7 @@ const PRINT_STYLES = `
     font-weight: 400;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #0d1c45;
+    color: ${BRAND_NAVY};
     line-height: 1;
     padding: 0.55rem 1.25rem 0.55rem 0;
     border-bottom: 1px solid #f0f0f0;
@@ -448,7 +428,7 @@ const PRINT_STYLES = `
     font-weight: 400;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: #0d1c45;
+    color: ${BRAND_NAVY};
     line-height: 1;
     padding: 0.55rem 0.875rem;
     background: #f9f9f9;
@@ -509,7 +489,7 @@ const PRINT_STYLES = `
     font-size: 1.05rem;
     font-weight: 400;
     letter-spacing: 0.08em;
-    color: #0d1c45;
+    color: ${BRAND_NAVY};
     text-transform: uppercase;
     line-height: 1;
   }
@@ -517,7 +497,10 @@ const PRINT_STYLES = `
 
 // ── Page builders ─────────────────────────────────────────────────────────────
 
-function buildCoverPage(job: AnchorReportData["job"]): string {
+function buildCoverPage(
+  job: AnchorReportData["job"],
+  assets: ReportAssets,
+): string {
   const coverPhotoLayer = job.coverPhoto
     ? `<div class="cover-hero-photo" style="background-image:url('${esc(job.coverPhoto)}')"></div>`
     : "";
@@ -540,8 +523,8 @@ function buildCoverPage(job: AnchorReportData["job"]): string {
     <div class="cover-hero-navy"></div>
     ${coverPhotoLayer}
     <div class="cover-hero-overlay"></div>
-    <div class="cover-logo"><img src="${ASSETS.rasLogo}" alt="RAS Vertex" /></div>
-    <div class="cover-web"><img src="${ASSETS.linkWhite}" alt="rasvertex.com.au" /></div>
+    <div class="cover-logo"><img src="${esc(assets.rasLogo)}" alt="RAS Vertex" /></div>
+    <div class="cover-web"><img src="${esc(assets.linkWhite)}" alt="rasvertex.com.au" /></div>
   </div>
   <div class="cover-body">
     <div class="cover-title-group">
@@ -550,12 +533,61 @@ function buildCoverPage(job: AnchorReportData["job"]): string {
     <div class="cover-meta-wrap">
       <table class="cover-meta"><tbody>${metaRows}</tbody></table>
     </div>
-    <div class="footer" style="margin-top:0;">${assocHTML}</div>
+    <div class="footer" style="margin-top:0;">${assocLogosHTML(assets)}</div>
   </div>
 </div>`;
 }
 
-function buildZonePage(zone: Zone): string {
+// A zone's map/legend/stats banner already eat most of a page, so far fewer
+// asset rows fit on the first page than on a continuation page (which is
+// just a repeated header + table). Splitting explicitly here — rather than
+// letting one unbounded div overflow and get auto-sliced by the printer —
+// is what keeps rows from being cut in half across a page boundary.
+const ZONE_ROWS_FIRST_PAGE = 8;
+const ZONE_ROWS_CONTINUATION = 28;
+
+function buildAssetTableHead(): string {
+  return `<thead><tr>
+           <th class="zone-th">Asset No.</th>
+           <th class="zone-th">Type</th>
+           <th class="zone-th">Commission</th>
+           <th class="zone-th">Inspection</th>
+           <th class="zone-th">Next Inspection</th>
+           <th class="zone-th">Pass/Fail</th>
+         </tr></thead>`;
+}
+
+function buildAssetTableRows(
+  anchors: Zone["anchors"],
+  startIndex: number,
+): string {
+  return anchors
+    .map((a, i) => {
+      const colour = ANCHOR_TYPE_COLOURS[a.type] ?? "#10b981";
+      const passFail =
+        a.result === "PASSED"
+          ? `<span class="badge-pass">PASSED</span>`
+          : a.result === "FAILED"
+            ? `<span class="badge-fail">FAILED</span>`
+            : `<span class="badge-na">—</span>`;
+      return `<tr style="${(startIndex + i) % 2 === 0 ? "" : "background:#fafbfc;"}">
+      <td class="zone-td">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="width:8px;height:8px;border-radius:50%;background:${colour};flex-shrink:0;display:inline-block;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>
+          <strong>${esc(a.label)}</strong>
+        </div>
+      </td>
+      <td class="zone-td">${esc(ANCHOR_TYPE_LABELS[a.type])}</td>
+      <td class="zone-td">${esc(a.commissionDate || "—")}</td>
+      <td class="zone-td">${esc(a.inspectionDate || "")}</td>
+      <td class="zone-td">${esc(a.nextInspection || "")}</td>
+      <td class="zone-td">${passFail}</td>
+    </tr>`;
+    })
+    .join("");
+}
+
+function buildZonePages(zone: Zone, assets: ReportAssets): string {
   // Map image + pin overlay
   const pinOverlays = zone.anchors
     .filter((a) => typeof a.x === "number" && typeof a.y === "number")
@@ -626,69 +658,63 @@ function buildZonePage(zone: Zone): string {
       </div>`
       : "";
 
-  // Asset register table
-  const assetRows = zone.anchors
-    .map((a, i) => {
-      const colour = ANCHOR_TYPE_COLOURS[a.type] ?? "#10b981";
-      const passFail =
-        a.result === "PASSED"
-          ? `<span class="badge-pass">PASSED</span>`
-          : a.result === "FAILED"
-            ? `<span class="badge-fail">FAILED</span>`
-            : `<span class="badge-na">—</span>`;
-      return `<tr style="${i % 2 === 0 ? "" : "background:#fafbfc;"}">
-      <td class="zone-td">
-        <div style="display:flex;align-items:center;gap:6px;">
-          <span style="width:8px;height:8px;border-radius:50%;background:${colour};flex-shrink:0;display:inline-block;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>
-          <strong>${esc(a.label)}</strong>
-        </div>
-      </td>
-      <td class="zone-td">${esc(ANCHOR_TYPE_LABELS[a.type])}</td>
-      <td class="zone-td">${esc(a.model ?? "—")}</td>
-      <td class="zone-td">${esc(a.manufacturer ?? "—")}</td>
-      <td class="zone-td">${esc(a.inspectionDate || "")}</td>
-      <td class="zone-td">${esc(a.nextInspection || "")}</td>
-      <td class="zone-td">${passFail}</td>
-    </tr>`;
-    })
-    .join("");
+  // Asset register — first page gets whatever fits alongside the map/
+  // legend/stats; any remainder flows onto continuation pages that repeat
+  // just the table header, so a long register never splits a row in half.
+  const firstPageAnchors = zone.anchors.slice(0, ZONE_ROWS_FIRST_PAGE);
+  const remainingAnchors = zone.anchors.slice(ZONE_ROWS_FIRST_PAGE);
 
-  const assetTable =
+  const firstPageTable =
     total > 0
       ? `<div class="zone-register-label">Asset Register</div>
        <table class="zone-table">
-         <thead><tr>
-           <th class="zone-th">Asset No.</th>
-           <th class="zone-th">Description</th>
-           <th class="zone-th">Model</th>
-           <th class="zone-th">Manufacturer</th>
-           <th class="zone-th">Inspection</th>
-           <th class="zone-th">Next Inspection</th>
-           <th class="zone-th">Pass/Fail</th>
-         </tr></thead>
-         <tbody>${assetRows}</tbody>
+         ${buildAssetTableHead()}
+         <tbody>${buildAssetTableRows(firstPageAnchors, 0)}</tbody>
        </table>`
       : `<p style="font-size:0.85rem;color:#9ca3af;text-align:center;padding:2rem 0;">No anchors recorded for this zone.</p>`;
 
-  return `
+  const firstPage = `
 <div class="page">
   <div class="top-bar">
     <span class="top-title">${esc(zone.name)}</span>
-    <img src="${ASSETS.linkBlue}" alt="rasvertex.com.au" class="top-link" />
+    <img src="${esc(assets.linkBlue)}" alt="rasvertex.com.au" class="top-link" />
   </div>
   <div class="zone-body">
     ${mapBlock}
     ${legendHTML}
     ${statsHTML}
-    ${assetTable}
+    ${firstPageTable}
   </div>
-  <div class="footer">${assocHTML}</div>
+  <div class="footer">${assocLogosHTML(assets)}</div>
 </div>`;
+
+  const continuationPages: string[] = [];
+  for (let i = 0; i < remainingAnchors.length; i += ZONE_ROWS_CONTINUATION) {
+    const chunk = remainingAnchors.slice(i, i + ZONE_ROWS_CONTINUATION);
+    continuationPages.push(`
+<div class="page">
+  <div class="top-bar">
+    <span class="top-title">${esc(zone.name)}</span>
+    <img src="${esc(assets.linkBlue)}" alt="rasvertex.com.au" class="top-link" />
+  </div>
+  <div class="zone-body">
+    <div class="zone-register-label">Asset Register (continued)</div>
+    <table class="zone-table">
+      ${buildAssetTableHead()}
+      <tbody>${buildAssetTableRows(chunk, ZONE_ROWS_FIRST_PAGE + i)}</tbody>
+    </table>
+  </div>
+  <div class="footer">${assocLogosHTML(assets)}</div>
+</div>`);
+  }
+
+  return firstPage + continuationPages.join("");
 }
 
 function buildCertificationPage(
   job: AnchorReportData["job"],
   zones: Zone[],
+  assets: ReportAssets,
 ): string {
   // Aggregate anchor types across all zones
   const typeMap = new Map<
@@ -740,7 +766,7 @@ function buildCertificationPage(
 <div class="page">
   <div class="top-bar">
     <span class="top-title">Certification</span>
-    <img src="${ASSETS.linkBlue}" alt="rasvertex.com.au" class="top-link" />
+    <img src="${esc(assets.linkBlue)}" alt="rasvertex.com.au" class="top-link" />
   </div>
   <div class="cert-body">
     <div class="cert-heading">
@@ -770,16 +796,16 @@ function buildCertificationPage(
 
     ${anchorTable}
   </div>
-  <div class="footer">${assocHTML}</div>
+  <div class="footer">${assocLogosHTML(assets)}</div>
 </div>`;
 }
 
-function buildSummaryPage(): string {
+function buildSummaryPage(assets: ReportAssets): string {
   return `
 <div class="page">
   <div class="top-bar">
     <span class="top-title">Summary</span>
-    <img src="${ASSETS.linkBlue}" alt="rasvertex.com.au" class="top-link" />
+    <img src="${esc(assets.linkBlue)}" alt="rasvertex.com.au" class="top-link" />
   </div>
   <div class="summary-body">
     <p class="summary-para">Hydraulic load testing equipment holds valid calibration and service certification.</p>
@@ -789,32 +815,33 @@ function buildSummaryPage(): string {
 
     <div class="signoff">
       <p class="sincerely">Sincerely,</p>
-      <img src="${ASSETS.signature}" alt="Phil Clark signature" class="sig-img" />
+      <img src="${esc(assets.signature)}" alt="Phil Clark signature" class="sig-img" />
       <p class="sig-name">Phil Clark</p>
       <p class="sig-title">Director</p>
     </div>
   </div>
-  <div class="footer">${assocHTML}</div>
+  <div class="footer">${assocLogosHTML(assets)}</div>
 </div>`;
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export function buildAnchorPrintHTML(report: AnchorReportData): string {
-  const coverPage = buildCoverPage(report.job);
-  const zonePages = report.zones.map(buildZonePage).join("\n");
-  const certPage = buildCertificationPage(report.job, report.zones);
-  const summaryPage = buildSummaryPage();
+export function buildAnchorPrintHTML(
+  report: AnchorReportData,
+  assets?: ReportAssets,
+): string {
+  const a = assets ?? DEFAULT_PRINT_ASSETS;
+  const coverPage = buildCoverPage(report.job, a);
+  const zonePages = report.zones.map((z) => buildZonePages(z, a)).join("\n");
+  const certPage = buildCertificationPage(report.job, report.zones, a);
+  const summaryPage = buildSummaryPage(a);
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <base href="${typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"}" />
   <title>${esc(report.job.reportType || "Anchor Inspection Report")}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+  ${PRINT_FONT_LINKS}
   <style>${PRINT_STYLES}</style>
 </head>
 <body>

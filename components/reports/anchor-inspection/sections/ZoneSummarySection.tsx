@@ -142,14 +142,11 @@ export default function ZoneSummarySection({
                   <tr>
                     {[
                       "Asset No.",
-                      "Description",
-                      "Model",
-                      "Manufacturer",
+                      "Type",
                       "Commission",
-                      "Major Service",
                       "Inspection",
-                      "Pass/Fail",
                       "Next Inspection",
+                      "Pass/Fail",
                     ].map((h) => (
                       <th key={h} className={styles.th}>
                         {h}
@@ -177,17 +174,11 @@ export default function ZoneSummarySection({
                       <td className={styles.td}>
                         {ANCHOR_TYPE_LABELS[anchor.type]}
                       </td>
-                      <td className={styles.tdMono}>{anchor.model ?? "—"}</td>
-                      <td className={styles.td}>
-                        {anchor.manufacturer ?? "—"}
-                      </td>
                       <td className={styles.td}>
                         {anchor.commissionDate ?? "—"}
                       </td>
-                      <td className={styles.td}>
-                        {anchor.majorServiceDate ?? "—"}
-                      </td>
                       <td className={styles.td}>{anchor.inspectionDate}</td>
+                      <td className={styles.td}>{anchor.nextInspection}</td>
                       <td className={styles.td}>
                         <span
                           className={`${styles.badge} ${
@@ -201,7 +192,6 @@ export default function ZoneSummarySection({
                           {anchor.result}
                         </span>
                       </td>
-                      <td className={styles.td}>{anchor.nextInspection}</td>
                     </tr>
                   ))}
                 </tbody>

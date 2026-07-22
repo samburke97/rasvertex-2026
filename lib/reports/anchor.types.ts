@@ -15,18 +15,12 @@ export type PassFail = "PASSED" | "FAILED" | "N/A";
 
 export interface AnchorPoint {
   id: string;
-  label: string;
+  label: string; // "Asset #" in the UI
   type: AnchorType;
-  description: string;
-  model?: string;
-  serialNumber?: string;
-  manufacturer?: string;
   commissionDate?: string;
-  majorServiceDate?: string;
   inspectionDate: string;
   nextInspection: string;
   result: PassFail;
-  notes?: string;
   x: number;
   y: number;
 }

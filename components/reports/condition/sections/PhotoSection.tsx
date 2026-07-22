@@ -13,6 +13,7 @@ import type {
 interface PhotoSectionProps {
   photos: ReportPhoto[];
   importStatus: ImportStatus;
+  awaitingFolderChoice?: boolean;
   showDates: boolean;
   layout: PhotoLayout;
   onPhotoRemove: (id: string) => void;
@@ -87,14 +88,16 @@ function groupByDate(photos: ReportPhoto[]): PhotoGroup[] {
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(p);
   }
-  return Array.from(map.entries()).map(([key, group]) => {
-    const sorted = [...group].sort((a, b) => naturalSort(a.name, b.name));
-    return {
-      key,
-      label: key === "undated" ? null : formatGroupDate(sorted[0].dateAdded!),
-      photos: sorted,
-    };
-  });
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, group]) => {
+      const sorted = [...group].sort((a, b) => naturalSort(a.name, b.name));
+      return {
+        key,
+        label: key === "undated" ? null : formatGroupDate(sorted[0].dateAdded!),
+        photos: sorted,
+      };
+    });
 }
 
 // ── Pagination constants ──────────────────────────────────────────────────────
@@ -176,6 +179,7 @@ export function paginateGroups(
 export default function PhotoSection({
   photos,
   importStatus,
+  awaitingFolderChoice = false,
   showDates,
   layout,
   onPhotoRemove,
@@ -224,7 +228,9 @@ export default function PhotoSection({
           <div className={styles.empty}>
             {isStreaming
               ? "Loading photos from SimPRO\u2026"
-              : "No photos yet \u2014 enter a job number to load photos from SimPRO."}
+              : awaitingFolderChoice
+                ? "Choose a folder in the sidebar to import photos."
+                : "No photos yet \u2014 enter a job number to load photos from SimPRO."}
           </div>
         </div>
       )}

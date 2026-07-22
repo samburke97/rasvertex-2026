@@ -41,6 +41,15 @@
   flex-shrink: 0;
 }
 
+/* Expand the tappable area on touch devices without growing the visible
+   track — keeps the switch looking the same, just easier to hit. */
+@media (pointer: coarse) {
+  .toggle {
+    padding: 12px;
+    margin: -12px;
+  }
+}
+
 .input {
   position: absolute;
   opacity: 0;

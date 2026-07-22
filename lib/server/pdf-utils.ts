@@ -7,6 +7,7 @@ export interface ReportAssets {
   rasLogo: string;
   linkWhite: string;
   linkBlue: string;
+  signature: string;
   associations: {
     communitySelect: string;
     dulux: string;
@@ -44,6 +45,7 @@ export function loadReportAssets(): ReportAssets {
     rasLogo: readPublicAsBase64("reports/ras-logo.png"),
     linkWhite: readPublicAsBase64("reports/link_white.png"),
     linkBlue: readPublicAsBase64("reports/link_blue.png"),
+    signature: readPublicAsBase64("reports/signature.png"),
     associations: {
       communitySelect: readPublicAsBase64(
         "reports/associations/communityselect.png",

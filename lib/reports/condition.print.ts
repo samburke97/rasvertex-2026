@@ -7,9 +7,9 @@
 //   - SummarySection.tsx  → summary page with topBar, body, footer
 //   - CoverSection.tsx    → cover page
 //
-// The browser Export PDF path uses this file directly (window.open + print()).
-// The Save to Job path uses Puppeteer to render this HTML server-side.
-// Both must produce identical output — do not diverge these two paths.
+// Rendered server-side via Puppeteer (see lib/server/pdf-utils.ts) — both
+// the "Export PDF" and "Save to Job" routes call buildPrintHTML() and
+// render the same way, so there's only one output path to keep in sync.
 
 import type {
   ConditionReportData,
@@ -17,6 +17,15 @@ import type {
   ScheduleRow,
 } from "./condition.types";
 import { formatScheduleDate } from "./condition.types";
+import {
+  BRAND_NAVY,
+  DEFAULT_PRINT_ASSETS,
+  PRINT_FONT_LINKS,
+  PRINT_RESET_CSS,
+  ASSOC_LOGO_CSS,
+  buildAssocLogosHTML,
+  type ReportAssets,
+} from "./print-shared";
 
 // ── Shared pagination constants (also used by PhotoSection.tsx) ───────────────
 // A4 at 96dpi: 794 x 1123px; padding 2.75rem = 44px each side
@@ -43,39 +52,6 @@ const ROWS_PER_CONTINUATION = 22;
 // printed page), so fewer of them fit per page — must match ScheduleSection.tsx
 const ROWS_PER_FIRST_PAGE_NOTES = 18;
 const ROWS_PER_CONTINUATION_NOTES = 20;
-
-// ── Static asset map ──────────────────────────────────────────────────────────
-// Browser path: omit — relative /public paths resolve normally.
-// Puppeteer path: pass pre-read base64 data URIs so headless Chrome needs
-// zero outbound requests and images always appear in the saved PDF.
-
-export interface StaticAssets {
-  rasLogo: string;
-  linkWhite: string;
-  linkBlue: string;
-  associations: {
-    communitySelect: string;
-    dulux: string;
-    haymes: string;
-    mpa: string;
-    qbcc: string;
-    smartStrata: string;
-  };
-}
-
-const DEFAULT_ASSETS: StaticAssets = {
-  rasLogo: "/reports/ras-logo.png",
-  linkWhite: "/reports/link_white.png",
-  linkBlue: "/reports/link_blue.png",
-  associations: {
-    communitySelect: "/reports/associations/communityselect.png",
-    dulux: "/reports/associations/dulux.png",
-    haymes: "/reports/associations/haymes.svg",
-    mpa: "/reports/associations/mpa.png",
-    qbcc: "/reports/associations/qbcc.png",
-    smartStrata: "/reports/associations/smartstrata.png",
-  },
-};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -146,14 +122,16 @@ function groupPhotosByDate(photos: Photo[]): PhotoGroup[] {
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(p);
   }
-  return Array.from(map.entries()).map(([key, group]) => {
-    const sorted = [...group].sort((a, b) => naturalSort(a.name, b.name));
-    return {
-      key,
-      label: key === "undated" ? null : formatGroupDate(sorted[0].dateAdded!),
-      photos: sorted,
-    };
-  });
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, group]) => {
+      const sorted = [...group].sort((a, b) => naturalSort(a.name, b.name));
+      return {
+        key,
+        label: key === "undated" ? null : formatGroupDate(sorted[0].dateAdded!),
+        photos: sorted,
+      };
+    });
 }
 
 // ── Photo paginator ───────────────────────────────────────────────────────────
@@ -212,8 +190,7 @@ const D = "#e5e7eb";
 // Every rule here must exactly match the corresponding .module.css files.
 
 const PRINT_STYLES = `
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #fff; font-family: 'Inter', Arial, sans-serif; }
+  ${PRINT_RESET_CSS}
 
   @media print {
     @page { size: A4; margin: 0; }
@@ -225,7 +202,7 @@ const PRINT_STYLES = `
   ───────────────────────────────────────────────────────────────────────── */
   .cover { width:210mm; height:297mm; display:flex; flex-direction:column; overflow:hidden; break-before:auto; page-break-before:auto; }
   .cover-hero { position:relative; width:100%; height:55%; flex-shrink:0; overflow:hidden; }
-  .cover-hero-navy { position:absolute; inset:0; background:#0d1c45; z-index:0; }
+  .cover-hero-navy { position:absolute; inset:0; background:${BRAND_NAVY}; z-index:0; }
   .cover-hero-photo { position:absolute; inset:0; background-size:cover; background-position:center; z-index:1; }
   .cover-hero-overlay { position:absolute; inset:0; background:rgba(13,28,69,0.45); z-index:2; }
   .cover-logo { position:absolute; top:2.5rem; left:2.75rem; z-index:3; }
@@ -234,16 +211,16 @@ const PRINT_STYLES = `
   .cover-web img { height:18px; width:auto; display:block; opacity:0.85; }
   .cover-body { flex:1; display:flex; flex-direction:column; padding:2.5rem 2.75rem 0; overflow:hidden; }
   .cover-title-group { flex-shrink:0; margin-bottom:1.5rem; }
-  .cover-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3.4rem; letter-spacing:0.04em; line-height:0.95; color:#0d1c45; text-transform:uppercase; margin-bottom:0.75rem; }
+  .cover-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3.4rem; letter-spacing:0.04em; line-height:0.95; color:${BRAND_NAVY}; text-transform:uppercase; margin-bottom:0.75rem; }
   .cover-intro { font-family:'Inter',Arial,sans-serif; font-size:0.82rem; font-weight:300; color:#555; line-height:1.65; max-width:480px; }
   .cover-intro p { margin:0; }
   .cover-intro p+p { margin-top:0.35em; }
-  .lbl { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.05rem; letter-spacing:0.08em; line-height:1; color:#0d1c45; padding:0.4rem 1.25rem 0.4rem 0; white-space:nowrap; vertical-align:middle; }
+  .lbl { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.05rem; letter-spacing:0.08em; line-height:1; color:${BRAND_NAVY}; padding:0.4rem 1.25rem 0.4rem 0; white-space:nowrap; vertical-align:middle; }
   .val { font-family:'Inter',Arial,sans-serif; font-size:0.82rem; font-weight:300; color:#333; padding:0.4rem 0; vertical-align:middle; white-space:nowrap; }
   .cover-meta-wrap { padding-bottom:2rem; }
   .cover-meta { border-collapse:collapse; width:1px; }
   .cover-footer { margin-top:auto; padding:1.5rem 0 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
-  .cover-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
+  .cover-footer img { ${ASSOC_LOGO_CSS} }
 
   /* ─────────────────────────────────────────────────────────────────────────
      PHOTO PAGES — mirrors PhotoSection.tsx / PhotoSection.module.css
@@ -266,12 +243,12 @@ const PRINT_STYLES = `
   ───────────────────────────────────────────────────────────────────────── */
   .sch-page { width:210mm; min-height:297mm; break-before:page; page-break-before:always; display:flex; flex-direction:column; }
   .sch-topbar { display:flex; align-items:flex-start; justify-content:space-between; padding:2.75rem 2.75rem 0; flex-shrink:0; }
-  .sch-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3rem; font-weight:400; letter-spacing:0.04em; color:#0d1c45; line-height:1; text-transform:uppercase; }
+  .sch-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3rem; font-weight:400; letter-spacing:0.04em; color:${BRAND_NAVY}; line-height:1; text-transform:uppercase; }
   .sch-topbar-link { height:22px; width:auto; display:block; margin-top:0.5rem; }
   .sch-body { padding:2rem 2.75rem 2rem; flex:1; display:flex; flex-direction:column; }
   .sch-heading { display:flex; align-items:center; gap:1rem; margin-bottom:1.25rem; }
-  .sch-heading-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.15rem; letter-spacing:0.08em; color:#0d1c45; white-space:nowrap; }
-  .sch-heading-rule { flex:1; height:2px; background:#0d1c45; }
+  .sch-heading-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.15rem; letter-spacing:0.08em; color:${BRAND_NAVY}; white-space:nowrap; }
+  .sch-heading-rule { flex:1; height:2px; background:${BRAND_NAVY}; }
   .sch-table-wrap { flex:1; }
   .sch-table { width:100%; border-collapse:collapse; }
   .sch-th { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; color:#374151; background:#f9f9f9; border-bottom:1px solid ${D}; text-align:left; width:20%; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
@@ -286,23 +263,23 @@ const PRINT_STYLES = `
   .sch-td-num { text-align:right; }
   .sch-table.tall .sch-td, .sch-table.tall .sch-td-num, .sch-table.tall .sch-td-note { padding-top:0.95rem; padding-bottom:0.95rem; }
   .sch-section-row { background:#eef1f6; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .sch-section-cell { padding:0.5rem 0.875rem; font-family:'Bebas Neue',Arial,sans-serif; font-size:1.15rem; font-weight:400; letter-spacing:0.08em; color:#0d1c45; text-transform:uppercase; line-height:1; border-bottom:1px solid #e0e4ee; }
+  .sch-section-cell { padding:0.5rem 0.875rem; font-family:'Bebas Neue',Arial,sans-serif; font-size:1.15rem; font-weight:400; letter-spacing:0.08em; color:${BRAND_NAVY}; text-transform:uppercase; line-height:1; border-bottom:1px solid #e0e4ee; }
   .sch-totals { background:#f9f9f9; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .sch-totals-label { padding:0.55rem 0.875rem; font-family:'Bebas Neue',Arial,sans-serif; font-size:0.85rem; letter-spacing:0.08em; color:#0d1c45; }
-  .sch-totals-cell { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:600; color:#0d1c45; text-align:right; }
+  .sch-totals-label { padding:0.55rem 0.875rem; font-family:'Bebas Neue',Arial,sans-serif; font-size:0.85rem; letter-spacing:0.08em; color:${BRAND_NAVY}; }
+  .sch-totals-cell { padding:0.55rem 0.875rem; font-family:'Inter',Arial,sans-serif; font-size:0.78rem; font-weight:600; color:${BRAND_NAVY}; text-align:right; }
   .sch-footer { padding:1.5rem 2.75rem 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
-  .sch-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
+  .sch-footer img { ${ASSOC_LOGO_CSS} }
 
   /* ─────────────────────────────────────────────────────────────────────────
      SUMMARY PAGE — mirrors SummarySection.tsx / SummarySection.module.css
   ───────────────────────────────────────────────────────────────────────── */
   .summary-page { width:210mm; min-height:297mm; break-before:page; page-break-before:always; display:flex; flex-direction:column; }
   .summary-topbar { display:flex; align-items:flex-start; justify-content:space-between; padding:2.75rem 2.75rem 0; flex-shrink:0; }
-  .summary-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3rem; font-weight:400; letter-spacing:0.04em; color:#0d1c45; line-height:1; text-transform:uppercase; }
+  .summary-title { font-family:'Bebas Neue',Arial,sans-serif; font-size:3rem; font-weight:400; letter-spacing:0.04em; color:${BRAND_NAVY}; line-height:1; text-transform:uppercase; }
   .summary-link { height:22px; width:auto; display:block; margin-top:0.5rem; }
   .summary-body { padding:2rem 2.75rem; flex:1; display:flex; flex-direction:column; gap:2rem; }
   .summary-section { display:flex; flex-direction:column; gap:0.5rem; }
-  .summary-label { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.15rem; letter-spacing:0.08em; color:#0d1c45; line-height:1; margin-bottom:0.15em; }
+  .summary-label { font-family:'Bebas Neue',Arial,sans-serif; font-size:1.15rem; letter-spacing:0.08em; color:${BRAND_NAVY}; line-height:1; margin-bottom:0.15em; }
   /* FIX 1: white-space:pre-wrap preserves line breaks from Tiptap HTML        */
   /* FIX 2: overflow-wrap + word-break prevents caption overflow               */
   /* FIX 3: min-height on <p> preserves blank lines (empty <p> from Tiptap)   */
@@ -316,7 +293,7 @@ const PRINT_STYLES = `
   .summary-text ol { list-style-type:decimal; }
   .summary-text li { margin-bottom:0.15em; }
   .summary-footer { margin-top:auto; padding:1.5rem 2.75rem 2rem; border-top:1px solid #ebebeb; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:nowrap; }
-  .summary-footer img { height:36px; width:auto; max-width:80px; object-fit:contain; display:block; opacity:0.85; }
+  .summary-footer img { ${ASSOC_LOGO_CSS} }
 `;
 
 // ── Schedule pages HTML builder ───────────────────────────────────────────────
@@ -530,37 +507,22 @@ function buildSchedulePagesHTML(
 // ── Main export ───────────────────────────────────────────────────────────────
 
 /**
- * Builds the full print-ready HTML for a condition report.
- *
- * @param report  Report data. Photos must already have base64 `url` values
- *                when called server-side (Puppeteer path).
- * @param assets  Optional pre-loaded base64 data URIs for /public static assets.
- *                Omit when calling from the browser — relative paths work fine.
- *                Pass when calling from Puppeteer so headless Chrome has no
- *                outbound image requests and all assets are embedded inline.
+ * Builds the full print-ready HTML for a condition report, rendered
+ * server-side via Puppeteer. `assets` should be `loadReportAssets()`
+ * (base64 data URIs) so headless Chrome has no outbound image requests.
  */
 export function buildPrintHTML(
   report: ConditionReportData,
-  assets?: StaticAssets,
+  assets?: ReportAssets,
 ): string {
   const { showDates, photoLayout, showSchedule, showScheduleNotes, scheduleSections } =
     report.settings;
-  const a = assets ?? DEFAULT_ASSETS;
+  const a = assets ?? DEFAULT_PRINT_ASSETS;
   const { columns: photoColumns, aspectRatio: photoAspectRatio } =
     PHOTO_LAYOUTS[photoLayout] ?? PHOTO_LAYOUTS.small;
 
-  // ── Association logos fragment (reused in cover, schedule, summary footers) ─
-  const ASSOC_LOGOS = [
-    { src: a.associations.communitySelect, alt: "Community Select" },
-    { src: a.associations.dulux, alt: "Dulux" },
-    { src: a.associations.haymes, alt: "Haymes Paint" },
-    { src: a.associations.mpa, alt: "MPA" },
-    { src: a.associations.qbcc, alt: "QBCC" },
-    { src: a.associations.smartStrata, alt: "Smart Strata" },
-  ];
-  const assocHTML = ASSOC_LOGOS.map(
-    (l) => `<img src="${esc(l.src)}" alt="${esc(l.alt)}" />`,
-  ).join("");
+  // Association logos fragment — reused in cover, schedule, summary footers.
+  const assocHTML = buildAssocLogosHTML(a);
 
   // ── Photo pages ───────────────────────────────────────────────────────────
   // When not grouping by date, still sort the flat list by filename
@@ -644,9 +606,7 @@ export function buildPrintHTML(
 <head>
   <meta charset="UTF-8" />
   <title>${esc(report.job.reportType || "Building Condition Report")} — ${esc(report.job.project)}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
+  ${PRINT_FONT_LINKS}
   <style>${PRINT_STYLES}</style>
 </head>
 <body>

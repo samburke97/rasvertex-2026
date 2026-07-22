@@ -74,12 +74,39 @@
   border-radius: 20px;
 }
 
+.draftStatus {
+  font-size: 0.75rem;
+  color: var(--for-light, #9ca3af);
+  white-space: nowrap;
+}
+
+.draftStatusError {
+  color: var(--red-wine-300, #900c40);
+}
+
 /* ── Body ────────────────────────────────────────────────────────────────── */
 .editorBody {
   flex: 1;
   display: flex;
   min-height: 0;
   overflow: hidden;
+}
+
+@media (max-width: 1024px) {
+  .topBar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 0.5rem 1rem;
+  }
+
+  .topBarRight {
+    flex-wrap: wrap;
+  }
+
+  .editorBody {
+    flex-direction: column;
+    overflow-y: auto;
+  }
 }
 
 /* ── Canvas ──────────────────────────────────────────────────────────────── */

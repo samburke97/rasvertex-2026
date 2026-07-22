@@ -1,13 +1,13 @@
 "use client";
 // components/reports/condition/OptionsPanel.tsx
 
-import React, { useRef, useState, useMemo, useEffect } from "react";
+import React, { useRef, useMemo } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import ToggleRow from "../shared/ToggleRow";
 import JobImportInput from "../shared/JobImportInput";
-import Button from "@/components/ui/Button";
 import type {
   ImportStatus,
+  PhotoFolder,
   ReportJobDetails,
   ReportPhoto,
   ReportSettings,
@@ -23,8 +23,12 @@ interface OptionsPanelProps {
   scheduleStatus: ScheduleImportStatus;
   onSettings: (s: ReportSettings) => void;
   onImport: (jobNumber: string) => void;
-  onConfirmFolder: (folderId: number | null) => void;
-  onConfirmCostCenter: (costCenter: ScheduleCostCenter | null) => void;
+  photoFolders: PhotoFolder[];
+  selectedFolderId: number | null;
+  onSelectFolder: (folderId: number | null) => void;
+  scheduleCostCenters: ScheduleCostCenter[];
+  selectedCostCenter: ScheduleCostCenter | null;
+  onSelectCostCenter: (costCenter: ScheduleCostCenter | null) => void;
   onCoverPhoto: (dataUrl: string | null) => void;
 }
 
@@ -92,41 +96,18 @@ export default function OptionsPanel({
   scheduleStatus,
   onSettings,
   onImport,
-  onConfirmFolder,
-  onConfirmCostCenter,
+  photoFolders,
+  selectedFolderId,
+  onSelectFolder,
+  scheduleCostCenters,
+  selectedCostCenter,
+  onSelectCostCenter,
   onCoverPhoto,
 }: OptionsPanelProps) {
   const coverInputRef = useRef<HTMLInputElement>(null);
-  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(
-    null,
-  );
-  const [selectedCostCenter, setSelectedCostCenter] =
-    useState<ScheduleCostCenter | null>(null);
-
-  const folderChoices =
-    importStatus.phase === "choosing-folder" ? importStatus.folders : null;
-
-  // Reset back to "All photos" each time a fresh folder list arrives.
-  useEffect(() => {
-    if (folderChoices) setSelectedFolderId(null);
-  }, [folderChoices]);
-
-  const costCenterChoices =
-    scheduleStatus.phase === "choosing-cost-center"
-      ? scheduleStatus.costCenters
-      : null;
-
-  // Reset back to "All hours" each time a fresh cost centre list arrives.
-  useEffect(() => {
-    if (costCenterChoices) setSelectedCostCenter(null);
-  }, [costCenterChoices]);
-
-  const isLoading =
-    importStatus.phase === "fetching-job" ||
-    importStatus.phase === "fetching-photos" ||
-    importStatus.phase === "fetching-schedule";
 
   const hasPhotos = photos.length > 0;
+  const canFilterByDate = hasPhotos || settings.scheduleLoaded;
 
   const progressPct =
     importStatus.phase === "fetching-photos" && importStatus.total > 0
@@ -175,39 +156,6 @@ export default function OptionsPanel({
               className={styles.progressBar}
               style={{ width: `${progressPct}%` }}
             />
-          </div>
-        )}
-
-        {folderChoices && (
-          <div className={styles.folderPicker}>
-            <div className={styles.subLabel}>
-              This job has {folderChoices.length} attachment folder
-              {folderChoices.length !== 1 ? "s" : ""} — choose what to import
-            </div>
-            <div className={styles.presetRow}>
-              <button
-                className={`${styles.presetBtn} ${selectedFolderId === null ? styles.presetBtnActive : ""}`}
-                onClick={() => setSelectedFolderId(null)}
-              >
-                All photos
-              </button>
-              {folderChoices.map((f) => (
-                <button
-                  key={f.id}
-                  className={`${styles.presetBtn} ${selectedFolderId === f.id ? styles.presetBtnActive : ""}`}
-                  onClick={() => setSelectedFolderId(f.id)}
-                >
-                  {f.name}
-                </button>
-              ))}
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => onConfirmFolder(selectedFolderId)}
-            >
-              Import photos
-            </Button>
           </div>
         )}
       </div>
@@ -263,6 +211,31 @@ export default function OptionsPanel({
       <div className={styles.group}>
         <div className={styles.groupLabel}>Photos</div>
 
+        {photoFolders.length > 0 && (
+          <>
+            <div className={styles.subLabel}>Folder</div>
+            <div className={styles.presetRow}>
+              <button
+                className={`${styles.presetBtn} ${selectedFolderId === null ? styles.presetBtnActive : ""}`}
+                onClick={() => onSelectFolder(null)}
+                disabled={importStatus.phase === "fetching-photos"}
+              >
+                All photos
+              </button>
+              {photoFolders.map((f) => (
+                <button
+                  key={f.id}
+                  className={`${styles.presetBtn} ${selectedFolderId === f.id ? styles.presetBtnActive : ""}`}
+                  onClick={() => onSelectFolder(f.id)}
+                  disabled={importStatus.phase === "fetching-photos"}
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
         <ToggleRow
           label="Show dates"
           sub={
@@ -294,12 +267,16 @@ export default function OptionsPanel({
           label="Filter by date"
           sub={
             isActivelyFiltered
-              ? `Showing ${filteredCount} of ${photos.length}`
-              : "Show all dates"
+              ? hasPhotos
+                ? `Showing ${filteredCount} of ${photos.length}`
+                : "Filtering schedule by date"
+              : canFilterByDate
+                ? "Show all dates"
+                : "Load photos or a schedule first"
           }
           checked={settings.filterByDate}
           onChange={(v) => set({ filterByDate: v })}
-          disabled={!hasPhotos}
+          disabled={!canFilterByDate}
         />
 
         {settings.filterByDate && (
@@ -342,37 +319,29 @@ export default function OptionsPanel({
       <div className={styles.group}>
         <div className={styles.groupLabel}>Schedule</div>
 
-        {costCenterChoices && (
-          <div className={styles.folderPicker}>
-            <div className={styles.subLabel}>
-              This job has {costCenterChoices.length} cost centres — choose
-              which hours to import
-            </div>
+        {scheduleCostCenters.length > 0 && (
+          <>
+            <div className={styles.subLabel}>Cost centre</div>
             <div className={styles.presetRow}>
               <button
                 className={`${styles.presetBtn} ${selectedCostCenter === null ? styles.presetBtnActive : ""}`}
-                onClick={() => setSelectedCostCenter(null)}
+                onClick={() => onSelectCostCenter(null)}
+                disabled={scheduleStatus.phase === "loading"}
               >
                 All hours
               </button>
-              {costCenterChoices.map((cc) => (
+              {scheduleCostCenters.map((cc) => (
                 <button
                   key={cc.id}
                   className={`${styles.presetBtn} ${selectedCostCenter?.id === cc.id ? styles.presetBtnActive : ""}`}
-                  onClick={() => setSelectedCostCenter(cc)}
+                  onClick={() => onSelectCostCenter(cc)}
+                  disabled={scheduleStatus.phase === "loading"}
                 >
                   {cc.name}
                 </button>
               ))}
             </div>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => onConfirmCostCenter(selectedCostCenter)}
-            >
-              Import hours
-            </Button>
-          </div>
+          </>
         )}
 
         <ToggleRow

@@ -76,19 +76,27 @@ export default function ConditionReportPage({
   });
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [savedFilename, setSavedFilename] = useState<string | null>(null);
-  // Job number + load id waiting on a folder choice before photos are fetched.
-  const [pendingImport, setPendingImport] = useState<{
-    jobNumber: string;
-    loadId: number;
-  } | null>(null);
-  // Job number + load id waiting on a cost centre choice before hours are fetched.
-  const [pendingSchedule, setPendingSchedule] = useState<{
-    jobNumber: string;
-    loadId: number;
-  } | null>(null);
+  // Attachment folders / cost centres for the current job, offered as
+  // filters once known — never gate the initial import on a choice.
+  const [photoFolders, setPhotoFolders] = useState<PhotoFolder[]>([]);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(
+    null,
+  );
+  const [scheduleCostCenters, setScheduleCostCenters] = useState<
+    ScheduleCostCenter[]
+  >([]);
+  const [selectedCostCenter, setSelectedCostCenter] =
+    useState<ScheduleCostCenter | null>(null);
   const [loadedJobId, setLoadedJobId] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
+  // Guards the job-detail + folder/cost-centre-list fetches that happen once
+  // per job import.
   const currentLoadId = useRef(0);
+  // Guard each resource's own fetch/stream independently, so re-scoping
+  // photos to a folder doesn't cancel an in-flight schedule fetch (or vice
+  // versa).
+  const photoLoadId = useRef(0);
+  const scheduleLoadId = useRef(0);
 
   const updateSettings = useCallback((s: ReportSettings) => {
     setReport((prev) => ({ ...prev, settings: s }));
@@ -126,16 +134,13 @@ export default function ConditionReportPage({
     setReport((prev) => ({ ...prev, schedule: rows }));
   }, []);
 
-  const isStaleFor = useCallback(
-    (loadId: number) => currentLoadId.current !== loadId,
-    [],
-  );
-
   const fetchPhotos = useCallback(
-    (jobNumber: string, loadId: number, folderId: number | null) => {
-      const isStale = () => isStaleFor(loadId);
+    (jobNumber: string, folderId: number | null) => {
+      const myGen = ++photoLoadId.current;
+      const isStale = () => photoLoadId.current !== myGen;
       return (async () => {
         if (isStale()) return;
+        setReport((prev) => ({ ...prev, photos: [] }));
         setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
         try {
           const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
@@ -219,18 +224,16 @@ export default function ConditionReportPage({
         }
       })();
     },
-    [isStaleFor],
+    [],
   );
 
   const fetchSchedule = useCallback(
-    (
-      jobNumber: string,
-      loadId: number,
-      costCenter: ScheduleCostCenter | null,
-    ) => {
-      const isStale = () => isStaleFor(loadId);
+    (jobNumber: string, costCenter: ScheduleCostCenter | null) => {
+      const myGen = ++scheduleLoadId.current;
+      const isStale = () => scheduleLoadId.current !== myGen;
       return (async () => {
         if (isStale()) return;
+        setReport((prev) => ({ ...prev, schedule: [] }));
         setScheduleStatus({ phase: "loading" });
         try {
           const scopeQuery = costCenter
@@ -274,46 +277,13 @@ export default function ConditionReportPage({
         }
       })();
     },
-    [isStaleFor],
-  );
-
-  const fetchCostCenters = useCallback(
-    (jobNumber: string, loadId: number) => {
-      const isStale = () => isStaleFor(loadId);
-      return (async () => {
-        if (isStale()) return;
-        let costCenters: ScheduleCostCenter[] = [];
-        try {
-          const res = await fetch(
-            `/api/simpro/jobs/${jobNumber}/schedule/cost-centers?companyId=0`,
-          );
-          if (isStale()) return;
-          if (res.ok) {
-            const data = await res.json();
-            costCenters = data.costCenters ?? [];
-          }
-        } catch {
-          // Treat as "no cost centres to choose from" — import everything.
-        }
-        if (isStale()) return;
-
-        if (costCenters.length > 1) {
-          setPendingSchedule({ jobNumber, loadId });
-          setScheduleStatus({ phase: "choosing-cost-center", costCenters });
-          return;
-        }
-
-        // 0 or 1 cost centre — nothing meaningful to choose, import everything.
-        fetchSchedule(jobNumber, loadId, null);
-      })();
-    },
-    [fetchSchedule, isStaleFor],
+    [],
   );
 
   const handleImport = useCallback(
     async (jobNumber: string) => {
       const loadId = ++currentLoadId.current;
-      const isStale = () => isStaleFor(loadId);
+      const isStale = () => currentLoadId.current !== loadId;
 
       setReport({
         ...DEFAULT_REPORT,
@@ -323,11 +293,13 @@ export default function ConditionReportPage({
         },
       });
       setSavedFilename(null);
-      setPendingImport(null);
-      setPendingSchedule(null);
       setImportStatus({ phase: "fetching-job" });
       setScheduleStatus({ phase: "idle" });
       setScheduleLoading(false);
+      setPhotoFolders([]);
+      setSelectedFolderId(null);
+      setScheduleCostCenters([]);
+      setSelectedCostCenter(null);
 
       // 1. Fetch job details
       try {
@@ -352,12 +324,30 @@ export default function ConditionReportPage({
         return;
       }
 
-      // 2. Schedule loads in the background, independent of photos — pausing
-      // for a cost centre choice if the job has more than one.
-      fetchCostCenters(jobNumber, loadId);
+      // 2. Schedule loads in the background, independent of photos — the
+      // report is editable while it fetches. Cost centres are fetched in
+      // parallel purely to offer as a filter afterwards.
+      (async () => {
+        try {
+          const res = await fetch(
+            `/api/simpro/jobs/${jobNumber}/schedule/cost-centers?companyId=0`,
+          );
+          if (isStale()) return;
+          if (res.ok) {
+            const data = await res.json();
+            const costCenters: ScheduleCostCenter[] = data.costCenters ?? [];
+            if (!isStale() && costCenters.length > 1)
+              setScheduleCostCenters(costCenters);
+          }
+        } catch {
+          // Filter just won't be offered.
+        }
+      })();
+      fetchSchedule(jobNumber, null);
 
-      // 3. Check for attachment folders — if the job has any, pause and let
-      // the user pick "all photos" or a specific folder before downloading.
+      // 3. Check for attachment folders. With a real choice to make (more
+      // than one folder), wait for the user to pick one instead of
+      // downloading every folder's photos up front.
       let folders: PhotoFolder[] = [];
       try {
         const foldersRes = await fetch(
@@ -373,36 +363,32 @@ export default function ConditionReportPage({
       }
       if (isStale()) return;
 
-      if (folders.length > 0) {
-        setPendingImport({ jobNumber, loadId });
-        setImportStatus({ phase: "choosing-folder", folders });
+      if (folders.length > 1) {
+        setPhotoFolders(folders);
+        setImportStatus({ phase: "idle" });
         return;
       }
 
-      // No folders — import everything immediately, same as before.
-      await fetchPhotos(jobNumber, loadId, null);
+      // 0 or 1 folder — nothing meaningful to choose, import everything.
+      fetchPhotos(jobNumber, null);
     },
-    [fetchCostCenters, fetchPhotos, isStaleFor],
+    [fetchPhotos, fetchSchedule],
   );
 
-  const confirmPhotoImport = useCallback(
+  const selectFolder = useCallback(
     (folderId: number | null) => {
-      if (!pendingImport) return;
-      const { jobNumber, loadId } = pendingImport;
-      setPendingImport(null);
-      fetchPhotos(jobNumber, loadId, folderId);
+      setSelectedFolderId(folderId);
+      if (loadedJobId) fetchPhotos(loadedJobId, folderId);
     },
-    [pendingImport, fetchPhotos],
+    [loadedJobId, fetchPhotos],
   );
 
-  const confirmScheduleImport = useCallback(
+  const selectCostCenter = useCallback(
     (costCenter: ScheduleCostCenter | null) => {
-      if (!pendingSchedule) return;
-      const { jobNumber, loadId } = pendingSchedule;
-      setPendingSchedule(null);
-      fetchSchedule(jobNumber, loadId, costCenter);
+      setSelectedCostCenter(costCenter);
+      if (loadedJobId) fetchSchedule(loadedJobId, costCenter);
     },
-    [pendingSchedule, fetchSchedule],
+    [loadedJobId, fetchSchedule],
   );
 
   const handleExportPDF = useCallback(async () => {
@@ -471,6 +457,11 @@ export default function ConditionReportPage({
   }, [report]);
 
   const hasReport = report.photos.length > 0 || !!report.job.preparedFor;
+
+  // Photos are deliberately deferred (see handleImport) while the user picks
+  // a folder from more than one option.
+  const awaitingFolderChoice =
+    importStatus.phase === "idle" && photoFolders.length > 0;
 
   const filteredPhotos = report.settings.filterByDate
     ? filterPhotosByDateRange(
@@ -558,8 +549,12 @@ export default function ConditionReportPage({
             setLoadedJobId(jobNumber);
             handleImport(jobNumber);
           }}
-          onConfirmFolder={confirmPhotoImport}
-          onConfirmCostCenter={confirmScheduleImport}
+          photoFolders={photoFolders}
+          selectedFolderId={selectedFolderId}
+          onSelectFolder={selectFolder}
+          scheduleCostCenters={scheduleCostCenters}
+          selectedCostCenter={selectedCostCenter}
+          onSelectCostCenter={selectCostCenter}
           onCoverPhoto={updateCoverPhoto}
         />
 
@@ -613,6 +608,7 @@ export default function ConditionReportPage({
           <PhotoSection
             photos={filteredPhotos}
             importStatus={importStatus}
+            awaitingFolderChoice={awaitingFolderChoice}
             showDates={report.settings.showDates}
             layout={report.settings.photoLayout}
             onPhotoRemove={removePhoto}
