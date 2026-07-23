@@ -192,7 +192,10 @@ async function notifyForCategory(
     fetchCategoryJobIds(config.costCentreIds),
     getIgnoredJobIds(config.id),
   ]);
-  const rawJobs: SimproJobRow[] = await fetchJobDetails(categoryJobIds);
+  const rawJobs: SimproJobRow[] = await fetchJobDetails(
+    categoryJobIds,
+    config.historySince,
+  );
 
   // Deduplicate to most recent job per site
   const latestJobBySite = new Map<number, SimproJobRow>();

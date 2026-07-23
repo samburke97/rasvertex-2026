@@ -28,6 +28,10 @@ export interface CategoryConfig {
    *  any of these is treated as "already quoted" for this category. */
   quoteMatchKeywords: string[];
   emailSubjectNoun: string;
+  /** ISO date (YYYY-MM-DD) — overrides the default 2-year job-history
+   *  lookback. Set on categories with sparse recent history so older
+   *  completed jobs still surface instead of being filtered out. */
+  historySince?: string;
 }
 
 export const RECURRING_CATEGORIES: Record<RecurringCategory, CategoryConfig> =
@@ -59,6 +63,11 @@ export const RECURRING_CATEGORIES: Record<RecurringCategory, CategoryConfig> =
       quoteName: (year) => `Annual Window Cleaning - ${year}`,
       quoteMatchKeywords: ["window cleaning"],
       emailSubjectNoun: "window cleaning",
+      // TEMPORARY (added 2026-07-23, requested by Sam) — this category was
+      // only just started, so the default 2-year lookback misses most of
+      // its real history. Widened to capture everything back to 2020.
+      // Revert to the 2-year default once there's enough recent data.
+      historySince: "2020-01-01",
     },
     "building-cleaning": {
       id: "building-cleaning",
@@ -73,6 +82,8 @@ export const RECURRING_CATEGORIES: Record<RecurringCategory, CategoryConfig> =
         "pressure cleaning",
       ],
       emailSubjectNoun: "building cleaning",
+      // TEMPORARY — see window-cleaning's historySince comment above.
+      historySince: "2020-01-01",
     },
   };
 

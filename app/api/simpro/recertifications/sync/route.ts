@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
     const jobs = await fetchCategoryJobs(
       config.costCentreIds,
       config.quoteMatchKeywords,
+      config.historySince,
     );
 
     await replaceCachedJobs(categoryParam, jobs);

@@ -77,10 +77,17 @@ export interface SimproJobRow {
 
 export async function fetchJobDetails(
   categoryJobIds: Set<number>,
+  /** ISO date (YYYY-MM-DD) — only jobs completed after this date are
+   *  considered. Defaults to 2 years ago; pass a category's `historySince`
+   *  to look back further for categories with sparse recent history. */
+  sinceDate?: string,
 ): Promise<SimproJobRow[]> {
-  const twoYearsAgo = new Date();
-  twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-  const dateFilter = twoYearsAgo.toISOString().split("T")[0];
+  let dateFilter = sinceDate;
+  if (!dateFilter) {
+    const twoYearsAgo = new Date();
+    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+    dateFilter = twoYearsAgo.toISOString().split("T")[0];
+  }
 
   const results: SimproJobRow[] = [];
   let page = 1;
@@ -258,11 +265,12 @@ export function buildJobs(
 export async function fetchCategoryJobs(
   costCentreIds: number[],
   quoteMatchKeywords: string[],
+  historySince?: string,
 ): Promise<RecertificationJob[]> {
   const [jobIds, quotedSiteMap] = await Promise.all([
     fetchCategoryJobIds(costCentreIds),
     fetchQuotedSiteMap(quoteMatchKeywords),
   ]);
-  const rawJobs = await fetchJobDetails(jobIds);
+  const rawJobs = await fetchJobDetails(jobIds, historySince);
   return buildJobs(rawJobs, quotedSiteMap);
 }

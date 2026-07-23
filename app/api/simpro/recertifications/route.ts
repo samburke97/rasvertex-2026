@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
       const jobs = await fetchCategoryJobs(
         config.costCentreIds,
         config.quoteMatchKeywords,
+        config.historySince,
       );
       await replaceCachedJobs(categoryParam, jobs);
       active = jobs.filter((j) => !ignoredIds.has(j.id));
