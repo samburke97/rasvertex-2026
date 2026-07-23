@@ -1,5 +1,5 @@
 "use client";
-// components/recertifications/RecertificationPage.tsx
+// components/recurring-jobs/RecurringJobsPage.tsx
 
 import React, {
   useState,
@@ -9,8 +9,14 @@ import React, {
   useRef,
 } from "react";
 import Image from "next/image";
-import styles from "./RecertificationPage.module.css";
-import type { RecertificationJob } from "@/app/api/simpro/recertifications/route";
+import styles from "./RecurringJobsPage.module.css";
+import type { RecertificationJob } from "@/lib/recertifications/types";
+import {
+  RECURRING_CATEGORIES,
+  RECURRING_CATEGORY_LIST,
+  isRecurringCategory,
+  type RecurringCategory,
+} from "@/lib/recertifications/categories";
 
 function formatDate(iso: string): string {
   if (!iso) return "—";
@@ -55,11 +61,17 @@ function StatusPill({
 
 // ── Parse deep link params synchronously ─────────────────────────────────
 // Called once at module level so the result is available before any render.
-function parseDeepLinkParams(): RecertificationJob | null {
+function parseDeepLinkParams(): {
+  category: RecurringCategory;
+  job: RecertificationJob;
+} | null {
   if (typeof window === "undefined") return null;
 
   const params = new URLSearchParams(window.location.search);
   if (params.get("action") !== "quote") return null;
+
+  const category = params.get("category");
+  if (!isRecurringCategory(category)) return null;
 
   const jobId = Number(params.get("jobId"));
   const customerId = Number(params.get("customerId"));
@@ -81,30 +93,35 @@ function parseDeepLinkParams(): RecertificationJob | null {
   window.history.replaceState({}, "", window.location.pathname);
 
   return {
-    id: jobId,
-    name: "",
-    customer,
-    customerId,
-    site,
-    siteId,
-    completedDate: "",
-    nextDueDate,
-    daysUntilDue: 0,
-    status: "overdue",
-    totalExTax: lastExTax,
-    totalIncTax: Math.round(lastExTax * 1.1 * 100) / 100,
-    quoteYear,
+    category,
+    job: {
+      id: jobId,
+      name: "",
+      customer,
+      customerId,
+      site,
+      siteId,
+      completedDate: "",
+      nextDueDate,
+      daysUntilDue: 0,
+      status: "overdue",
+      totalExTax: lastExTax,
+      totalIncTax: Math.round(lastExTax * 1.1 * 100) / 100,
+      quoteYear,
+    },
   };
 }
 
 // ── Confirm modal ─────────────────────────────────────────────────────────
 function ConfirmModal({
   job,
+  category,
   onConfirm,
   onCancel,
   creating,
 }: {
   job: RecertificationJob;
+  category: RecurringCategory;
   onConfirm: () => void;
   onCancel: () => void;
   creating: boolean;
@@ -120,7 +137,7 @@ function ConfirmModal({
   const rows: { label: string; value: string; highlight?: boolean }[] = [
     {
       label: "Quote name",
-      value: `Annual Anchor Recertification - ${quoteYear}`,
+      value: RECURRING_CATEGORIES[category].quoteName(quoteYear),
       highlight: true,
     },
     { label: "Customer", value: job.customer },
@@ -218,7 +235,16 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
 // ── Main ──────────────────────────────────────────────────────────────────
 type FilterKey = "all" | "overdue" | "due-soon" | "upcoming" | "hidden";
 
-export default function RecertificationPage() {
+export default function RecurringJobsPage() {
+  // Parse deep link params synchronously on first render so the right
+  // category + modal are already selected before load() completes.
+  const deepLink = useRef(
+    typeof window !== "undefined" ? parseDeepLinkParams() : null,
+  );
+
+  const [category, setCategory] = useState<RecurringCategory>(
+    deepLink.current?.category ?? "height-safety",
+  );
   const [jobs, setJobs] = useState<RecertificationJob[]>([]);
   const [ignoredJobs, setIgnoredJobs] = useState<RecertificationJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,41 +257,48 @@ export default function RecertificationPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [ignoringId, setIgnoringId] = useState<number | null>(null);
 
-  // Parse deep link params synchronously on first render so the modal opens
-  // immediately — before load() completes. useRef ensures we only parse once.
-  const deepLinkJob = useRef<RecertificationJob | null>(
-    typeof window !== "undefined" ? parseDeepLinkParams() : null,
-  );
   const [confirmJob, setConfirmJob] = useState<RecertificationJob | null>(
-    deepLinkJob.current,
+    deepLink.current?.job ?? null,
   );
 
+  const config = RECURRING_CATEGORIES[category];
+
   // ── Load from SimPRO ──────────────────────────────────────────────────
-  const load = useCallback(async () => {
+  const load = useCallback(async (cat: RecurringCategory) => {
     setLoading(true);
     setError(null);
+    // Clear the previous category's data immediately — otherwise the
+    // summary cards keep showing the old category's counts (stale, and
+    // easy to misread as belonging to the newly-selected category) for
+    // however long the live SimPRO fetch takes.
+    setJobs([]);
+    setIgnoredJobs([]);
+    setSyncedAt(null);
     try {
-      const res = await fetch("/api/simpro/recertifications");
+      const res = await fetch(
+        `/api/simpro/recertifications?category=${cat}`,
+      );
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setJobs(data.jobs ?? []);
       setIgnoredJobs(data.ignoredJobs ?? []);
       setSyncedAt(data.syncedAt ? new Date(data.syncedAt) : null);
     } catch {
-      setError("Could not load recertification data.");
+      setError("Could not load data.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // ── Sync from SimPRO — triggered manually or by cron ─────────────────
+  // ── Sync from SimPRO — triggered manually ─────────────────────────────
   const sync = useCallback(async () => {
     setSyncing(true);
     setError(null);
     try {
-      const res = await fetch("/api/simpro/recertifications/sync", {
-        method: "POST",
-      });
+      const res = await fetch(
+        `/api/simpro/recertifications/sync?category=${category}`,
+        { method: "POST" },
+      );
       if (!res.ok) throw new Error("Sync failed");
       const data = await res.json();
       setJobs(data.jobs ?? []);
@@ -277,11 +310,13 @@ export default function RecertificationPage() {
     } finally {
       setSyncing(false);
     }
-  }, []);
+  }, [category]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    load(category);
+    setFilter("all");
+    setSearch("");
+  }, [category, load]);
 
   // ── Quote action ──────────────────────────────────────────────────────
   const handleQuoteAction = (job: RecertificationJob) => {
@@ -296,6 +331,7 @@ export default function RecertificationPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          category,
           customerId: confirmJob.customerId,
           siteId: confirmJob.siteId,
           siteName: confirmJob.site,
@@ -341,7 +377,7 @@ export default function RecertificationPage() {
       await fetch("/api/simpro/recertifications/ignore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: job.id }),
+        body: JSON.stringify({ jobId: job.id, category }),
       });
       setJobs((prev) => prev.filter((j) => j.id !== job.id));
       setIgnoredJobs((prev) => [...prev, job]);
@@ -359,7 +395,7 @@ export default function RecertificationPage() {
       await fetch("/api/simpro/recertifications/ignore", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: job.id }),
+        body: JSON.stringify({ jobId: job.id, category }),
       });
       setIgnoredJobs((prev) => prev.filter((j) => j.id !== job.id));
       setJobs((prev) =>
@@ -433,8 +469,23 @@ export default function RecertificationPage() {
 
   return (
     <div className={styles.page}>
+      {/* ── Category selector ── */}
+      <div className={styles.categoryTabs}>
+        {RECURRING_CATEGORY_LIST.map((c) => (
+          <button
+            key={c.id}
+            className={`${styles.categoryTab} ${
+              category === c.id ? styles.categoryTabActive : ""
+            }`}
+            onClick={() => setCategory(c.id)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
       <div className={styles.header}>
-        <h1 className={styles.title}>Anchor Recertifications</h1>
+        <h1 className={styles.title}>{config.pageHeading}</h1>
         <div className={styles.headerRight}>
           {syncedAt && (
             <span className={styles.syncedAt}>Synced {timeAgo(syncedAt)}</span>
@@ -505,7 +556,7 @@ export default function RecertificationPage() {
       ) : error ? (
         <div className={styles.emptyState}>
           {error}
-          <button className={styles.retryBtn} onClick={load}>
+          <button className={styles.retryBtn} onClick={() => load(category)}>
             Retry
           </button>
         </div>
@@ -617,6 +668,7 @@ export default function RecertificationPage() {
       {confirmJob && (
         <ConfirmModal
           job={confirmJob}
+          category={category}
           onConfirm={handleCreateQuote}
           onCancel={() => setConfirmJob(null)}
           creating={creating}

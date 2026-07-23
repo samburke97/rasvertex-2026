@@ -1,16 +1,14 @@
 "use client";
 // components/reports/anchor-inspection/AnchorOptionsPanel.tsx
 
-import React, { useRef } from "react";
+import React from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import JobImportInput from "../shared/JobImportInput";
-import type { AnchorReportJob, Zone } from "@/lib/reports/anchor.types";
+import type { Zone } from "@/lib/reports/anchor.types";
 import type { AnchorImportStatus } from "./AnchorInspectionPage";
 
 interface AnchorOptionsPanelProps {
-  job: AnchorReportJob;
   zones: Zone[];
-  onUpdateJob: (field: keyof AnchorReportJob, value: string | null) => void;
   onAddZone: () => void;
   onOpenZone: (zoneId: string) => void;
   onDeleteZone: (zoneId: string) => void;
@@ -21,9 +19,7 @@ interface AnchorOptionsPanelProps {
 }
 
 export default function AnchorOptionsPanel({
-  job,
   zones,
-  onUpdateJob,
   onAddZone,
   onOpenZone,
   onDeleteZone,
@@ -32,20 +28,6 @@ export default function AnchorOptionsPanel({
   importStatus,
   onImport,
 }: AnchorOptionsPanelProps) {
-  const coverInputRef = useRef<HTMLInputElement>(null);
-
-  const handleCoverPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result;
-      if (typeof result === "string") onUpdateJob("coverPhoto", result);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
   return (
     <aside className={styles.panel}>
       {/* ── Job Number ───────────────────────────────────────────────────── */}
@@ -55,53 +37,6 @@ export default function AnchorOptionsPanel({
           onImport={onImport}
           importStatus={importStatus}
           placeholder="e.g. 10737"
-        />
-      </div>
-
-      {/* ── Cover Photo ──────────────────────────────────────────────────── */}
-      <div className={styles.group}>
-        <div className={styles.groupLabel}>Cover Photo</div>
-        {job.coverPhoto ? (
-          <div className={styles.coverPhotoPreview}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={job.coverPhoto}
-              alt="Cover photo preview"
-              className={styles.coverPhotoThumb}
-            />
-            <div className={styles.coverPhotoActions}>
-              <button
-                className={styles.coverPhotoChange}
-                onClick={() => coverInputRef.current?.click()}
-              >
-                Change
-              </button>
-              <button
-                className={styles.coverPhotoRemove}
-                onClick={() => onUpdateJob("coverPhoto", null)}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            className={styles.coverPhotoUpload}
-            onClick={() => coverInputRef.current?.click()}
-          >
-            <span className={styles.coverPhotoUploadIcon}>↑</span>
-            <span className={styles.coverPhotoUploadText}>Upload photo</span>
-            <span className={styles.coverPhotoUploadSub}>
-              JPG, PNG — shown behind cover design
-            </span>
-          </button>
-        )}
-        <input
-          ref={coverInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className={styles.hiddenInput}
-          onChange={handleCoverPhotoChange}
         />
       </div>
 

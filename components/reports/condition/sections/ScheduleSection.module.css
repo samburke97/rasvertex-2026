@@ -277,7 +277,12 @@
 }
 
 .sectionCellInput {
-  composes: cellInput;
+  border: 1px solid #6b7280;
+  border-radius: 3px;
+  padding: 0.1rem 0.25rem;
+  width: 100%;
+  outline: none;
+  background: #fff;
   font-family: "Bebas Neue", Arial, sans-serif;
   font-size: 1.15rem;
   font-weight: 400;
@@ -285,6 +290,10 @@
   color: #0d1c45;
   text-transform: uppercase;
   line-height: 1;
+}
+
+.sectionCellInput:focus {
+  border-color: #0d1c45;
 }
 
 .sectionRemoveBtn {

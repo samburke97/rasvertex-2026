@@ -1,19 +1,25 @@
 // app/api/recertifications/notify-due-soon/route.ts
 //
-// Called daily by Vercel cron at 0 22 * * * (8am AEST).
+// Called daily by Vercel cron at 0 22 * * * (8am AEST) — see caveat below.
 //
-// Flow:
-//   1. Fetch all Height Safety jobs live from SimPRO
-//   2. For each job in the 0–28 day window, check SimPRO for an existing quote
+// Loops every recurring-job category (height-safety, window-cleaning,
+// building-cleaning, ...) and for each:
+//   1. Fetch that category's jobs live from SimPRO
+//   2. For each job in the 0–28 day window, check SimPRO for an existing
+//      matching quote (using the category's quote-match keywords)
 //   3. If no quote exists, apply cadence rules:
 //      - daysUntilDue > 7  → notify if last notified > 3 days ago (or never)
 //      - daysUntilDue <= 7 → notify if last notified > 1 day ago (or never)
 //   4. Send one email per qualifying job with a deep link that opens the
-//      create-quote modal pre-filled for that site
-//   5. Update last_notified_at in Neon
+//      create-quote modal pre-filled for that site + category
+//   5. Update last_notified_at in Neon (scoped by category)
 //
-// Natural stop: once a quote is created in SimPRO (by anyone),
-// hasExistingQuote returns true and the job is skipped automatically.
+// Natural stop: once a matching quote is created in SimPRO (by anyone),
+// the job is skipped automatically on the next run.
+//
+// NOTE: as of 2026-07-23 there is no cron entry in vercel.json wiring this
+// route to an actual schedule — confirm how/whether this currently fires
+// before assuming it runs automatically.
 
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
@@ -23,11 +29,18 @@ import {
   upsertLastNotified,
   shouldNotify,
 } from "@/lib/recertifications/store";
+import {
+  fetchCategoryJobIds,
+  fetchJobDetails,
+  siteHasMatchingQuote,
+  hasSimproConfig,
+  type SimproJobRow,
+} from "@/lib/recertifications/simpro";
+import {
+  RECURRING_CATEGORY_LIST,
+  type CategoryConfig,
+} from "@/lib/recertifications/categories";
 
-const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
-const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
-const HEIGHT_SAFETY_COST_CENTRE_ID = 11;
-const PAGE_SIZE = 250;
 const APP_URL = "https://rasvertex-2026-lt5c.vercel.app";
 const TO = ["admin@rasvertex.com.au", "sam@rasvertex.com.au"];
 
@@ -47,109 +60,6 @@ function getResend(): Resend {
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new Error("RESEND_API_KEY is not set");
   return new Resend(key);
-}
-
-async function simproGet<T>(url: string): Promise<T> {
-  const res = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    next: { revalidate: 0 },
-  });
-  if (!res.ok) throw new Error(`SimPRO ${res.status}: ${res.statusText}`);
-  return res.json();
-}
-
-// ── Fetch Height Safety job IDs ───────────────────────────────────────────
-
-async function fetchHeightSafetyJobIds(): Promise<Set<number>> {
-  const jobIds = new Set<number>();
-  let page = 1;
-  while (true) {
-    const url =
-      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobCostCenters/` +
-      `?CostCenter=${HEIGHT_SAFETY_COST_CENTRE_ID}` +
-      `&pageSize=${PAGE_SIZE}&page=${page}&columns=ID,Job`;
-    const batch = await simproGet<{ ID: number; Job: { ID: number } }[]>(url);
-    for (const item of batch) {
-      if (item.Job?.ID) jobIds.add(item.Job.ID);
-    }
-    if (batch.length < PAGE_SIZE) break;
-    page++;
-  }
-  return jobIds;
-}
-
-// ── Fetch job details ─────────────────────────────────────────────────────
-
-async function fetchJobDetails(
-  heightSafetyJobIds: Set<number>,
-): Promise<any[]> {
-  const twoYearsAgo = new Date();
-  twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-  const dateFilter = twoYearsAgo.toISOString().split("T")[0];
-
-  const results: any[] = [];
-  let page = 1;
-
-  while (true) {
-    const url =
-      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/jobs/` +
-      `?pageSize=${PAGE_SIZE}&page=${page}` +
-      `&columns=ID,Name,CompletedDate,Customer,Site,Tags,Total` +
-      `&CompletedDate=gt(${dateFilter})`;
-
-    const batch = await simproGet<any[]>(url);
-
-    for (const job of batch) {
-      if (!heightSafetyJobIds.has(job.ID)) continue;
-      if (!job.CompletedDate) continue;
-      const tags: string[] = (job.Tags || []).map((t: any) =>
-        typeof t === "string" ? t : t?.Name || "",
-      );
-      if (tags.some((t) => t.toUpperCase() === "BLACKLIST")) continue;
-      results.push(job);
-    }
-
-    if (batch.length < PAGE_SIZE) break;
-    page++;
-  }
-
-  return results;
-}
-
-// ── Check for existing quote in SimPRO ────────────────────────────────────
-
-function isRecertificationQuote(name: string): boolean {
-  const n = name
-    .toLowerCase()
-    .replace(/\s*&\s*/g, " and ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return (
-    n.includes("anchor recertification") ||
-    n.includes("annual anchor recertification") ||
-    n.includes("annual anchor test") ||
-    n.includes("anchor test and recertification") ||
-    n.includes("anchor rest and recertification") ||
-    n.includes("anchor test") ||
-    n.includes("recertification")
-  );
-}
-
-async function hasExistingQuote(siteId: number): Promise<boolean> {
-  try {
-    const url =
-      `${SIMPRO_BASE_URL}/api/v1.0/companies/0/quotes/` +
-      `?pageSize=50&page=1` +
-      `&columns=ID,Name,DateIssued,Site` +
-      `&Site=${siteId}`;
-    const quotes = await simproGet<any[]>(url);
-    return quotes.some((q) => isRecertificationQuote(q.Name || ""));
-  } catch {
-    return false;
-  }
 }
 
 // ── Email template ────────────────────────────────────────────────────────
@@ -190,9 +100,10 @@ function urgencyLabel(days: number): {
   };
 }
 
-function buildDeepLink(job: JobSummary): string {
+function buildDeepLink(job: JobSummary, config: CategoryConfig): string {
   const params = new URLSearchParams({
     action: "quote",
+    category: config.id,
     jobId: String(job.id),
     customerId: String(job.customerId),
     siteId: String(job.siteId),
@@ -201,25 +112,25 @@ function buildDeepLink(job: JobSummary): string {
     nextDueDate: job.nextDueDate,
     lastExTax: String(job.totalExTax),
   });
-  return `${APP_URL}/recertifications?${params.toString()}`;
+  return `${APP_URL}/recurring-jobs?${params.toString()}`;
 }
 
-function buildJobEmail(job: JobSummary): string {
+function buildJobEmail(job: JobSummary, config: CategoryConfig): string {
   const urgency = urgencyLabel(job.daysUntilDue);
-  const createUrl = buildDeepLink(job);
+  const createUrl = buildDeepLink(job, config);
 
   return `
     <div style="background:#f4f4f0;padding:2rem;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
       <div style="max-width:520px;margin:0 auto;">
 
         <div style="background:#0f2d4a;border-radius:10px 10px 0 0;padding:24px 32px;">
-          <p style="margin:0 0 2px;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">RAS Vertex · Anchor Recertifications</p>
+          <p style="margin:0 0 2px;color:rgba(255,255,255,0.5);font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">RAS Vertex · ${config.pageHeading}</p>
           <p style="margin:0;color:#fff;font-size:18px;font-weight:500;">Quote needed</p>
         </div>
 
         <div style="background:#fff;padding:28px 32px 8px;border-left:1px solid #ebebeb;border-right:1px solid #ebebeb;">
           <p style="margin:0 0 20px;font-size:15px;color:#444;line-height:1.6;">
-            Hi Caro, the following site is due for recertification and needs a quote created.
+            The following site is due for ${config.emailSubjectNoun} and needs a quote created.
           </p>
 
           <div style="background:#f9f9f7;border-radius:8px;padding:20px 24px;margin-bottom:8px;">
@@ -259,144 +170,161 @@ function buildJobEmail(job: JobSummary): string {
     </div>`;
 }
 
-function buildSubject(job: JobSummary): string {
+function buildSubject(job: JobSummary, config: CategoryConfig): string {
   if (job.daysUntilDue <= 0)
-    return `⚠️ Overdue — ${job.customer} anchor recertification`;
+    return `⚠️ Overdue — ${job.customer} ${config.emailSubjectNoun}`;
   if (job.daysUntilDue <= 7)
-    return `🔴 ${job.daysUntilDue}d — ${job.customer} anchor recertification`;
-  return `🟡 ${job.daysUntilDue}d — ${job.customer} anchor recertification`;
+    return `🔴 ${job.daysUntilDue}d — ${job.customer} ${config.emailSubjectNoun}`;
+  return `🟡 ${job.daysUntilDue}d — ${job.customer} ${config.emailSubjectNoun}`;
+}
+
+// ── Per-category run ───────────────────────────────────────────────────────
+
+async function notifyForCategory(
+  config: CategoryConfig,
+  resend: Resend,
+): Promise<{ sent: number; skippedCadence: number; skippedQuoted: number; total: number }> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const currentYear = today.getFullYear();
+
+  const [categoryJobIds, ignoredIds] = await Promise.all([
+    fetchCategoryJobIds(config.costCentreIds),
+    getIgnoredJobIds(config.id),
+  ]);
+  const rawJobs: SimproJobRow[] = await fetchJobDetails(categoryJobIds);
+
+  // Deduplicate to most recent job per site
+  const latestJobBySite = new Map<number, SimproJobRow>();
+  for (const j of rawJobs) {
+    const siteId = j.Site?.ID;
+    if (!siteId || !j.CompletedDate) continue;
+    const existing = latestJobBySite.get(siteId);
+    if (
+      !existing ||
+      new Date(j.CompletedDate) > new Date(existing.CompletedDate!)
+    ) {
+      latestJobBySite.set(siteId, j);
+    }
+  }
+
+  // Build candidate list — 0–28 day window, not ignored
+  const candidates: JobSummary[] = [];
+  for (const [siteId, j] of latestJobBySite) {
+    if (ignoredIds.has(j.ID)) continue;
+
+    const completed = new Date(j.CompletedDate!);
+    const nextDue = new Date(completed);
+    nextDue.setFullYear(nextDue.getFullYear() + 1);
+
+    const diffMs = nextDue.getTime() - today.getTime();
+    const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    if (daysUntilDue > 28) continue;
+
+    const dueYear = nextDue.getFullYear();
+    const quoteYear = Math.max(dueYear, currentYear);
+
+    candidates.push({
+      id: j.ID,
+      customerId: j.Customer?.ID ?? 0,
+      customer: j.Customer?.CompanyName || "Unknown",
+      site: j.Site?.Name || "Unknown",
+      siteId,
+      nextDueDate: nextDue.toISOString().split("T")[0],
+      daysUntilDue,
+      totalExTax: j.Total?.ExTax ?? 0,
+      quoteYear,
+    });
+  }
+
+  if (!candidates.length) {
+    console.log(`[NotifyDueSoon] ${config.id}: no jobs in 0–28 day window`);
+    return { sent: 0, skippedCadence: 0, skippedQuoted: 0, total: 0 };
+  }
+
+  const notifiedMap = await getNotifiedMap(
+    config.id,
+    candidates.map((c) => ({ jobId: c.id, year: c.quoteYear })),
+  );
+
+  let sent = 0;
+  let skippedCadence = 0;
+  let skippedQuoted = 0;
+
+  for (const job of candidates) {
+    const lastNotified = notifiedMap.get(`${job.id}:${job.quoteYear}`) ?? null;
+
+    if (!shouldNotify(job.daysUntilDue, lastNotified)) {
+      skippedCadence++;
+      continue;
+    }
+
+    const quoted = await siteHasMatchingQuote(
+      job.siteId,
+      config.quoteMatchKeywords,
+    );
+    if (quoted) {
+      skippedQuoted++;
+      continue;
+    }
+
+    try {
+      await resend.emails.send({
+        from: "RAS Admin <team@rasvertex.com.au>",
+        to: TO,
+        subject: buildSubject(job, config),
+        html: buildJobEmail(job, config),
+      });
+      await upsertLastNotified(job.id, job.quoteYear, config.id);
+      sent++;
+      console.log(
+        `[NotifyDueSoon] ✅ Sent (${config.id}) — ${job.customer} / ${job.site} (${job.daysUntilDue}d)`,
+      );
+    } catch (emailErr) {
+      console.error(
+        `[NotifyDueSoon] Email failed (${config.id}) for job ${job.id}:`,
+        emailErr,
+      );
+    }
+  }
+
+  return { sent, skippedCadence, skippedQuoted, total: candidates.length };
 }
 
 // ── POST handler (called by Vercel cron) ──────────────────────────────────
 
 export async function POST() {
-  if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN) {
+  if (!hasSimproConfig()) {
     return NextResponse.json(
       { error: "SimPRO configuration missing" },
       { status: 500 },
     );
   }
 
+  const resend = getResend();
+  const results: Record<string, Awaited<ReturnType<typeof notifyForCategory>>> = {};
+
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const currentYear = today.getFullYear();
-
-    // 1. Fetch all jobs live
-    const [heightSafetyJobIds, ignoredIds] = await Promise.all([
-      fetchHeightSafetyJobIds(),
-      getIgnoredJobIds(),
-    ]);
-    const rawJobs = await fetchJobDetails(heightSafetyJobIds);
-
-    // 2. Deduplicate to most recent job per site
-    const latestJobBySite = new Map<number, any>();
-    for (const j of rawJobs) {
-      const siteId: number = j.Site?.ID;
-      if (!siteId || !j.CompletedDate) continue;
-      const existing = latestJobBySite.get(siteId);
-      if (
-        !existing ||
-        new Date(j.CompletedDate) > new Date(existing.CompletedDate)
-      ) {
-        latestJobBySite.set(siteId, j);
-      }
+    for (const config of RECURRING_CATEGORY_LIST) {
+      results[config.id] = await notifyForCategory(config, resend);
     }
 
-    // 3. Build candidate list — 0–28 day window, not ignored
-    const candidates: JobSummary[] = [];
-    for (const [siteId, j] of latestJobBySite) {
-      if (ignoredIds.has(j.ID)) continue;
-
-      const completed = new Date(j.CompletedDate);
-      const nextDue = new Date(completed);
-      nextDue.setFullYear(nextDue.getFullYear() + 1);
-
-      const diffMs = nextDue.getTime() - today.getTime();
-      const daysUntilDue = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-      if (daysUntilDue > 28) continue;
-
-      const dueYear = nextDue.getFullYear();
-      const quoteYear = Math.max(dueYear, currentYear);
-
-      candidates.push({
-        id: j.ID,
-        customerId: j.Customer?.ID ?? 0,
-        customer: j.Customer?.CompanyName || "Unknown",
-        site: j.Site?.Name || "Unknown",
-        siteId,
-        nextDueDate: nextDue.toISOString().split("T")[0],
-        daysUntilDue,
-        totalExTax: j.Total?.ExTax ?? 0,
-        quoteYear,
-      });
-    }
-
-    if (!candidates.length) {
-      console.log("[NotifyDueSoon] No jobs in 0–28 day window — done");
-      return NextResponse.json({ sent: 0, skipped: "no candidates" });
-    }
-
-    // 4. Load notification history for all candidates in one query
-    const notifiedMap = await getNotifiedMap(
-      candidates.map((c) => ({ jobId: c.id, year: c.quoteYear })),
+    const totals = Object.values(results).reduce(
+      (acc, r) => ({
+        sent: acc.sent + r.sent,
+        skippedCadence: acc.skippedCadence + r.skippedCadence,
+        skippedQuoted: acc.skippedQuoted + r.skippedQuoted,
+        total: acc.total + r.total,
+      }),
+      { sent: 0, skippedCadence: 0, skippedQuoted: 0, total: 0 },
     );
-
-    // 5. For each candidate: check cadence, then check SimPRO for existing quote
-    const resend = getResend();
-    let sent = 0;
-    let skippedCadence = 0;
-    let skippedQuoted = 0;
-
-    for (const job of candidates) {
-      const lastNotified =
-        notifiedMap.get(`${job.id}:${job.quoteYear}`) ?? null;
-
-      // Cadence check first — cheap, no API call
-      if (!shouldNotify(job.daysUntilDue, lastNotified)) {
-        skippedCadence++;
-        continue;
-      }
-
-      // Quote check — live SimPRO call, any year
-      const quoted = await hasExistingQuote(job.siteId);
-      if (quoted) {
-        skippedQuoted++;
-        continue;
-      }
-
-      // Send individual email
-      try {
-        await resend.emails.send({
-          from: "RAS Admin <team@rasvertex.com.au>",
-          to: TO,
-          subject: buildSubject(job),
-          html: buildJobEmail(job),
-        });
-        await upsertLastNotified(job.id, job.quoteYear);
-        sent++;
-        console.log(
-          `[NotifyDueSoon] ✅ Sent — ${job.customer} / ${job.site} (${job.daysUntilDue}d)`,
-        );
-      } catch (emailErr) {
-        console.error(
-          `[NotifyDueSoon] Email failed for job ${job.id}:`,
-          emailErr,
-        );
-      }
-    }
 
     console.log(
-      `[NotifyDueSoon] Done — sent: ${sent}, skipped cadence: ${skippedCadence}, skipped quoted: ${skippedQuoted}`,
+      `[NotifyDueSoon] Done — sent: ${totals.sent}, skipped cadence: ${totals.skippedCadence}, skipped quoted: ${totals.skippedQuoted}`,
     );
 
-    return NextResponse.json({
-      sent,
-      skippedCadence,
-      skippedQuoted,
-      total: candidates.length,
-    });
+    return NextResponse.json({ ...totals, byCategory: results });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     console.error("[NotifyDueSoon] Error:", message);

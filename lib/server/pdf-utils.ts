@@ -8,6 +8,7 @@ export interface ReportAssets {
   linkWhite: string;
   linkBlue: string;
   signature: string;
+  heightSafety: string;
   associations: {
     communitySelect: string;
     dulux: string;
@@ -46,6 +47,7 @@ export function loadReportAssets(): ReportAssets {
     linkWhite: readPublicAsBase64("reports/link_white.png"),
     linkBlue: readPublicAsBase64("reports/link_blue.png"),
     signature: readPublicAsBase64("reports/signature.png"),
+    heightSafety: readPublicAsBase64("images/height-safety.png"),
     associations: {
       communitySelect: readPublicAsBase64(
         "reports/associations/communityselect.png",

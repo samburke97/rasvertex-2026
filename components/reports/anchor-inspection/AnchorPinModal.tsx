@@ -169,9 +169,7 @@ export default function AnchorPinModal({
           {!isNew && (
             <button
               className={styles.deleteBtn}
-              onClick={() => {
-                if (confirm("Remove this anchor?")) onDelete(form.id);
-              }}
+              onClick={() => onDelete(form.id)}
             >
               Remove
             </button>

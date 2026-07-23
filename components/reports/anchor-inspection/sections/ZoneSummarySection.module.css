@@ -237,6 +237,11 @@
   font-size: 0.7rem;
 }
 
+.emptyDash {
+  display: block;
+  text-align: center;
+}
+
 .tdMono {
   padding: 0.35rem 0.5rem;
   border: 1px solid #e5e7eb;

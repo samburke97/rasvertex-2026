@@ -157,10 +157,13 @@ const PRINT_STYLES = `
   .cover-lbl {
     font-family: 'Bebas Neue', Arial, sans-serif;
     font-size: 1.05rem;
+    font-weight: 400;
     letter-spacing: 0.08em;
+    text-transform: uppercase;
     line-height: 1;
     color: ${BRAND_NAVY};
-    padding: 0.4rem 1.25rem 0.4rem 0;
+    padding: 0.55rem 1.25rem 0.55rem 0;
+    border-bottom: 1px solid #f0f0f0;
     white-space: nowrap;
     vertical-align: middle;
   }
@@ -168,11 +171,15 @@ const PRINT_STYLES = `
     font-family: 'Inter', Arial, sans-serif;
     font-size: 0.82rem;
     font-weight: 300;
-    color: #333;
-    padding: 0.4rem 0;
+    line-height: 1.5;
+    color: #374151;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid #f0f0f0;
     vertical-align: middle;
     white-space: nowrap;
   }
+  .cover-meta tr:last-child .cover-lbl,
+  .cover-meta tr:last-child .cover-val { border-bottom: none; }
 
   /* ─────────────────────────────────────────────────────────────
      ZONE SUMMARY PAGE
@@ -219,7 +226,6 @@ const PRINT_STYLES = `
     font-weight: 700;
     color: #fff;
     white-space: nowrap;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
     letter-spacing: 0.02em;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -244,11 +250,11 @@ const PRINT_STYLES = `
     vertical-align: middle;
     font-size: 0.72rem;
   }
-  /* ── Zone legend ── */
+  /* ── Zone legend — compact wrapped chips, matches the live editor ── */
   .zone-legend {
     display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.875rem;
     padding: 0.75rem 1rem;
     background: #f8fafc;
     border: 1px solid #e5e7eb;
@@ -257,7 +263,7 @@ const PRINT_STYLES = `
   .zone-legend-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.375rem;
   }
   .zone-legend-dot {
     width: 10px;
@@ -271,15 +277,18 @@ const PRINT_STYLES = `
   .zone-legend-label {
     font-family: 'Inter', Arial, sans-serif;
     font-size: 0.78rem;
-    font-weight: 400;
+    font-weight: 500;
     color: #374151;
-    flex: 1;
+    white-space: nowrap;
   }
   .zone-legend-count {
     font-family: 'Inter', Arial, sans-serif;
-    font-size: 0.78rem;
-    font-weight: 400;
-    color: #6b7280;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #7e807f;
+    background: #fafafa;
+    border-radius: 20px;
+    padding: 0.05rem 0.4rem;
   }
 
   /* ── Zone stats banner ── */
@@ -450,6 +459,24 @@ const PRINT_STYLES = `
   .at-pass { color: #065f46 !important; font-weight: 400 !important; }
   .at-fail { color: #900c40 !important; font-weight: 400 !important; }
 
+  .comments-block { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+  .comments-lbl {
+    font-family: 'Bebas Neue', Arial, sans-serif;
+    font-size: 1.05rem;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: ${BRAND_NAVY};
+    line-height: 1;
+  }
+  .comments-box {
+    font-family: 'Inter', Arial, sans-serif;
+    font-size: 0.82rem;
+    font-weight: 300;
+    color: #374151;
+    line-height: 1.5;
+  }
+
   /* ─────────────────────────────────────────────────────────────
      SUMMARY / SIGN-OFF PAGE
   ───────────────────────────────────────────────────────────── */
@@ -501,9 +528,7 @@ function buildCoverPage(
   job: AnchorReportData["job"],
   assets: ReportAssets,
 ): string {
-  const coverPhotoLayer = job.coverPhoto
-    ? `<div class="cover-hero-photo" style="background-image:url('${esc(job.coverPhoto)}')"></div>`
-    : "";
+  const coverPhotoLayer = `<div class="cover-hero-photo" style="background-image:url('${esc(assets.heightSafety)}')"></div>`;
 
   const metaRows = [
     { label: "Prepared For", value: job.preparedFor },
@@ -543,8 +568,68 @@ function buildCoverPage(
 // just a repeated header + table). Splitting explicitly here — rather than
 // letting one unbounded div overflow and get auto-sliced by the printer —
 // is what keeps rows from being cut in half across a page boundary.
-const ZONE_ROWS_FIRST_PAGE = 8;
+//
+// The map and stats banner are fixed-height, but the legend is not — its
+// chips wrap (same compact layout as the live editor), so it grows by one
+// *row* per ~3 distinct anchor types present, not one row per type. A zone
+// with many types (e.g. 7-9) still wraps to 2-3 legend rows and eats more
+// vertical space than one with 2-3 types on a single row. A flat row budget
+// sized for a short legend silently overflows the page for a tall one,
+// pushing the footer onto its own orphaned page — so the first-page row
+// count is computed per zone from how much of the page the map/legend/
+// stats banner actually consume, rather than assumed constant. Pixel
+// estimates below come from the print CSS (map max-height, legend/stats
+// padding + row heights, A4 content height minus top bar/footer) with a
+// small safety margin.
 const ZONE_ROWS_CONTINUATION = 28;
+
+const ZONE_BODY_AVAILABLE_PX = 820; // A4 content height minus top-bar, footer, body padding
+const ZONE_BODY_GAP_PX = 24; // 1.5rem gap between each stacked block
+const ZONE_MAP_HEIGHT_PX = 340;
+const ZONE_STATS_HEIGHT_PX = 72;
+const ZONE_LEGEND_BASE_PX = 24; // vertical padding only, no rows
+const ZONE_LEGEND_ROW_PX = 22; // per wrapped legend row, gap included
+const ZONE_LEGEND_TYPES_PER_ROW = 3; // conservative — "Fall Arrest Anchor"-length chips at page width
+const ZONE_REGISTER_LABEL_PX = 28;
+const ZONE_TABLE_HEADER_PX = 26;
+const ZONE_TABLE_ROW_PX = 26;
+const ZONE_ROWS_FIRST_PAGE_MAX = 12;
+
+function computeFirstPageRowBudget(
+  hasMap: boolean,
+  legendTypeCount: number,
+  hasStats: boolean,
+): number {
+  const mapPx = hasMap ? ZONE_MAP_HEIGHT_PX : 0;
+  const statsPx = hasStats ? ZONE_STATS_HEIGHT_PX : 0;
+  const legendRows =
+    legendTypeCount > 0
+      ? Math.ceil(legendTypeCount / ZONE_LEGEND_TYPES_PER_ROW)
+      : 0;
+  const legendPx =
+    legendRows > 0 ? ZONE_LEGEND_BASE_PX + legendRows * ZONE_LEGEND_ROW_PX : 0;
+  // Blocks stacked in .zone-body: map?, legend?, stats?, register label, table.
+  const blockCount =
+    [mapPx, legendPx, statsPx].filter((h) => h > 0).length + 2;
+  const gapsPx = (blockCount - 1) * ZONE_BODY_GAP_PX;
+
+  const availableForRows =
+    ZONE_BODY_AVAILABLE_PX -
+    mapPx -
+    legendPx -
+    statsPx -
+    gapsPx -
+    ZONE_REGISTER_LABEL_PX -
+    ZONE_TABLE_HEADER_PX;
+
+  return Math.max(
+    1,
+    Math.min(
+      ZONE_ROWS_FIRST_PAGE_MAX,
+      Math.floor(availableForRows / ZONE_TABLE_ROW_PX),
+    ),
+  );
+}
 
 function buildAssetTableHead(): string {
   return `<thead><tr>
@@ -578,7 +663,11 @@ function buildAssetTableRows(
         </div>
       </td>
       <td class="zone-td">${esc(ANCHOR_TYPE_LABELS[a.type])}</td>
-      <td class="zone-td">${esc(a.commissionDate || "—")}</td>
+      <td class="zone-td">${
+        a.commissionDate
+          ? esc(a.commissionDate)
+          : `<span style="display:block;text-align:center;">-</span>`
+      }</td>
       <td class="zone-td">${esc(a.inspectionDate || "")}</td>
       <td class="zone-td">${esc(a.nextInspection || "")}</td>
       <td class="zone-td">${passFail}</td>
@@ -607,24 +696,15 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
     : "";
 
   // Type legend — deduplicated, one row per type present
-  const typesSeen = new Map<
-    string,
-    { colour: string; label: string; total: number; passed: number }
-  >();
+  const typesSeen = new Map<string, { colour: string; label: string; total: number }>();
   for (const a of zone.anchors) {
     const colour = ANCHOR_TYPE_COLOURS[a.type] ?? "#10b981";
     const label = ANCHOR_TYPE_LABELS[a.type] ?? a.type;
     const existing = typesSeen.get(a.type);
     if (existing) {
       existing.total++;
-      if (a.result === "PASSED") existing.passed++;
     } else {
-      typesSeen.set(a.type, {
-        colour,
-        label,
-        total: 1,
-        passed: a.result === "PASSED" ? 1 : 0,
-      });
+      typesSeen.set(a.type, { colour, label, total: 1 });
     }
   }
   const legendHTML =
@@ -636,7 +716,7 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
           <div class="zone-legend-item">
             <span class="zone-legend-dot" style="background:${t.colour};"></span>
             <span class="zone-legend-label">${esc(t.label)}</span>
-            <span class="zone-legend-count">${t.passed}/${t.total}</span>
+            <span class="zone-legend-count">${t.total}</span>
           </div>`,
           )
           .join("")}
@@ -661,8 +741,13 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
   // Asset register — first page gets whatever fits alongside the map/
   // legend/stats; any remainder flows onto continuation pages that repeat
   // just the table header, so a long register never splits a row in half.
-  const firstPageAnchors = zone.anchors.slice(0, ZONE_ROWS_FIRST_PAGE);
-  const remainingAnchors = zone.anchors.slice(ZONE_ROWS_FIRST_PAGE);
+  const firstPageRowBudget = computeFirstPageRowBudget(
+    !!zone.mapImageUrl,
+    typesSeen.size,
+    total > 0,
+  );
+  const firstPageAnchors = zone.anchors.slice(0, firstPageRowBudget);
+  const remainingAnchors = zone.anchors.slice(firstPageRowBudget);
 
   const firstPageTable =
     total > 0
@@ -701,7 +786,7 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
     <div class="zone-register-label">Asset Register (continued)</div>
     <table class="zone-table">
       ${buildAssetTableHead()}
-      <tbody>${buildAssetTableRows(chunk, ZONE_ROWS_FIRST_PAGE + i)}</tbody>
+      <tbody>${buildAssetTableRows(chunk, firstPageRowBudget + i)}</tbody>
     </table>
   </div>
   <div class="footer">${assocLogosHTML(assets)}</div>
@@ -762,6 +847,10 @@ function buildCertificationPage(
         </table>`
       : "";
 
+  const commentsHTML = job.certComments?.trim()
+    ? esc(job.certComments).replace(/\n/g, "<br />")
+    : "";
+
   return `
 <div class="page">
   <div class="top-bar">
@@ -795,6 +884,15 @@ function buildCertificationPage(
     </div>
 
     ${anchorTable}
+
+    ${
+      commentsHTML
+        ? `<div class="comments-block">
+             <div class="comments-lbl">Comments</div>
+             <div class="comments-box">${commentsHTML}</div>
+           </div>`
+        : ""
+    }
   </div>
   <div class="footer">${assocLogosHTML(assets)}</div>
 </div>`;

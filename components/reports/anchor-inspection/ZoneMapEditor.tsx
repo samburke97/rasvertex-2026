@@ -28,8 +28,13 @@ interface ZoneMapEditorProps {
   onDelete: () => void;
 }
 
-const DEFAULT_ZOOM = 19;
-const PREVIEW_SIZE = "640x400";
+// Close, near-overhead framing by default — a fresh zone should already be
+// tight on the building in question, ready to capture with minimal manual
+// adjustment, rather than opening zoomed out to the whole street.
+const DEFAULT_ZOOM = 20;
+const PREVIEW_WIDTH = 640;
+const PREVIEW_HEIGHT = 400;
+const PREVIEW_SIZE = `${PREVIEW_WIDTH}x${PREVIEW_HEIGHT}`;
 const DEFAULT_TYPE: AnchorType = "fall-arrest-anchor";
 
 // Live, pannable/zoomable Google Maps embed — used whenever a client-side
@@ -82,6 +87,16 @@ export default function ZoneMapEditor({
   onDelete,
 }: ZoneMapEditorProps) {
   const [localZone, setLocalZone] = useState<Zone>({ ...zone });
+  // Mirrors localZone so event handlers (e.g. pointerup after a drag) can
+  // read the latest value directly and call `save` (which updates the
+  // *parent's* state) without doing it from inside a setLocalZone updater —
+  // updater functions must be pure, and calling another component's setState
+  // from one trips React's "setState while rendering a different component"
+  // check.
+  const localZoneRef = useRef(localZone);
+  useEffect(() => {
+    localZoneRef.current = localZone;
+  }, [localZone]);
   const [zoneName, setZoneName] = useState(zone.name);
 
   const [previewError, setPreviewError] = useState(false);
@@ -115,7 +130,17 @@ export default function ZoneMapEditor({
 
   const save = useCallback((updated: Zone) => onUpdate(updated), [onUpdate]);
 
-  const hasAddress = !!jobAddress?.trim();
+  // Step 1's address — starts from the job's SimPRO address, but is always
+  // manually searchable/correctable so a bad geocode or missing job address
+  // is never a dead end (only escape hatch used to be Upload Aerial).
+  const [searchInput, setSearchInput] = useState(jobAddress);
+  const [activeAddress, setActiveAddress] = useState(jobAddress);
+  const handleLocate = useCallback(() => {
+    const trimmed = searchInput.trim();
+    if (trimmed) setActiveAddress(trimmed);
+  }, [searchInput]);
+
+  const hasAddress = !!activeAddress?.trim();
 
   // Reset preview error whenever the zoom (and therefore the request) changes.
   useEffect(() => {
@@ -148,27 +173,30 @@ export default function ZoneMapEditor({
         });
         liveMapRef.current = map;
 
-        // Already have a precise position from a previous capture — reuse
-        // it directly instead of re-geocoding the address string.
-        if (zone.mapLat != null && zone.mapLng != null) {
+        // Only trust a stored position if it came from an actual confirmed
+        // capture (mapImageUrl set) — otherwise it's a leftover from an
+        // incomplete/stale session and re-geocoding from the (possibly
+        // since-corrected) address is safer than trusting it.
+        if (zone.mapImageUrl && zone.mapLat != null && zone.mapLng != null) {
           map.setCenter({ lat: zone.mapLat, lng: zone.mapLng });
           setLiveMapReady(true);
           return;
         }
 
-        const geocoder = new g.maps.Geocoder();
-        geocoder.geocode(
-          { address: jobAddress, region: "au" },
-          (results, status) => {
-            if (cancelled) return;
-            if (status === "OK" && results?.[0]) {
-              map.setCenter(results[0].geometry.location);
-              setLiveMapReady(true);
-            } else {
-              setLiveMapError(`Couldn't locate that address (${status})`);
-            }
-          },
+        // Geocoded via our own server route (its own dedicated key/quota)
+        // rather than the JS SDK's Geocoder, which is tied to whichever key
+        // loaded the map script.
+        const res = await fetch(
+          `/api/maps/geocode?address=${encodeURIComponent(activeAddress)}`,
         );
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok && data.lat != null && data.lng != null) {
+          map.setCenter({ lat: data.lat, lng: data.lng });
+          setLiveMapReady(true);
+        } else {
+          setLiveMapError(data.error ?? "Couldn't locate that address");
+        }
       } catch (err) {
         if (!cancelled) {
           setLiveMapError(
@@ -183,7 +211,7 @@ export default function ZoneMapEditor({
       liveMapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [captured, hasAddress, jobAddress]);
+  }, [captured, hasAddress, activeAddress]);
 
   // Scroll/trackpad zoom over the static-fallback preview — Static Maps only
   // takes a fixed integer zoom per request (no continuous zoom), so this
@@ -230,9 +258,24 @@ export default function ZoneMapEditor({
       if (HAS_LIVE_MAPS && liveMapRef.current) {
         const center = liveMapRef.current.getCenter();
         if (!center) throw new Error("Map not ready");
-        capturedZoom = liveMapRef.current.getZoom() ?? DEFAULT_ZOOM;
+        const liveZoom = liveMapRef.current.getZoom() ?? DEFAULT_ZOOM;
         capturedLat = center.lat();
         capturedLng = center.lng();
+
+        // The static capture is a much smaller image than the live map's
+        // on-screen size, and a Google zoom level defines real-world-area
+        // per pixel — reusing the same zoom number on a smaller image shows
+        // a smaller slice of the world (looks "more zoomed in" than what
+        // was actually framed). Compensate by the size ratio so the capture
+        // matches what was on screen.
+        const containerWidth =
+          liveMapContainerRef.current?.clientWidth || PREVIEW_WIDTH;
+        const zoomAdjust = Math.log2(PREVIEW_WIDTH / containerWidth);
+        capturedZoom = Math.max(
+          1,
+          Math.min(21, Math.round(liveZoom + zoomAdjust)),
+        );
+
         url = buildStaticUrl({
           lat: capturedLat,
           lng: capturedLng,
@@ -240,7 +283,7 @@ export default function ZoneMapEditor({
         });
       } else {
         capturedZoom = zoomLevel;
-        url = buildStaticUrl({ address: jobAddress.trim(), zoom: capturedZoom });
+        url = buildStaticUrl({ address: activeAddress.trim(), zoom: capturedZoom });
       }
 
       const dataUrl = await urlToDataUrl(url);
@@ -260,7 +303,7 @@ export default function ZoneMapEditor({
     } finally {
       setCapturing(false);
     }
-  }, [hasAddress, jobAddress, zoomLevel, localZone, zoneName, save]);
+  }, [hasAddress, activeAddress, zoomLevel, localZone, zoneName, save]);
 
   // ── Re-capture ────────────────────────────────────────────────────────────
 
@@ -337,11 +380,21 @@ export default function ZoneMapEditor({
     setEditingAnchor(null);
   };
 
+  // Deleting a pin closes the gap in the numbering (A4 becomes A3, etc.) so
+  // the register never skips a number — but only for labels still on the
+  // default "A{n}" pattern. A label a tech has manually retyped to
+  // something else is left alone rather than silently overwritten.
+  const AUTO_LABEL_RE = /^A\d+$/;
   const handlePinDelete = (anchorId: string) => {
-    const updated: Zone = {
-      ...localZone,
-      anchors: localZone.anchors.filter((a) => a.id !== anchorId),
-    };
+    let seq = 0;
+    const anchors = localZone.anchors
+      .filter((a) => a.id !== anchorId)
+      .map((a) => {
+        if (!AUTO_LABEL_RE.test(a.label)) return a;
+        seq += 1;
+        return { ...a, label: `A${seq}` };
+      });
+    const updated: Zone = { ...localZone, anchors };
     setLocalZone(updated);
     save(updated);
     setEditingAnchor(null);
@@ -409,10 +462,7 @@ export default function ZoneMapEditor({
       if (!ds) return;
 
       if (ds.moved) {
-        setLocalZone((prev) => {
-          save(prev);
-          return prev;
-        });
+        save(localZoneRef.current);
       } else {
         setEditingAnchor(anchor);
       }
@@ -486,38 +536,77 @@ export default function ZoneMapEditor({
         </div>
       </div>
 
-      {/* Status bar */}
+      {/* Step indicator — always visible so it's unambiguous which phase
+          you're in and what's left. */}
+      <div className={styles.stepBar}>
+        <span
+          className={`${styles.step} ${!captured ? styles.stepActive : styles.stepDone}`}
+        >
+          {captured ? "✓" : "1"} Set Aerial View
+        </span>
+        <span className={styles.stepArrow}>→</span>
+        <span
+          className={`${styles.step} ${captured ? styles.stepActive : styles.stepPending}`}
+        >
+          2 Place Anchors
+        </span>
+      </div>
+
       {!captured && (
-        <div className={styles.statusBar}>
-          {!hasAddress ? (
-            <span className={styles.statusError}>
-              ⚠ No job address set — use Upload Aerial instead.
-            </span>
-          ) : HAS_LIVE_MAPS ? (
-            liveMapError ? (
-              <span className={styles.statusError}>
-                ⚠ {liveMapError} — use Upload Aerial instead.
+        <>
+          {/* Address search — always available, not just on error, so a
+              wrong/missing job address is never a dead end. */}
+          <div className={styles.addressBar}>
+            <input
+              className={styles.addressInput}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLocate()}
+              placeholder="Search an address…"
+            />
+            <button
+              className={styles.addressLocateBtn}
+              onClick={handleLocate}
+              disabled={!searchInput.trim()}
+            >
+              Locate
+            </button>
+          </div>
+
+          <div className={styles.statusBar}>
+            {!hasAddress ? (
+              <span className={styles.statusInfo}>
+                Search an address above, or upload an aerial screenshot
+                directly.
               </span>
-            ) : !liveMapReady ? (
-              <span className={styles.statusInfo}>📍 Locating address…</span>
+            ) : HAS_LIVE_MAPS ? (
+              liveMapError ? (
+                <span className={styles.statusError}>
+                  ⚠ {liveMapError} — try a different search above, or upload
+                  an aerial screenshot instead.
+                </span>
+              ) : !liveMapReady ? (
+                <span className={styles.statusInfo}>📍 Locating address…</span>
+              ) : (
+                <span className={styles.statusInfo}>
+                  <strong>Drag and scroll to frame the roof</strong>, then
+                  click Use This View.
+                </span>
+              )
+            ) : previewError ? (
+              <span className={styles.statusError}>
+                ⚠ Couldn&apos;t load satellite imagery for this address — try
+                a different search above, or upload an aerial screenshot
+                instead.
+              </span>
             ) : (
               <span className={styles.statusInfo}>
-                <strong>Drag and scroll to frame the roof</strong>, then click
-                Use This View.
+                <strong>Scroll to zoom</strong> and frame the roof, then
+                click Use This View.
               </span>
-            )
-          ) : previewError ? (
-            <span className={styles.statusError}>
-              ⚠ Couldn&apos;t load satellite imagery for this address — use
-              Upload Aerial instead.
-            </span>
-          ) : (
-            <span className={styles.statusInfo}>
-              <strong>Scroll to zoom</strong> and frame the roof, then click
-              Use This View.
-            </span>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Type stamp toolbar — pick a type, then tap the map to place it */}
@@ -557,15 +646,23 @@ export default function ZoneMapEditor({
           {!captured ? (
             hasAddress ? (
               HAS_LIVE_MAPS ? (
-                <div className={styles.liveMapContainer} ref={liveMapContainerRef} />
+                <div
+                  key="live-map"
+                  className={styles.liveMapContainer}
+                  ref={liveMapContainerRef}
+                />
               ) : (
-                <div className={styles.previewWrap} ref={previewWrapRef}>
+                <div
+                  key="static-preview"
+                  className={styles.previewWrap}
+                  ref={previewWrapRef}
+                >
                   {!previewError && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       key={zoomLevel}
                       src={buildStaticUrl({
-                        address: jobAddress.trim(),
+                        address: activeAddress.trim(),
                         zoom: zoomLevel,
                       })}
                       alt="Satellite preview"
@@ -599,7 +696,7 @@ export default function ZoneMapEditor({
                 </div>
               )
             ) : (
-              <div className={styles.mapSetup}>
+              <div key="no-address" className={styles.mapSetup}>
                 <div className={styles.mapSetupIcon}>
                   <svg
                     width="28"
@@ -613,15 +710,15 @@ export default function ZoneMapEditor({
                     <circle cx="12" cy="10" r="3" />
                   </svg>
                 </div>
-                <p className={styles.mapSetupTitle}>No job address set</p>
+                <p className={styles.mapSetupTitle}>No address set</p>
                 <p className={styles.mapSetupSub}>
-                  Load a job to fetch its address, or upload an aerial
-                  screenshot directly.
+                  Search an address above, or upload an aerial screenshot
+                  directly.
                 </p>
               </div>
             )
           ) : (
-            <div className={styles.mapContainer}>
+            <div key="captured" className={styles.mapContainer}>
               <div
                 ref={frozenMapRef}
                 className={styles.mapCanvas}
@@ -660,11 +757,13 @@ export default function ZoneMapEditor({
                     </span>
                   </button>
                 ))}
-              </div>
 
-              {activeTypes.length > 0 && (
-                <MapLegend types={activeTypes} anchors={localZone.anchors} />
-              )}
+                {activeTypes.length > 0 && (
+                  <div className={styles.legendOverlay}>
+                    <MapLegend types={activeTypes} anchors={localZone.anchors} />
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

@@ -2,12 +2,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { removeSiteFromCache } from "@/lib/recertifications/store";
+import { RECURRING_CATEGORIES, isRecurringCategory } from "@/lib/recertifications/categories";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
 
 const ARCHER_DUTCH_ID = 20;
-const HEIGHT_SAFETY_COST_CENTRE_ID = 11;
 
 async function simproPost<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${SIMPRO_BASE_URL}${path}`, {
@@ -28,6 +28,7 @@ async function simproPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 export interface CreateQuotePayload {
+  category: string;
   customerId: number;
   siteId: number;
   siteName: string;
@@ -45,8 +46,14 @@ export async function POST(request: NextRequest) {
   }
 
   const body: CreateQuotePayload = await request.json();
-  const { customerId, siteId, lastExTax, nextDueDate } = body;
+  const { category, customerId, siteId, lastExTax, nextDueDate } = body;
 
+  if (!isRecurringCategory(category)) {
+    return NextResponse.json(
+      { error: "Missing or invalid category" },
+      { status: 400 },
+    );
+  }
   if (!customerId || !siteId || lastExTax === undefined || !nextDueDate) {
     return NextResponse.json(
       { error: "Missing required fields" },
@@ -54,11 +61,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const config = RECURRING_CATEGORIES[category];
+
   const currentYear = new Date().getFullYear();
   const dueYear = new Date(nextDueDate).getFullYear();
   const quoteYear = Math.max(dueYear, currentYear);
 
-  const quoteName = `Annual Anchor Recertification - ${quoteYear}`;
+  const quoteName = config.quoteName(quoteYear);
 
   const newExTax = Math.round(lastExTax * 1.05 * 100) / 100;
   const newIncTax = Math.round(newExTax * 1.1 * 100) / 100;
@@ -92,11 +101,12 @@ export async function POST(request: NextRequest) {
 
     const sectionId = section.ID;
 
-    // 3. Create cost center
+    // 3. Create cost center — the category's primary cost centre (the first
+    // of possibly several that count toward this category when *reading*).
     const costCenter = await simproPost<{ ID: number }>(
       `/api/v1.0/companies/0/quotes/${quoteId}/sections/${sectionId}/costCenters/`,
       {
-        CostCenter: HEIGHT_SAFETY_COST_CENTRE_ID,
+        CostCenter: config.primaryCostCentreId,
       },
     );
 
@@ -116,7 +126,7 @@ export async function POST(request: NextRequest) {
     );
 
     // 5. Clear cache
-    await removeSiteFromCache(siteId);
+    await removeSiteFromCache(siteId, category);
 
     return NextResponse.json({
       quoteId,

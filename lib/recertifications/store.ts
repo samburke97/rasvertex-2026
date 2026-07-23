@@ -1,23 +1,30 @@
 // lib/recertifications/store.ts
-// Neon Postgres — recertification cache, ignored jobs, notification cadence.
+// Neon Postgres — recurring-job cache, ignored jobs, notification cadence.
+// Shared across all recurring-job categories (height-safety, window-cleaning,
+// building-cleaning, ...) — every table is scoped by a `category` column so
+// syncing/ignoring/notifying in one category never touches another's rows.
 //
 // ── Schema ────────────────────────────────────────────────────────────────
 //
 // CREATE TABLE recertification_ignored (
-//   job_id     INTEGER PRIMARY KEY,
+//   job_id     INTEGER NOT NULL,
+//   category   TEXT NOT NULL,
 //   reason     TEXT,
-//   ignored_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+//   ignored_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+//   PRIMARY KEY (job_id, category)
 // );
 //
 // CREATE TABLE recertification_notified (
 //   job_id           INTEGER NOT NULL,
 //   year             INTEGER NOT NULL,
+//   category         TEXT NOT NULL,
 //   last_notified_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-//   PRIMARY KEY (job_id, year)
+//   PRIMARY KEY (job_id, year, category)
 // );
 //
 // CREATE TABLE recertification_cache (
-//   site_id        INTEGER PRIMARY KEY,
+//   site_id        INTEGER NOT NULL,
+//   category       TEXT NOT NULL,
 //   job_id         INTEGER NOT NULL,
 //   customer_id    INTEGER NOT NULL,
 //   customer       TEXT NOT NULL,
@@ -29,12 +36,14 @@
 //   total_ex_tax   NUMERIC NOT NULL,
 //   total_inc_tax  NUMERIC NOT NULL,
 //   quote_year     INTEGER NOT NULL,
-//   synced_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+//   synced_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+//   PRIMARY KEY (site_id, category)
 // );
 // ─────────────────────────────────────────────────────────────────────────
 
 import { neon } from "@neondatabase/serverless";
-import type { RecertificationJob } from "@/app/api/simpro/recertifications/route";
+import { computeDueStatus, type RecertificationJob } from "./types";
+import type { RecurringCategory } from "./categories";
 
 function db() {
   const url = process.env.DATABASE_URL;
@@ -44,45 +53,69 @@ function db() {
 
 // ── Ignored jobs ──────────────────────────────────────────────────────────
 
-export async function ignoreJob(jobId: number, reason?: string): Promise<void> {
+export async function ignoreJob(
+  jobId: number,
+  category: RecurringCategory,
+  reason?: string,
+): Promise<void> {
   const sql = db();
   await sql`
-    INSERT INTO recertification_ignored (job_id, reason)
-    VALUES (${jobId}, ${reason ?? null})
-    ON CONFLICT (job_id) DO NOTHING
+    INSERT INTO recertification_ignored (job_id, category, reason)
+    VALUES (${jobId}, ${category}, ${reason ?? null})
+    ON CONFLICT (job_id, category) DO NOTHING
   `;
 }
 
-export async function restoreJob(jobId: number): Promise<void> {
+export async function restoreJob(
+  jobId: number,
+  category: RecurringCategory,
+): Promise<void> {
   const sql = db();
-  await sql`DELETE FROM recertification_ignored WHERE job_id = ${jobId}`;
+  await sql`
+    DELETE FROM recertification_ignored
+    WHERE job_id = ${jobId} AND category = ${category}
+  `;
 }
 
-export async function getIgnoredJobIds(): Promise<Set<number>> {
+export async function getIgnoredJobIds(
+  category: RecurringCategory,
+): Promise<Set<number>> {
   const sql = db();
-  const rows = await sql`SELECT job_id FROM recertification_ignored`;
+  const rows = await sql`
+    SELECT job_id FROM recertification_ignored WHERE category = ${category}
+  `;
   return new Set(rows.map((r) => r.job_id as number));
 }
 
 // ── Cache reads ───────────────────────────────────────────────────────────
 
-export async function getCachedJobs(ignoredIds: Set<number>): Promise<{
+export async function getCachedJobs(
+  category: RecurringCategory,
+  ignoredIds: Set<number>,
+): Promise<{
   active: RecertificationJob[];
   ignored: RecertificationJob[];
   syncedAt: Date | null;
 }> {
   const sql = db();
+  // Not ordering by days_until_due here — that column is a snapshot from
+  // whenever this row was last synced, and days-until-due (and everything
+  // derived from it) is recomputed below relative to *today* regardless of
+  // sync age. Sort after recomputing instead.
   const rows = await sql`
-    SELECT * FROM recertification_cache ORDER BY days_until_due ASC
+    SELECT * FROM recertification_cache WHERE category = ${category}
   `;
 
   if (!rows.length) return { active: [], ignored: [], syncedAt: null };
 
   const syncedAt = new Date(rows[0].synced_at as string);
+  const currentYear = new Date().getFullYear();
   const active: RecertificationJob[] = [];
   const ignored: RecertificationJob[] = [];
 
   for (const r of rows) {
+    const nextDueDate = (r.next_due_date as Date).toISOString().split("T")[0];
+    const { daysUntilDue, status } = computeDueStatus(nextDueDate);
     const job: RecertificationJob = {
       id: r.job_id as number,
       name: "",
@@ -91,12 +124,12 @@ export async function getCachedJobs(ignoredIds: Set<number>): Promise<{
       site: r.site as string,
       siteId: r.site_id as number,
       completedDate: (r.completed_date as Date).toISOString().split("T")[0],
-      nextDueDate: (r.next_due_date as Date).toISOString().split("T")[0],
-      daysUntilDue: r.days_until_due as number,
-      status: r.status as RecertificationJob["status"],
+      nextDueDate,
+      daysUntilDue,
+      status,
       totalExTax: Number(r.total_ex_tax),
       totalIncTax: Number(r.total_inc_tax),
-      quoteYear: r.quote_year as number,
+      quoteYear: Math.max(r.quote_year as number, currentYear),
     };
     if (ignoredIds.has(job.id)) {
       ignored.push(job);
@@ -105,22 +138,28 @@ export async function getCachedJobs(ignoredIds: Set<number>): Promise<{
     }
   }
 
+  active.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+  ignored.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+
   return { active, ignored, syncedAt };
 }
 
 // ── Cache writes ──────────────────────────────────────────────────────────
 
 export async function replaceCachedJobs(
+  category: RecurringCategory,
   jobs: RecertificationJob[],
 ): Promise<void> {
   const sql = db();
-  await sql`DELETE FROM recertification_cache`;
+  // Scoped to this category only — other categories' cached rows are untouched.
+  await sql`DELETE FROM recertification_cache WHERE category = ${category}`;
   if (!jobs.length) return;
 
   for (const j of jobs) {
     await sql`
       INSERT INTO recertification_cache (
         site_id,
+        category,
         job_id,
         customer_id,
         customer,
@@ -134,6 +173,7 @@ export async function replaceCachedJobs(
         quote_year
       ) VALUES (
         ${j.siteId},
+        ${category},
         ${j.id},
         ${j.customerId},
         ${j.customer},
@@ -150,9 +190,15 @@ export async function replaceCachedJobs(
   }
 }
 
-export async function removeSiteFromCache(siteId: number): Promise<void> {
+export async function removeSiteFromCache(
+  siteId: number,
+  category: RecurringCategory,
+): Promise<void> {
   const sql = db();
-  await sql`DELETE FROM recertification_cache WHERE site_id = ${siteId}`;
+  await sql`
+    DELETE FROM recertification_cache
+    WHERE site_id = ${siteId} AND category = ${category}
+  `;
 }
 
 // ── Notification cadence ──────────────────────────────────────────────────
@@ -163,33 +209,21 @@ export interface NotifiedRecord {
   lastNotifiedAt: Date;
 }
 
-export async function getLastNotified(
-  jobId: number,
-  year: number,
-): Promise<Date | null> {
-  const sql = db();
-  const rows = await sql`
-    SELECT last_notified_at
-    FROM recertification_notified
-    WHERE job_id = ${jobId} AND year = ${year}
-  `;
-  if (!rows.length) return null;
-  return new Date(rows[0].last_notified_at as string);
-}
-
 export async function upsertLastNotified(
   jobId: number,
   year: number,
+  category: RecurringCategory,
 ): Promise<void> {
   const sql = db();
   await sql`
-    INSERT INTO recertification_notified (job_id, year, last_notified_at)
-    VALUES (${jobId}, ${year}, NOW())
-    ON CONFLICT (job_id, year) DO UPDATE SET last_notified_at = NOW()
+    INSERT INTO recertification_notified (job_id, year, category, last_notified_at)
+    VALUES (${jobId}, ${year}, ${category}, NOW())
+    ON CONFLICT (job_id, year, category) DO UPDATE SET last_notified_at = NOW()
   `;
 }
 
 export async function getNotifiedMap(
+  category: RecurringCategory,
   pairs: { jobId: number; year: number }[],
 ): Promise<Map<string, Date>> {
   if (!pairs.length) return new Map();
@@ -201,6 +235,7 @@ export async function getNotifiedMap(
     FROM recertification_notified
     WHERE job_id = ANY(${jobIds}::int[])
       AND year = ANY(${years}::int[])
+      AND category = ${category}
   `;
   const map = new Map<string, Date>();
   for (const row of rows) {

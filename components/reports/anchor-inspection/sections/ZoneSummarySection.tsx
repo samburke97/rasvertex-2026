@@ -175,7 +175,9 @@ export default function ZoneSummarySection({
                         {ANCHOR_TYPE_LABELS[anchor.type]}
                       </td>
                       <td className={styles.td}>
-                        {anchor.commissionDate ?? "—"}
+                        {anchor.commissionDate || (
+                          <span className={styles.emptyDash}>-</span>
+                        )}
                       </td>
                       <td className={styles.td}>{anchor.inspectionDate}</td>
                       <td className={styles.td}>{anchor.nextInspection}</td>

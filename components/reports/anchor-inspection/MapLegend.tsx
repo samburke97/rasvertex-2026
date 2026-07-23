@@ -20,9 +20,6 @@ export default function MapLegend({ types, anchors }: MapLegendProps) {
     <div className={styles.legend}>
       {types.map((type) => {
         const count = anchors.filter((a) => a.type === type).length;
-        const passed = anchors.filter(
-          (a) => a.type === type && a.result === "PASSED",
-        ).length;
         return (
           <div key={type} className={styles.item}>
             <span
@@ -30,9 +27,7 @@ export default function MapLegend({ types, anchors }: MapLegendProps) {
               style={{ background: ANCHOR_TYPE_COLOURS[type] }}
             />
             <span className={styles.label}>{ANCHOR_TYPE_LABELS[type]}</span>
-            <span className={styles.count}>
-              {passed}/{count}
-            </span>
+            <span className={styles.count}>{count}</span>
           </div>
         );
       })}

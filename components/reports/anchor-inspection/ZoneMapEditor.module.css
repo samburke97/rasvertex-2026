@@ -105,6 +105,98 @@
   color: var(--red-wine-300, #900c40);
 }
 
+/* ── Step indicator ───────────────────────────────────────────────────────── */
+.stepBar {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 1.5rem;
+  background: var(--white, #fff);
+  border-bottom: 1px solid var(--out-light, #edf0f0);
+  flex-shrink: 0;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--for-light, #9ca3af);
+}
+
+.stepActive {
+  color: var(--primary-600, #059669);
+}
+
+.stepDone {
+  color: var(--for-medium, #7e807f);
+}
+
+.stepPending {
+  color: var(--for-light, #9ca3af);
+}
+
+.stepArrow {
+  color: var(--out-darkest, #c9cbcb);
+  font-size: 0.75rem;
+}
+
+/* ── Address search bar ───────────────────────────────────────────────────── */
+.addressBar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.625rem 1.5rem;
+  background: var(--white, #fff);
+  border-bottom: 1px solid var(--out-light, #edf0f0);
+  flex-shrink: 0;
+}
+
+.addressInput {
+  flex: 1;
+  height: 34px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.addressInput:focus {
+  border-color: var(--primary-400, #74db89);
+}
+
+.addressLocateBtn {
+  height: 34px;
+  padding: 0 1rem;
+  border-radius: 7px;
+  border: 1px solid var(--out-darkest, #c9cbcb);
+  background: var(--white, #fff);
+  color: var(--for-darkest, #141414);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.addressLocateBtn:hover:not(:disabled) {
+  border-color: var(--primary-400, #74db89);
+  background: var(--primary-50, #f0fdf4);
+}
+
+.addressLocateBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ── Status bar ───────────────────────────────────────────────────────────── */
 .statusBar {
   display: flex;
@@ -298,21 +390,17 @@
 .mapContainer {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
   width: 100%;
   height: 100%;
-  overflow-y: auto;
-  padding: 1.5rem;
-  box-sizing: border-box;
 }
 
 .mapCanvas {
   position: relative;
   width: 100%;
-  border-radius: 10px;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--out-light, #edf0f0);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   cursor: crosshair;
   user-select: none;
 }
@@ -320,10 +408,16 @@
 .mapImage {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
   pointer-events: none;
-  max-height: 60vh;
   object-fit: cover;
+}
+
+.legendOverlay {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 15;
 }
 
 /* ── Anchor pins ──────────────────────────────────────────────────────────── */
@@ -370,7 +464,6 @@
   font-weight: 700;
   color: #fff;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   letter-spacing: 0.02em;
 }
 

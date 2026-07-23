@@ -192,6 +192,20 @@ export default function CertificationSection({
             </tbody>
           </table>
         )}
+
+        {/* ── Comments ── */}
+        <div className={styles.commentsBlock}>
+          <div className={styles.commentsLabel}>Comments</div>
+          <EditableField
+            value={job.certComments}
+            onChange={(v) => onUpdate("certComments", v)}
+            multiline
+            richText={false}
+            placeholder="Add any comments on the test…"
+            label="Comments"
+            className={styles.commentsField}
+          />
+        </div>
       </div>
 
       <CertFooter />

@@ -44,6 +44,7 @@ export const DEFAULT_PRINT_ASSETS: ReportAssets = {
   linkWhite: "/reports/link_white.png",
   linkBlue: "/reports/link_blue.png",
   signature: "/reports/signature.png",
+  heightSafety: "/images/height-safety.png",
   associations: {
     communitySelect: "/reports/associations/communityselect.png",
     dulux: "/reports/associations/dulux.png",

@@ -28,12 +28,10 @@ export default function AnchorCoverSection({
       {/* ── Hero ───────────────────────────────────────────────────── */}
       <div className={styles.hero}>
         <div className={styles.heroNavy} />
-        {job.coverPhoto && (
-          <div
-            className={styles.heroCoverPhoto}
-            style={{ backgroundImage: `url(${job.coverPhoto})` }}
-          />
-        )}
+        <div
+          className={styles.heroCoverPhoto}
+          style={{ backgroundImage: "url(/images/height-safety.png)" }}
+        />
         <div className={styles.heroOverlay} />
         <div className={styles.heroLogo}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

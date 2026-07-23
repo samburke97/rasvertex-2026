@@ -122,44 +122,14 @@ export default function AnchorInspectionPage({
     [],
   );
 
-  // ── Load job from SimPRO — resuming an existing draft if one exists ───────
-  const handleImport = useCallback(async (jobNumber: string) => {
-    const loadId = ++currentLoadId.current;
-    const isStale = () => currentLoadId.current !== loadId;
-
-    setImportStatus({ phase: "fetching-job" });
-    setSaveStatus("idle");
-    setSavedFilename(null);
-
-    try {
-      // Fetch the SimPRO job details and check for an in-progress draft in
-      // parallel — typing the same job number a tech already started is the
-      // entire "resume" UX, no extra list/search UI needed.
-      const [jobRes, draftRes] = await Promise.all([
-        fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`),
-        fetch(`/api/anchor-inspection-reports/${jobNumber}`),
-      ]);
-      if (isStale()) return;
-
-      if (draftRes.ok) {
-        const { report: draft } = (await draftRes.json()) as {
-          report: AnchorReportData;
-        };
-        if (isStale()) return;
-        setReport(draft);
-        setLoadedJobId(jobNumber);
-        setImportStatus({ phase: "done" });
-        return;
-      }
-
-      if (!jobRes.ok)
-        throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
-      const jobData: EnrichedJob = await jobRes.json();
-      if (isStale()) return;
-
-      // Inspection date = job completed date; next = +1 year
-      let inspectionDate = "";
-      let nextInspectionDate = "";
+  // Builds the SimPRO-sourced admin fields (address, prepared-for, dates,
+  // etc.) fresh from a job fetch. These always come from SimPRO — never
+  // trusted from a stale draft snapshot — so a resumed draft can't get
+  // stuck showing site data that's since been corrected upstream.
+  const buildJobFields = useCallback(
+    (jobData: EnrichedJob, fallback: AnchorReportJob): AnchorReportJob => {
+      let inspectionDate = fallback.inspectionDate;
+      let nextInspectionDate = fallback.nextInspectionDate;
       const d = parseAuDate(jobData.date);
       if (d) {
         inspectionDate = formatOrdinalDate(d);
@@ -167,34 +137,87 @@ export default function AnchorInspectionPage({
         ny.setFullYear(ny.getFullYear() + 1);
         nextInspectionDate = formatOrdinalDate(ny);
       }
+      return {
+        ...fallback,
+        preparedFor: jobData.preparedFor || "",
+        address: jobData.siteAddress || "",
+        date: jobData.date || fallback.date,
+        certNumber: jobData.jobNo?.replace(/^#/, "") || "",
+        buildingName: jobData.siteName || "",
+        inspectionDate,
+        nextInspectionDate,
+        authorisedBy: "Archer Dutch",
+      };
+    },
+    [],
+  );
 
-      // Start from a clean report (not the previous job's zones/anchors —
-      // only merge job fields on top of a fresh draft).
-      setReport({
-        ...DEFAULT_ANCHOR_REPORT,
-        job: {
-          ...DEFAULT_ANCHOR_REPORT.job,
-          preparedFor: jobData.preparedFor || "",
-          address: jobData.siteAddress || "",
-          date: jobData.date || DEFAULT_ANCHOR_REPORT.job.date,
-          certNumber: jobData.jobNo?.replace(/^#/, "") || "",
-          buildingName: jobData.siteName || "",
-          inspectionDate,
-          nextInspectionDate,
-          authorisedBy: "Archer Dutch",
-        },
-      });
+  // ── Load job from SimPRO — resuming an existing draft if one exists ───────
+  const handleImport = useCallback(
+    async (jobNumber: string) => {
+      const loadId = ++currentLoadId.current;
+      const isStale = () => currentLoadId.current !== loadId;
 
-      setLoadedJobId(jobNumber);
-      setImportStatus({ phase: "done" });
-    } catch (err) {
-      if (isStale()) return;
-      setImportStatus({
-        phase: "error",
-        message: err instanceof Error ? err.message : "Failed to fetch job",
-      });
-    }
-  }, []);
+      setImportStatus({ phase: "fetching-job" });
+      setSaveStatus("idle");
+      setSavedFilename(null);
+
+      try {
+        // Fetch the SimPRO job details and check for an in-progress draft in
+        // parallel — typing the same job number a tech already started is
+        // the entire "resume" UX, no extra list/search UI needed.
+        const [jobRes, draftRes] = await Promise.all([
+          fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`),
+          fetch(`/api/anchor-inspection-reports/${jobNumber}`),
+        ]);
+        if (isStale()) return;
+
+        const jobData: EnrichedJob | null = jobRes.ok
+          ? await jobRes.json()
+          : null;
+        if (isStale()) return;
+
+        if (draftRes.ok) {
+          const { report: draft } = (await draftRes.json()) as {
+            report: AnchorReportData;
+          };
+          if (isStale()) return;
+          setReport({
+            ...draft,
+            // Zones/anchors/comments are the tech's own work — keep them
+            // from the draft. Admin fields refresh from SimPRO so a fixed
+            // address (or any other corrected site detail) actually shows
+            // up next time the draft is opened, instead of staying frozen
+            // at whatever was true when the draft was first created.
+            job: jobData ? buildJobFields(jobData, draft.job) : draft.job,
+          });
+          setLoadedJobId(jobNumber);
+          setImportStatus({ phase: "done" });
+          return;
+        }
+
+        if (!jobData)
+          throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
+
+        // Start from a clean report (not the previous job's zones/anchors —
+        // only merge job fields on top of a fresh draft).
+        setReport({
+          ...DEFAULT_ANCHOR_REPORT,
+          job: buildJobFields(jobData, DEFAULT_ANCHOR_REPORT.job),
+        });
+
+        setLoadedJobId(jobNumber);
+        setImportStatus({ phase: "done" });
+      } catch (err) {
+        if (isStale()) return;
+        setImportStatus({
+          phase: "error",
+          message: err instanceof Error ? err.message : "Failed to fetch job",
+        });
+      }
+    },
+    [buildJobFields],
+  );
 
   // ── Autosave the draft, debounced, whenever the report changes ───────────
   useEffect(() => {
@@ -360,9 +383,7 @@ export default function AnchorInspectionPage({
       {/* ── Body ── */}
       <div className={styles.editorBody}>
         <AnchorOptionsPanel
-          job={report.job}
           zones={report.zones}
-          onUpdateJob={updateJob}
           onAddZone={addZone}
           onOpenZone={openZoneMap}
           onDeleteZone={deleteZone}

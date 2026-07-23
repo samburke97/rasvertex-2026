@@ -18,8 +18,8 @@ const sidebarItems: SidebarItem[] = [
   { icon: "/icons/menu/reports.svg", href: "/reports", label: "Reports" },
   {
     icon: "/icons/menu/calendar.svg",
-    href: "/recertifications",
-    label: "Anchor Recertifications",
+    href: "/recurring-jobs",
+    label: "Recurring Jobs",
   },
   // { icon: "/icons/menu/sales.svg", href: "/sales", label: "Sales" },
   // { icon: "/icons/menu/inventory.svg", href: "/inventory", label: "Inventory" },

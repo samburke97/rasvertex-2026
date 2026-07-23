@@ -236,6 +236,47 @@
   font-weight: 400 !important;
 }
 
+/* ── Comments ── */
+.commentsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.commentsLabel {
+  font-family: "Bebas Neue", Arial, sans-serif !important;
+  font-size: 1.05rem !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0d1c45 !important;
+  line-height: 1 !important;
+}
+
+.commentsField {
+  font-family: "Inter", Arial, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 300;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.commentsField :global(.display) {
+  display: block;
+  white-space: pre-wrap;
+  min-height: 3.4em;
+}
+
+.commentsField :global(.textarea) {
+  min-height: 3.4em;
+}
+
+.commentsField :global(.placeholder) {
+  font-style: normal;
+  color: #9ca3af;
+}
+
 /* ── Footer ── */
 .footer {
   margin-top: auto;

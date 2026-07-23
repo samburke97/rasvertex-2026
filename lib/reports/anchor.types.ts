@@ -42,7 +42,6 @@ export interface AnchorReportJob {
   address: string;
   reportType: string;
   date: string;
-  coverPhoto: string | null;
   description: string;
   // Certification page
   certNumber: string;
@@ -50,6 +49,7 @@ export interface AnchorReportJob {
   inspectionDate: string;
   nextInspectionDate: string;
   authorisedBy: string;
+  certComments: string;
 }
 
 export interface AnchorReportData {
@@ -98,7 +98,6 @@ export const DEFAULT_ANCHOR_REPORT: AnchorReportData = {
     address: "",
     reportType: "Roof Access & Fall Prevention Systems Inspection Report",
     date: new Date().toLocaleDateString("en-AU"),
-    coverPhoto: null,
     description:
       "This report relates to existing Height Safety and Roof Access Systems. All systems were visually inspected in accordance with AS/NZS 1891.4:2009, AS/NZS 1891.2 and AS 1657:2018.",
     certNumber: "",
@@ -106,6 +105,7 @@ export const DEFAULT_ANCHOR_REPORT: AnchorReportData = {
     inspectionDate: "",
     nextInspectionDate: "",
     authorisedBy: "",
+    certComments: "",
   },
   zones: [],
 };
