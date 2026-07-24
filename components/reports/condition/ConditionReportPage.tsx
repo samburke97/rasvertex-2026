@@ -301,32 +301,22 @@ export default function ConditionReportPage({
       setScheduleCostCenters([]);
       setSelectedCostCenter(null);
 
-      // 1. Fetch job details
-      try {
-        const jobRes = await fetch(
-          `/api/simpro/jobs/${jobNumber}?companyId=0`,
-        );
-        if (isStale()) return;
-        if (!jobRes.ok)
-          throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
-        const jobData: EnrichedJob = await jobRes.json();
-        if (isStale()) return;
-        setReport((prev) => ({
-          ...prev,
-          job: mapJobToReportDetails(jobData),
-        }));
-      } catch (err) {
-        if (isStale()) return;
-        setImportStatus({
-          phase: "error",
-          message: err instanceof Error ? err.message : "Failed to fetch job",
-        });
-        return;
-      }
+      // Job details and attachment folders only depend on `jobNumber`, which
+      // we already have — not on each other's results — so fire both
+      // requests immediately instead of awaiting job first and only then
+      // starting folders. That serial round-trip was pure added latency on
+      // every import. (.catch on the folders request is just to avoid an
+      // unhandled-rejection warning if we return early on a job-fetch
+      // failure before ever awaiting it below.)
+      const jobPromise = fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
+      const foldersPromise = fetch(
+        `/api/simpro/jobs/${jobNumber}/attachments/folders?companyId=0`,
+      ).catch(() => null);
 
-      // 2. Schedule loads in the background, independent of photos — the
+      // Schedule loads in the background, independent of photos — the
       // report is editable while it fetches. Cost centres are fetched in
-      // parallel purely to offer as a filter afterwards.
+      // parallel purely to offer as a filter afterwards. Also started
+      // immediately for the same reason as above.
       (async () => {
         try {
           const res = await fetch(
@@ -345,16 +335,35 @@ export default function ConditionReportPage({
       })();
       fetchSchedule(jobNumber, null);
 
-      // 3. Check for attachment folders. With a real choice to make (more
-      // than one folder), wait for the user to pick one instead of
-      // downloading every folder's photos up front.
+      // 1. Job details — required; abort the whole import on failure.
+      try {
+        const jobRes = await jobPromise;
+        if (isStale()) return;
+        if (!jobRes.ok)
+          throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
+        const jobData: EnrichedJob = await jobRes.json();
+        if (isStale()) return;
+        setReport((prev) => ({
+          ...prev,
+          job: mapJobToReportDetails(jobData),
+        }));
+      } catch (err) {
+        if (isStale()) return;
+        setImportStatus({
+          phase: "error",
+          message: err instanceof Error ? err.message : "Failed to fetch job",
+        });
+        return;
+      }
+
+      // 2. Attachment folders — optional, already in flight above. With a
+      // real choice to make (more than one folder), wait for the user to
+      // pick one instead of downloading every folder's photos up front.
       let folders: PhotoFolder[] = [];
       try {
-        const foldersRes = await fetch(
-          `/api/simpro/jobs/${jobNumber}/attachments/folders?companyId=0`,
-        );
+        const foldersRes = await foldersPromise;
         if (isStale()) return;
-        if (foldersRes.ok) {
+        if (foldersRes?.ok) {
           const data = await foldersRes.json();
           folders = data.folders ?? [];
         }

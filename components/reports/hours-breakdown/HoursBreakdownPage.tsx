@@ -76,6 +76,13 @@ export default function HoursBreakdownPage({ onBack }: Props) {
     setImportStatus({ phase: "fetching-job" });
     setScheduleLoading(false);
 
+    // Job and schedule only depend on `jobNumber`, not on each other's
+    // results — fire both immediately instead of waiting for the job to
+    // finish before even starting the schedule request.
+    const schedulePromise = fetch(
+      `/api/simpro/jobs/${jobNumber}/schedule?companyId=0`,
+    ).catch(() => null);
+
     // 1. Fetch job details
     try {
       const jobRes = await fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
@@ -103,15 +110,13 @@ export default function HoursBreakdownPage({ onBack }: Props) {
       return;
     }
 
-    // 2. Fetch schedule
+    // 2. Schedule — already in flight above, just await the response now.
     setScheduleLoading(true);
     setImportStatus({ phase: "fetching-schedule" });
     try {
-      const res = await fetch(
-        `/api/simpro/jobs/${jobNumber}/schedule?companyId=0`,
-      );
+      const res = await schedulePromise;
       if (isStale()) return;
-      if (!res.ok) {
+      if (!res?.ok) {
         setScheduleLoading(false);
         setImportStatus({ phase: "done" });
         return;

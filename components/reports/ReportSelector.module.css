@@ -1,3 +1,26 @@
+/* ── Report loading (dynamic import fallback) ───────────────────────────── */
+.loadingState {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--Outline-Light, #f5f5f5);
+  border-top-color: var(--for-medium, #7e807f);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ── Page Layout ─────────────────────────────────────────────────────────── */
 .page {
   max-width: 1200px;

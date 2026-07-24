@@ -7,6 +7,7 @@
 // category's cost-centre IDs and quote-match keywords instead.
 
 import { computeDueStatus, type RecertificationJob } from "./types";
+import { fetchWithTimeout } from "@/lib/simpro/timeout";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
@@ -16,7 +17,7 @@ export async function simproGet<T>(
   url: string,
   extraHeaders?: Record<string, string>,
 ): Promise<T> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: {
       Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
       "Content-Type": "application/json",

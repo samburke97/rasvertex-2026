@@ -1,10 +1,34 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import ConditionReportPage from "./condition/ConditionReportPage";
-import AnchorInspectionPage from "./anchor-inspection/AnchorInspectionPage";
-import HoursBreakdownPage from "./hours-breakdown/HoursBreakdownPage";
+import dynamic from "next/dynamic";
 import styles from "./ReportSelector.module.css";
+
+// Each report builder is a large, self-contained editor (Condition Report
+// alone pulls in a full Tiptap rich-text engine) — loading all three
+// unconditionally nearly tripled this page's bundle for no reason, since a
+// visit only ever uses one. Loading whichever one is picked, on demand,
+// keeps the initial /reports visit light.
+const ConditionReportPage = dynamic(
+  () => import("./condition/ConditionReportPage"),
+  { loading: () => <ReportLoading />, ssr: false },
+);
+const AnchorInspectionPage = dynamic(
+  () => import("./anchor-inspection/AnchorInspectionPage"),
+  { loading: () => <ReportLoading />, ssr: false },
+);
+const HoursBreakdownPage = dynamic(
+  () => import("./hours-breakdown/HoursBreakdownPage"),
+  { loading: () => <ReportLoading />, ssr: false },
+);
+
+function ReportLoading() {
+  return (
+    <div className={styles.loadingState}>
+      <div className={styles.spinner} />
+    </div>
+  );
+}
 
 type ReportTypeId = "condition" | "anchor-inspection" | "hours-breakdown";
 

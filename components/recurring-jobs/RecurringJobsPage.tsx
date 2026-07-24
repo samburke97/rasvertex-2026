@@ -374,11 +374,12 @@ export default function RecurringJobsPage() {
   const handleIgnore = async (job: RecertificationJob) => {
     setIgnoringId(job.id);
     try {
-      await fetch("/api/simpro/recertifications/ignore", {
+      const res = await fetch("/api/simpro/recertifications/ignore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobId: job.id, category }),
       });
+      if (!res.ok) throw new Error("Failed to hide");
       setJobs((prev) => prev.filter((j) => j.id !== job.id));
       setIgnoredJobs((prev) => [...prev, job]);
       setToast(`${job.site} hidden`);
@@ -392,11 +393,12 @@ export default function RecurringJobsPage() {
   const handleRestore = async (job: RecertificationJob) => {
     setIgnoringId(job.id);
     try {
-      await fetch("/api/simpro/recertifications/ignore", {
+      const res = await fetch("/api/simpro/recertifications/ignore", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobId: job.id, category }),
       });
+      if (!res.ok) throw new Error("Failed to restore");
       setIgnoredJobs((prev) => prev.filter((j) => j.id !== job.id));
       setJobs((prev) =>
         [...prev, job].sort((a, b) => a.daysUntilDue - b.daysUntilDue),

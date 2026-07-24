@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { EnrichedJob, SimproRawJob, SimproRawSite } from "./types";
+import { fetchWithTimeout } from "./timeout";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
@@ -15,7 +16,7 @@ export async function simproGet<T>(url: string): Promise<T> {
   if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN) {
     throw new Error("SimPRO configuration missing — check env vars");
   }
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     headers: {
       Authorization: `Bearer ${SIMPRO_ACCESS_TOKEN}`,
       "Content-Type": "application/json",
