@@ -3,13 +3,11 @@
 export type AnchorType =
   | "fall-arrest-anchor"
   | "ladder-bracket"
-  | "rung-ladder"
-  | "walkway"
-  | "guardrail"
   | "access-hatch"
   | "wire-rope-sling"
   | "static-line"
-  | "harness";
+  | "harness"
+  | "rope-access-anchor";
 
 export type PassFail = "PASSED" | "FAILED" | "N/A";
 
@@ -23,6 +21,12 @@ export interface AnchorPoint {
   result: PassFail;
   x: number;
   y: number;
+  // Static-line only — ids of other static-line anchors this one has a
+  // cable segment to. Placing anchors back-to-back auto-connects them into
+  // a chain; closing a loop (or any non-sequential connection) adds an
+  // explicit edge on top of that. Each edge is stored once, on one side
+  // only — see computeStaticLineEdges.
+  connectsTo?: string[];
 }
 
 export interface Zone {
@@ -60,25 +64,21 @@ export interface AnchorReportData {
 export const ANCHOR_TYPE_COLOURS: Record<AnchorType, string> = {
   "fall-arrest-anchor": "#10b981",
   "ladder-bracket": "#3b82f6",
-  "rung-ladder": "#f59e0b",
-  walkway: "#8b5cf6",
-  guardrail: "#06b6d4",
   "access-hatch": "#ec4899",
   "wire-rope-sling": "#f97316",
   "static-line": "#6366f1",
   harness: "#14b8a6",
+  "rope-access-anchor": "#8b5cf6",
 };
 
 export const ANCHOR_TYPE_LABELS: Record<AnchorType, string> = {
   "fall-arrest-anchor": "Fall Arrest Anchor",
   "ladder-bracket": "Ladder Bracket",
-  "rung-ladder": "Rung Ladder",
-  walkway: "Walkway",
-  guardrail: "Guardrail",
   "access-hatch": "Access Hatch",
   "wire-rope-sling": "Wire Rope Sling",
   "static-line": "Static Line",
   harness: "Harness",
+  "rope-access-anchor": "Rope Access Anchor",
 };
 
 export const ANCHOR_TYPE_OPTIONS: { value: AnchorType; label: string }[] =
@@ -89,6 +89,43 @@ export const ANCHOR_TYPE_OPTIONS: { value: AnchorType; label: string }[] =
 
 export function generateId(): string {
   return Math.random().toString(36).slice(2, 9);
+}
+
+// A static line is a fixed safety cable run between anchor points — usually
+// a straight chain, but sometimes it loops back on itself, and there's no
+// way to know that from placement order alone. So connections are explicit
+// (AnchorPoint.connectsTo), not inferred: placing anchors back-to-back
+// auto-connects them (see ZoneMapEditor's placePin), and closing a loop or
+// making any other non-sequential connection adds one more explicit edge.
+// This just resolves those ids to actual points for rendering, dropping any
+// edge whose target no longer exists (deleted) or isn't static-line.
+export interface StaticLineEdge {
+  from: AnchorPoint;
+  to: AnchorPoint;
+}
+
+export function computeStaticLineEdges(anchors: AnchorPoint[]): StaticLineEdge[] {
+  const byId = new Map(anchors.map((a) => [a.id, a]));
+  const edges: StaticLineEdge[] = [];
+  for (const a of anchors) {
+    if (a.type !== "static-line" || !a.connectsTo) continue;
+    for (const targetId of a.connectsTo) {
+      const target = byId.get(targetId);
+      if (target && target.type === "static-line") {
+        edges.push({ from: a, to: target });
+      }
+    }
+  }
+  if (edges.length > 0) return edges;
+
+  // Legacy data placed before connectsTo existed has no edges stored at
+  // all — fall back to chaining static-line anchors in placement order so
+  // zones built before this feature don't end up with invisible lines.
+  const lineAnchors = anchors.filter((a) => a.type === "static-line");
+  for (let i = 0; i < lineAnchors.length - 1; i++) {
+    edges.push({ from: lineAnchors[i], to: lineAnchors[i + 1] });
+  }
+  return edges;
 }
 
 export const DEFAULT_ANCHOR_REPORT: AnchorReportData = {

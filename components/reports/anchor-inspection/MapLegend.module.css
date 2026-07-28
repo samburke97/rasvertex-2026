@@ -24,6 +24,10 @@
   flex-shrink: 0;
 }
 
+.lineIcon {
+  flex-shrink: 0;
+}
+
 .label {
   font-size: 0.775rem;
   font-weight: 500;

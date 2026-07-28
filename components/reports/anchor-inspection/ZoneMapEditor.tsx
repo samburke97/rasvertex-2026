@@ -12,6 +12,7 @@ import {
   ANCHOR_TYPE_COLOURS,
   ANCHOR_TYPE_LABELS,
   ANCHOR_TYPE_OPTIONS,
+  computeStaticLineEdges,
   generateId,
   type AnchorPoint,
   type AnchorType,
@@ -77,6 +78,83 @@ async function urlToDataUrl(url: string): Promise<string> {
   });
 }
 
+// Google's satellite tiles are fixed north-up — there's no API to rotate the
+// actual tile imagery (confirmed: setting tilt/heading on a live map has no
+// effect outside a handful of major-metro "45° imagery" areas). Rotating the
+// live map's own container via CSS was tried and reverted — Google's pan
+// gestures compute deltas in the map's own unrotated coordinate space, so a
+// visually-rotated map makes dragging go in the wrong direction, and the
+// map's native zoom control (rendered inside that container) gets carried
+// out of the visible viewport along with it. Both are real, unfixable
+// limitations of transforming a widget Google controls internally — not
+// bugs to patch around.
+//
+// So: the live map stays completely native (perfect pan/zoom, controls in
+// their normal place). A thin rotated guide overlay (pointer-events: none)
+// gives a straightedge to line up against while framing. The chosen angle
+// is only actually applied once — baked into the captured bitmap the
+// instant "Use This View" fires, at the image's full native resolution
+// (not a fixed small size) so quality isn't lost.
+function coverScaleForRotation(angleDeg: number, w: number, h: number): number {
+  const rad = (angleDeg * Math.PI) / 180;
+  const cos = Math.abs(Math.cos(rad));
+  const sin = Math.abs(Math.sin(rad));
+  return Math.max((w * cos + h * sin) / w, (w * sin + h * cos) / h);
+}
+
+function rotateImageToDataUrl(
+  imageUrl: string,
+  angleDeg: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      // Full native resolution of the fetched capture (the static-map proxy
+      // already requests scale=2, so this is real detail, not a guess) —
+      // rotating into a smaller fixed canvas was silently downsampling the
+      // image every time a rotation was applied.
+      const targetRatio = PREVIEW_WIDTH / PREVIEW_HEIGHT;
+      const w = img.naturalWidth;
+      const h = Math.round(w / targetRatio);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas not supported"));
+        return;
+      }
+
+      // object-fit:cover-style crop of the source to the target aspect
+      // ratio first, so a non-8:5 image doesn't get stretched.
+      const srcRatio = img.naturalWidth / img.naturalHeight;
+      let sx: number, sy: number, sw: number, sh: number;
+      if (srcRatio > targetRatio) {
+        sh = img.naturalHeight;
+        sw = sh * targetRatio;
+        sx = (img.naturalWidth - sw) / 2;
+        sy = 0;
+      } else {
+        sw = img.naturalWidth;
+        sh = sw / targetRatio;
+        sx = 0;
+        sy = (img.naturalHeight - sh) / 2;
+      }
+
+      const scale = coverScaleForRotation(angleDeg, w, h);
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate((angleDeg * Math.PI) / 180);
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
+
+      resolve(canvas.toDataURL("image/jpeg", 0.92));
+    };
+    img.onerror = () => reject(new Error("Failed to load captured image"));
+    img.src = imageUrl;
+  });
+}
+
 export default function ZoneMapEditor({
   zone,
   jobAddress,
@@ -103,6 +181,11 @@ export default function ZoneMapEditor({
   const [capturing, setCapturing] = useState(false);
   const [captured, setCaptured] = useState<boolean>(!!zone.mapImageUrl);
 
+  // Rotation, dialed in live while framing the shot in step 1 — applied to
+  // the map's on-screen container as you set it, then baked into the
+  // captured bitmap the moment "Use This View" fires. No separate step.
+  const [mapRotation, setMapRotation] = useState(0);
+
   // ── Live map (Google Maps JS API) ────────────────────────────────────────
   const liveMapContainerRef = useRef<HTMLDivElement>(null);
   const liveMapRef = useRef<google.maps.Map | null>(null);
@@ -119,6 +202,10 @@ export default function ZoneMapEditor({
   const [selectedType, setSelectedType] = useState<AnchorType>(DEFAULT_TYPE);
   const [editingAnchor, setEditingAnchor] = useState<AnchorPoint | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  // "Close Loop" mode — armed from the last-placed static-line anchor;
+  // tapping another static-line pin while armed connects the two instead of
+  // opening its edit modal. Covers loops and any other non-sequential join.
+  const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const dragState = useRef<{
@@ -137,7 +224,10 @@ export default function ZoneMapEditor({
   const [activeAddress, setActiveAddress] = useState(jobAddress);
   const handleLocate = useCallback(() => {
     const trimmed = searchInput.trim();
-    if (trimmed) setActiveAddress(trimmed);
+    if (trimmed) {
+      setActiveAddress(trimmed);
+      setMapRotation(0);
+    }
   }, [searchInput]);
 
   const hasAddress = !!activeAddress?.trim();
@@ -286,7 +376,13 @@ export default function ZoneMapEditor({
         url = buildStaticUrl({ address: activeAddress.trim(), zoom: capturedZoom });
       }
 
-      const dataUrl = await urlToDataUrl(url);
+      let dataUrl = await urlToDataUrl(url);
+      // Bake in whatever rotation was dialed in while framing — silently,
+      // right here, no extra confirmation step.
+      if (mapRotation !== 0) {
+        dataUrl = await rotateImageToDataUrl(dataUrl, mapRotation);
+      }
+
       const updated: Zone = {
         ...localZone,
         name: zoneName,
@@ -303,7 +399,7 @@ export default function ZoneMapEditor({
     } finally {
       setCapturing(false);
     }
-  }, [hasAddress, activeAddress, zoomLevel, localZone, zoneName, save]);
+  }, [hasAddress, activeAddress, zoomLevel, mapRotation, localZone, zoneName, save]);
 
   // ── Re-capture ────────────────────────────────────────────────────────────
 
@@ -312,9 +408,10 @@ export default function ZoneMapEditor({
     setLocalZone(updated);
     save(updated);
     setCaptured(false);
+    setMapRotation(0);
   }, [localZone, save]);
 
-  // ── Upload fallback ───────────────────────────────────────────────────────
+  // ── Upload fallback — used as-is, no refine step ─────────────────────────
 
   const handleUploadMap = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -337,6 +434,7 @@ export default function ZoneMapEditor({
 
   const placePin = useCallback(
     (x: number, y: number) => {
+      const lastAnchor = localZone.anchors[localZone.anchors.length - 1];
       const anchor: AnchorPoint = {
         id: generateId(),
         x,
@@ -347,6 +445,12 @@ export default function ZoneMapEditor({
         inspectionDate: defaultInspectionDate,
         nextInspection: defaultNextInspection,
         result: "PASSED",
+        // Placing static-line anchors back-to-back auto-connects them into
+        // a chain — closing a loop later (Close Loop) adds an extra edge.
+        connectsTo:
+          selectedType === "static-line" && lastAnchor?.type === "static-line"
+            ? [lastAnchor.id]
+            : undefined,
       };
       const updated: Zone = {
         ...localZone,
@@ -363,6 +467,12 @@ export default function ZoneMapEditor({
     // Clicks bubble up from pin buttons too — ignore those, they're handled
     // by the pin's own pointer handlers (drag vs. tap-to-edit).
     if ((e.target as HTMLElement).closest(`.${styles.pin}`)) return;
+    // Tapping empty space while "Close Loop" is armed cancels it rather
+    // than placing a new pin — only tapping an existing pin can complete it.
+    if (connectingFrom) {
+      setConnectingFrom(null);
+      return;
+    }
     const rect = frozenMapRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = ((e.clientX - rect.left) / rect.width) * 100;
@@ -386,13 +496,20 @@ export default function ZoneMapEditor({
   // something else is left alone rather than silently overwritten.
   const AUTO_LABEL_RE = /^A\d+$/;
   const handlePinDelete = (anchorId: string) => {
+    if (connectingFrom === anchorId) setConnectingFrom(null);
     let seq = 0;
     const anchors = localZone.anchors
       .filter((a) => a.id !== anchorId)
       .map((a) => {
-        if (!AUTO_LABEL_RE.test(a.label)) return a;
+        // Drop any static-line edge pointing at the pin being deleted.
+        const connectsTo = a.connectsTo?.filter((id) => id !== anchorId);
+        const withCleanEdges =
+          connectsTo?.length !== a.connectsTo?.length
+            ? { ...a, connectsTo }
+            : a;
+        if (!AUTO_LABEL_RE.test(withCleanEdges.label)) return withCleanEdges;
         seq += 1;
-        return { ...a, label: `A${seq}` };
+        return { ...withCleanEdges, label: `A${seq}` };
       });
     const updated: Zone = { ...localZone, anchors };
     setLocalZone(updated);
@@ -454,6 +571,35 @@ export default function ZoneMapEditor({
     [],
   );
 
+  // Completes "Close Loop": adds an edge from the armed anchor to whichever
+  // static-line pin was tapped next. A no-op (just disarms) if they're the
+  // same pin or it's already connected. Reads connectingFrom directly
+  // (not via a setState updater) — save() updates the *parent's* state, and
+  // calling that from inside another component's state updater trips
+  // React's "setState while rendering a different component" check.
+  const handleConnectTo = useCallback(
+    (targetId: string) => {
+      if (!connectingFrom || connectingFrom === targetId) {
+        setConnectingFrom(null);
+        return;
+      }
+      const from = connectingFrom;
+      const updated: Zone = {
+        ...localZone,
+        anchors: localZone.anchors.map((a) => {
+          if (a.id !== from) return a;
+          const existing = a.connectsTo ?? [];
+          if (existing.includes(targetId)) return a;
+          return { ...a, connectsTo: [...existing, targetId] };
+        }),
+      };
+      setLocalZone(updated);
+      save(updated);
+      setConnectingFrom(null);
+    },
+    [connectingFrom, localZone, save],
+  );
+
   const handlePinPointerUp = useCallback(
     (e: React.PointerEvent<HTMLButtonElement>, anchor: AnchorPoint) => {
       const ds = dragState.current;
@@ -463,16 +609,29 @@ export default function ZoneMapEditor({
 
       if (ds.moved) {
         save(localZoneRef.current);
+      } else if (connectingFrom) {
+        // Tapping a non-static-line pin while armed just cancels — only a
+        // static-line target can complete the connection.
+        if (anchor.type === "static-line") handleConnectTo(anchor.id);
+        else setConnectingFrom(null);
       } else {
         setEditingAnchor(anchor);
       }
     },
-    [save],
+    [save, connectingFrom, handleConnectTo],
   );
 
   const activeTypes = [
     ...new Set(localZone.anchors.map((a) => a.type)),
   ] as AnchorType[];
+
+  const staticLineEdges = computeStaticLineEdges(localZone.anchors);
+  const lastAnchor = localZone.anchors[localZone.anchors.length - 1];
+  const canCloseLoop =
+    selectedType === "static-line" &&
+    !!lastAnchor &&
+    lastAnchor.type === "static-line" &&
+    localZone.anchors.filter((a) => a.type === "static-line").length > 1;
 
   return (
     <div className={styles.page}>
@@ -537,7 +696,8 @@ export default function ZoneMapEditor({
       </div>
 
       {/* Step indicator — always visible so it's unambiguous which phase
-          you're in and what's left. */}
+          you're in and what's left. Rotate/crop is still "Set Aerial View"
+          — framing the shot isn't done until it's confirmed. */}
       <div className={styles.stepBar}>
         <span
           className={`${styles.step} ${!captured ? styles.stepActive : styles.stepDone}`}
@@ -636,6 +796,21 @@ export default function ZoneMapEditor({
               {opt.label}
             </button>
           ))}
+
+          {canCloseLoop && (
+            <button
+              type="button"
+              className={`${styles.closeLoopBtn} ${connectingFrom ? styles.closeLoopBtnActive : ""}`}
+              onClick={() =>
+                setConnectingFrom((from) => (from ? null : (lastAnchor?.id ?? null)))
+              }
+              title="Connect the last static line anchor to another one — e.g. to close a loop"
+            >
+              {connectingFrom
+                ? "Tap an anchor to connect…"
+                : "⤾ Close Loop"}
+            </button>
+          )}
         </div>
       )}
 
@@ -646,11 +821,51 @@ export default function ZoneMapEditor({
           {!captured ? (
             hasAddress ? (
               HAS_LIVE_MAPS ? (
-                <div
-                  key="live-map"
-                  className={styles.liveMapContainer}
-                  ref={liveMapContainerRef}
-                />
+                <div key="live-map" className={styles.liveMapWrap}>
+                  {/* The map itself is never transformed — Google's own pan
+                      gestures and native zoom control both assume an
+                      unrotated container, so rotating this div breaks both
+                      (confirmed the hard way). This is a straightedge guide
+                      only, purely visual, clicks pass straight through it. */}
+                  <div
+                    className={styles.liveMapContainer}
+                    ref={liveMapContainerRef}
+                  />
+                  {liveMapReady && !liveMapError && mapRotation !== 0 && (
+                    <div
+                      className={styles.rotateGuideOverlay}
+                      style={{ transform: `rotate(${mapRotation}deg)` }}
+                    >
+                      <div className={styles.rotateGuideLineH} />
+                      <div className={styles.rotateGuideLineV} />
+                    </div>
+                  )}
+                  {liveMapReady && !liveMapError && (
+                    <div className={styles.rotateControls}>
+                      <button
+                        type="button"
+                        className={styles.rotateResetBtn}
+                        onClick={() => setMapRotation(0)}
+                        disabled={mapRotation === 0}
+                        aria-label="Reset rotation"
+                        title="Reset rotation"
+                      >
+                        ⟲
+                      </button>
+                      <input
+                        type="range"
+                        min={-180}
+                        max={180}
+                        step={1}
+                        value={mapRotation}
+                        onChange={(e) => setMapRotation(Number(e.target.value))}
+                        className={styles.rotateSlider}
+                        aria-label="Straighten angle, applied when captured"
+                      />
+                      <span className={styles.rotateValue}>{mapRotation}°</span>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div
                   key="static-preview"
@@ -732,12 +947,44 @@ export default function ZoneMapEditor({
                   draggable={false}
                 />
 
+                {/* Static line cable path — every explicit connection
+                    between static-line pins, chain or loop alike. Behind
+                    the pins, ignores pointer events so it never blocks
+                    placing/dragging. */}
+                {staticLineEdges.length > 0 && (
+                  <svg
+                    className={styles.staticLineOverlay}
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                  >
+                    {staticLineEdges.map((edge, i) => (
+                      <line
+                        key={i}
+                        x1={edge.from.x}
+                        y1={edge.from.y}
+                        x2={edge.to.x}
+                        y2={edge.to.y}
+                        stroke={ANCHOR_TYPE_COLOURS["static-line"]}
+                        strokeWidth={0.5}
+                        vectorEffect="non-scaling-stroke"
+                        strokeLinecap="round"
+                      />
+                    ))}
+                  </svg>
+                )}
+
                 {/* Anchor pins */}
                 {localZone.anchors.map((anchor) => (
                   <button
                     key={anchor.id}
                     className={`${styles.pin} ${
                       draggingId === anchor.id ? styles.pinDragging : ""
+                    } ${connectingFrom === anchor.id ? styles.pinConnecting : ""} ${
+                      connectingFrom &&
+                      connectingFrom !== anchor.id &&
+                      anchor.type === "static-line"
+                        ? styles.pinConnectTarget
+                        : ""
                     }`}
                     style={{
                       left: `${anchor.x}%`,

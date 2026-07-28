@@ -7,7 +7,11 @@
 // requests and images always appear in the rendered PDF.
 
 import type { AnchorReportData, Zone } from "./anchor.types";
-import { ANCHOR_TYPE_LABELS, ANCHOR_TYPE_COLOURS } from "./anchor.types";
+import {
+  ANCHOR_TYPE_LABELS,
+  ANCHOR_TYPE_COLOURS,
+  computeStaticLineEdges,
+} from "./anchor.types";
 import {
   BRAND_NAVY,
   DEFAULT_PRINT_ASSETS,
@@ -205,9 +209,15 @@ const PRINT_STYLES = `
     max-height: 340px;
     object-fit: cover;
   }
+  .zone-line-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
   .zone-pin {
     position: absolute;
-    transform: translate(-50%, -100%);
+    transform: translate(-50%, -50%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -271,6 +281,11 @@ const PRINT_STYLES = `
     border-radius: 50%;
     flex-shrink: 0;
     display: inline-block;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .zone-legend-line-icon {
+    flex-shrink: 0;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -688,9 +703,26 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
     })
     .join("");
 
+  // Static line cable path — every explicit connection between static-line
+  // pins (chain or loop alike), drawn behind the pins. See
+  // computeStaticLineEdges for how connections are determined.
+  const staticLineEdges = computeStaticLineEdges(zone.anchors);
+  const staticLineSvg =
+    staticLineEdges.length > 0
+      ? `<svg class="zone-line-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
+          ${staticLineEdges
+            .map(
+              (edge) =>
+                `<line x1="${edge.from.x}" y1="${edge.from.y}" x2="${edge.to.x}" y2="${edge.to.y}" stroke="${ANCHOR_TYPE_COLOURS["static-line"]}" stroke-width="0.5" vector-effect="non-scaling-stroke" stroke-linecap="round" />`,
+            )
+            .join("")}
+        </svg>`
+      : "";
+
   const mapBlock = zone.mapImageUrl
     ? `<div class="zone-map-wrap">
         <img class="zone-map-img" src="${esc(zone.mapImageUrl)}" alt="Zone aerial" />
+        ${staticLineSvg}
         ${pinOverlays}
       </div>`
     : "";
@@ -710,15 +742,23 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
   const legendHTML =
     typesSeen.size > 0
       ? `<div class="zone-legend">
-        ${[...typesSeen.values()]
-          .map(
-            (t) => `
+        ${[...typesSeen.entries()]
+          .map(([typeId, t]) => {
+            const icon =
+              typeId === "static-line"
+                ? `<svg class="zone-legend-line-icon" width="14" height="10" viewBox="0 0 14 10">
+                     <line x1="1" y1="5" x2="13" y2="5" stroke="${t.colour}" stroke-width="1.5" stroke-linecap="round" />
+                     <circle cx="1" cy="5" r="1.5" fill="${t.colour}" />
+                     <circle cx="13" cy="5" r="1.5" fill="${t.colour}" />
+                   </svg>`
+                : `<span class="zone-legend-dot" style="background:${t.colour};"></span>`;
+            return `
           <div class="zone-legend-item">
-            <span class="zone-legend-dot" style="background:${t.colour};"></span>
+            ${icon}
             <span class="zone-legend-label">${esc(t.label)}</span>
             <span class="zone-legend-count">${t.total}</span>
-          </div>`,
-          )
+          </div>`;
+          })
           .join("")}
       </div>`
       : "";
