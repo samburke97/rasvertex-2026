@@ -13,7 +13,7 @@
 }
 
 .wrapFocused {
-  border-color: var(--primary-400, #74db89);
+  border-color: var(--brand-primary, #900c40);
 }
 
 /* ── Toolbar — only rendered when focused, no animation needed ─────────── */
@@ -73,7 +73,7 @@
 
 .btnActive {
   background: rgba(116, 219, 137, 0.18);
-  color: var(--primary-600, #16a34a);
+  color: var(--brand-primary, #900c40);
 }
 
 .btnActive:hover {

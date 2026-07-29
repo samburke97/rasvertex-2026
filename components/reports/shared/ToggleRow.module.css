@@ -67,7 +67,7 @@
 }
 
 .input:checked ~ .track {
-  background: var(--primary-400, #74db89);
+  background: var(--brand-primary, #900c40);
 }
 
 .thumb {

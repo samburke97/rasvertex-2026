@@ -8,7 +8,6 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import Image from "next/image";
 import styles from "./RecurringJobsPage.module.css";
 import type { RecertificationJob } from "@/lib/recertifications/types";
 import {
@@ -17,6 +16,15 @@ import {
   isRecurringCategory,
   type RecurringCategory,
 } from "@/lib/recertifications/categories";
+import Card from "@/components/ui/Card";
+import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
+import Modal from "@/components/ui/Modal";
+import Toast from "@/components/ui/Toast";
+import CountBadge from "@/components/ui/CountBadge";
+import SearchInput from "@/components/ui/SearchInput";
+import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import DataTable, { type Column } from "@/components/ui/DataTable";
 
 function formatDate(iso: string): string {
   if (!iso) return "—";
@@ -52,11 +60,11 @@ function StatusPill({
 }) {
   if (status === "overdue")
     return (
-      <span className={styles.pillOverdue}>Overdue {Math.abs(days)}d</span>
+      <CountBadge variant="danger" label={`Overdue ${Math.abs(days)}d`} />
     );
   if (status === "due-soon")
-    return <span className={styles.pillDueSoon}>Due in {days}d</span>;
-  return <span className={styles.pillUpcoming}>{days}d away</span>;
+    return <CountBadge variant="warning" label={`Due in ${days}d`} />;
+  return <CountBadge variant="neutral" label={`${days}d away`} />;
 }
 
 // ── Parse deep link params synchronously ─────────────────────────────────
@@ -112,8 +120,8 @@ function parseDeepLinkParams(): {
   };
 }
 
-// ── Confirm modal ─────────────────────────────────────────────────────────
-function ConfirmModal({
+// ── Confirm quote modal ────────────────────────────────────────────────────
+function ConfirmQuoteModal({
   job,
   category,
   onConfirm,
@@ -166,69 +174,28 @@ function ConfirmModal({
   ];
 
   return (
-    <div className={styles.modalOverlay}>
-      <div className={styles.modal}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Create quote in SimPRO</h2>
-          <button className={styles.modalClose} onClick={onCancel}>
-            ×
-          </button>
-        </div>
-        <div className={styles.modalBody}>
-          {rows.map(({ label, value, highlight }) => (
-            <React.Fragment key={label}>
-              <div className={styles.modalRow}>
-                <span className={styles.modalLabel}>{label}</span>
-                <span
-                  className={`${styles.modalValue} ${highlight ? styles.modalValueGreen : ""}`}
-                >
-                  {value}
-                </span>
-              </div>
-            </React.Fragment>
-          ))}
-        </div>
-        <div className={styles.modalFooter}>
-          <button
-            className={styles.modalCancelBtn}
-            onClick={onCancel}
-            disabled={creating}
-          >
-            Cancel
-          </button>
-          <button
-            className={styles.modalConfirmBtn}
-            onClick={onConfirm}
-            disabled={creating}
-          >
-            {creating ? "Creating…" : "Create in SimPRO"}
-          </button>
-        </div>
+    <Modal isOpen title="Create quote in SimPRO" onClose={onCancel}>
+      <div className={styles.modalRows}>
+        {rows.map(({ label, value, highlight }) => (
+          <div className={styles.modalRow} key={label}>
+            <span className={styles.modalLabel}>{label}</span>
+            <span
+              className={`${styles.modalValue} ${highlight ? styles.modalValueHighlight : ""}`}
+            >
+              {value}
+            </span>
+          </div>
+        ))}
       </div>
-    </div>
-  );
-}
-
-// ── Toast ─────────────────────────────────────────────────────────────────
-function Toast({ message, onClose }: { message: string; onClose: () => void }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 4000);
-    return () => clearTimeout(t);
-  }, [onClose]);
-  return (
-    <div className={styles.toast}>
-      {message}
-      <button className={styles.toastClose} onClick={onClose}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/icons/utility-outline/close.svg"
-          width={14}
-          height={14}
-          alt="Close"
-          style={{ opacity: 0.5, display: "block" }}
-        />
-      </button>
-    </div>
+      <div className={styles.modalFooter}>
+        <Button variant="secondary" onClick={onCancel} disabled={creating}>
+          Cancel
+        </Button>
+        <Button variant="brand" onClick={onConfirm} disabled={creating}>
+          {creating ? "Creating…" : "Create in SimPRO"}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -469,6 +436,94 @@ export default function RecurringJobsPage() {
     { key: "hidden", count: ignoredJobs.length, label: "Hidden" },
   ];
 
+  const isHiddenView = filter === "hidden";
+
+  const columns: Column<RecertificationJob>[] = [
+    { key: "customer", header: "Customer" },
+    { key: "site", header: "Site" },
+    {
+      key: "completedDate",
+      header: "Last Completed",
+      render: (job) => (
+        <span className={styles.tdMuted}>{formatDate(job.completedDate)}</span>
+      ),
+    },
+    {
+      key: "nextDueDate",
+      header: "Next Due",
+      render: (job) => (
+        <span
+          className={`${styles.tdMuted} ${job.status === "overdue" && !isHiddenView ? styles.tdOverdue : ""}`}
+        >
+          {formatDate(job.nextDueDate)}
+        </span>
+      ),
+    },
+    {
+      key: "totalExTax",
+      header: "Last Price",
+      render: (job) => (
+        <span className={styles.tdMuted}>
+          {formatCurrency(job.totalExTax)} ex
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (job) => <StatusPill status={job.status} days={job.daysUntilDue} />,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (job) => {
+        const isIgnoring = ignoringId === job.id;
+        return (
+          <div className={styles.actions}>
+            {!isHiddenView && (
+              <IconButton
+                variant="secondary"
+                size="sm"
+                title="Create quote"
+                onClick={() => handleQuoteAction(job)}
+                icon={
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src="/icons/utility-outline/edit.svg" width={15} height={15} alt="" />
+                }
+              />
+            )}
+            {isHiddenView ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => handleRestore(job)}
+                disabled={isIgnoring}
+              >
+                {isIgnoring ? "…" : "Restore"}
+              </Button>
+            ) : (
+              <IconButton
+                variant="secondary"
+                size="sm"
+                title="Hide"
+                onClick={() => handleIgnore(job)}
+                disabled={isIgnoring}
+                icon={
+                  isIgnoring ? (
+                    "…"
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src="/icons/utility-outline/trash.svg" width={15} height={15} alt="" />
+                  )
+                }
+              />
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className={styles.page}>
       {/* ── Category selector ── */}
@@ -492,183 +547,70 @@ export default function RecurringJobsPage() {
           {syncedAt && (
             <span className={styles.syncedAt}>Synced {timeAgo(syncedAt)}</span>
           )}
-          <button
-            className={styles.refreshBtn}
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={sync}
             disabled={syncing || loading}
           >
             {syncing ? "Syncing…" : "↺ Sync"}
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className={styles.cards}>
         {cards.map(({ key, count, label, colorClass }) => (
-          <button
+          <Card
             key={key}
-            className={`${styles.card} ${filter === key ? styles.cardActive : ""}`}
+            interactive
             onClick={() => setFilter(key)}
+            padding="sm"
+            className={`${styles.card} ${filter === key ? styles.cardActive : ""}`}
           >
             <span className={`${styles.cardCount} ${colorClass ?? ""}`}>
               {count}
             </span>
             <span className={styles.cardLabel}>{label}</span>
-          </button>
+          </Card>
         ))}
       </div>
 
       <div className={styles.searchRow}>
-        <div className={styles.searchWrap}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/icons/utility-outline/search.svg"
-            width={14}
-            height={14}
-            alt=""
-            className={styles.searchIcon}
-          />
-          <input
-            className={styles.searchInput}
-            placeholder="Search customer or site..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {search && (
-            <button
-              className={styles.searchClearBtn}
-              onClick={() => setSearch("")}
-              aria-label="Clear search"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/icons/utility-outline/cross.svg"
-                width={12}
-                height={12}
-                alt="Clear"
-              />
-            </button>
-          )}
-        </div>
+        <SearchInput
+          placeholder="Search customer or site..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onClear={() => setSearch("")}
+          className={styles.searchWrap}
+        />
       </div>
 
       {loading ? (
         <div className={styles.loadingState}>
-          <div className={styles.spinner} />
+          <LoadingSpinner />
         </div>
       ) : error ? (
         <div className={styles.emptyState}>
           {error}
-          <button className={styles.retryBtn} onClick={() => load(category)}>
+          <Button variant="secondary" size="sm" onClick={() => load(category)}>
             Retry
-          </button>
+          </Button>
         </div>
       ) : (
-        <div className={styles.tableContainer}>
-          {filtered.length === 0 ? (
-            <div className={styles.emptyState}>
-              {search ? `No results for "${search}"` : "Nothing here."}
-            </div>
-          ) : (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th className={styles.th}>Customer</th>
-                  <th className={styles.th}>Site</th>
-                  <th className={styles.th}>Last Completed</th>
-                  <th className={styles.th}>Next Due</th>
-                  <th className={styles.th}>Last Price</th>
-                  <th className={styles.th}>Status</th>
-                  <th className={styles.th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((job) => {
-                  const isHidden = filter === "hidden";
-                  const isIgnoring = ignoringId === job.id;
-                  return (
-                    <tr
-                      key={job.id}
-                      className={`${styles.tr} ${isHidden ? styles.trHidden : ""}`}
-                    >
-                      <td className={styles.td}>{job.customer}</td>
-                      <td className={styles.td}>{job.site}</td>
-                      <td className={`${styles.td} ${styles.tdMuted}`}>
-                        {formatDate(job.completedDate)}
-                      </td>
-                      <td
-                        className={`${styles.td} ${styles.tdMuted} ${job.status === "overdue" && !isHidden ? styles.tdOverdue : ""}`}
-                      >
-                        {formatDate(job.nextDueDate)}
-                      </td>
-                      <td className={`${styles.td} ${styles.tdMuted}`}>
-                        {formatCurrency(job.totalExTax)} ex
-                      </td>
-                      <td className={styles.td}>
-                        <StatusPill
-                          status={job.status}
-                          days={job.daysUntilDue}
-                        />
-                      </td>
-                      <td className={styles.td}>
-                        <div className={styles.actions}>
-                          {!isHidden && (
-                            <button
-                              className={styles.actionBtn}
-                              onClick={() => handleQuoteAction(job)}
-                              title="Create quote"
-                            >
-                              <Image
-                                src="/icons/utility-outline/edit.svg"
-                                width={15}
-                                height={15}
-                                alt="Create quote"
-                                className={styles.actionIcon}
-                                priority
-                              />
-                            </button>
-                          )}
-                          {isHidden ? (
-                            <button
-                              className={styles.restoreBtn}
-                              onClick={() => handleRestore(job)}
-                              disabled={isIgnoring}
-                            >
-                              {isIgnoring ? "…" : "Restore"}
-                            </button>
-                          ) : (
-                            <button
-                              className={styles.actionBtn}
-                              onClick={() => handleIgnore(job)}
-                              disabled={isIgnoring}
-                              title="Hide"
-                            >
-                              {isIgnoring ? (
-                                "…"
-                              ) : (
-                                <Image
-                                  src="/icons/utility-outline/trash.svg"
-                                  width={15}
-                                  height={15}
-                                  alt="Hide"
-                                  className={styles.actionIcon}
-                                  priority
-                                />
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <DataTable
+          columns={columns}
+          data={filtered}
+          keyField="id"
+          rowClassName={() => (isHiddenView ? styles.trHidden : "")}
+          emptyMessage={
+            search ? `No results for "${search}"` : "Nothing here."
+          }
+          itemsPerPage={25}
+        />
       )}
 
       {confirmJob && (
-        <ConfirmModal
+        <ConfirmQuoteModal
           job={confirmJob}
           category={category}
           onConfirm={handleCreateQuote}
@@ -676,7 +618,9 @@ export default function RecurringJobsPage() {
           creating={creating}
         />
       )}
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      {toast && (
+        <Toast message={toast} type="success" onClose={() => setToast(null)} />
+      )}
     </div>
   );
 }

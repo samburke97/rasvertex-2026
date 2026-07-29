@@ -86,11 +86,11 @@
 }
 
 .input::placeholder {
-  color: var(--Foreground-Medium, #7e807f);
+  color: var(--for-medium, #7e807f);
 }
 
 .inputWrapper.hasError {
-  border: 1px solid var(--Red-Wine-Red-Wine, #900c40);
+  border: 1px solid var(--red-wine-300, #900c40);
 }
 
 .input:disabled {
@@ -114,7 +114,7 @@
 
 .charCount {
   width: 72px;
-  color: var(--Foreground-Medium, #7e807f);
+  color: var(--for-medium, #7e807f);
   text-align: right;
   font-family: Inter, var(--font-family);
   font-size: 14px;
@@ -126,7 +126,7 @@
 
 .errorText {
   font-size: 0.875rem;
-  color: var(--Red-Wine-Red-Wine, #900c40);
+  color: var(--red-wine-300, #900c40);
   margin-top: 0.25rem;
 }
 

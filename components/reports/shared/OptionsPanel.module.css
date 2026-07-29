@@ -26,8 +26,8 @@
 .group {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1.25rem 1rem;
+  gap: 0.875rem;
+  padding: 1.5rem 1.25rem;
   border-bottom: 1px solid var(--out-light, #f0f0f0);
 }
 
@@ -36,7 +36,7 @@
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--for-light, #9ca3af);
+  color: var(--for-medium, #7e807f);
 }
 
 .groupLabelRow {
@@ -71,8 +71,8 @@
 }
 
 .coverPhotoUpload:hover {
-  border-color: var(--primary-400, #74db89);
-  background: var(--primary-50, #f0fdf4);
+  border-color: var(--brand-primary, #900c40);
+  background: var(--brand-primary-light, #faebf1);
 }
 
 .coverPhotoUploadIcon {
@@ -88,7 +88,7 @@
 
 .coverPhotoUploadSub {
   font-size: 0.7rem;
-  color: var(--for-light, #9ca3af);
+  color: var(--for-medium, #7e807f);
 }
 
 .coverPhotoPreview {
@@ -130,7 +130,7 @@
 }
 
 .coverPhotoChange:hover {
-  border-color: var(--primary-400, #74db89);
+  border-color: var(--brand-primary, #900c40);
 }
 
 .coverPhotoRemove {
@@ -182,13 +182,13 @@
 }
 
 .presetBtn:hover {
-  border-color: var(--primary-400, #74db89);
+  border-color: var(--brand-primary, #900c40);
 }
 
 .presetBtnActive {
-  background: var(--primary-50, #f0fdf4);
-  border-color: var(--primary-400, #74db89);
-  color: var(--primary-700, #047857);
+  background: var(--brand-primary-light, #faebf1);
+  border-color: var(--brand-primary, #900c40);
+  color: var(--brand-primary, #900c40);
 }
 
 .presetBtn:disabled {
@@ -221,7 +221,7 @@
 }
 
 .dateInput:focus {
-  border-color: var(--primary-400, #74db89);
+  border-color: var(--brand-primary, #900c40);
 }
 
 .dateSep {
@@ -233,12 +233,12 @@
 /* ── Misc ────────────────────────────────────────────────────────────────── */
 .filterCount {
   font-size: 0.72rem;
-  color: var(--for-light, #9ca3af);
+  color: var(--for-medium, #7e807f);
   margin: 0;
 }
 
 .filterCountActive {
-  color: var(--primary-600, #059669);
+  color: var(--brand-primary, #900c40);
 }
 
 .addBtn {
@@ -262,15 +262,15 @@
 }
 
 .addBtn:hover {
-  border-color: var(--primary-400, #74db89);
-  color: var(--primary-700, #047857);
+  border-color: var(--brand-primary, #900c40);
+  color: var(--brand-primary, #900c40);
 }
 
 /* ── Zone list (anchor report) ───────────────────────────────────────────── */
 .zoneStats {
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--primary-600, #059669);
+  color: var(--brand-primary, #900c40);
 }
 
 .addZoneBtn {
@@ -294,9 +294,9 @@
 }
 
 .addZoneBtn:hover {
-  border-color: var(--primary-400, #74db89);
-  color: var(--primary-700, #047857);
-  background: var(--primary-50, #f0fdf4);
+  border-color: var(--brand-primary, #900c40);
+  color: var(--brand-primary, #900c40);
+  background: var(--brand-primary-light, #faebf1);
 }
 
 .zoneList {
@@ -375,7 +375,7 @@
 
 .zoneCount {
   font-size: 0.72rem;
-  color: var(--for-light, #9ca3af);
+  color: var(--for-medium, #7e807f);
 }
 
 .zoneChevron {

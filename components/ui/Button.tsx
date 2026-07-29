@@ -6,7 +6,7 @@ import styles from "./Button.module.css";
 
 export type ButtonVariant =
   | "primary"
-  | "primary-green"
+  | "brand"
   | "secondary"
   | "outline"
   | "ghost"

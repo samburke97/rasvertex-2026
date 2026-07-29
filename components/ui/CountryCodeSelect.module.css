@@ -8,16 +8,24 @@
   align-items: center;
   gap: 4px;
   padding: 10px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background-color: var(--bg-standard);
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: var(--border-radius-md, 8px);
+  background-color: var(--bg-card, #fff);
   cursor: pointer;
   transition: border-color 0.2s;
   user-select: none;
 }
 
 .selector:hover {
-  border-color: var(--grey-500);
+  border-color: var(--for-medium, #7e807f);
+}
+
+/* Composed inside another input's own bordered container (e.g. PhoneInput)
+   — no border/background/padding of its own. */
+.selector.inline {
+  padding: 0;
+  border: none;
+  background: transparent;
 }
 
 .flag {
@@ -43,9 +51,9 @@
   width: 240px;
   max-height: 300px;
   overflow-y: auto;
-  background-color: var(--bg-standard);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  background-color: var(--bg-card, #fff);
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: var(--border-radius-md, 8px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 10;
 }
@@ -64,7 +72,7 @@
 }
 
 .option.selected {
-  background-color: var(--primary-100);
+  background-color: var(--brand-primary-light, #faebf1);
 }
 
 .option .flag {

@@ -11,10 +11,23 @@ export type AnchorType =
 
 export type PassFail = "PASSED" | "FAILED" | "N/A";
 
+// Mounting sub-option — only meaningful for anchor types listed in
+// ANCHOR_TYPE_SUBTYPES. Shared across types (e.g. "eye-bolt" means the same
+// thing whether it's a fall-arrest-anchor or a rope-access-anchor), so this
+// is one flat enum rather than a per-type one.
+export type AnchorSubtype =
+  | "surface-mount"
+  | "eye-bolt"
+  | "through-bolt"
+  | "screw-in"
+  | "tensile";
+
 export interface AnchorPoint {
   id: string;
   label: string; // "Asset #" in the UI
   type: AnchorType;
+  // Only set (and only shown in the UI) for types in ANCHOR_TYPE_SUBTYPES.
+  subtype?: AnchorSubtype;
   commissionDate?: string;
   inspectionDate: string;
   nextInspection: string;
@@ -87,6 +100,53 @@ export const ANCHOR_TYPE_OPTIONS: { value: AnchorType; label: string }[] =
     label,
   }));
 
+export const ANCHOR_SUBTYPE_LABELS: Record<AnchorSubtype, string> = {
+  "surface-mount": "Surface Mount",
+  "eye-bolt": "Eye Bolt",
+  "through-bolt": "Through Bolt",
+  "screw-in": "Screw In",
+  tensile: "Tensile",
+};
+
+// Only these anchor types offer a mounting sub-choice; anything absent
+// here places directly, no sub-picker shown.
+export const ANCHOR_TYPE_SUBTYPES: Partial<Record<AnchorType, AnchorSubtype[]>> = {
+  "fall-arrest-anchor": ["surface-mount", "eye-bolt"],
+  "rope-access-anchor": [
+    "surface-mount",
+    "eye-bolt",
+    "through-bolt",
+    "screw-in",
+    "tensile",
+  ],
+};
+
+// Simple geometric shape used to tell subtypes apart in the legend — colour
+// alone can't do it since a subtype shares its parent type's colour.
+export type LegendIconShape =
+  | "dot"
+  | "static-line"
+  | "circle"
+  | "ring"
+  | "square"
+  | "triangle"
+  | "diamond";
+
+export const ANCHOR_SUBTYPE_ICONS: Record<AnchorSubtype, LegendIconShape> = {
+  "surface-mount": "circle",
+  "eye-bolt": "ring",
+  "through-bolt": "square",
+  "screw-in": "triangle",
+  tensile: "diamond",
+};
+
+export function anchorTypeDisplayLabel(anchor: AnchorPoint): string {
+  const base = ANCHOR_TYPE_LABELS[anchor.type];
+  return anchor.subtype
+    ? `${base} – ${ANCHOR_SUBTYPE_LABELS[anchor.subtype]}`
+    : base;
+}
+
 export function generateId(): string {
   return Math.random().toString(36).slice(2, 9);
 }
@@ -126,6 +186,65 @@ export function computeStaticLineEdges(anchors: AnchorPoint[]): StaticLineEdge[]
     edges.push({ from: lineAnchors[i], to: lineAnchors[i + 1] });
   }
   return edges;
+}
+
+export interface LegendGroup {
+  key: string;
+  label: string;
+  count: number;
+  colour: string;
+  icon: LegendIconShape;
+}
+
+// Shared by the live editor, the in-app report preview, and the exported
+// PDF so all three always render the exact same legend from the exact same
+// data — the static-line connecting-line bug earlier came from this kind
+// of grouping logic being reimplemented three times and drifting apart.
+export function buildLegendGroups(
+  types: AnchorType[],
+  anchors: AnchorPoint[],
+): LegendGroup[] {
+  const groups: LegendGroup[] = [];
+  for (const type of types) {
+    const subtypes = ANCHOR_TYPE_SUBTYPES[type];
+    const colour = ANCHOR_TYPE_COLOURS[type];
+    const anchorsOfType = anchors.filter((a) => a.type === type);
+    if (!subtypes) {
+      groups.push({
+        key: type,
+        label: ANCHOR_TYPE_LABELS[type],
+        count: anchorsOfType.length,
+        colour,
+        icon: type === "static-line" ? "static-line" : "dot",
+      });
+      continue;
+    }
+    // Anchors placed before subtypes existed (or left unset) fall back to
+    // one plain row for the parent type, same idea as the static-line
+    // legacy-data fallback in computeStaticLineEdges.
+    const noSubtypeCount = anchorsOfType.filter((a) => !a.subtype).length;
+    if (noSubtypeCount > 0) {
+      groups.push({
+        key: `${type}:none`,
+        label: ANCHOR_TYPE_LABELS[type],
+        count: noSubtypeCount,
+        colour,
+        icon: "dot",
+      });
+    }
+    for (const subtype of subtypes) {
+      const count = anchorsOfType.filter((a) => a.subtype === subtype).length;
+      if (count === 0) continue;
+      groups.push({
+        key: `${type}:${subtype}`,
+        label: `${ANCHOR_TYPE_LABELS[type]} – ${ANCHOR_SUBTYPE_LABELS[subtype]}`,
+        count,
+        colour,
+        icon: ANCHOR_SUBTYPE_ICONS[subtype],
+      });
+    }
+  }
+  return groups;
 }
 
 export const DEFAULT_ANCHOR_REPORT: AnchorReportData = {

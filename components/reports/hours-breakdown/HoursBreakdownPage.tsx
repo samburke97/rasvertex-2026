@@ -7,6 +7,8 @@ import ScheduleSection from "../condition/sections/ScheduleSection";
 import HoursBreakdownOptionsPanel from "./HoursBreakdownOptionsPanel";
 import HoursSaveToJobModal from "./HoursSaveToJobModal";
 import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
+import SavedBadge from "../shared/SavedBadge";
 import {
   filterScheduleByDateRange,
   type ScheduleRow,
@@ -210,35 +212,23 @@ export default function HoursBreakdownPage({ onBack }: Props) {
     <div className={styles.page}>
       {/* ── Top bar — identical structure to ConditionReportPage ── */}
       <div className={styles.topBar}>
-        <button className={styles.backBtn} onClick={onBack}>
-          ← Report types
-        </button>
+        <IconButton
+          variant="secondary"
+          size="sm"
+          onClick={onBack}
+          aria-label="Back to report types"
+          icon={
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/icons/utility-outline/back.svg" alt="" width={18} height={18} />
+          }
+        />
         <div className={styles.topBarRight}>
           <span className={styles.topBarTitle}>Hours Breakdown</span>
-          <span className={styles.photoCount}>
+          <span className={styles.badge}>
             {filteredSchedule.length} row
             {filteredSchedule.length !== 1 ? "s" : ""}
           </span>
-          {savedFilename && (
-            <span className={styles.savedBadge}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <circle
-                  cx="6"
-                  cy="6"
-                  r="6"
-                  fill="var(--primary-400, #10b981)"
-                />
-                <path
-                  d="M3.5 6l2 2 3-3"
-                  stroke="#fff"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Saved
-            </span>
-          )}
+          {savedFilename && <SavedBadge />}
           <Button
             variant="secondary"
             size="sm"

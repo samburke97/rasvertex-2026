@@ -67,7 +67,7 @@
 }
 
 .input::placeholder {
-  color: var(--Foreground-Medium, #7e807f);
+  color: var(--for-medium, #7e807f);
 }
 
 .input:read-only {

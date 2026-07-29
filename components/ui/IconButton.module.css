@@ -2,10 +2,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
-  transition: all 0.2s;
+  border-radius: var(--border-radius-full, 9999px);
+  background-color: var(--bg-card, #fff);
+  border: 1px solid var(--out-medium, #d9dbdb);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
   cursor: pointer;
   padding: 0;
   overflow: hidden;
@@ -34,33 +36,33 @@
 
 /* Style variants */
 .primary {
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
-  color: #333;
+  background-color: var(--bg-card, #fff);
+  border: 1px solid var(--out-medium, #d9dbdb);
+  color: var(--for-darkest, #141414);
 }
 
 .primary:hover {
-  background-color: #f5f5f5;
+  background-color: var(--con-light, #fafafa);
 }
 
 .secondary {
-  background-color: #f5f5f5;
-  border: 1px solid #e0e0e0;
-  color: #333;
+  background-color: var(--con-light, #fafafa);
+  border: 1px solid var(--out-medium, #d9dbdb);
+  color: var(--for-darkest, #141414);
 }
 
 .secondary:hover {
-  background-color: #e0e0e0;
+  background-color: var(--con-medium, #edf0f0);
 }
 
 .ghost {
-  background-color: #fff;
-  border: 1px solid #e0e0e0;
-  color: #333;
+  background-color: transparent;
+  border: none;
+  color: var(--for-dark, #374151);
 }
 
 .ghost:hover {
-  background-color: #f5f5f5;
+  background-color: var(--con-light, #fafafa);
 }
 
 /* Dotted border variant */

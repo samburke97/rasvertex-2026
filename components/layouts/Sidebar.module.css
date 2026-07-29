@@ -1,21 +1,16 @@
-/* Sidebar.module.css - Fixed version with working tooltips */
+/* Sidebar.module.css — slim icon rail, Vanguard-style red active indicator */
 
 .sidebar {
   grid-area: sidebar;
-  background: #ffffff;
-  border-right: 1px solid #e5e7eb;
+  background: var(--bg-card, #fff);
+  border-right: 1px solid var(--out-light, #edf0f0);
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 12px 0;
-  transition: width 0.3s ease;
   z-index: 1000;
-  overflow: visible; /* IMPORTANT: Changed from auto to visible for tooltips */
-  position: relative; /* IMPORTANT: Ensure proper positioning context */
-}
-
-.sidebar.expanded {
-  width: 240px;
+  overflow: visible; /* allow tooltips to escape the rail */
+  position: relative;
 }
 
 .navItems {
@@ -26,7 +21,7 @@
   align-items: center;
   flex: 1;
   margin-top: 24px;
-  overflow: visible; /* IMPORTANT: Allow tooltips to show outside */
+  overflow: visible;
 }
 
 .navItemWrapper {
@@ -34,7 +29,26 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  overflow: visible; /* IMPORTANT: Allow tooltips to overflow */
+  overflow: visible;
+}
+
+/* Active indicator — a maroon bar flush against the sidebar's left edge */
+.navItemWrapper::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 28px;
+  border-radius: 0 3px 3px 0;
+  background: var(--brand-primary, #900c40);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.navItemWrapper.activeWrapper::before {
+  opacity: 1;
 }
 
 .navItem {
@@ -44,20 +58,20 @@
   justify-content: center;
   align-items: center;
   gap: 10px;
-  border-radius: 8px;
+  border-radius: var(--border-radius-lg, 12px);
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: background 0.15s;
   position: relative;
   width: 56px;
   height: 56px;
 }
 
 .navItem.hovered {
-  background: var(--Container-Medium, #edf0f0);
+  background: var(--con-light, #fafafa);
 }
 
 .navItem.active {
-  background: var(--Container-Medium, #edf0f0);
+  background: var(--con-light, #fafafa);
 }
 
 .iconContainer {
@@ -78,27 +92,26 @@
   filter: brightness(0) saturate(100%);
 }
 
-/* FIXED TOOLTIP STYLES */
+/* Tooltip */
 .tooltip {
   position: absolute;
-  left: calc(100% + 16px); /* Position to the right of the sidebar */
+  left: calc(100% + 16px);
   top: 50%;
   transform: translateY(-50%);
-  background: #000000;
+  background: var(--grey-900, #141414);
   color: #ffffff;
-  padding: 12px 18px;
-  border-radius: 12px;
-  font-size: 14px; /* Reduced from 18px for better readability */
+  padding: 10px 16px;
+  border-radius: var(--border-radius-md, 8px);
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
-  z-index: 1050; /* INCREASED z-index to be above TopNavbar */
+  z-index: 1050;
   opacity: 0;
-  pointer-events: none; /* IMPORTANT: Prevent tooltip from interfering with mouse events */
+  pointer-events: none;
   animation: fadeIn 0.2s ease forwards;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* Added shadow for better visibility */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* TOOLTIP ARROW */
 .tooltip::before {
   content: "";
   position: absolute;
@@ -109,10 +122,9 @@
   height: 0;
   border-top: 8px solid transparent;
   border-bottom: 8px solid transparent;
-  border-right: 8px solid #000000;
+  border-right: 8px solid var(--grey-900, #141414);
 }
 
-/* FADE IN ANIMATION */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -124,58 +136,9 @@
   }
 }
 
-.toggleButton {
-  background: none;
-  border: none;
-  padding: 8px;
-  cursor: pointer;
-  border-radius: 6px;
-  transition: background-color 0.2s ease;
-  margin-top: auto;
-}
-
-.toggleButton:hover {
-  background: #f3f4f6;
-}
-
-.toggleIcon {
-  transition: transform 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280;
-}
-
-.toggleIcon.rotated {
-  transform: rotate(180deg);
-}
-
-/* Expanded State Styles */
-.sidebar.expanded .navItem {
-  width: auto;
-  min-width: 200px;
-  flex-direction: row;
-  justify-content: flex-start;
-  padding: 12px 16px;
-  gap: 12px;
-}
-
-.sidebar.expanded .navItemWrapper {
-  justify-content: flex-start;
-  padding: 0 16px;
-}
-
-/* Mobile: Hide sidebar completely */
+/* Mobile: hide sidebar completely */
 @media (max-width: 768px) {
   .sidebar {
     display: none;
   }
 }
-
-/* DEBUGGING: Uncomment to see tooltip boundaries */
-/*
-.tooltip {
-  border: 2px solid red !important;
-  background: red !important;
-}
-*/

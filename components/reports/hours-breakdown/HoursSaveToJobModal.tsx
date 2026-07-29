@@ -136,7 +136,7 @@ export default function HoursSaveToJobModal({
                   cx="10"
                   cy="10"
                   r="10"
-                  fill="var(--primary-400, #10b981)"
+                  fill="var(--success-400, #10b981)"
                 />
                 <path
                   d="M6 10l3 3 5-5"
@@ -203,12 +203,12 @@ export default function HoursSaveToJobModal({
                   cx="24"
                   cy="24"
                   r="22"
-                  stroke="var(--primary-400, #10b981)"
+                  stroke="var(--success-400, #10b981)"
                   strokeWidth="2"
                 />
                 <path
                   d="M15 24l7 7 11-11"
-                  stroke="var(--primary-400, #10b981)"
+                  stroke="var(--success-400, #10b981)"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"

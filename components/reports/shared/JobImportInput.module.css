@@ -30,7 +30,7 @@
 }
 
 .input:focus {
-  border-color: var(--primary-400, #74db89);
+  border-color: var(--brand-primary, #900c40);
 }
 
 .input:disabled {
@@ -71,7 +71,7 @@
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--primary-400, #74db89);
+  border-color: var(--brand-primary, #900c40);
 }
 
 .btn:disabled {

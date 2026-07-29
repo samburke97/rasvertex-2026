@@ -59,7 +59,7 @@ export default function Congratulations({
         </div>
 
         <div className={styles.buttonContainer}>
-          <Button variant="primary-green" onClick={onContinue} fullWidth>
+          <Button variant="brand" onClick={onContinue} fullWidth>
             {primaryButtonText}
           </Button>
 

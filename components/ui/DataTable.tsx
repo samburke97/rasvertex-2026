@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import Image from "next/image";
 import styles from "./DataTable.module.css";
 import Pagination from "./Pagination";
 
@@ -11,7 +10,6 @@ export interface Column<T> {
   render?: (row: T) => React.ReactNode;
   width?: string;
   align?: "left" | "center" | "right";
-  isNameColumn?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -20,108 +18,43 @@ interface DataTableProps<T> {
   onRowClick?: (row: T) => void;
   keyField: keyof T;
   className?: string;
+  rowClassName?: (row: T) => string;
   isLoading?: boolean;
   emptyMessage?: React.ReactNode | string;
   selectedId?: string | null;
-  itemType?: "group" | "tag" | "location" | "sport" | "activity";
   itemsPerPage?: number;
   initialPage?: number;
 }
 
-export default function DataTable<
-  T extends { id: string; [key: string]: any }
->({
+export default function DataTable<T>({
   columns,
   data,
   onRowClick,
   keyField,
   className = "",
+  rowClassName,
   isLoading = false,
   emptyMessage = "No data available",
   selectedId,
-  itemType = "group",
   itemsPerPage = 8,
   initialPage = 1,
 }: DataTableProps<T>) {
   const [currentPage, setCurrentPage] = useState(initialPage);
 
-  // Calculate total pages
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(data.length / itemsPerPage)),
-    [data.length, itemsPerPage]
+    [data.length, itemsPerPage],
   );
 
-  // Reset to first page if data changes significantly
+  // Reset to first page if the data set changes size (new filter/search).
   React.useEffect(() => {
     setCurrentPage(1);
   }, [data.length]);
 
-  // Get current page data
   const currentData = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return data.slice(startIndex, startIndex + itemsPerPage);
   }, [data, currentPage, itemsPerPage]);
-
-  const getIconPath = (type: string) => {
-    if (type === "group") {
-      return "/icons/utility-outline/group.svg";
-    } else if (type === "sport") {
-      return "/icons/utility-outline/add-image.svg";
-    } else if (type === "activity") {
-      return "/icons/utility-outline/activity.svg";
-    } else if (type === "tag") {
-      return "/icons/utility-outline/add-image.svg";
-    } else {
-      return;
-    }
-  };
-
-  // Function to render a cell with the name cell styling for the first column
-  const renderCell = (row: T, column: Column<T>, rowId: string) => {
-    if ((itemType === "location" || itemType === "activity") && column.render) {
-      return column.render(row);
-    }
-
-    // For first column or name column
-    if (column.isNameColumn || columns.indexOf(column) === 0) {
-      const iconPath = getIconPath(itemType);
-      const name = (row as any)[column.key];
-      const imageUrl = (row as any).imageUrl;
-
-      if (itemType === "location" || itemType === "activity") {
-        return name;
-      }
-
-      return (
-        <div className={styles.nameCell}>
-          <div className={styles.iconContainer}>
-            {(itemType === "tag" || itemType === "sport") && imageUrl ? (
-              <Image
-                src={imageUrl}
-                width={20}
-                height={20}
-                alt={String(name)}
-                className={styles.itemImage}
-                priority={true}
-              />
-            ) : iconPath ? (
-              <Image
-                src={iconPath}
-                width={20}
-                height={20}
-                alt={itemType}
-                priority={true}
-              />
-            ) : null}
-          </div>
-          <span>{column.render ? column.render(row) : name}</span>
-        </div>
-      );
-    }
-
-    // For other columns, use the standard rendering
-    return column.render ? column.render(row) : (row as any)[column.key];
-  };
 
   if (isLoading) {
     return (
@@ -135,18 +68,10 @@ export default function DataTable<
   if (data.length === 0) {
     return (
       <div className={styles.emptyState}>
-        {typeof emptyMessage === "string" ? (
-          <p>{emptyMessage}</p>
-        ) : (
-          emptyMessage
-        )}
+        {typeof emptyMessage === "string" ? <p>{emptyMessage}</p> : emptyMessage}
       </div>
     );
   }
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
 
   return (
     <div className={`${styles.tableWrapper} ${className}`}>
@@ -179,7 +104,7 @@ export default function DataTable<
                   onClick={() => onRowClick && onRowClick(row)}
                   className={`${onRowClick ? styles.clickableRow : ""} ${
                     isSelected ? styles.selected : ""
-                  }`}
+                  } ${rowClassName ? rowClassName(row) : ""}`}
                 >
                   {columns.map((column) => (
                     <td
@@ -187,7 +112,9 @@ export default function DataTable<
                       className={styles.tableCell}
                       style={{ textAlign: column.align || "left" }}
                     >
-                      {renderCell(row, column, rowId)}
+                      {column.render
+                        ? column.render(row)
+                        : String(row[column.key as keyof T] ?? "")}
                     </td>
                   ))}
                 </tr>
@@ -201,7 +128,7 @@ export default function DataTable<
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          onPageChange={handlePageChange}
+          onPageChange={setCurrentPage}
         />
       )}
     </div>

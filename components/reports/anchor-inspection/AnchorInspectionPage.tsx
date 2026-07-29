@@ -4,7 +4,9 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import styles from "../shared/ReportPage.module.css";
 import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
 import SaveToJobModal from "../shared/SaveToJobModal";
+import SavedBadge from "../shared/SavedBadge";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
 import AnchorCoverSection from "./sections/AnchorCoverSection";
@@ -315,9 +317,16 @@ export default function AnchorInspectionPage({
     <div className={styles.page}>
       {/* ── Top bar ── */}
       <div className={styles.topBar}>
-        <button className={styles.backBtn} onClick={onBack}>
-          ← Report types
-        </button>
+        <IconButton
+          variant="secondary"
+          size="sm"
+          onClick={onBack}
+          aria-label="Back to report types"
+          icon={
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/icons/utility-outline/back.svg" alt="" width={18} height={18} />
+          }
+        />
         <div className={styles.topBarRight}>
           <span className={styles.topBarTitle}>Anchor Inspection</span>
           <span className={styles.badge}>
@@ -328,26 +337,7 @@ export default function AnchorInspectionPage({
               {totalAnchors} anchor{totalAnchors !== 1 ? "s" : ""}
             </span>
           )}
-          {savedFilename && (
-            <span className={styles.savedBadge}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <circle
-                  cx="6"
-                  cy="6"
-                  r="6"
-                  fill="var(--primary-400, #10b981)"
-                />
-                <path
-                  d="M3.5 6l2 2 3-3"
-                  stroke="#fff"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Saved
-            </span>
-          )}
+          {savedFilename && <SavedBadge />}
           {loadedJobId && saveStatus !== "idle" && (
             <span
               className={`${styles.draftStatus} ${

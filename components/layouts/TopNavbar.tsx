@@ -49,8 +49,7 @@ export default function TopNavbar() {
       {/* Left section - Bord Logo */}
       <div className={styles.leftSection}>
         <div className={styles.logoContainer}>
-          {" "}
-          <Image src="/ras.png" alt="Notifications" width={150} height={50} />
+          <Image src="/ras.png" alt="RAS Vertex" width={160} height={40} />
         </div>
       </div>
 

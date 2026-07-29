@@ -122,10 +122,19 @@
   color: #9ca3af;
 }
 
+.lineOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 /* ── Anchor pins (print view) ────────────────────────────────────────────── */
+/* Center-anchored chip pins — the line overlay above terminates at each
+   pin's center and is hidden behind the pin's opaque background. */
 .pin {
   position: absolute;
-  transform: translate(-50%, -100%);
+  transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;

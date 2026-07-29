@@ -3,10 +3,15 @@
 import { useState, useRef, useEffect } from "react";
 import { RiArrowDownSLine } from "react-icons/ri";
 import styles from "./CountryCodeSelect.module.css";
+import { COUNTRY_DIAL_CODES } from "@/lib/constants/countries";
 
 interface CountryCodeSelectProps {
   value: string;
   onChange: (value: string) => void;
+  /** "inline" strips the boxed border/background — for composing inside
+   *  another input's own container (e.g. PhoneInput). Default "boxed" is
+   *  the standalone look. */
+  variant?: "boxed" | "inline";
 }
 
 interface CountryCode {
@@ -15,28 +20,16 @@ interface CountryCode {
   flag: string;
 }
 
-// Most common country codes
-const COUNTRY_CODES: CountryCode[] = [
-  { code: "+44", name: "United Kingdom", flag: "🇬🇧" },
-  { code: "+1", name: "United States", flag: "🇺🇸" },
-  { code: "+353", name: "Ireland", flag: "🇮🇪" },
-  { code: "+33", name: "France", flag: "🇫🇷" },
-  { code: "+49", name: "Germany", flag: "🇩🇪" },
-  { code: "+34", name: "Spain", flag: "🇪🇸" },
-  { code: "+39", name: "Italy", flag: "🇮🇹" },
-  { code: "+31", name: "Netherlands", flag: "🇳🇱" },
-  { code: "+61", name: "Australia", flag: "🇦🇺" },
-  { code: "+91", name: "India", flag: "🇮🇳" },
-  { code: "+86", name: "China", flag: "🇨🇳" },
-  { code: "+351", name: "Portugal", flag: "🇵🇹" },
-  { code: "+55", name: "Brazil", flag: "🇧🇷" },
-  { code: "+81", name: "Japan", flag: "🇯🇵" },
-  { code: "+82", name: "South Korea", flag: "🇰🇷" },
-];
+const COUNTRY_CODES: CountryCode[] = COUNTRY_DIAL_CODES.map((c) => ({
+  code: c.dialCode,
+  name: c.name,
+  flag: c.flag,
+}));
 
 export default function CountryCodeSelect({
   value,
   onChange,
+  variant = "boxed",
 }: CountryCodeSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -70,7 +63,10 @@ export default function CountryCodeSelect({
 
   return (
     <div className={styles.container} ref={dropdownRef}>
-      <div className={styles.selector} onClick={() => setIsOpen(!isOpen)}>
+      <div
+        className={`${styles.selector} ${variant === "inline" ? styles.inline : ""}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
         <span className={styles.flag}>{selectedCountry.flag}</span>
         <span className={styles.code}>{selectedCountry.code}</span>
         <span className={styles.arrow}>

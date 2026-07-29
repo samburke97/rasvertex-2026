@@ -82,7 +82,7 @@
   width: 100%;
   font-size: 0.68rem;
   text-align: center;
-  border: 1px solid var(--primary-400, #74db89);
+  border: 1px solid var(--brand-primary, #900c40);
   border-radius: 3px;
   padding: 2px 4px;
   outline: none;

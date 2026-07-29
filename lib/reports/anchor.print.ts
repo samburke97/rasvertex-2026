@@ -6,11 +6,13 @@
 // loadReportAssets() via `assets` so headless Chrome needs zero outbound
 // requests and images always appear in the rendered PDF.
 
-import type { AnchorReportData, Zone } from "./anchor.types";
+import type { AnchorReportData, Zone, LegendIconShape } from "./anchor.types";
 import {
   ANCHOR_TYPE_LABELS,
   ANCHOR_TYPE_COLOURS,
   computeStaticLineEdges,
+  buildLegendGroups,
+  anchorTypeDisplayLabel,
 } from "./anchor.types";
 import {
   BRAND_NAVY,
@@ -264,16 +266,24 @@ const PRINT_STYLES = `
   .zone-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.35rem 0.875rem;
-    padding: 0.75rem 1rem;
+    align-items: center;
+    gap: 0.625rem 1.125rem;
+    padding: 0.875rem 1.125rem;
     background: #f8fafc;
     border: 1px solid #e5e7eb;
-    border-radius: 8px;
+    border-radius: 10px;
   }
   .zone-legend-item {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.5rem;
+  }
+  .zone-legend-icon-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    flex-shrink: 0;
   }
   .zone-legend-dot {
     width: 10px;
@@ -284,7 +294,8 @@ const PRINT_STYLES = `
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  .zone-legend-line-icon {
+  .zone-legend-line-icon,
+  .zone-legend-shape-icon {
     flex-shrink: 0;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
@@ -297,13 +308,17 @@ const PRINT_STYLES = `
     white-space: nowrap;
   }
   .zone-legend-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
     font-family: 'Inter', Arial, sans-serif;
     font-size: 0.7rem;
     font-weight: 600;
     color: #7e807f;
     background: #fafafa;
     border-radius: 20px;
-    padding: 0.05rem 0.4rem;
+    padding: 0.15rem 0.4rem;
   }
 
   /* ── Zone stats banner ── */
@@ -657,6 +672,30 @@ function buildAssetTableHead(): string {
          </tr></thead>`;
 }
 
+// HTML-string mirror of MapLegend.tsx's LegendIcon — same shapes, same
+// meanings, kept in sync manually since one renders React and the other
+// raw markup for Puppeteer.
+function legendIconHTML(icon: LegendIconShape, colour: string): string {
+  if (icon === "static-line") {
+    return `<svg class="zone-legend-line-icon" width="14" height="10" viewBox="0 0 14 10">
+      <line x1="1" y1="5" x2="13" y2="5" stroke="${colour}" stroke-width="1.5" stroke-linecap="round" />
+      <circle cx="1" cy="5" r="1.5" fill="${colour}" />
+      <circle cx="13" cy="5" r="1.5" fill="${colour}" />
+    </svg>`;
+  }
+  if (icon === "dot") {
+    return `<span class="zone-legend-dot" style="background:${colour};"></span>`;
+  }
+  const shapes: Record<string, string> = {
+    circle: `<circle cx="7" cy="7" r="5" fill="${colour}" />`,
+    ring: `<circle cx="7" cy="7" r="4.5" fill="none" stroke="${colour}" stroke-width="2.5" />`,
+    square: `<rect x="2" y="2" width="10" height="10" rx="1.5" fill="${colour}" />`,
+    triangle: `<polygon points="7,1.5 13,12.5 1,12.5" fill="${colour}" />`,
+    diamond: `<polygon points="7,1 13,7 7,13 1,7" fill="${colour}" />`,
+  };
+  return `<svg class="zone-legend-shape-icon" width="14" height="14" viewBox="0 0 14 14">${shapes[icon] ?? ""}</svg>`;
+}
+
 function buildAssetTableRows(
   anchors: Zone["anchors"],
   startIndex: number,
@@ -677,7 +716,7 @@ function buildAssetTableRows(
           <strong>${esc(a.label)}</strong>
         </div>
       </td>
-      <td class="zone-td">${esc(ANCHOR_TYPE_LABELS[a.type])}</td>
+      <td class="zone-td">${esc(anchorTypeDisplayLabel(a))}</td>
       <td class="zone-td">${
         a.commissionDate
           ? esc(a.commissionDate)
@@ -727,38 +766,24 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
       </div>`
     : "";
 
-  // Type legend — deduplicated, one row per type present
-  const typesSeen = new Map<string, { colour: string; label: string; total: number }>();
-  for (const a of zone.anchors) {
-    const colour = ANCHOR_TYPE_COLOURS[a.type] ?? "#10b981";
-    const label = ANCHOR_TYPE_LABELS[a.type] ?? a.type;
-    const existing = typesSeen.get(a.type);
-    if (existing) {
-      existing.total++;
-    } else {
-      typesSeen.set(a.type, { colour, label, total: 1 });
-    }
-  }
+  // Legend — same grouping logic the live editor and in-app report preview
+  // use (buildLegendGroups), so all three always show the same rows.
+  const legendGroups = buildLegendGroups(
+    [...new Set(zone.anchors.map((a) => a.type))],
+    zone.anchors,
+  );
   const legendHTML =
-    typesSeen.size > 0
+    legendGroups.length > 0
       ? `<div class="zone-legend">
-        ${[...typesSeen.entries()]
-          .map(([typeId, t]) => {
-            const icon =
-              typeId === "static-line"
-                ? `<svg class="zone-legend-line-icon" width="14" height="10" viewBox="0 0 14 10">
-                     <line x1="1" y1="5" x2="13" y2="5" stroke="${t.colour}" stroke-width="1.5" stroke-linecap="round" />
-                     <circle cx="1" cy="5" r="1.5" fill="${t.colour}" />
-                     <circle cx="13" cy="5" r="1.5" fill="${t.colour}" />
-                   </svg>`
-                : `<span class="zone-legend-dot" style="background:${t.colour};"></span>`;
-            return `
+        ${legendGroups
+          .map(
+            (g) => `
           <div class="zone-legend-item">
-            ${icon}
-            <span class="zone-legend-label">${esc(t.label)}</span>
-            <span class="zone-legend-count">${t.total}</span>
-          </div>`;
-          })
+            <span class="zone-legend-icon-slot">${legendIconHTML(g.icon, g.colour)}</span>
+            <span class="zone-legend-label">${esc(g.label)}</span>
+            <span class="zone-legend-count">${g.count}</span>
+          </div>`,
+          )
           .join("")}
       </div>`
       : "";
@@ -783,7 +808,7 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
   // just the table header, so a long register never splits a row in half.
   const firstPageRowBudget = computeFirstPageRowBudget(
     !!zone.mapImageUrl,
-    typesSeen.size,
+    legendGroups.length,
     total > 0,
   );
   const firstPageAnchors = zone.anchors.slice(0, firstPageRowBudget);

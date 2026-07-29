@@ -5,8 +5,13 @@
   justify-content: center;
   align-items: center;
   gap: 10px;
-  border-radius: 8px;
+  border-radius: var(--border-radius-full, 9999px);
   cursor: pointer;
+  font-weight: 600;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
 }
 
 /* Icon styling */
@@ -35,32 +40,35 @@
 }
 
 /* Variants */
+
+/* Primary — near-black pill, main CTA (Vanguard's "View"/"Sign in" style) */
 .primary {
-  background: var(--grey-700);
+  background: var(--grey-900, #141414);
   color: white;
   border: none;
 }
 
 .primary:hover:not(:disabled) {
-  background-color: var(--grey-600);
+  background-color: var(--grey-950, #0f0f0f);
 }
 
-.primary-green {
-  background: var(--primary-300);
-  color: #000;
-  border: none;
-}
-
-.primary-green:hover:not(:disabled) {
-  background: var(--grey-700);
+/* Brand — maroon pill, for standout/brand-forward CTAs */
+.brand {
+  background: var(--brand-primary, #900c40);
   color: white;
   border: none;
 }
 
+.brand:hover:not(:disabled) {
+  background: var(--brand-primary-hover, #66082d);
+}
+
+/* Secondary — white pill with a dark border, lower-emphasis actions
+   (Vanguard's "Withdraw"/"Sell" style) */
 .secondary {
-  background-color: var(--white);
+  background-color: var(--bg-card, #fff);
   color: var(--for-darkest);
-  border: 1px solid var(--out-darkest);
+  border: 1.5px solid var(--out-darkest);
 }
 
 .secondary:hover:not(:disabled) {
@@ -68,26 +76,28 @@
 }
 
 .danger {
-  background: var(--red-wine-300);
+  background: var(--brand-primary, #900c40);
   color: white;
+  border: none;
 }
 
 .danger:hover:not(:disabled) {
-  background-color: #d33473;
+  background-color: var(--brand-primary-hover, #66082d);
 }
 
 .whiteIcon {
   filter: brightness(0) invert(1);
 }
 
+/* Outline — teal accent, transparent fill */
 .outline {
   background-color: transparent;
-  color: var(--primary-color);
-  border: 1px solid var(--primary-color);
+  color: var(--teal-300, #175347);
+  border: 1.5px solid var(--teal-300, #175347);
 }
 
 .outline:hover:not(:disabled) {
-  background-color: rgba(22, 101, 52, 0.05);
+  background-color: var(--teal-100, #cff1ea);
 }
 
 .ghost {
@@ -102,19 +112,19 @@
 
 /* Sizes */
 .sm {
-  padding: 0.375rem 0.75rem;
+  padding: 0.375rem 0.875rem;
   font-size: var(--font-size-sm);
   height: 32px;
 }
 
 .md {
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 1.25rem;
   font-size: var(--font-size-md);
   height: 40px;
 }
 
 .lg {
-  padding: 0.625rem 1.25rem;
+  padding: 0.625rem 1.5rem;
   font-size: var(--font-size-lg);
   height: 48px;
 }

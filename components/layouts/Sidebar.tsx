@@ -34,7 +34,6 @@ const sidebarItems: SidebarItem[] = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [isExpanded, setIsExpanded] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   const isActive = (href: string) => {
@@ -52,14 +51,17 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className={`${styles.sidebar} ${isExpanded ? styles.expanded : ""}`}>
+    <aside className={styles.sidebar}>
       <nav className={styles.navItems}>
         {sidebarItems.map((item) => {
           const itemIsActive = isActive(item.href);
           const isHovered = hoveredItem === item.href;
 
           return (
-            <div key={item.href} className={styles.navItemWrapper}>
+            <div
+              key={item.href}
+              className={`${styles.navItemWrapper} ${itemIsActive ? styles.activeWrapper : ""}`}
+            >
               <Link
                 href={item.href}
                 className={`${styles.navItem} ${itemIsActive ? styles.active : ""} ${isHovered ? styles.hovered : ""}`}

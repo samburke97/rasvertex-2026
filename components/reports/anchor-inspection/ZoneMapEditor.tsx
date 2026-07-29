@@ -5,16 +5,20 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import styles from "./ZoneMapEditor.module.css";
 import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
 import AnchorPinModal from "./AnchorPinModal";
 import MapLegend from "./MapLegend";
 import { loadGoogleMaps } from "@/lib/reports/googleMapsLoader";
 import {
+  ANCHOR_SUBTYPE_LABELS,
   ANCHOR_TYPE_COLOURS,
   ANCHOR_TYPE_LABELS,
   ANCHOR_TYPE_OPTIONS,
+  ANCHOR_TYPE_SUBTYPES,
   computeStaticLineEdges,
   generateId,
   type AnchorPoint,
+  type AnchorSubtype,
   type AnchorType,
   type Zone,
 } from "@/lib/reports/anchor.types";
@@ -200,6 +204,16 @@ export default function ZoneMapEditor({
   // Stamp mode: whichever type is selected here places instantly on tap —
   // no modal per pin, since techs place many of the same type in a row.
   const [selectedType, setSelectedType] = useState<AnchorType>(DEFAULT_TYPE);
+  // Mount sub-option for the selected type (only meaningful when the type
+  // has entries in ANCHOR_TYPE_SUBTYPES) — defaults to the first option
+  // whenever the selected type changes.
+  const [selectedSubtype, setSelectedSubtype] = useState<
+    AnchorSubtype | undefined
+  >(ANCHOR_TYPE_SUBTYPES[DEFAULT_TYPE]?.[0]);
+  const selectType = useCallback((type: AnchorType) => {
+    setSelectedType(type);
+    setSelectedSubtype(ANCHOR_TYPE_SUBTYPES[type]?.[0]);
+  }, []);
   const [editingAnchor, setEditingAnchor] = useState<AnchorPoint | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // "Close Loop" mode — armed from the last-placed static-line anchor;
@@ -213,9 +227,70 @@ export default function ZoneMapEditor({
     startX: number;
     startY: number;
     moved: boolean;
+    startZone: Zone;
   } | null>(null);
 
   const save = useCallback((updated: Zone) => onUpdate(updated), [onUpdate]);
+
+  // ── Undo/redo for pin actions (place, edit, delete, connect, drag) ───────
+  // Not used for zone setup (capture/upload/rename) — scoped to anchor
+  // edits only, so it matches "step back through what I just did to the
+  // pins" rather than the whole zone's history.
+  const MAX_HISTORY = 50;
+  const [undoStack, setUndoStack] = useState<Zone[]>([]);
+  const [redoStack, setRedoStack] = useState<Zone[]>([]);
+
+  // Records `previous` (the state right before the change about to be
+  // applied) and clears the redo stack, as any fresh action normally would.
+  const pushHistory = useCallback((previous: Zone) => {
+    setUndoStack((stack) => [...stack.slice(-MAX_HISTORY + 1), previous]);
+    setRedoStack([]);
+  }, []);
+
+  // Reads localZoneRef (not localZone) for the same reason save() does
+  // elsewhere in this file — avoids calling setState from inside another
+  // state's functional updater.
+  const handleUndo = useCallback(() => {
+    setUndoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const previous = stack[stack.length - 1];
+      setRedoStack((redo) => [...redo, localZoneRef.current]);
+      setLocalZone(previous);
+      setZoneName(previous.name);
+      save(previous);
+      return stack.slice(0, -1);
+    });
+  }, [save]);
+
+  const handleRedo = useCallback(() => {
+    setRedoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const next = stack[stack.length - 1];
+      setUndoStack((undo) => [...undo, localZoneRef.current]);
+      setLocalZone(next);
+      setZoneName(next.name);
+      save(next);
+      return stack.slice(0, -1);
+    });
+  }, [save]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key.toLowerCase() === "z" && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+      } else if (e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        handleUndo();
+      } else if (e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleUndo, handleRedo]);
 
   // Step 1's address — starts from the job's SimPRO address, but is always
   // manually searchable/correctable so a bad geocode or missing job address
@@ -441,6 +516,7 @@ export default function ZoneMapEditor({
         y,
         label: `A${localZone.anchors.length + 1}`,
         type: selectedType,
+        subtype: ANCHOR_TYPE_SUBTYPES[selectedType] ? selectedSubtype : undefined,
         commissionDate: "",
         inspectionDate: defaultInspectionDate,
         nextInspection: defaultNextInspection,
@@ -456,10 +532,19 @@ export default function ZoneMapEditor({
         ...localZone,
         anchors: [...localZone.anchors, anchor],
       };
+      pushHistory(localZone);
       setLocalZone(updated);
       save(updated);
     },
-    [localZone, selectedType, defaultInspectionDate, defaultNextInspection, save],
+    [
+      localZone,
+      selectedType,
+      selectedSubtype,
+      defaultInspectionDate,
+      defaultNextInspection,
+      save,
+      pushHistory,
+    ],
   );
 
   const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -485,6 +570,7 @@ export default function ZoneMapEditor({
       ...localZone,
       anchors: localZone.anchors.map((a) => (a.id === anchor.id ? anchor : a)),
     };
+    pushHistory(localZone);
     setLocalZone(updated);
     save(updated);
     setEditingAnchor(null);
@@ -512,6 +598,7 @@ export default function ZoneMapEditor({
         return { ...withCleanEdges, label: `A${seq}` };
       });
     const updated: Zone = { ...localZone, anchors };
+    pushHistory(localZone);
     setLocalZone(updated);
     save(updated);
     setEditingAnchor(null);
@@ -534,6 +621,7 @@ export default function ZoneMapEditor({
         startX: e.clientX,
         startY: e.clientY,
         moved: false,
+        startZone: localZoneRef.current,
       };
       setDraggingId(anchorId);
     },
@@ -593,11 +681,12 @@ export default function ZoneMapEditor({
           return { ...a, connectsTo: [...existing, targetId] };
         }),
       };
+      pushHistory(localZone);
       setLocalZone(updated);
       save(updated);
       setConnectingFrom(null);
     },
-    [connectingFrom, localZone, save],
+    [connectingFrom, localZone, save, pushHistory],
   );
 
   const handlePinPointerUp = useCallback(
@@ -608,6 +697,7 @@ export default function ZoneMapEditor({
       if (!ds) return;
 
       if (ds.moved) {
+        pushHistory(ds.startZone);
         save(localZoneRef.current);
       } else if (connectingFrom) {
         // Tapping a non-static-line pin while armed just cancels — only a
@@ -618,7 +708,7 @@ export default function ZoneMapEditor({
         setEditingAnchor(anchor);
       }
     },
-    [save, connectingFrom, handleConnectTo],
+    [save, connectingFrom, handleConnectTo, pushHistory],
   );
 
   const activeTypes = [
@@ -632,14 +722,22 @@ export default function ZoneMapEditor({
     !!lastAnchor &&
     lastAnchor.type === "static-line" &&
     localZone.anchors.filter((a) => a.type === "static-line").length > 1;
+  const subtypeOptions = ANCHOR_TYPE_SUBTYPES[selectedType];
 
   return (
     <div className={styles.page}>
       {/* Top bar */}
       <div className={styles.topBar}>
-        <button className={styles.backBtn} onClick={onBack}>
-          ← Back to report
-        </button>
+        <IconButton
+          variant="secondary"
+          size="sm"
+          onClick={onBack}
+          aria-label="Back to report"
+          icon={
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/icons/utility-outline/back.svg" alt="" width={18} height={18} />
+          }
+        />
 
         <div className={styles.zoneTitleWrap}>
           <input
@@ -652,6 +750,31 @@ export default function ZoneMapEditor({
         </div>
 
         <div className={styles.topActions}>
+          {captured && (
+            <div className={styles.undoRedoGroup}>
+              <button
+                type="button"
+                className={styles.undoRedoBtn}
+                onClick={handleUndo}
+                disabled={undoStack.length === 0}
+                aria-label="Undo"
+                title="Undo (Ctrl+Z)"
+              >
+                ↺
+              </button>
+              <button
+                type="button"
+                className={styles.undoRedoBtn}
+                onClick={handleRedo}
+                disabled={redoStack.length === 0}
+                aria-label="Redo"
+                title="Redo (Ctrl+Shift+Z)"
+              >
+                ↻
+              </button>
+            </div>
+          )}
+
           <Button
             variant="secondary"
             size="sm"
@@ -699,17 +822,19 @@ export default function ZoneMapEditor({
           you're in and what's left. Rotate/crop is still "Set Aerial View"
           — framing the shot isn't done until it's confirmed. */}
       <div className={styles.stepBar}>
-        <span
+        <div
           className={`${styles.step} ${!captured ? styles.stepActive : styles.stepDone}`}
         >
-          {captured ? "✓" : "1"} Set Aerial View
-        </span>
-        <span className={styles.stepArrow}>→</span>
-        <span
+          <span className={styles.stepCircle}>{captured ? "✓" : "1"}</span>
+          <span className={styles.stepLabel}>Set Aerial View</span>
+        </div>
+        <span className={styles.stepConnector} />
+        <div
           className={`${styles.step} ${captured ? styles.stepActive : styles.stepPending}`}
         >
-          2 Place Anchors
-        </span>
+          <span className={styles.stepCircle}>2</span>
+          <span className={styles.stepLabel}>Place Anchors</span>
+        </div>
       </div>
 
       {!captured && (
@@ -787,7 +912,7 @@ export default function ZoneMapEditor({
                     }
                   : {}
               }
-              onClick={() => setSelectedType(opt.value)}
+              onClick={() => selectType(opt.value)}
             >
               <span
                 className={styles.stampDot}
@@ -811,6 +936,32 @@ export default function ZoneMapEditor({
                 : "⤾ Close Loop"}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Mount-type sub-picker — only for types with sub-options */}
+      {captured && subtypeOptions && (
+        <div className={styles.stampSubBar}>
+          {subtypeOptions.map((st) => (
+            <button
+              key={st}
+              type="button"
+              className={`${styles.stampSubChip} ${
+                selectedSubtype === st ? styles.stampSubChipActive : ""
+              }`}
+              style={
+                selectedSubtype === st
+                  ? {
+                      borderColor: ANCHOR_TYPE_COLOURS[selectedType],
+                      color: ANCHOR_TYPE_COLOURS[selectedType],
+                    }
+                  : {}
+              }
+              onClick={() => setSelectedSubtype(st)}
+            >
+              {ANCHOR_SUBTYPE_LABELS[st]}
+            </button>
+          ))}
         </div>
       )}
 

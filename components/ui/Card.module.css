@@ -1,0 +1,43 @@
+.card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--out-light, #edf0f0);
+  border-radius: var(--border-radius-lg, 12px);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05));
+  font-family: inherit;
+  cursor: default;
+  transition:
+    box-shadow 0.15s,
+    transform 0.15s,
+    border-color 0.15s;
+}
+
+.padding-none {
+  padding: 0;
+}
+
+.padding-sm {
+  padding: 0.875rem 1rem;
+}
+
+.padding-md {
+  padding: 1.25rem 1.5rem;
+}
+
+.padding-lg {
+  padding: 2rem;
+}
+
+.interactive {
+  cursor: pointer;
+}
+
+.interactive:hover {
+  border-color: var(--out-medium, #d9dbdb);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}

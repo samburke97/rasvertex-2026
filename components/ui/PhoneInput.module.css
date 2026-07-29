@@ -54,7 +54,7 @@
 }
 
 .phoneContainer.error {
-  border: 1px solid var(--Red-Wine-Red-Wine, #900c40);
+  border: 1px solid var(--red-wine-300, #900c40);
 }
 
 .phoneContainer.disabled {
@@ -62,49 +62,10 @@
   opacity: 0.7;
 }
 
-/* Country Selector */
+/* Country Selector — CountryCodeSelect (variant="inline") renders here */
 .countrySelector {
   position: relative;
   flex-shrink: 0;
-}
-
-.countryBtn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 24px;
-  color: var(--for-darkest, #171717);
-  font-family: Inter;
-  padding: 0;
-}
-
-.countryBtn:disabled {
-  cursor: not-allowed;
-}
-
-.flag {
-  font-size: 18px;
-  line-height: 1;
-}
-
-.code {
-  font-family: monospace;
-  font-size: 16px;
-  color: var(--for-darkest, #171717);
-}
-
-.arrow {
-  color: var(--Foreground-Medium, #7e807f);
-  transition: transform 0.15s ease;
-}
-
-.arrowUp {
-  transform: rotate(180deg);
 }
 
 /* Separator */
@@ -155,67 +116,11 @@
 }
 
 .phoneInput::placeholder {
-  color: var(--Foreground-Medium, #7e807f);
+  color: var(--for-medium, #7e807f);
 }
 
 .phoneInput:disabled {
   cursor: not-allowed;
-}
-
-/* Dropdown */
-.overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 9998;
-  background: transparent;
-}
-
-.dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 9999;
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  min-width: 280px;
-  max-height: 240px;
-  overflow-y: auto;
-}
-
-.option {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 10px 16px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-align: left;
-  font-size: 14px;
-  font-family: Inter;
-  transition: background-color 0.15s ease;
-}
-
-.option:hover {
-  background-color: #f9fafb;
-}
-
-.countryName {
-  flex: 1;
-  font-weight: 400;
-  color: var(--for-darkest, #171717);
-}
-
-.option .code {
-  font-family: monospace;
-  font-size: 14px;
-  color: var(--Foreground-Medium, #7e807f);
 }
 
 /* Error Text */

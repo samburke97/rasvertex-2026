@@ -40,7 +40,7 @@
 }
 
 .input:focus {
-  border-color: var(--primary-400, #74db89);
+  border-color: var(--brand-primary, #900c40);
 }
 
 .input:disabled {
@@ -57,7 +57,7 @@
 
 .progressBar {
   height: 100%;
-  background: var(--primary-400, #74db89);
+  background: var(--brand-primary, #900c40);
   border-radius: 999px;
   transition: width 0.3s ease;
 }

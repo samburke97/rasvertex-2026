@@ -1,16 +1,52 @@
 .badge {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: var(--for-dark, #374151);
+}
+
+/* Numeric count — circular pill, unchanged from the original look */
+.count {
   width: 32px;
   height: 32px;
   padding: 8px;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
   border-radius: 16px;
-  border: 1px solid var(--Outline-Medium, #d9dbdb);
-  background: var(--Conatiner-Lightest, #fff);
+  border: 1px solid var(--out-medium, #d9dbdb);
+  background: var(--bg-card, #fff);
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-color, #374151);
+}
+
+/* Status pills — pill-shaped, colour communicates state */
+.success,
+.warning,
+.danger,
+.neutral {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--border-radius-full, 9999px);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.success {
+  background: var(--success-100, #e6fffa);
+  color: var(--success-600, #047857);
+}
+
+.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.danger {
+  background: var(--brand-primary-light, #faebf1);
+  color: var(--brand-primary, #900c40);
+}
+
+.neutral {
+  background: var(--con-medium, #edf0f0);
+  color: var(--for-dark, #374151);
 }
