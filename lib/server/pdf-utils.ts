@@ -9,6 +9,8 @@ export interface ReportAssets {
   linkBlue: string;
   signature: string;
   heightSafety: string;
+  bebasNeueFont: string;
+  interFont: string;
   associations: {
     communitySelect: string;
     dulux: string;
@@ -29,6 +31,7 @@ function readPublicAsBase64(relativePath: string): string {
       ".jpeg": "image/jpeg",
       ".svg": "image/svg+xml",
       ".webp": "image/webp",
+      ".woff2": "font/woff2",
     };
     const mime =
       mimeTypes[path.extname(relativePath).toLowerCase()] ?? "image/png";
@@ -48,6 +51,8 @@ export function loadReportAssets(): ReportAssets {
     linkBlue: readPublicAsBase64("reports/link_blue.png"),
     signature: readPublicAsBase64("reports/signature.png"),
     heightSafety: readPublicAsBase64("images/height-safety.png"),
+    bebasNeueFont: readPublicAsBase64("fonts/bebas-neue.woff2"),
+    interFont: readPublicAsBase64("fonts/inter.woff2"),
     associations: {
       communitySelect: readPublicAsBase64(
         "reports/associations/communityselect.png",
@@ -63,8 +68,41 @@ export function loadReportAssets(): ReportAssets {
 }
 
 // ── Puppeteer PDF runner ──────────────────────────────────────────────────────
+//
+// Vercel's serverless functions run in a stripped-down environment that's
+// missing the system libraries (libnss3, libatk, fontconfig, etc.) a normal
+// downloaded Chromium needs, and often doesn't correctly bundle the
+// `puppeteer` package's separately-downloaded browser binary into the
+// deployed function at all — so the full `puppeteer` package that works
+// perfectly in local dev silently fails to launch a browser in production.
+// `@sparticuz/chromium` is a Chromium build compiled specifically for
+// Lambda/Vercel's runtime, paired with `puppeteer-core` (no bundled
+// browser). Local dev keeps using plain `puppeteer` (already downloaded,
+// simpler, faster) since it has none of these constraints.
+const IS_VERCEL = !!process.env.VERCEL;
 
-export async function renderPDF(htmlContent: string): Promise<Buffer> {
+// `puppeteer`'s Browser class wraps/re-exports `puppeteer-core`'s at
+// runtime, but TS can't unify the two independently-imported module's
+// types structurally (generic methods like page.evaluate() end up with
+// unmergeable overload sets) — puppeteer-core's type is used as the single
+// return type for both branches since that's what the Vercel path needs.
+async function launchBrowser(): Promise<import("puppeteer-core").Browser> {
+  if (IS_VERCEL) {
+    const [{ default: chromium }, puppeteerCore] = await Promise.all([
+      import("@sparticuz/chromium"),
+      import("puppeteer-core"),
+    ]);
+    return puppeteerCore.default.launch({
+      headless: true,
+      args: [
+        ...chromium.args,
+        "--disable-dev-shm-usage",
+        "--font-render-hinting=none",
+      ],
+      executablePath: await chromium.executablePath(),
+    });
+  }
+
   const puppeteer = await import("puppeteer");
   const browser = await puppeteer.default.launch({
     headless: true,
@@ -76,6 +114,11 @@ export async function renderPDF(htmlContent: string): Promise<Buffer> {
       "--font-render-hinting=none",
     ],
   });
+  return browser as unknown as import("puppeteer-core").Browser;
+}
+
+export async function renderPDF(htmlContent: string): Promise<Buffer> {
+  const browser = await launchBrowser();
 
   try {
     const page = await browser.newPage();

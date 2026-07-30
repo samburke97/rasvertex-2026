@@ -5,6 +5,7 @@ import React, { useRef, useMemo } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import ToggleRow from "../shared/ToggleRow";
 import JobImportInput from "../shared/JobImportInput";
+import DatePicker from "@/components/ui/DatePicker";
 import type {
   ImportStatus,
   PhotoFolder,
@@ -298,19 +299,20 @@ export default function OptionsPanel({
 
         {settings.filterByDate && (
           <div className={styles.dateRange}>
-            <input
-              type="date"
-              className={styles.dateInput}
-              value={settings.dateFrom ?? ""}
-              onChange={(e) => set({ dateFrom: e.target.value || null })}
-            />
-            <span className={styles.dateSep}>—</span>
-            <input
-              type="date"
-              className={styles.dateInput}
-              value={settings.dateTo ?? ""}
-              onChange={(e) => set({ dateTo: e.target.value || null })}
-            />
+            <div className={styles.dateField}>
+              <label className={styles.dateFieldLabel}>From</label>
+              <DatePicker
+                value={settings.dateFrom}
+                onChange={(v) => set({ dateFrom: v })}
+              />
+            </div>
+            <div className={styles.dateField}>
+              <label className={styles.dateFieldLabel}>To</label>
+              <DatePicker
+                value={settings.dateTo}
+                onChange={(v) => set({ dateTo: v })}
+              />
+            </div>
           </div>
         )}
       </div>

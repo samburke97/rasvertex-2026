@@ -564,7 +564,7 @@ export default function RecurringJobsPage() {
             key={key}
             interactive
             onClick={() => setFilter(key)}
-            padding="sm"
+            padding="md"
             className={`${styles.card} ${filter === key ? styles.cardActive : ""}`}
           >
             <span className={`${styles.cardCount} ${colorClass ?? ""}`}>

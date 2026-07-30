@@ -23,11 +23,30 @@ export const BRAND_NAVY = "#0d1c45";
 export const FONT_DISPLAY = "'Bebas Neue', Arial, sans-serif";
 export const FONT_BODY = "'Inter', Arial, sans-serif";
 
-export const PRINT_FONT_LINKS = `
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap" rel="stylesheet" />
-`;
+/**
+ * Font-face CSS for the print HTML — self-hosted (base64-embedded via
+ * `assets`, see loadReportAssets()) rather than a Google Fonts <link>.
+ * Puppeteer previously had to fetch fonts.googleapis.com over the network
+ * on every PDF render; on Vercel that's one more thing that can time out
+ * or fail mid-render for no reason the report content controls. This has
+ * zero outbound requests, same as every other asset in the PDF pipeline.
+ */
+export function buildPrintFontFaceCSS(assets: ReportAssets): string {
+  return `
+    @font-face {
+      font-family: 'Bebas Neue';
+      src: url(${assets.bebasNeueFont}) format('woff2');
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'Inter';
+      src: url(${assets.interFont}) format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+    }
+  `;
+}
 
 export const PRINT_RESET_CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -45,6 +64,8 @@ export const DEFAULT_PRINT_ASSETS: ReportAssets = {
   linkBlue: "/reports/link_blue.png",
   signature: "/reports/signature.png",
   heightSafety: "/images/height-safety.png",
+  bebasNeueFont: "/fonts/bebas-neue.woff2",
+  interFont: "/fonts/inter.woff2",
   associations: {
     communitySelect: "/reports/associations/communityselect.png",
     dulux: "/reports/associations/dulux.png",

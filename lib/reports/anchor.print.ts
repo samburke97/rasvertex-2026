@@ -10,6 +10,7 @@ import type { AnchorReportData, Zone, LegendIconShape } from "./anchor.types";
 import {
   ANCHOR_TYPE_LABELS,
   ANCHOR_TYPE_COLOURS,
+  ANCHOR_TYPE_IS_RATED,
   computeStaticLineEdges,
   buildLegendGroups,
   anchorTypeDisplayLabel,
@@ -17,12 +18,13 @@ import {
 import {
   BRAND_NAVY,
   DEFAULT_PRINT_ASSETS,
-  PRINT_FONT_LINKS,
+  buildPrintFontFaceCSS,
   PRINT_RESET_CSS,
   ASSOC_LOGO_CSS,
   buildAssocLogosHTML,
   type ReportAssets,
 } from "./print-shared";
+import { PHOTO_LAYOUTS, buildPhotoPages, stripExt } from "./photos";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -550,7 +552,81 @@ const PRINT_STYLES = `
     text-transform: uppercase;
     line-height: 1;
   }
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     PHOTO PAGES — mirrors shared/PhotoSection.tsx / PhotoSection.module.css
+     (same classes/values as condition.print.ts's photo pages)
+  ───────────────────────────────────────────────────────────────────────── */
+  .photo-page { width:210mm; min-height:297mm; break-before:page; page-break-before:always; display:flex; flex-direction:column; justify-content:space-between; padding:2.75rem; }
+  .photo-page-inner { display:flex; flex-direction:column; gap:0.875rem; flex:1; }
+  .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.875rem; align-items:start; }
+  .photo-item { display:flex; flex-direction:column; gap:0; min-width:0; width:100%; }
+  .photo-thumb { width:100%; aspect-ratio:1/1; border-radius:6px; overflow:hidden; }
+  .photo-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .photo-caption { padding:0.35rem 0.25rem 0; font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:400; color:#374151; text-align:center; }
+  .date-header { display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem; }
+  .date-line { flex:1; height:1px; background:#e5e7eb; }
+  .date-text { font-family:'Inter',Arial,sans-serif; font-size:0.72rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#6b7280; white-space:nowrap; padding:0 0.25rem; }
+  .page-num { text-align:right; font-family:'Inter',Arial,sans-serif; font-size:0.68rem; font-weight:400; letter-spacing:0.1em; text-transform:uppercase; color:#9ca3af; padding-top:1rem; }
 `;
+
+// ── Photo pages HTML builder ──────────────────────────────────────────────────
+// Pagination/grouping comes from lib/reports/photos.ts (shared with
+// Condition Report) — only the HTML template is local to this file.
+function buildPhotoPagesHTML(report: AnchorReportData): string {
+  // Defensive: a draft saved before photos/photoSettings existed (or a
+  // stale client tab that hasn't picked up this feature yet) won't have
+  // either field — treat that the same as "no photos" rather than crash
+  // PDF generation.
+  if (!report.photos?.length || !report.photoSettings) return "";
+  const { showDates, photoLayout, filterByDate, dateFrom, dateTo } =
+    report.photoSettings;
+
+  const photos = filterByDate
+    ? report.photos.filter((p) => {
+        if (!p.dateAdded) return true;
+        const day = p.dateAdded.slice(0, 10);
+        if (dateFrom && day < dateFrom) return false;
+        if (dateTo && day > dateTo) return false;
+        return true;
+      })
+    : report.photos;
+  if (photos.length === 0) return "";
+
+  const { columns, aspectRatio } =
+    PHOTO_LAYOUTS[photoLayout] ?? PHOTO_LAYOUTS.small;
+  const pages = buildPhotoPages(photos, showDates, photoLayout);
+  const totalPages = pages.length;
+
+  return pages
+    .map((items, pageIdx) => {
+      const inner = items
+        .map((item) => {
+          if (item.type === "dateHeader") {
+            return `<div class="date-header"><span class="date-line"></span><span class="date-text">${esc(item.label)}</span><span class="date-line"></span></div>`;
+          }
+          const cells = item.photos
+            .map(
+              (photo) => `<div class="photo-item">
+  <div class="photo-thumb" style="aspect-ratio:${aspectRatio}"><img src="${esc(photo.url)}" alt="${esc(photo.name)}" /></div>
+  <div class="photo-caption">${esc(stripExt(photo.name))}</div>
+</div>`,
+            )
+            .join("\n");
+          return `<div class="photo-grid" style="grid-template-columns:repeat(${columns}, 1fr)">${cells}</div>`;
+        })
+        .join("\n");
+
+      const pageLabel =
+        totalPages > 1 ? `PAGE ${pageIdx + 1} / ${totalPages}` : `PAGE ${pageIdx + 1}`;
+
+      return `<div class="photo-page">
+  <div class="photo-page-inner">${inner}</div>
+  <div class="page-num">${pageLabel}</div>
+</div>`;
+    })
+    .join("\n");
+}
 
 // ── Page builders ─────────────────────────────────────────────────────────────
 
@@ -887,13 +963,13 @@ function buildCertificationPage(
     }
   }
 
-  const anchorTableRows = [...typeMap.values()]
+  const anchorTableRows = [...typeMap.entries()]
     .map(
-      (row) => `
+      ([type, row]) => `
     <tr class="at-row">
       <td class="at-cell">${esc(row.label)}</td>
       <td class="at-cell">${row.qty}</td>
-      <td class="at-cell">15kn</td>
+      <td class="at-cell">${ANCHOR_TYPE_IS_RATED[type as keyof typeof ANCHOR_TYPE_IS_RATED] ? "15kn" : "-"}</td>
       <td class="at-cell ${row.anyFail ? "at-fail" : "at-pass"}">${row.anyFail ? "Fail" : "Pass"}</td>
     </tr>`,
     )
@@ -997,6 +1073,9 @@ export function buildAnchorPrintHTML(
   const coverPage = buildCoverPage(report.job, a);
   const zonePages = report.zones.map((z) => buildZonePages(z, a)).join("\n");
   const certPage = buildCertificationPage(report.job, report.zones, a);
+  const photoPages = report.photoSettings?.enabled
+    ? buildPhotoPagesHTML(report)
+    : "";
   const summaryPage = buildSummaryPage(a);
 
   return `<!DOCTYPE html>
@@ -1004,13 +1083,14 @@ export function buildAnchorPrintHTML(
 <head>
   <meta charset="UTF-8" />
   <title>${esc(report.job.reportType || "Anchor Inspection Report")}</title>
-  ${PRINT_FONT_LINKS}
+  <style>${buildPrintFontFaceCSS(a)}</style>
   <style>${PRINT_STYLES}</style>
 </head>
 <body>
 ${coverPage}
 ${zonePages}
 ${certPage}
+${photoPages}
 ${summaryPage}
 </body>
 </html>`;

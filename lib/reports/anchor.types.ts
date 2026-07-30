@@ -1,5 +1,8 @@
 // lib/reports/anchor.types.ts
 
+import type { ReportPhoto, PhotoLayout } from "./photos";
+export type { ReportPhoto, PhotoFolder, PhotoLayout } from "./photos";
+
 export type AnchorType =
   | "fall-arrest-anchor"
   | "ladder-bracket"
@@ -69,9 +72,23 @@ export interface AnchorReportJob {
   certComments: string;
 }
 
+// Supporting photos are entirely optional on the anchor report (unlike the
+// condition report, where the photo grid is the point of the report) — off
+// by default, switched on from the options panel.
+export interface AnchorPhotoSettings {
+  enabled: boolean;
+  showDates: boolean;
+  photoLayout: PhotoLayout;
+  filterByDate: boolean;
+  dateFrom: string | null; // "YYYY-MM-DD"
+  dateTo: string | null; // "YYYY-MM-DD"
+}
+
 export interface AnchorReportData {
   job: AnchorReportJob;
   zones: Zone[];
+  photos: ReportPhoto[];
+  photoSettings: AnchorPhotoSettings;
 }
 
 export const ANCHOR_TYPE_COLOURS: Record<AnchorType, string> = {
@@ -99,6 +116,21 @@ export const ANCHOR_TYPE_OPTIONS: { value: AnchorType; label: string }[] =
     value: value as AnchorType,
     label,
   }));
+
+// Only fall-arrest and rope-access anchors are load-rated fall-arrest
+// points (certified to a kN rating under AS/NZS 1891.4) — everything else
+// (ladder brackets, access hatches, wire rope slings, static lines,
+// harnesses) is access/connector hardware, not a rated anchor itself, and
+// shows "-" instead of a rating on the certification summary table.
+export const ANCHOR_TYPE_IS_RATED: Record<AnchorType, boolean> = {
+  "fall-arrest-anchor": true,
+  "ladder-bracket": false,
+  "access-hatch": false,
+  "wire-rope-sling": false,
+  "static-line": false,
+  harness: false,
+  "rope-access-anchor": true,
+};
 
 export const ANCHOR_SUBTYPE_LABELS: Record<AnchorSubtype, string> = {
   "surface-mount": "Surface Mount",
@@ -264,4 +296,13 @@ export const DEFAULT_ANCHOR_REPORT: AnchorReportData = {
     certComments: "",
   },
   zones: [],
+  photos: [],
+  photoSettings: {
+    enabled: false,
+    showDates: false,
+    photoLayout: "small",
+    filterByDate: false,
+    dateFrom: null,
+    dateTo: null,
+  },
 };

@@ -7,6 +7,7 @@ import EditableField from "../../shared/EditableField";
 import { ASSOCIATIONS } from "@/lib/reports/constants";
 import {
   ANCHOR_TYPE_LABELS,
+  ANCHOR_TYPE_IS_RATED,
   type AnchorReportJob,
   type Zone,
 } from "@/lib/reports/anchor.types";
@@ -33,7 +34,7 @@ function buildAnchorRows(zones: Zone[]) {
         map.set(anchor.type, {
           label: ANCHOR_TYPE_LABELS[anchor.type],
           qty: 1,
-          rating: "15kn",
+          rating: ANCHOR_TYPE_IS_RATED[anchor.type] ? "15kn" : "-",
           anyFail: anchor.result === "FAILED",
         });
       }

@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef } from "react";
 import styles from "../shared/ReportPage.module.css";
 import CoverSection from "../shared/CoverSection";
 import RichTextEditor from "../shared/RichTextEditor";
-import PhotoSection from "./sections/PhotoSection";
+import PhotoSection from "../shared/PhotoSection";
 import ScheduleSection from "./sections/ScheduleSection";
 import SummarySection from "./sections/SummarySection";
 import OptionsPanel from "./OptionsPanel";

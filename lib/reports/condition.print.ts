@@ -20,7 +20,7 @@ import { formatScheduleDate } from "./condition.types";
 import {
   BRAND_NAVY,
   DEFAULT_PRINT_ASSETS,
-  PRINT_FONT_LINKS,
+  buildPrintFontFaceCSS,
   PRINT_RESET_CSS,
   ASSOC_LOGO_CSS,
   buildAssocLogosHTML,
@@ -606,7 +606,7 @@ export function buildPrintHTML(
 <head>
   <meta charset="UTF-8" />
   <title>${esc(report.job.reportType || "Building Condition Report")} — ${esc(report.job.project)}</title>
-  ${PRINT_FONT_LINKS}
+  <style>${buildPrintFontFaceCSS(a)}</style>
   <style>${PRINT_STYLES}</style>
 </head>
 <body>

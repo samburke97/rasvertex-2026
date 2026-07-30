@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+/* Report display fonts — self-hosted rather than pulled from
+   fonts.googleapis.com at page-load time. The external @import previously
+   used here silently failed (falling back to the default font) whenever a
+   machine's network blocked or was slow to reach Google's CDN — ad
+   blockers, corporate firewalls, and privacy extensions all commonly do
+   this. Self-hosted files have no such failure mode. */
+@font-face {
+  font-family: "Bebas Neue";
+  src: url("/fonts/bebas-neue.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/inter.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* CSS Reset */
 * {
   margin: 0;

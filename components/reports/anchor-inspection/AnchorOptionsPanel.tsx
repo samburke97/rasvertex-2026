@@ -1,11 +1,20 @@
 "use client";
 // components/reports/anchor-inspection/AnchorOptionsPanel.tsx
 
-import React from "react";
+import React, { useRef } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import JobImportInput from "../shared/JobImportInput";
-import type { Zone } from "@/lib/reports/anchor.types";
+import ToggleRow from "../shared/ToggleRow";
+import Button from "@/components/ui/Button";
+import DatePicker from "@/components/ui/DatePicker";
+import type {
+  AnchorPhotoSettings,
+  PhotoFolder,
+  ReportPhoto,
+  Zone,
+} from "@/lib/reports/anchor.types";
 import type { AnchorImportStatus } from "./AnchorInspectionPage";
+import type { PhotoImportStatus } from "../shared/PhotoSection";
 
 interface AnchorOptionsPanelProps {
   zones: Zone[];
@@ -16,6 +25,70 @@ interface AnchorOptionsPanelProps {
   totalPassed: number;
   importStatus: AnchorImportStatus;
   onImport: (jobNumber: string) => void;
+
+  // Photos — entirely optional, off by default (see AnchorPhotoSettings).
+  hasLoadedJob: boolean;
+  photos: ReportPhoto[];
+  photoSettings: AnchorPhotoSettings;
+  onPhotoSettings: (s: AnchorPhotoSettings) => void;
+  photoImportStatus: PhotoImportStatus;
+  photoFolders: PhotoFolder[];
+  selectedPhotoFolderId: number | null;
+  onSelectPhotoFolder: (folderId: number | null) => void;
+  onLoadPhotosFromJob: () => void;
+  onUploadPhotos: (files: FileList) => void;
+}
+
+// ── Date preset helpers ───────────────────────────────────────────────────────
+
+function toISO(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+const PRESETS = [
+  {
+    key: "all",
+    label: "All",
+    resolve: () => ({ from: null as string | null, to: null as string | null }),
+  },
+  {
+    key: "today",
+    label: "Today",
+    resolve: () => {
+      const d = toISO(new Date());
+      return { from: d, to: d };
+    },
+  },
+  {
+    key: "7d",
+    label: "Last 7 days",
+    resolve: () => {
+      const from = new Date();
+      from.setDate(from.getDate() - 6);
+      return { from: toISO(from), to: toISO(new Date()) };
+    },
+  },
+] as const;
+
+type PresetKey = (typeof PRESETS)[number]["key"];
+
+const PHOTO_LAYOUT_OPTIONS = [
+  { key: "large", label: "Large", sub: "4 per page" },
+  { key: "medium", label: "Medium", sub: "6 per page" },
+  { key: "small", label: "Small", sub: "9 per page" },
+] as const;
+
+function detectPreset(
+  from: string | null,
+  to: string | null,
+): PresetKey | "custom" {
+  if (!from && !to) return "all";
+  for (const p of PRESETS) {
+    if (p.key === "all") continue;
+    const r = p.resolve();
+    if (r.from === from && r.to === to) return p.key;
+  }
+  return "custom";
 }
 
 export default function AnchorOptionsPanel({
@@ -27,7 +100,50 @@ export default function AnchorOptionsPanel({
   totalPassed,
   importStatus,
   onImport,
+  hasLoadedJob,
+  photos,
+  photoSettings,
+  onPhotoSettings,
+  photoImportStatus,
+  photoFolders,
+  selectedPhotoFolderId,
+  onSelectPhotoFolder,
+  onLoadPhotosFromJob,
+  onUploadPhotos,
 }: AnchorOptionsPanelProps) {
+  const uploadRef = useRef<HTMLInputElement>(null);
+
+  const hasPhotos = photos.length > 0;
+  const isLoadingPhotos = photoImportStatus.phase === "fetching-photos";
+
+  const set = (patch: Partial<AnchorPhotoSettings>) =>
+    onPhotoSettings({ ...photoSettings, ...patch });
+
+  const activePreset = detectPreset(
+    photoSettings.dateFrom,
+    photoSettings.dateTo,
+  );
+  const isActivelyFiltered =
+    photoSettings.filterByDate &&
+    (photoSettings.dateFrom || photoSettings.dateTo);
+
+  const filteredCount = photoSettings.filterByDate
+    ? photos.filter((p) => {
+        if (!p.dateAdded) return true;
+        const d = p.dateAdded.slice(0, 10);
+        if (photoSettings.dateFrom && d < photoSettings.dateFrom) return false;
+        if (photoSettings.dateTo && d > photoSettings.dateTo) return false;
+        return true;
+      }).length
+    : photos.length;
+
+  const handleUploadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      onUploadPhotos(e.target.files);
+    }
+    e.target.value = "";
+  };
+
   return (
     <aside className={styles.panel}>
       {/* ── Job Number ───────────────────────────────────────────────────── */}
@@ -125,6 +241,159 @@ export default function AnchorOptionsPanel({
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      {/* ── Supporting Photos — optional, off by default ────────────────── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabelRow}>
+          <span className={styles.groupLabel}>Supporting Photos</span>
+        </div>
+
+        <ToggleRow
+          label="Add Photos"
+          sub={
+            photoSettings.enabled
+              ? "Photos page will appear in the report"
+              : "Optional — attach supporting photos to this report"
+          }
+          checked={photoSettings.enabled}
+          onChange={(v) => set({ enabled: v })}
+        />
+
+        {photoSettings.enabled && (
+          <>
+            <input
+              ref={uploadRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className={styles.hiddenInput}
+              onChange={handleUploadChange}
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              fullWidth
+              onClick={() => uploadRef.current?.click()}
+            >
+              Upload Photos
+            </Button>
+
+            {hasLoadedJob && (
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                onClick={onLoadPhotosFromJob}
+                disabled={isLoadingPhotos}
+              >
+                {isLoadingPhotos ? "Loading…" : "Pull From Job"}
+              </Button>
+            )}
+
+            {photoFolders.length > 0 && (
+              <>
+                <div className={styles.subLabel}>Folder</div>
+                <div className={styles.presetRow}>
+                  <button
+                    className={`${styles.presetBtn} ${selectedPhotoFolderId === null ? styles.presetBtnActive : ""}`}
+                    onClick={() => onSelectPhotoFolder(null)}
+                    disabled={isLoadingPhotos}
+                  >
+                    All photos
+                  </button>
+                  {photoFolders.map((f) => (
+                    <button
+                      key={f.id}
+                      className={`${styles.presetBtn} ${selectedPhotoFolderId === f.id ? styles.presetBtnActive : ""}`}
+                      onClick={() => onSelectPhotoFolder(f.id)}
+                      disabled={isLoadingPhotos}
+                    >
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <ToggleRow
+              label="Show dates"
+              sub={
+                hasPhotos
+                  ? "Print capture date under each photo"
+                  : "Add photos first"
+              }
+              checked={photoSettings.showDates}
+              onChange={(v) => set({ showDates: v })}
+              disabled={!hasPhotos}
+            />
+
+            <div className={styles.subLabel}>Grid size</div>
+            <div className={styles.presetRow}>
+              {PHOTO_LAYOUT_OPTIONS.map((l) => (
+                <button
+                  key={l.key}
+                  className={`${styles.presetBtn} ${photoSettings.photoLayout === l.key ? styles.presetBtnActive : ""}`}
+                  onClick={() => set({ photoLayout: l.key })}
+                  disabled={!hasPhotos}
+                  title={l.sub}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+
+            <ToggleRow
+              label="Filter by date"
+              sub={
+                isActivelyFiltered
+                  ? `Showing ${filteredCount} of ${photos.length}`
+                  : hasPhotos
+                    ? "Show all dates"
+                    : "Add photos first"
+              }
+              checked={photoSettings.filterByDate}
+              onChange={(v) => set({ filterByDate: v })}
+              disabled={!hasPhotos}
+            />
+
+            {photoSettings.filterByDate && (
+              <div className={styles.presetRow}>
+                {PRESETS.map((p) => (
+                  <button
+                    key={p.key}
+                    className={`${styles.presetBtn} ${activePreset === p.key ? styles.presetBtnActive : ""}`}
+                    onClick={() => {
+                      const r = p.resolve();
+                      set({ dateFrom: r.from, dateTo: r.to });
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {photoSettings.filterByDate && (
+              <div className={styles.dateRange}>
+                <div className={styles.dateField}>
+                  <label className={styles.dateFieldLabel}>From</label>
+                  <DatePicker
+                    value={photoSettings.dateFrom}
+                    onChange={(v) => set({ dateFrom: v })}
+                  />
+                </div>
+                <div className={styles.dateField}>
+                  <label className={styles.dateFieldLabel}>To</label>
+                  <DatePicker
+                    value={photoSettings.dateTo}
+                    onChange={(v) => set({ dateTo: v })}
+                  />
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </aside>

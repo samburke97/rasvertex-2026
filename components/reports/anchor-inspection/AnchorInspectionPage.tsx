@@ -13,13 +13,17 @@ import AnchorCoverSection from "./sections/AnchorCoverSection";
 import ZoneSummarySection from "./sections/ZoneSummarySection";
 import CertificationSection from "./sections/CertificationSection";
 import SummarySignoffSection from "./sections/SummarySignoffSection";
+import PhotoSection from "../shared/PhotoSection";
 import {
   DEFAULT_ANCHOR_REPORT,
   generateId,
   type AnchorReportData,
   type AnchorReportJob,
+  type PhotoFolder,
+  type ReportPhoto,
   type Zone,
 } from "@/lib/reports/anchor.types";
+import { filterPhotosByDateRange } from "@/lib/reports/photos";
 import type { EnrichedJob } from "@/lib/simpro/types";
 
 interface AnchorInspectionPageProps {
@@ -32,6 +36,12 @@ type SaveStatus = "idle" | "saving" | "saved" | "error";
 export type AnchorImportStatus =
   | { phase: "idle" }
   | { phase: "fetching-job" }
+  | { phase: "done" }
+  | { phase: "error"; message: string };
+
+type PhotoLoadStatus =
+  | { phase: "idle" }
+  | { phase: "fetching-photos"; loaded: number; total: number }
   | { phase: "done" }
   | { phase: "error"; message: string };
 
@@ -77,6 +87,16 @@ export default function AnchorInspectionPage({
   const [isExporting, setIsExporting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Supporting photos (optional) ───────────────────────────────────────
+  const [photoImportStatus, setPhotoImportStatus] = useState<PhotoLoadStatus>({
+    phase: "idle",
+  });
+  const [photoFolders, setPhotoFolders] = useState<PhotoFolder[]>([]);
+  const [selectedPhotoFolderId, setSelectedPhotoFolderId] = useState<
+    number | null
+  >(null);
+  const photoLoadId = useRef(0);
 
   // ── Export PDF — builds clean print HTML via anchor.print.ts ──────────────
   const handleExport = useCallback(async () => {
@@ -163,6 +183,9 @@ export default function AnchorInspectionPage({
       setImportStatus({ phase: "fetching-job" });
       setSaveStatus("idle");
       setSavedFilename(null);
+      setPhotoImportStatus({ phase: "idle" });
+      setPhotoFolders([]);
+      setSelectedPhotoFolderId(null);
 
       try {
         // Fetch the SimPRO job details and check for an in-progress draft in
@@ -185,6 +208,11 @@ export default function AnchorInspectionPage({
           };
           if (isStale()) return;
           setReport({
+            // Backfills fields added after this draft was first saved (e.g.
+            // photos/photoSettings) — an old draft's JSON simply doesn't
+            // have them, so without this a resumed draft crashes on
+            // whatever new field the rest of the page assumes exists.
+            ...DEFAULT_ANCHOR_REPORT,
             ...draft,
             // Zones/anchors/comments are the tech's own work — keep them
             // from the draft. Admin fields refresh from SimPRO so a fixed
@@ -282,6 +310,183 @@ export default function AnchorInspectionPage({
     }));
   }, []);
 
+  // ── Supporting photos ──────────────────────────────────────────────────
+  // Entirely optional — nothing here fires until the tech turns on "Add
+  // Photos" in the options panel, unlike the condition report where photos
+  // load automatically on import.
+
+  const updatePhotoSettings = useCallback(
+    (s: AnchorReportData["photoSettings"]) => {
+      setReport((prev) => ({ ...prev, photoSettings: s }));
+    },
+    [],
+  );
+
+  const removePhoto = useCallback((id: string) => {
+    setReport((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((p) => p.id !== id),
+    }));
+  }, []);
+
+  const renamePhoto = useCallback((id: string, name: string) => {
+    setReport((prev) => ({
+      ...prev,
+      photos: prev.photos.map((p) => (p.id !== id ? p : { ...p, name })),
+    }));
+  }, []);
+
+  // Manual upload — reads each file as a data URL, so uploaded photos need
+  // zero network requests both in the live preview and in the Puppeteer PDF
+  // render (same reasoning as the cover photo upload in Condition Report).
+  const handleUploadPhotos = useCallback((files: FileList) => {
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const result = ev.target?.result;
+        if (typeof result !== "string") return;
+        const photo: ReportPhoto = {
+          id: generateId(),
+          name: file.name,
+          url: result,
+          size: file.size,
+          dateAdded: new Date().toISOString(),
+        };
+        setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] }));
+      };
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  // Pull from job — streams photos in via SSE, same protocol/endpoint as
+  // Condition Report's photo import (lib/reports/condition.types.ts's
+  // ImportStatus "fetching-photos" phase mirrors this one).
+  const fetchPhotos = useCallback(
+    (jobNumber: string, folderId: number | null) => {
+      const myGen = ++photoLoadId.current;
+      const isStale = () => photoLoadId.current !== myGen;
+      return (async () => {
+        if (isStale()) return;
+        setReport((prev) => ({ ...prev, photos: [] }));
+        setPhotoImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
+        try {
+          const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
+          const response = await fetch(
+            `/api/simpro/jobs/${jobNumber}/attachments?companyId=0${folderQuery}`,
+          );
+          if (isStale()) return;
+          if (!response.ok || !response.body)
+            throw new Error("Stream connect failed");
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+
+          while (true) {
+            if (isStale()) {
+              reader.cancel();
+              return;
+            }
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const frames = buffer.split("\n\n");
+            buffer = frames.pop() ?? "";
+
+            for (const frame of frames) {
+              if (isStale()) {
+                reader.cancel();
+                return;
+              }
+              const eventMatch = frame.match(/^event:\s*(.+)$/m);
+              const dataMatch = frame.match(/^data:\s*(.+)$/m);
+              if (!eventMatch || !dataMatch) continue;
+              const event = eventMatch[1].trim();
+              let payload: Record<string, unknown>;
+              try {
+                payload = JSON.parse(dataMatch[1]);
+              } catch {
+                continue;
+              }
+
+              if (event === "photo") {
+                const photo: ReportPhoto = {
+                  id: String(payload.id),
+                  name: String(payload.name),
+                  url: String(payload.url),
+                  size: Number(payload.size) || 0,
+                  dateAdded: payload.dateAdded
+                    ? String(payload.dateAdded)
+                    : null,
+                };
+                if (!isStale())
+                  setReport((prev) => ({
+                    ...prev,
+                    photos: [...prev.photos, photo],
+                  }));
+              } else if (event === "progress") {
+                if (!isStale())
+                  setPhotoImportStatus({
+                    phase: "fetching-photos",
+                    loaded: Number(payload.loaded) || 0,
+                    total: Number(payload.total) || 0,
+                  });
+              } else if (event === "done") {
+                if (!isStale()) setPhotoImportStatus({ phase: "done" });
+              } else if (event === "error") {
+                if (!isStale())
+                  setPhotoImportStatus({
+                    phase: "error",
+                    message: String(payload.message ?? "Photo import failed"),
+                  });
+              }
+            }
+          }
+        } catch (err) {
+          if (isStale()) return;
+          setPhotoImportStatus({
+            phase: "error",
+            message: err instanceof Error ? err.message : "Photo import failed",
+          });
+        }
+      })();
+    },
+    [],
+  );
+
+  const handleSelectPhotoFolder = useCallback(
+    (folderId: number | null) => {
+      setSelectedPhotoFolderId(folderId);
+      if (loadedJobId) fetchPhotos(loadedJobId, folderId);
+    },
+    [loadedJobId, fetchPhotos],
+  );
+
+  // "Pull From Job" button — fetches the folder list (if not already
+  // fetched) and either shows a folder picker (more than one folder) or
+  // imports everything straight away (0 or 1 folder, nothing to choose).
+  const handleLoadPhotosFromJob = useCallback(async () => {
+    if (!loadedJobId) return;
+    if (photoFolders.length > 0) {
+      fetchPhotos(loadedJobId, selectedPhotoFolderId);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/simpro/jobs/${loadedJobId}/attachments/folders?companyId=0`,
+      );
+      const data = res.ok ? await res.json() : {};
+      const folders: PhotoFolder[] = data.folders ?? [];
+      if (folders.length > 1) {
+        setPhotoFolders(folders);
+        return;
+      }
+    } catch {
+      // Treat as "no folders" — fall through to importing everything.
+    }
+    fetchPhotos(loadedJobId, null);
+  }, [loadedJobId, photoFolders, selectedPhotoFolderId, fetchPhotos]);
+
   // ── Derived ────────────────────────────────────────────────────────────
   const totalAnchors = report.zones.reduce(
     (sum, z) => sum + z.anchors.length,
@@ -291,6 +496,13 @@ export default function AnchorInspectionPage({
     (sum, z) => sum + z.anchors.filter((a) => a.result === "PASSED").length,
     0,
   );
+  const filteredPhotos = report.photoSettings.filterByDate
+    ? filterPhotosByDateRange(
+        report.photos,
+        report.photoSettings.dateFrom,
+        report.photoSettings.dateTo,
+      )
+    : report.photos;
 
   // ── Zone map view ──────────────────────────────────────────────────────
   if (view === "zone-map" && editingZoneId) {
@@ -381,6 +593,16 @@ export default function AnchorInspectionPage({
           totalPassed={totalPassed}
           importStatus={importStatus}
           onImport={handleImport}
+          hasLoadedJob={!!loadedJobId}
+          photos={report.photos}
+          photoSettings={report.photoSettings}
+          onPhotoSettings={updatePhotoSettings}
+          photoImportStatus={photoImportStatus}
+          photoFolders={photoFolders}
+          selectedPhotoFolderId={selectedPhotoFolderId}
+          onSelectPhotoFolder={handleSelectPhotoFolder}
+          onLoadPhotosFromJob={handleLoadPhotosFromJob}
+          onUploadPhotos={handleUploadPhotos}
         />
 
         {/* ── Canvas ── */}
@@ -410,6 +632,25 @@ export default function AnchorInspectionPage({
             zones={report.zones}
             onUpdate={updateJob}
           />
+
+          {report.photoSettings.enabled && (
+            <>
+              <div className={styles.pageLabel}>
+                Supporting Photos
+                {filteredPhotos.length > 0 &&
+                  ` · ${filteredPhotos.length} photo${filteredPhotos.length !== 1 ? "s" : ""}`}
+              </div>
+              <PhotoSection
+                photos={filteredPhotos}
+                importStatus={photoImportStatus}
+                showDates={report.photoSettings.showDates}
+                layout={report.photoSettings.photoLayout}
+                onPhotoRemove={removePhoto}
+                onPhotoRename={renamePhoto}
+                emptyMessage="No photos yet — upload some or pull them from the job."
+              />
+            </>
+          )}
 
           <div className={styles.pageLabel}>Summary &amp; Sign-off</div>
           <SummarySignoffSection />

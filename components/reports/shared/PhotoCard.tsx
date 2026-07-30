@@ -3,7 +3,7 @@
 
 import React, { useState } from "react";
 import styles from "./PhotoCard.module.css";
-import type { ReportPhoto } from "@/lib/reports/condition.types";
+import type { ReportPhoto } from "@/lib/reports/photos";
 
 interface PhotoCardProps {
   photo: ReportPhoto;

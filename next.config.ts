@@ -4,6 +4,27 @@ const nextConfig = {
   // functional effect.
   poweredByHeader: false,
 
+  // @sparticuz/chromium's Chromium binary is read from disk at runtime via
+  // fs, not required as a JS module — Next's automatic file tracing for
+  // serverless functions can miss it, silently shipping a function that
+  // can't find its browser binary in production. Explicitly include it for
+  // every route that calls renderPDF() (lib/server/pdf-utils.ts).
+  outputFileTracingIncludes: {
+    "/api/reports/export-pdf": ["./node_modules/@sparticuz/chromium/**/*"],
+    "/api/reports/export-hours-pdf": [
+      "./node_modules/@sparticuz/chromium/**/*",
+    ],
+    "/api/reports/export-anchor-pdf": [
+      "./node_modules/@sparticuz/chromium/**/*",
+    ],
+    "/api/simpro/jobs/[jobId]/save-report": [
+      "./node_modules/@sparticuz/chromium/**/*",
+    ],
+    "/api/simpro/jobs/[jobId]/save-anchor-report": [
+      "./node_modules/@sparticuz/chromium/**/*",
+    ],
+  },
+
   images: {
     remotePatterns: [
       {

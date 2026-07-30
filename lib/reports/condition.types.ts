@@ -1,21 +1,13 @@
 // lib/reports/condition.types.ts
 
 import type { EnrichedJob } from "@/lib/simpro/types";
+import type { ReportPhoto, PhotoLayout } from "./photos";
 
-export interface ReportPhoto {
-  id: string;
-  name: string;
-  url: string;
-  size: number;
-  dateAdded?: string | null;
-}
-
-// ── Attachment folders ────────────────────────────────────────────────────────
-
-export interface PhotoFolder {
-  id: number;
-  name: string;
-}
+// Photo data model + date-range filter now live in lib/reports/photos.ts
+// (shared with the Anchor Inspection report's photo section) — re-exported
+// here so existing imports from condition.types.ts keep working.
+export type { ReportPhoto, PhotoFolder, PhotoLayout } from "./photos";
+export { filterPhotosByDateRange } from "./photos";
 
 // ── Schedule ──────────────────────────────────────────────────────────────────
 
@@ -56,9 +48,6 @@ export interface ReportJobDetails {
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
-
-/** Photo grid density: large = 4/page, medium = 6/page, small = 9/page. */
-export type PhotoLayout = "large" | "medium" | "small";
 
 export interface ReportSettings {
   showDates: boolean;
@@ -108,21 +97,6 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
     date: job.date,
     coverPhoto: null,
   };
-}
-
-export function filterPhotosByDateRange(
-  photos: ReportPhoto[],
-  dateFrom: string | null,
-  dateTo: string | null,
-): ReportPhoto[] {
-  if (!dateFrom && !dateTo) return photos;
-  return photos.filter((p) => {
-    if (!p.dateAdded) return true;
-    const day = p.dateAdded.slice(0, 10);
-    if (dateFrom && day < dateFrom) return false;
-    if (dateTo && day > dateTo) return false;
-    return true;
-  });
 }
 
 export function filterScheduleByDateRange(

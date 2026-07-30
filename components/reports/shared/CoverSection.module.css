@@ -1,7 +1,6 @@
 /* components/reports/shared/CoverSection.module.css */
 /* Single source of truth for the cover page design used by all reports. */
 
-@import url("https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;600&display=swap");
 
 .page {
   width: 794px;
