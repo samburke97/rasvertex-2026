@@ -14,7 +14,7 @@ import { formatScheduleDate } from "./condition.types";
 import {
   BRAND_NAVY,
   DEFAULT_PRINT_ASSETS,
-  PRINT_FONT_LINKS,
+  buildPrintFontFaceCSS,
   PRINT_RESET_CSS,
   ASSOC_LOGO_CSS,
   buildAssocLogosHTML,
@@ -148,7 +148,7 @@ export function buildHoursPrintHTML(
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hours Breakdown</title>
-${PRINT_FONT_LINKS}
+<style>${buildPrintFontFaceCSS(a)}</style>
 <style>
   ${PRINT_RESET_CSS}
 
