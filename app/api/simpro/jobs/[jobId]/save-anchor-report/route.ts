@@ -3,11 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildAnchorPrintHTML } from "@/lib/reports/anchor.print";
 import { loadReportAssets, renderPDF } from "@/lib/server/pdf-utils";
-import {
-  checkDuplicateAttachment,
-  uploadPDFToJob,
-  getSimproConfig,
-} from "@/lib/server/simpro";
+import { saveReportToDestinations, getSimproConfig } from "@/lib/server/simpro";
 import type { AnchorReportData } from "@/lib/reports/anchor.types";
 
 export async function POST(
@@ -33,6 +29,8 @@ export async function POST(
     filename?: string;
     report?: AnchorReportData;
     companyId?: number;
+    siteId?: string;
+    destinations?: { job?: boolean; site?: boolean };
   };
   try {
     body = await request.json();
@@ -43,7 +41,13 @@ export async function POST(
     );
   }
 
-  const { filename, report, companyId = 0 } = body;
+  const {
+    filename,
+    report,
+    companyId = 0,
+    siteId,
+    destinations = { job: true, site: false },
+  } = body;
   if (!filename?.trim())
     return NextResponse.json(
       { error: "filename is required" },
@@ -54,37 +58,15 @@ export async function POST(
       { error: "report data is required" },
       { status: 400 },
     );
+  if (!destinations.job && !destinations.site)
+    return NextResponse.json(
+      { error: "At least one save destination is required" },
+      { status: 400 },
+    );
 
   const cleanFilename = filename.trim().replace(/\.pdf$/i, "") + ".pdf";
 
-  // Duplicate check
-  try {
-    const duplicate = await checkDuplicateAttachment(
-      companyId,
-      parsedJobId,
-      cleanFilename,
-    );
-    if (duplicate) {
-      return NextResponse.json(
-        {
-          error: `A file named "${cleanFilename}" already exists on this job.`,
-          code: "DUPLICATE_FILENAME",
-          existingFile: { id: duplicate.ID, filename: duplicate.Filename },
-        },
-        { status: 409 },
-      );
-    }
-  } catch {
-    return NextResponse.json(
-      {
-        error: "Could not verify existing attachments.",
-        code: "LIST_FETCH_FAILED",
-      },
-      { status: 502 },
-    );
-  }
-
-  // Build + render PDF
+  // Build + render PDF once, then fan out to whichever destinations were requested.
   let buffer: Buffer;
   try {
     const html = buildAnchorPrintHTML(report, loadReportAssets());
@@ -97,23 +79,15 @@ export async function POST(
     );
   }
 
-  // Upload to SimPRO
-  try {
-    const attachment = await uploadPDFToJob(
-      companyId,
-      parsedJobId,
-      cleanFilename,
-      buffer,
-    );
-    return NextResponse.json(
-      { success: true, filename: cleanFilename, attachment },
-      { status: 201 },
-    );
-  } catch (err) {
-    console.error("[SaveAnchorReport] Upload failed:", err);
-    return NextResponse.json(
-      { error: "Failed to upload PDF to SimPRO." },
-      { status: 502 },
-    );
-  }
+  const { job, site } = await saveReportToDestinations(
+    companyId,
+    parsedJobId,
+    siteId,
+    destinations,
+    cleanFilename,
+    buffer,
+    "[SaveAnchorReport]",
+  );
+
+  return NextResponse.json({ filename: cleanFilename, job, site }, { status: 200 });
 }

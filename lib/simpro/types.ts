@@ -90,6 +90,7 @@ export interface EnrichedJob {
   jobNo: string;
   name: string;
   clientName: string;
+  siteId: string;
   siteName: string;
   siteAddress: string;
   preparedFor: string;

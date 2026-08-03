@@ -1,4 +1,4 @@
-/* components/reports/shared/SaveToJobModal.module.css */
+/* components/reports/shared/SaveReportModal.module.css */
 
 /* ── Overlay ─────────────────────────────────────────────────────────────── */
 .overlay {
@@ -133,30 +133,10 @@
   margin-top: 1px;
 }
 
-.bannerWarn {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-  color: #92400e;
-}
-.bannerWarn strong {
-  color: #78350f;
-}
-
 .bannerError {
   background: #fef2f2;
   border: 1px solid #fecaca;
   color: #991b1b;
-}
-
-.existingName {
-  font-weight: 600;
-}
-
-.bannerHint {
-  color: #a16207;
-  font-size: 0.77rem;
-  margin-top: 0.1rem;
-  display: block;
 }
 
 /* ── Filename field ──────────────────────────────────────────────────────── */
@@ -221,11 +201,44 @@
   font-weight: 500;
 }
 
-.hint {
+/* ── Save-to checkboxes ──────────────────────────────────────────────────── */
+.checkRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--out-light, #edf0f0);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--for-darkest, #141414);
+  font-weight: 500;
+}
+.checkRow:not(:last-child) {
+  margin-bottom: 0.5rem;
+}
+.checkRow input[type="checkbox"] {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: var(--brand-primary, #900c40);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+.checkRowDisabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.checkRowDisabled input[type="checkbox"] {
+  cursor: not-allowed;
+}
+
+.checkHint {
+  display: block;
   font-size: 0.75rem;
+  font-weight: 400;
   color: var(--for-medium, #7e807f);
-  margin: 0;
-  line-height: 1.4;
+  margin-top: 0.1rem;
 }
 
 /* ── Saving row ──────────────────────────────────────────────────────────── */

@@ -117,12 +117,37 @@ async function launchBrowser(): Promise<import("puppeteer-core").Browser> {
   return browser as unknown as import("puppeteer-core").Browser;
 }
 
+// Launching Chromium is by far the most expensive part of a render — multiple
+// seconds, worse on Vercel's Lambda-based @sparticuz/chromium. Closing the
+// browser after every single render (the old behaviour) throws that cost
+// away and pays it again on the very next request, even when it's the same
+// warm server/container seconds later. Caching the launch and only closing
+// the per-request `page` means only the first render after a cold start
+// (or after a crash) pays for a full browser launch.
+let _browserPromise: Promise<import("puppeteer-core").Browser> | null = null;
+
+async function getBrowser(): Promise<import("puppeteer-core").Browser> {
+  if (_browserPromise) {
+    const browser = await _browserPromise;
+    if (browser.isConnected()) return browser;
+    _browserPromise = null; // crashed/disconnected — fall through and relaunch
+  }
+  const promise = launchBrowser();
+  _browserPromise = promise;
+  try {
+    return await promise;
+  } catch (err) {
+    // Launch failed — don't leave a rejected promise cached for next call.
+    if (_browserPromise === promise) _browserPromise = null;
+    throw err;
+  }
+}
+
 export async function renderPDF(htmlContent: string): Promise<Buffer> {
-  const browser = await launchBrowser();
+  const browser = await getBrowser();
+  const page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
-
     await page.setRequestInterception(true);
     page.on("request", (req) => {
       const type = req.resourceType();
@@ -144,7 +169,7 @@ export async function renderPDF(htmlContent: string): Promise<Buffer> {
 
     return Buffer.from(pdfData);
   } finally {
-    await browser.close();
+    await page.close();
   }
 }
 

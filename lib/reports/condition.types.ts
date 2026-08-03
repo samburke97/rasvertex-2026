@@ -45,6 +45,8 @@ export interface ReportJobDetails {
   project: string;
   date: string;
   coverPhoto: string | null;
+  /** SimPRO Site ID, used only for the Save-to-Site export path — not rendered. */
+  siteId: string;
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -96,6 +98,7 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
     project: job.name,
     date: job.date,
     coverPhoto: null,
+    siteId: job.siteId,
   };
 }
 

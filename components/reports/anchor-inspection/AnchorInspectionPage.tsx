@@ -5,7 +5,8 @@ import React, { useState, useCallback, useRef, useEffect } from "react";
 import styles from "../shared/ReportPage.module.css";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
-import SaveToJobModal from "../shared/SaveToJobModal";
+import SaveReportModal from "../shared/SaveReportModal";
+import { compressImageDataUrl } from "@/lib/reports/compressImage";
 import SavedBadge from "../shared/SavedBadge";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
@@ -169,6 +170,7 @@ export default function AnchorInspectionPage({
         inspectionDate,
         nextInspectionDate,
         authorisedBy: "Archer Dutch",
+        siteId: jobData.siteId || "",
       };
     },
     [],
@@ -410,20 +412,26 @@ export default function AnchorInspectionPage({
               }
 
               if (event === "photo") {
+                const compressedUrl = await compressImageDataUrl(
+                  String(payload.url),
+                );
+                if (isStale()) {
+                  reader.cancel();
+                  return;
+                }
                 const photo: ReportPhoto = {
                   id: String(payload.id),
                   name: String(payload.name),
-                  url: String(payload.url),
+                  url: compressedUrl,
                   size: Number(payload.size) || 0,
                   dateAdded: payload.dateAdded
                     ? String(payload.dateAdded)
                     : null,
                 };
-                if (!isStale())
-                  setReport((prev) => ({
-                    ...prev,
-                    photos: [...prev.photos, photo],
-                  }));
+                setReport((prev) => ({
+                  ...prev,
+                  photos: [...prev.photos, photo],
+                }));
               } else if (event === "progress") {
                 if (!isStale())
                   setPhotoImportStatus({
@@ -569,7 +577,7 @@ export default function AnchorInspectionPage({
             onClick={() => setShowSaveModal(true)}
             disabled={!loadedJobId}
           >
-            Save to Job
+            Save
           </Button>
           <Button
             variant="primary"
@@ -657,17 +665,20 @@ export default function AnchorInspectionPage({
         </div>
       </div>
 
-      {/* Save to Job Modal */}
+      {/* Save Report Modal */}
       {showSaveModal && (
-        <SaveToJobModal
+        <SaveReportModal
           jobId={loadedJobId}
           jobNo={`#${loadedJobId}`}
           companyId={0}
-          defaultFilename={`Anchor Inspection Report - ${report.job.address || "Draft"}`}
+          siteId={report.job.siteId}
+          defaultFilename={`Anchor Inspection Report - ${new Date().getFullYear()}`}
           saveEndpoint={`/api/simpro/jobs/${loadedJobId}/save-anchor-report`}
-          prepareBody={(filename, companyId) => ({
+          prepareBody={(filename, companyId, destinations) => ({
             filename,
             companyId,
+            siteId: report.job.siteId,
+            destinations,
             report,
           })}
           onClose={() => setShowSaveModal(false)}

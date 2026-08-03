@@ -10,8 +10,9 @@ import SummarySection from "./sections/SummarySection";
 import OptionsPanel from "./OptionsPanel";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
-import SaveToJobModal from "../shared/SaveToJobModal";
+import SaveReportModal from "../shared/SaveReportModal";
 import SavedBadge from "../shared/SavedBadge";
+import { compressImageDataUrl } from "@/lib/reports/compressImage";
 import {
   mapJobToReportDetails,
   filterPhotosByDateRange,
@@ -55,6 +56,7 @@ const DEFAULT_REPORT: ConditionReportData = {
     project: "",
     date: new Date().toLocaleDateString("en-AU"),
     coverPhoto: null,
+    siteId: "",
   },
   photos: [],
   schedule: [],
@@ -112,10 +114,16 @@ export default function ConditionReportPage({
   );
 
   const updateCoverPhoto = useCallback((dataUrl: string | null) => {
-    setReport((prev) => ({
-      ...prev,
-      job: { ...prev.job, coverPhoto: dataUrl },
-    }));
+    if (!dataUrl) {
+      setReport((prev) => ({ ...prev, job: { ...prev.job, coverPhoto: null } }));
+      return;
+    }
+    compressImageDataUrl(dataUrl).then((compressed) => {
+      setReport((prev) => ({
+        ...prev,
+        job: { ...prev.job, coverPhoto: compressed },
+      }));
+    });
   }, []);
 
   const removePhoto = useCallback((id: string) => {
@@ -185,20 +193,26 @@ export default function ConditionReportPage({
               }
 
               if (event === "photo") {
+                const compressedUrl = await compressImageDataUrl(
+                  String(payload.url),
+                );
+                if (isStale()) {
+                  reader.cancel();
+                  return;
+                }
                 const photo: ReportPhoto = {
                   id: String(payload.id),
                   name: String(payload.name),
-                  url: String(payload.url),
+                  url: compressedUrl,
                   size: Number(payload.size) || 0,
                   dateAdded: payload.dateAdded
                     ? String(payload.dateAdded)
                     : null,
                 };
-                if (!isStale())
-                  setReport((prev) => ({
-                    ...prev,
-                    photos: [...prev.photos, photo],
-                  }));
+                setReport((prev) => ({
+                  ...prev,
+                  photos: [...prev.photos, photo],
+                }));
               } else if (event === "progress") {
                 if (!isStale())
                   setImportStatus({
@@ -522,7 +536,7 @@ export default function ConditionReportPage({
             onClick={() => setShowSaveModal(true)}
             disabled={!hasReport || !loadedJobId}
           >
-            Save to Job
+            Save
           </Button>
           <Button
             variant="primary"
@@ -644,15 +658,16 @@ export default function ConditionReportPage({
         </div>
       </div>
 
-      {/* Save to Job Modal */}
+      {/* Save Report Modal */}
       {showSaveModal && (
-        <SaveToJobModal
+        <SaveReportModal
           jobId={loadedJobId}
           jobNo={`#${loadedJobId}`}
           companyId={0}
-          defaultFilename={`Condition Report - ${report.job.address || "Draft"}`}
-          saveEndpoint="/api/simpro/jobs/save-report"
-          prepareBody={(filename, companyId) => {
+          siteId={report.job.siteId}
+          defaultFilename={`Condition Report - ${new Date().getFullYear()}`}
+          saveEndpoint={`/api/simpro/jobs/${loadedJobId}/save-report`}
+          prepareBody={(filename, companyId, destinations) => {
             // Apply the same date filter so the saved PDF matches the preview.
             const photosToSave = report.settings.filterByDate
               ? filterPhotosByDateRange(
@@ -674,6 +689,8 @@ export default function ConditionReportPage({
               filename,
               companyId,
               jobId: loadedJobId,
+              siteId: report.job.siteId,
+              destinations,
               report: {
                 ...report,
                 photos: photosToSave.map(

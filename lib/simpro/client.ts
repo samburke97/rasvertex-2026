@@ -168,6 +168,7 @@ export async function fetchEnrichedJob(
     jobNo,
     name: job.Name?.trim() || `Job ${parsed}`,
     clientName,
+    siteId: job.Site?.ID ? String(job.Site.ID) : "",
     siteName: job.Site?.Name?.trim() || clientName,
     siteAddress,
     preparedFor,

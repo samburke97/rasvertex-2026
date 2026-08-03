@@ -70,6 +70,8 @@ export interface AnchorReportJob {
   nextInspectionDate: string;
   authorisedBy: string;
   certComments: string;
+  /** SimPRO Site ID, used only for the Save-to-Site export path — not rendered. */
+  siteId: string;
 }
 
 // Supporting photos are entirely optional on the anchor report (unlike the
@@ -294,6 +296,7 @@ export const DEFAULT_ANCHOR_REPORT: AnchorReportData = {
     nextInspectionDate: "",
     authorisedBy: "",
     certComments: "",
+    siteId: "",
   },
   zones: [],
   photos: [],

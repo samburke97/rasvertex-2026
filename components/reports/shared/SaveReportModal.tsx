@@ -1,24 +1,42 @@
 "use client";
-// components/reports/shared/SaveToJobModal.tsx
+// components/reports/shared/SaveReportModal.tsx
 //
-// Generic "Save to Job" modal used by all report types.
+// Generic "Save Report" modal used by all report types. Lets the user save
+// the report as a PDF to the SimPRO Job, the SimPRO Site (visible in the
+// Customer Portal), or both at once.
+//
 // The caller provides:
 //   - saveEndpoint: which API route to POST to
-//   - defaultFilename: pre-filled filename
+//   - defaultFilename: pre-filled filename (year-based, e.g. "Anchor Inspection Report - 2026")
+//   - siteId: SimPRO Site ID for this job, or "" if unavailable (disables the Site checkbox)
 //   - prepareBody: function that returns the POST body (allows photo stripping etc.)
+//
+// Filenames are predictable-by-design (one per report type per year), so the
+// backend replaces any existing same-name file rather than blocking — this
+// modal never shows a "duplicate" state, only success or per-destination error.
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import styles from "./SaveToJobModal.module.css";
+import styles from "./SaveReportModal.module.css";
 import Button from "@/components/ui/Button";
 
-interface SaveToJobModalProps {
+interface DestinationResult {
+  success: boolean;
+  error?: string;
+}
+
+interface SaveReportModalProps {
   jobId: string;
   jobNo: string;
   companyId?: number;
+  siteId?: string;
   defaultFilename: string;
   saveEndpoint: string;
   /** Return the JSON body to POST. Runs just before save so it can be async. */
-  prepareBody: (filename: string, companyId: number) => Record<string, unknown>;
+  prepareBody: (
+    filename: string,
+    companyId: number,
+    destinations: { job: boolean; site: boolean },
+  ) => Record<string, unknown>;
   onClose: () => void;
   onSuccess: (filename: string) => void;
 }
@@ -26,24 +44,28 @@ interface SaveToJobModalProps {
 type ModalState =
   | { phase: "idle" }
   | { phase: "saving" }
-  | { phase: "duplicate"; existingFilename: string }
   | { phase: "error"; message: string }
-  | { phase: "success"; filename: string };
+  | { phase: "success"; filename: string; job: boolean; site: boolean };
 
-export default function SaveToJobModal({
+export default function SaveReportModal({
   jobId,
   jobNo,
   companyId = 0,
+  siteId,
   defaultFilename,
   saveEndpoint,
   prepareBody,
   onClose,
   onSuccess,
-}: SaveToJobModalProps) {
+}: SaveReportModalProps) {
   const [filename, setFilename] = useState(defaultFilename);
+  const hasSite = !!siteId;
+  const [saveToJob, setSaveToJob] = useState(true);
+  const [saveToSite, setSaveToSite] = useState(hasSite);
   const [modalState, setModalState] = useState<ModalState>({ phase: "idle" });
   const inputRef = useRef<HTMLInputElement>(null);
   const isSaving = modalState.phase === "saving";
+  const noDestination = !saveToJob && !saveToSite;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -53,9 +75,7 @@ export default function SaveToJobModal({
   useEffect(() => {
     if (modalState.phase === "success") {
       const timer = setTimeout(() => {
-        onSuccess(
-          (modalState as { phase: "success"; filename: string }).filename,
-        );
+        onSuccess(modalState.filename);
         onClose();
       }, 1500);
       return () => clearTimeout(timer);
@@ -72,14 +92,16 @@ export default function SaveToJobModal({
 
   const handleSave = useCallback(async () => {
     const trimmed = filename.trim();
-    if (!trimmed) {
-      inputRef.current?.focus();
+    if (!trimmed || noDestination) {
+      if (!trimmed) inputRef.current?.focus();
       return;
     }
     setModalState({ phase: "saving" });
 
+    const destinations = { job: saveToJob, site: saveToSite };
+
     try {
-      const body = prepareBody(trimmed, companyId);
+      const body = prepareBody(trimmed, companyId, destinations);
       const res = await fetch(saveEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -87,13 +109,6 @@ export default function SaveToJobModal({
       });
       const data = await res.json();
 
-      if (res.status === 409) {
-        setModalState({
-          phase: "duplicate",
-          existingFilename: data.existingFile?.filename ?? trimmed + ".pdf",
-        });
-        return;
-      }
       if (!res.ok) {
         setModalState({
           phase: "error",
@@ -101,7 +116,36 @@ export default function SaveToJobModal({
         });
         return;
       }
-      setModalState({ phase: "success", filename: data.filename });
+
+      const jobResult: DestinationResult | undefined = data.job;
+      const siteResult: DestinationResult | undefined = data.site;
+      const jobFailed = destinations.job && jobResult && !jobResult.success;
+      const siteFailed = destinations.site && siteResult && !siteResult.success;
+
+      if (jobFailed || siteFailed) {
+        const parts: string[] = [];
+        if (destinations.job)
+          parts.push(
+            jobResult?.success
+              ? "Saved to Job."
+              : `Job failed: ${jobResult?.error ?? "unknown error"}`,
+          );
+        if (destinations.site)
+          parts.push(
+            siteResult?.success
+              ? "Saved to Site."
+              : `Site failed: ${siteResult?.error ?? "unknown error"}`,
+          );
+        setModalState({ phase: "error", message: parts.join(" ") });
+        return;
+      }
+
+      setModalState({
+        phase: "success",
+        filename: data.filename,
+        job: destinations.job,
+        site: destinations.site,
+      });
     } catch (err) {
       setModalState({
         phase: "error",
@@ -111,13 +155,21 @@ export default function SaveToJobModal({
             : "Network error. Check your connection.",
       });
     }
-  }, [filename, prepareBody, saveEndpoint, companyId]);
+  }, [filename, noDestination, saveToJob, saveToSite, prepareBody, saveEndpoint, companyId]);
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isSaving && e.target === e.currentTarget) onClose();
   };
 
   const isSuccess = modalState.phase === "success";
+
+  const successText = isSuccess
+    ? modalState.job && modalState.site
+      ? `"${modalState.filename}" added to Job ${jobNo} and to the Site`
+      : modalState.job
+        ? `"${modalState.filename}" added to Job ${jobNo}`
+        : `"${modalState.filename}" added to the Site`
+    : "";
 
   return (
     <div className={styles.overlay} onClick={handleOverlayClick}>
@@ -168,12 +220,12 @@ export default function SaveToJobModal({
           </div>
           <div>
             <h2 className={styles.title} id="modal-title">
-              {isSuccess ? "Saved to Job" : "Save to Job"}
+              {isSuccess ? "Saved" : "Save Report"}
             </h2>
             <p className={styles.subtitle}>
               {isSuccess
-                ? `"${(modalState as { phase: "success"; filename: string }).filename}" added to job ${jobNo}`
-                : `Attach this report as a PDF to SimPRO job ${jobNo}`}
+                ? successText
+                : "Attach this report as a PDF to SimPRO"}
             </p>
           </div>
           {!isSaving && !isSuccess && (
@@ -222,45 +274,6 @@ export default function SaveToJobModal({
         {/* Form */}
         {!isSuccess && (
           <div className={styles.body}>
-            {modalState.phase === "duplicate" && (
-              <div className={`${styles.banner} ${styles.bannerWarn}`}>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  className={styles.bannerIcon}
-                >
-                  <circle
-                    cx="8"
-                    cy="8"
-                    r="7"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                  />
-                  <line
-                    x1="8"
-                    y1="5"
-                    x2="8"
-                    y2="8.5"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                  <circle cx="8" cy="11" r="0.75" fill="currentColor" />
-                </svg>
-                <div>
-                  <strong>File already exists:</strong>{" "}
-                  <span className={styles.existingName}>
-                    "{modalState.existingFilename}"
-                  </span>
-                  <br />
-                  <span className={styles.bannerHint}>
-                    Rename below and try again.
-                  </span>
-                </div>
-              </div>
-            )}
             {modalState.phase === "error" && (
               <div className={`${styles.banner} ${styles.bannerError}`}>
                 <svg
@@ -298,16 +311,12 @@ export default function SaveToJobModal({
                 <input
                   ref={inputRef}
                   type="text"
-                  className={`${styles.input} ${modalState.phase === "duplicate" || modalState.phase === "error" ? styles.inputWarn : ""}`}
+                  className={`${styles.input} ${modalState.phase === "error" ? styles.inputWarn : ""}`}
                   value={filename}
                   onChange={(e) => {
                     setFilename(e.target.value);
-                    if (
-                      modalState.phase === "duplicate" ||
-                      modalState.phase === "error"
-                    ) {
+                    if (modalState.phase === "error")
                       setModalState({ phase: "idle" });
-                    }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !isSaving) handleSave();
@@ -320,9 +329,37 @@ export default function SaveToJobModal({
                 />
                 <span className={styles.ext}>.pdf</span>
               </div>
-              <p className={styles.hint}>
-                The PDF will be attached to SimPRO job {jobNo}
-              </p>
+            </div>
+
+            <div className={styles.fieldWrap}>
+              <label className={styles.fieldLabel}>Save to</label>
+              <label className={styles.checkRow}>
+                <input
+                  type="checkbox"
+                  checked={saveToJob}
+                  onChange={(e) => setSaveToJob(e.target.checked)}
+                  disabled={isSaving}
+                />
+                <span>Save to Job</span>
+              </label>
+              <label
+                className={`${styles.checkRow} ${!hasSite ? styles.checkRowDisabled : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={saveToSite}
+                  onChange={(e) => setSaveToSite(e.target.checked)}
+                  disabled={isSaving || !hasSite}
+                />
+                <span>
+                  Save to Site
+                  {!hasSite && (
+                    <span className={styles.checkHint}>
+                      Site ID unavailable for this job
+                    </span>
+                  )}
+                </span>
+              </label>
             </div>
 
             {isSaving && (
@@ -351,9 +388,9 @@ export default function SaveToJobModal({
               variant="primary"
               size="sm"
               onClick={handleSave}
-              disabled={isSaving || !filename.trim()}
+              disabled={isSaving || !filename.trim() || noDestination}
             >
-              {isSaving ? "Saving…" : "Save to Job"}
+              {isSaving ? "Saving…" : "Save"}
             </Button>
           </div>
         )}
