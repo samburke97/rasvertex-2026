@@ -437,13 +437,23 @@ export default function ConditionReportPage({
           )
         : report.schedule;
 
+      // Self-healing safety net (mirrors AnchorInspectionPage) — recompresses
+      // whatever is in state right before it leaves the browser, so a photo
+      // or cover image from before compression was added doesn't need a
+      // manual re-import to export cleanly. Cheap when already small.
       const photoData: Record<string, string> = {};
+      await Promise.all(
+        photosToExport.map(async (p) => {
+          if (p.url) photoData[p.id] = await compressImageDataUrl(p.url);
+        }),
+      );
+      const compressedCoverPhoto = report.job.coverPhoto
+        ? await compressImageDataUrl(report.job.coverPhoto)
+        : report.job.coverPhoto;
       const strippedReport: ConditionReportData = {
         ...report,
-        photos: photosToExport.map((p) => {
-          if (p.url) photoData[p.id] = p.url;
-          return { ...p, url: "" };
-        }),
+        job: { ...report.job, coverPhoto: compressedCoverPhoto },
+        photos: photosToExport.map((p) => ({ ...p, url: "" })),
         schedule: scheduleToExport,
       };
 
@@ -667,7 +677,7 @@ export default function ConditionReportPage({
           siteId={report.job.siteId}
           defaultFilename={`Condition Report - ${new Date().getFullYear()}`}
           saveEndpoint={`/api/simpro/jobs/${loadedJobId}/save-report`}
-          prepareBody={(filename, companyId, destinations) => {
+          prepareBody={async (filename, companyId, destinations) => {
             // Apply the same date filter so the saved PDF matches the preview.
             const photosToSave = report.settings.filterByDate
               ? filterPhotosByDateRange(
@@ -685,6 +695,20 @@ export default function ConditionReportPage({
                 )
               : report.schedule;
 
+            // Self-healing safety net — see handleExportPDF above.
+            const compressedPhotos = await Promise.all(
+              photosToSave.map(async ({ id, name, url, size, dateAdded }) => ({
+                id,
+                name,
+                url: await compressImageDataUrl(url),
+                size,
+                dateAdded,
+              })),
+            );
+            const compressedCoverPhoto = report.job.coverPhoto
+              ? await compressImageDataUrl(report.job.coverPhoto)
+              : report.job.coverPhoto;
+
             return {
               filename,
               companyId,
@@ -693,15 +717,8 @@ export default function ConditionReportPage({
               destinations,
               report: {
                 ...report,
-                photos: photosToSave.map(
-                  ({ id, name, url, size, dateAdded }) => ({
-                    id,
-                    name,
-                    url,
-                    size,
-                    dateAdded,
-                  }),
-                ),
+                job: { ...report.job, coverPhoto: compressedCoverPhoto },
+                photos: compressedPhotos,
                 schedule: scheduleToSave,
               },
             };

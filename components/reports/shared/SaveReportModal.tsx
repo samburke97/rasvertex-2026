@@ -36,7 +36,7 @@ interface SaveReportModalProps {
     filename: string,
     companyId: number,
     destinations: { job: boolean; site: boolean },
-  ) => Record<string, unknown>;
+  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
   onClose: () => void;
   onSuccess: (filename: string) => void;
 }
@@ -101,7 +101,7 @@ export default function SaveReportModal({
     const destinations = { job: saveToJob, site: saveToSite };
 
     try {
-      const body = prepareBody(trimmed, companyId, destinations);
+      const body = await prepareBody(trimmed, companyId, destinations);
       const res = await fetch(saveEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -99,6 +99,33 @@ export default function AnchorInspectionPage({
   >(null);
   const photoLoadId = useRef(0);
 
+  // Self-healing safety net for reports saved before zone-map images were
+  // compressed at capture/upload time (see ZoneMapEditor.tsx) — re-compresses
+  // whatever is currently in state right before it leaves the browser, so an
+  // old draft with a multi-MB uncompressed map doesn't need a manual
+  // re-upload to export or save cleanly. Cheap when already small:
+  // compressImageDataUrl skips its own re-encode below ~400KB.
+  const compressReportForTransfer = useCallback(
+    async (r: AnchorReportData): Promise<AnchorReportData> => ({
+      ...r,
+      zones: await Promise.all(
+        r.zones.map(async (zone) => ({
+          ...zone,
+          mapImageUrl: zone.mapImageUrl
+            ? await compressImageDataUrl(zone.mapImageUrl)
+            : zone.mapImageUrl,
+        })),
+      ),
+      photos: await Promise.all(
+        r.photos.map(async (photo) => ({
+          ...photo,
+          url: await compressImageDataUrl(photo.url),
+        })),
+      ),
+    }),
+    [],
+  );
+
   // ── Export PDF — builds clean print HTML via anchor.print.ts ──────────────
   const handleExport = useCallback(async () => {
     setIsExporting(true);
@@ -107,10 +134,11 @@ export default function AnchorInspectionPage({
         ? `Anchor Inspection Report - ${report.job.address}`
         : "Anchor Inspection Report";
 
+      const exportReport = await compressReportForTransfer(report);
       const res = await fetch("/api/reports/export-anchor-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, report }),
+        body: JSON.stringify({ filename, report: exportReport }),
       });
 
       if (!res.ok) {
@@ -135,7 +163,7 @@ export default function AnchorInspectionPage({
     } finally {
       setIsExporting(false);
     }
-  }, [report]);
+  }, [report, compressReportForTransfer]);
 
   // ── Job detail handlers ────────────────────────────────────────────────
   const updateJob = useCallback(
@@ -674,12 +702,12 @@ export default function AnchorInspectionPage({
           siteId={report.job.siteId}
           defaultFilename={`Anchor Inspection Report - ${new Date().getFullYear()}`}
           saveEndpoint={`/api/simpro/jobs/${loadedJobId}/save-anchor-report`}
-          prepareBody={(filename, companyId, destinations) => ({
+          prepareBody={async (filename, companyId, destinations) => ({
             filename,
             companyId,
             siteId: report.job.siteId,
             destinations,
-            report,
+            report: await compressReportForTransfer(report),
           })}
           onClose={() => setShowSaveModal(false)}
           onSuccess={(filename) => {

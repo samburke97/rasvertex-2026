@@ -9,6 +9,7 @@ import IconButton from "@/components/ui/IconButton";
 import AnchorPinModal from "./AnchorPinModal";
 import MapLegend from "./MapLegend";
 import { loadGoogleMaps } from "@/lib/reports/googleMapsLoader";
+import { compressImageDataUrl } from "@/lib/reports/compressImage";
 import {
   ANCHOR_SUBTYPE_LABELS,
   ANCHOR_TYPE_COLOURS,
@@ -457,6 +458,7 @@ export default function ZoneMapEditor({
       if (mapRotation !== 0) {
         dataUrl = await rotateImageToDataUrl(dataUrl, mapRotation);
       }
+      dataUrl = await compressImageDataUrl(dataUrl);
 
       const updated: Zone = {
         ...localZone,
@@ -486,14 +488,19 @@ export default function ZoneMapEditor({
     setMapRotation(0);
   }, [localZone, save]);
 
-  // ── Upload fallback — used as-is, no refine step ─────────────────────────
-
+  // ── Upload fallback — no framing/refine step, but always compressed ──────
+  // A raw phone photo used as a zone map is easily 5-15MB uncompressed —
+  // with several zones each carrying one, that's the entire cause of
+  // multi-hundred-MB PDF exports. Every mapImageUrl goes through the same
+  // downscale-and-recompress pass photos get, so file size never depends on
+  // what resolution a tech happened to upload.
   const handleUploadMap = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const url = ev.target?.result as string;
+    reader.onload = async (ev) => {
+      const raw = ev.target?.result as string;
+      const url = await compressImageDataUrl(raw);
       const updated: Zone = { ...localZone, mapImageUrl: url };
       setLocalZone(updated);
       save(updated);
