@@ -51,6 +51,8 @@ export interface ReportJobDetails {
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 export interface ReportSettings {
+  /** Photo grid pages — on by default, optional per report. */
+  showPhotos: boolean;
   showDates: boolean;
   filterByDate: boolean;
   dateFrom: string | null; // "YYYY-MM-DD"

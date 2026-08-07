@@ -38,6 +38,7 @@ const AUTOSAVE_DEBOUNCE_MS = 1500;
 const AUTOSAVE_RETRY_MS = 5000;
 
 const DEFAULT_SETTINGS: ReportSettings = {
+  showPhotos: true,
   showDates: false,
   filterByDate: false,
   dateFrom: null,
@@ -360,6 +361,12 @@ export default function ConditionReportPage({
           setReport({
             ...DEFAULT_REPORT,
             ...draft,
+            // Shallow-merged above like every other field, but settings is
+            // itself an object — a draft saved before a new setting existed
+            // (e.g. showPhotos) has it undefined, which is falsy and would
+            // silently turn that feature off on resume. Backfill per-key
+            // instead of trusting the draft's settings object wholesale.
+            settings: { ...DEFAULT_SETTINGS, ...draft.settings },
             job: mapJobToReportDetails(jobData),
           });
           setLoadedJobId(jobNumber);
@@ -503,13 +510,17 @@ export default function ConditionReportPage({
     try {
       // Apply the same date filter to photos and schedule that the on-screen
       // preview uses, so the PDF only contains what the user is seeing.
-      const photosToExport = report.settings.filterByDate
-        ? filterPhotosByDateRange(
-            report.photos,
-            report.settings.dateFrom,
-            report.settings.dateTo,
-          )
-        : report.photos;
+      // When photos are excluded entirely, skip them here too — no point
+      // uploading potentially many MB of images the PDF won't render.
+      const photosToExport = !report.settings.showPhotos
+        ? []
+        : report.settings.filterByDate
+          ? filterPhotosByDateRange(
+              report.photos,
+              report.settings.dateFrom,
+              report.settings.dateTo,
+            )
+          : report.photos;
 
       const scheduleToExport = report.settings.filterByDate
         ? filterScheduleByDateRange(
@@ -720,19 +731,23 @@ export default function ConditionReportPage({
             }
           />
 
-          <div className={styles.pageLabel}>
-            Photos &middot; {filteredPhotos.length} image
-            {filteredPhotos.length !== 1 ? "s" : ""}
-          </div>
-          <PhotoSection
-            photos={filteredPhotos}
-            importStatus={importStatus}
-            awaitingFolderChoice={awaitingFolderChoice}
-            showDates={report.settings.showDates}
-            layout={report.settings.photoLayout}
-            onPhotoRemove={removePhoto}
-            onPhotoRename={renamePhoto}
-          />
+          {report.settings.showPhotos && (
+            <>
+              <div className={styles.pageLabel}>
+                Photos &middot; {filteredPhotos.length} image
+                {filteredPhotos.length !== 1 ? "s" : ""}
+              </div>
+              <PhotoSection
+                photos={filteredPhotos}
+                importStatus={importStatus}
+                awaitingFolderChoice={awaitingFolderChoice}
+                showDates={report.settings.showDates}
+                layout={report.settings.photoLayout}
+                onPhotoRemove={removePhoto}
+                onPhotoRename={renamePhoto}
+              />
+            </>
+          )}
 
           {report.settings.showSchedule && (
             <>
@@ -779,13 +794,17 @@ export default function ConditionReportPage({
           saveEndpoint={`/api/simpro/jobs/${loadedJobId}/save-report`}
           prepareBody={async (filename, companyId, destinations) => {
             // Apply the same date filter so the saved PDF matches the preview.
-            const photosToSave = report.settings.filterByDate
-              ? filterPhotosByDateRange(
-                  report.photos,
-                  report.settings.dateFrom,
-                  report.settings.dateTo,
-                )
-              : report.photos;
+            // When photos are excluded entirely, skip them here too — no
+            // point uploading images the PDF won't render.
+            const photosToSave = !report.settings.showPhotos
+              ? []
+              : report.settings.filterByDate
+                ? filterPhotosByDateRange(
+                    report.photos,
+                    report.settings.dateFrom,
+                    report.settings.dateTo,
+                  )
+                : report.photos;
 
             const scheduleToSave = report.settings.filterByDate
               ? filterScheduleByDateRange(

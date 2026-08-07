@@ -516,6 +516,7 @@ export function buildPrintHTML(
   assets?: ReportAssets,
 ): string {
   const {
+    showPhotos,
     showDates,
     photoLayout,
     showSchedule,
@@ -531,13 +532,19 @@ export function buildPrintHTML(
   const assocHTML = buildAssocLogosHTML(a);
 
   // ── Photo pages ───────────────────────────────────────────────────────────
-  // When not grouping by date, still sort the flat list by filename
-  const flatSorted = [...report.photos].sort((a, b) =>
-    naturalSort(a.name, b.name),
-  );
-  const groups = showDates
-    ? groupPhotosByDate(report.photos)
-    : [{ key: "all", label: null, photos: flatSorted }];
+  // When not grouping by date, still sort the flat list by filename.
+  // Photos are optional per report — showPhotos off means no photo pages at
+  // all, regardless of what's in report.photos (the client also already
+  // omits photo data from the payload in this case; this is a second,
+  // defense-in-depth check, same pattern as showSummary below).
+  const flatSorted = showPhotos
+    ? [...report.photos].sort((a, b) => naturalSort(a.name, b.name))
+    : [];
+  const groups = !showPhotos
+    ? []
+    : showDates
+      ? groupPhotosByDate(report.photos)
+      : [{ key: "all", label: null, photos: flatSorted }];
 
   const photoPages = paginatePhotos(groups, showDates, photoLayout);
   const totalPhotoPages = photoPages.length;

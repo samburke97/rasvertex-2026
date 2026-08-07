@@ -146,7 +146,19 @@ export default function OptionsPanel({
       <div className={styles.group}>
         <div className={styles.groupLabel}>Photos</div>
 
-        {photoFolders.length > 0 && (
+        <ToggleRow
+          label="Include photos"
+          sub={
+            hasPhotos
+              ? "Photo pages will appear in PDF"
+              : "Load a job to fetch photos"
+          }
+          checked={settings.showPhotos}
+          onChange={(v) => set({ showPhotos: v })}
+          disabled={!hasPhotos}
+        />
+
+        {settings.showPhotos && photoFolders.length > 0 && (
           <>
             <div className={styles.subLabel}>Folder</div>
             <div className={styles.presetRow}>
@@ -171,32 +183,36 @@ export default function OptionsPanel({
           </>
         )}
 
-        <ToggleRow
-          label="Show dates"
-          sub={
-            hasPhotos
-              ? "Print capture date under each photo"
-              : "Load photos first"
-          }
-          checked={settings.showDates}
-          onChange={(v) => set({ showDates: v })}
-          disabled={!hasPhotos}
-        />
-
-        <div className={styles.subLabel}>Grid size</div>
-        <div className={styles.presetRow}>
-          {PHOTO_LAYOUTS.map((l) => (
-            <button
-              key={l.key}
-              className={`${styles.presetBtn} ${settings.photoLayout === l.key ? styles.presetBtnActive : ""}`}
-              onClick={() => set({ photoLayout: l.key })}
+        {settings.showPhotos && (
+          <>
+            <ToggleRow
+              label="Show dates"
+              sub={
+                hasPhotos
+                  ? "Print capture date under each photo"
+                  : "Load photos first"
+              }
+              checked={settings.showDates}
+              onChange={(v) => set({ showDates: v })}
               disabled={!hasPhotos}
-              title={l.sub}
-            >
-              {l.label}
-            </button>
-          ))}
-        </div>
+            />
+
+            <div className={styles.subLabel}>Grid size</div>
+            <div className={styles.presetRow}>
+              {PHOTO_LAYOUTS.map((l) => (
+                <button
+                  key={l.key}
+                  className={`${styles.presetBtn} ${settings.photoLayout === l.key ? styles.presetBtnActive : ""}`}
+                  onClick={() => set({ photoLayout: l.key })}
+                  disabled={!hasPhotos}
+                  title={l.sub}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         <ToggleRow
           label="Filter by date"
