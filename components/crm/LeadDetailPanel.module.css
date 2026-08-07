@@ -1,0 +1,125 @@
+/* components/crm/LeadDetailPanel.module.css */
+
+.loading {
+  font-size: 0.875rem;
+  color: var(--for-medium, #7e807f);
+  padding: 1rem 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 420px;
+  max-width: 480px;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+}
+
+.stageRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.stageLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--for-dark, #4c4d4c);
+}
+
+.stageSelect {
+  flex: 1;
+  height: 38px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: var(--for-darkest, #141414);
+  background: var(--white, #fff);
+}
+
+.error {
+  font-size: 0.8125rem;
+  color: #dc2626;
+  margin: 0;
+}
+
+.actionsRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--out-light, #edf0f0);
+}
+
+/* ── Timeline ────────────────────────────────────────────────────────────── */
+.timelineSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.timelineHeader {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--for-medium, #7e807f);
+}
+
+.noteForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.timelineEmpty {
+  font-size: 0.8125rem;
+  color: var(--for-medium, #7e807f);
+  margin: 0;
+}
+
+.timelineRow {
+  display: flex;
+  gap: 0.625rem;
+}
+
+.timelineDot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand-primary, #900c40);
+  margin-top: 0.4rem;
+}
+
+.timelineBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.timelineText {
+  font-size: 0.825rem;
+  color: var(--for-darkest, #141414);
+  line-height: 1.4;
+}
+
+.timelineTime {
+  font-size: 0.7rem;
+  color: var(--for-medium, #7e807f);
+}

@@ -515,8 +515,14 @@ export function buildPrintHTML(
   report: ConditionReportData,
   assets?: ReportAssets,
 ): string {
-  const { showDates, photoLayout, showSchedule, showScheduleNotes, scheduleSections } =
-    report.settings;
+  const {
+    showDates,
+    photoLayout,
+    showSchedule,
+    showScheduleNotes,
+    scheduleSections,
+    showSummary,
+  } = report.settings;
   const a = assets ?? DEFAULT_PRINT_ASSETS;
   const { columns: photoColumns, aspectRatio: photoAspectRatio } =
     PHOTO_LAYOUTS[photoLayout] ?? PHOTO_LAYOUTS.small;
@@ -579,10 +585,29 @@ export function buildPrintHTML(
         )
       : "";
 
-  // ── Cover page ────────────────────────────────────────────────────────────
-  const coverPhotoLayer = report.job.coverPhoto
-    ? `<div class="cover-hero-photo" style="background-image:url('${report.job.coverPhoto}')"></div>`
+  const summaryHTML = showSummary
+    ? `<div class="summary-page">
+  <div class="summary-topbar">
+    <div class="summary-title">Summary</div>
+    <img src="${esc(a.linkBlue)}" alt="rasvertex.com.au" class="summary-link" />
+  </div>
+  <div class="summary-body">
+    <div class="summary-section">
+      <div class="summary-label">Comments:</div>
+      <div class="summary-text">${report.comments || ""}</div>
+    </div>
+    <div class="summary-section">
+      <div class="summary-label">Recommendations:</div>
+      <div class="summary-text">${report.recommendations || ""}</div>
+    </div>
+  </div>
+  <div class="summary-footer">${assocHTML}</div>
+</div>`
     : "";
+
+  // ── Cover page ────────────────────────────────────────────────────────────
+  // Fixed app background — no per-report upload (see shared/CoverSection.tsx).
+  const coverPhotoLayer = `<div class="cover-hero-photo" style="background-image:url('${a.conditionBg}')"></div>`;
 
   const metaRows = [
     { label: "Prepared For:", value: report.job.preparedFor },
@@ -639,23 +664,7 @@ ${photoPageHTML}
 ${scheduleHTML}
 
 <!-- ── SUMMARY ── -->
-<div class="summary-page">
-  <div class="summary-topbar">
-    <div class="summary-title">Summary</div>
-    <img src="${esc(a.linkBlue)}" alt="rasvertex.com.au" class="summary-link" />
-  </div>
-  <div class="summary-body">
-    <div class="summary-section">
-      <div class="summary-label">Comments:</div>
-      <div class="summary-text">${report.comments || ""}</div>
-    </div>
-    <div class="summary-section">
-      <div class="summary-label">Recommendations:</div>
-      <div class="summary-text">${report.recommendations || ""}</div>
-    </div>
-  </div>
-  <div class="summary-footer">${assocHTML}</div>
-</div>
+${summaryHTML}
 
 </body>
 </html>`;

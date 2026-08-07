@@ -9,6 +9,7 @@ export interface ReportAssets {
   linkBlue: string;
   signature: string;
   heightSafety: string;
+  conditionBg: string;
   bebasNeueFont: string;
   interFont: string;
   associations: {
@@ -51,6 +52,7 @@ export function loadReportAssets(): ReportAssets {
     linkBlue: readPublicAsBase64("reports/link_blue.png"),
     signature: readPublicAsBase64("reports/signature.png"),
     heightSafety: readPublicAsBase64("images/height-safety.png"),
+    conditionBg: readPublicAsBase64("images/backgrounds/condition-bg.jpeg"),
     bebasNeueFont: readPublicAsBase64("fonts/bebas-neue.woff2"),
     interFont: readPublicAsBase64("fonts/inter.woff2"),
     associations: {

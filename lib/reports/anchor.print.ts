@@ -200,9 +200,16 @@ const PRINT_STYLES = `
     gap: 1.5rem;
     overflow: hidden;
   }
+  /* Fixed to 8:5 (matches ZoneMapEditor's captured PREVIEW_WIDTH x
+     PREVIEW_HEIGHT = 640x400) rather than a max-height crop — pin x/y are
+     percentages of this box, so its rendered ratio has to exactly match the
+     editor's or a pin lands in a different spot on export than where it was
+     placed. See ZoneMapEditor.module.css .mapCanvas for the editor side;
+     keep ZONE_MAP_HEIGHT_PX below in sync with this ratio. */
   .zone-map-wrap {
     position: relative;
     width: 100%;
+    aspect-ratio: 8 / 5;
     border-radius: 4px;
     overflow: hidden;
     flex-shrink: 0;
@@ -210,7 +217,7 @@ const PRINT_STYLES = `
   .zone-map-img {
     display: block;
     width: 100%;
-    max-height: 340px;
+    height: 100%;
     object-fit: cover;
   }
   .zone-line-overlay {
@@ -691,7 +698,11 @@ const ZONE_ROWS_CONTINUATION = 28;
 
 const ZONE_BODY_AVAILABLE_PX = 820; // A4 content height minus top-bar, footer, body padding
 const ZONE_BODY_GAP_PX = 24; // 1.5rem gap between each stacked block
-const ZONE_MAP_HEIGHT_PX = 340;
+// .zone-map-wrap is width:100% at aspect-ratio 8:5. Content width = 210mm
+// (~793.7px @96dpi) minus .zone-body's 2.75rem left/right padding (88px)
+// = ~705.7px, so height = 705.7 / 1.6 ≈ 441px. Keep this in sync with that
+// aspect-ratio (and the padding it's derived from) if either changes.
+const ZONE_MAP_HEIGHT_PX = 441;
 const ZONE_STATS_HEIGHT_PX = 72;
 const ZONE_LEGEND_BASE_PX = 24; // vertical padding only, no rows
 const ZONE_LEGEND_ROW_PX = 22; // per wrapped legend row, gap included

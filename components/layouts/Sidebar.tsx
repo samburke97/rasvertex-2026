@@ -21,6 +21,29 @@ const sidebarItems: SidebarItem[] = [
     href: "/recurring-jobs",
     label: "Recurring Jobs",
   },
+  {
+    href: "/crm",
+    label: "CRM",
+    // Inline — no /icons/menu/crm.svg asset exists yet, and svgIcon avoids
+    // needing one (or a -filled variant) just for this one nav entry.
+    svgIcon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="3.25" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M3.5 19c0-3.038 2.462-5.5 5.5-5.5s5.5 2.462 5.5 5.5"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+        <path
+          d="M15.5 4.14a3.25 3.25 0 0 1 0 6.22M17.5 19c0-2.485-1.53-4.61-3.7-5.31"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
   // { icon: "/icons/menu/sales.svg", href: "/sales", label: "Sales" },
   // { icon: "/icons/menu/inventory.svg", href: "/inventory", label: "Inventory" },
   // {

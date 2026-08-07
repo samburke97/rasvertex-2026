@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import styles from "../shared/ReportPage.module.css";
 import CoverSection from "../shared/CoverSection";
 import RichTextEditor from "../shared/RichTextEditor";
@@ -33,6 +33,10 @@ interface ConditionReportPageProps {
   onBack: () => void;
 }
 
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+const AUTOSAVE_DEBOUNCE_MS = 1500;
+const AUTOSAVE_RETRY_MS = 5000;
+
 const DEFAULT_SETTINGS: ReportSettings = {
   showDates: false,
   filterByDate: false,
@@ -43,6 +47,7 @@ const DEFAULT_SETTINGS: ReportSettings = {
   scheduleLoaded: false,
   showScheduleNotes: false,
   scheduleSections: false,
+  showSummary: true,
 };
 
 const DEFAULT_REPORT: ConditionReportData = {
@@ -55,7 +60,6 @@ const DEFAULT_REPORT: ConditionReportData = {
       "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
     project: "",
     date: new Date().toLocaleDateString("en-AU"),
-    coverPhoto: null,
     siteId: "",
   },
   photos: [],
@@ -93,6 +97,8 @@ export default function ConditionReportPage({
     useState<ScheduleCostCenter | null>(null);
   const [loadedJobId, setLoadedJobId] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Guards the job-detail + folder/cost-centre-list fetches that happen once
   // per job import.
   const currentLoadId = useRef(0);
@@ -112,19 +118,6 @@ export default function ConditionReportPage({
     },
     [],
   );
-
-  const updateCoverPhoto = useCallback((dataUrl: string | null) => {
-    if (!dataUrl) {
-      setReport((prev) => ({ ...prev, job: { ...prev.job, coverPhoto: null } }));
-      return;
-    }
-    compressImageDataUrl(dataUrl).then((compressed) => {
-      setReport((prev) => ({
-        ...prev,
-        job: { ...prev.job, coverPhoto: compressed },
-      }));
-    });
-  }, []);
 
   const removePhoto = useCallback((id: string) => {
     setReport((prev) => ({
@@ -309,6 +302,7 @@ export default function ConditionReportPage({
         },
       });
       setSavedFilename(null);
+      setSaveStatus("idle");
       setImportStatus({ phase: "fetching-job" });
       setScheduleStatus({ phase: "idle" });
       setScheduleLoading(false);
@@ -317,22 +311,75 @@ export default function ConditionReportPage({
       setScheduleCostCenters([]);
       setSelectedCostCenter(null);
 
-      // Job details and attachment folders only depend on `jobNumber`, which
-      // we already have — not on each other's results — so fire both
-      // requests immediately instead of awaiting job first and only then
-      // starting folders. That serial round-trip was pure added latency on
-      // every import. (.catch on the folders request is just to avoid an
-      // unhandled-rejection warning if we return early on a job-fetch
-      // failure before ever awaiting it below.)
+      // Job details, attachment folders, and any saved draft only depend on
+      // `jobNumber` — fire all three immediately rather than serially.
+      // (.catch on folders/draft is just to avoid an unhandled-rejection
+      // warning if we return early before ever awaiting them below.)
       const jobPromise = fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
       const foldersPromise = fetch(
         `/api/simpro/jobs/${jobNumber}/attachments/folders?companyId=0`,
       ).catch(() => null);
+      const draftPromise = fetch(
+        `/api/condition-reports/${jobNumber}`,
+      ).catch(() => null);
+
+      // 1. Job details — required; abort the whole import on failure.
+      let jobData: EnrichedJob;
+      try {
+        const jobRes = await jobPromise;
+        if (isStale()) return;
+        if (!jobRes.ok)
+          throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
+        jobData = await jobRes.json();
+        if (isStale()) return;
+      } catch (err) {
+        if (isStale()) return;
+        setImportStatus({
+          phase: "error",
+          message: err instanceof Error ? err.message : "Failed to fetch job",
+        });
+        return;
+      }
+
+      // 1b. Resume an in-progress draft if one exists for this job number —
+      // keep the tech's own work (photos, schedule, comments,
+      // recommendations, settings) and only refresh the SimPRO-sourced job
+      // fields, so a corrected address/date shows up without discarding
+      // anything already entered. Schedule/photos are deliberately NOT
+      // re-fetched here — the draft already has them, and firing those
+      // fetches in parallel with the draft check would race and overwrite
+      // whatever the draft branch just set.
+      try {
+        const draftRes = await draftPromise;
+        if (isStale()) return;
+        if (draftRes?.ok) {
+          const { report: draft } = (await draftRes.json()) as {
+            report: ConditionReportData;
+          };
+          if (isStale()) return;
+          setReport({
+            ...DEFAULT_REPORT,
+            ...draft,
+            job: mapJobToReportDetails(jobData),
+          });
+          setLoadedJobId(jobNumber);
+          setImportStatus({ phase: "done" });
+          setScheduleStatus({ phase: "done" });
+          return;
+        }
+      } catch {
+        // Treat as "no draft" — fall through to a fresh import.
+      }
+      if (isStale()) return;
+
+      setReport((prev) => ({
+        ...prev,
+        job: mapJobToReportDetails(jobData),
+      }));
 
       // Schedule loads in the background, independent of photos — the
       // report is editable while it fetches. Cost centres are fetched in
-      // parallel purely to offer as a filter afterwards. Also started
-      // immediately for the same reason as above.
+      // parallel purely to offer as a filter afterwards.
       (async () => {
         try {
           const res = await fetch(
@@ -350,27 +397,6 @@ export default function ConditionReportPage({
         }
       })();
       fetchSchedule(jobNumber, null);
-
-      // 1. Job details — required; abort the whole import on failure.
-      try {
-        const jobRes = await jobPromise;
-        if (isStale()) return;
-        if (!jobRes.ok)
-          throw new Error(`Job fetch failed: HTTP ${jobRes.status}`);
-        const jobData: EnrichedJob = await jobRes.json();
-        if (isStale()) return;
-        setReport((prev) => ({
-          ...prev,
-          job: mapJobToReportDetails(jobData),
-        }));
-      } catch (err) {
-        if (isStale()) return;
-        setImportStatus({
-          phase: "error",
-          message: err instanceof Error ? err.message : "Failed to fetch job",
-        });
-        return;
-      }
 
       // 2. Attachment folders — optional, already in flight above. With a
       // real choice to make (more than one folder), wait for the user to
@@ -399,6 +425,62 @@ export default function ConditionReportPage({
     },
     [fetchPhotos, fetchSchedule],
   );
+
+  // ── Autosave the draft, debounced, whenever the report changes ───────────
+  // Never persist while photos are still streaming in — every arriving
+  // photo triggers a `report` change, so without this guard a save could
+  // fire (and get resumed from later) with only a handful of photos loaded,
+  // or none at all. Once importStatus leaves "fetching-photos" this effect
+  // re-runs (it's a dependency below) and saves the by-then-complete report.
+  useEffect(() => {
+    if (!loadedJobId) return;
+    if (importStatus.phase === "fetching-photos") return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+    const delay =
+      saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
+    autosaveTimer.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      try {
+        const res = await fetch(`/api/condition-reports/${loadedJobId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(report),
+        });
+        setSaveStatus(res.ok ? "saved" : "error");
+      } catch {
+        setSaveStatus("error");
+      }
+    }, delay);
+
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report, loadedJobId, importStatus.phase]);
+
+  // Discards the saved draft for the current job and re-imports everything
+  // fresh from SimPRO — the self-serve fix for a draft that got stuck with
+  // stale/missing photos (e.g. one saved mid-import before this was guarded
+  // against), without needing direct database access to clear it.
+  const handleResetDraft = useCallback(async () => {
+    if (!loadedJobId) return;
+    if (
+      !window.confirm(
+        "Discard the saved draft and reload this job fresh from SimPRO? Any comments or recommendations typed here will be lost — photos and schedule will be re-fetched.",
+      )
+    )
+      return;
+    try {
+      await fetch(`/api/condition-reports/${loadedJobId}`, {
+        method: "DELETE",
+      });
+    } catch {
+      // Even if the delete fails, re-importing below will just overwrite
+      // the stale draft on the next autosave — not a blocker either way.
+    }
+    handleImport(loadedJobId);
+  }, [loadedJobId, handleImport]);
 
   const selectFolder = useCallback(
     (folderId: number | null) => {
@@ -439,20 +521,16 @@ export default function ConditionReportPage({
 
       // Self-healing safety net (mirrors AnchorInspectionPage) — recompresses
       // whatever is in state right before it leaves the browser, so a photo
-      // or cover image from before compression was added doesn't need a
-      // manual re-import to export cleanly. Cheap when already small.
+      // from before compression was added doesn't need a manual re-import
+      // to export cleanly. Cheap when already small.
       const photoData: Record<string, string> = {};
       await Promise.all(
         photosToExport.map(async (p) => {
           if (p.url) photoData[p.id] = await compressImageDataUrl(p.url);
         }),
       );
-      const compressedCoverPhoto = report.job.coverPhoto
-        ? await compressImageDataUrl(report.job.coverPhoto)
-        : report.job.coverPhoto;
       const strippedReport: ConditionReportData = {
         ...report,
-        job: { ...report.job, coverPhoto: compressedCoverPhoto },
         photos: photosToExport.map((p) => ({ ...p, url: "" })),
         schedule: scheduleToExport,
       };
@@ -540,6 +618,27 @@ export default function ConditionReportPage({
             </span>
           )}
           {savedFilename && <SavedBadge />}
+          {loadedJobId && saveStatus !== "idle" && (
+            <span
+              className={`${styles.draftStatus} ${
+                saveStatus === "error" ? styles.draftStatusError : ""
+              }`}
+            >
+              {saveStatus === "saving"
+                ? "Saving draft…"
+                : saveStatus === "error"
+                  ? "Draft save failed — retrying"
+                  : "Draft saved"}
+            </span>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleResetDraft}
+            disabled={!loadedJobId}
+          >
+            Reload from SimPRO
+          </Button>
           <Button
             variant="secondary"
             size="sm"
@@ -564,7 +663,6 @@ export default function ConditionReportPage({
         <OptionsPanel
           settings={report.settings}
           photos={report.photos}
-          job={report.job}
           importStatus={importStatus}
           scheduleStatus={scheduleStatus}
           onSettings={updateSettings}
@@ -578,13 +676,11 @@ export default function ConditionReportPage({
           scheduleCostCenters={scheduleCostCenters}
           selectedCostCenter={selectedCostCenter}
           onSelectCostCenter={selectCostCenter}
-          onCoverPhoto={updateCoverPhoto}
         />
 
         <div className={styles.canvas}>
           <div className={styles.pageLabel}>Cover Page</div>
           <CoverSection
-            coverPhoto={report.job.coverPhoto}
             reportType={report.job.reportType}
             onReportTypeChange={(v) => updateJobField("reportType", v)}
             metaRows={[
@@ -654,17 +750,21 @@ export default function ConditionReportPage({
             </>
           )}
 
-          <div className={styles.pageLabel}>Summary Page</div>
-          <SummarySection
-            comments={report.comments}
-            recommendations={report.recommendations}
-            onCommentsChange={(v) =>
-              setReport((prev) => ({ ...prev, comments: v }))
-            }
-            onRecommendationsChange={(v) =>
-              setReport((prev) => ({ ...prev, recommendations: v }))
-            }
-          />
+          {report.settings.showSummary && (
+            <>
+              <div className={styles.pageLabel}>Summary Page</div>
+              <SummarySection
+                comments={report.comments}
+                recommendations={report.recommendations}
+                onCommentsChange={(v) =>
+                  setReport((prev) => ({ ...prev, comments: v }))
+                }
+                onRecommendationsChange={(v) =>
+                  setReport((prev) => ({ ...prev, recommendations: v }))
+                }
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -705,9 +805,6 @@ export default function ConditionReportPage({
                 dateAdded,
               })),
             );
-            const compressedCoverPhoto = report.job.coverPhoto
-              ? await compressImageDataUrl(report.job.coverPhoto)
-              : report.job.coverPhoto;
 
             return {
               filename,
@@ -717,7 +814,6 @@ export default function ConditionReportPage({
               destinations,
               report: {
                 ...report,
-                job: { ...report.job, coverPhoto: compressedCoverPhoto },
                 photos: compressedPhotos,
                 schedule: scheduleToSave,
               },

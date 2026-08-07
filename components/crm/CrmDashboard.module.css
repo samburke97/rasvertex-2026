@@ -1,0 +1,106 @@
+/* components/crm/CrmDashboard.module.css */
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--for-darkest, #111827);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: var(--for-medium, #7e807f);
+  margin: 0.35rem 0 0;
+}
+
+/* ── Stage tabs ──────────────────────────────────────────────────────────── */
+.stageTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--out-light, #edf0f0);
+}
+
+.stageTab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.875rem;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--for-medium, #7e807f);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.stageTab:hover {
+  background: var(--con-light, #f5f5f5);
+  color: var(--for-darkest, #111827);
+}
+.stageTabActive {
+  background: var(--brand-primary-light, #faebf1);
+  color: var(--brand-primary, #900c40);
+}
+.stageTabActive:hover {
+  background: var(--brand-primary-light, #faebf1);
+  color: var(--brand-primary, #900c40);
+}
+
+.stageTabCount {
+  font-size: 0.75rem;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+/* ── Stage badge (table cell) ───────────────────────────────────────────── */
+.stageBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ── Add-lead form ───────────────────────────────────────────────────────── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 340px;
+}
+
+.formError {
+  font-size: 0.8125rem;
+  color: #dc2626;
+  margin: 0;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}

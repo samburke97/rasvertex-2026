@@ -64,6 +64,7 @@ export const DEFAULT_PRINT_ASSETS: ReportAssets = {
   linkBlue: "/reports/link_blue.png",
   signature: "/reports/signature.png",
   heightSafety: "/images/height-safety.png",
+  conditionBg: "/images/backgrounds/condition-bg.jpeg",
   bebasNeueFont: "/fonts/bebas-neue.woff2",
   interFont: "/fonts/inter.woff2",
   associations: {

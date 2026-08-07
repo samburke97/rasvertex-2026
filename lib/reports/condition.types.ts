@@ -44,7 +44,6 @@ export interface ReportJobDetails {
   intro: string;
   project: string;
   date: string;
-  coverPhoto: string | null;
   /** SimPRO Site ID, used only for the Save-to-Site export path — not rendered. */
   siteId: string;
 }
@@ -62,6 +61,8 @@ export interface ReportSettings {
   showScheduleNotes: boolean;
   /** Break the schedule table into named sections with per-section subtotals. */
   scheduleSections: boolean;
+  /** Comments/Recommendations summary page — on by default, optional per report. */
+  showSummary: boolean;
 }
 
 // ── Root data ─────────────────────────────────────────────────────────────────
@@ -97,7 +98,6 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
       "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
     project: job.name,
     date: job.date,
-    coverPhoto: null,
     siteId: job.siteId,
   };
 }

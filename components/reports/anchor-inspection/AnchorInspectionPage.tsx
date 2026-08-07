@@ -280,8 +280,13 @@ export default function AnchorInspectionPage({
   );
 
   // ── Autosave the draft, debounced, whenever the report changes ───────────
+  // Never persist while photos are still streaming in — see the identical
+  // guard + explanation in ConditionReportPage.tsx's autosave effect. A
+  // draft saved mid-stream here would resume with a partial photo set next
+  // time, exactly like the bug that hit Condition Report job 10970.
   useEffect(() => {
     if (!loadedJobId) return;
+    if (photoImportStatus.phase === "fetching-photos") return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
 
     const delay = saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
@@ -306,7 +311,7 @@ export default function AnchorInspectionPage({
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report, loadedJobId]);
+  }, [report, loadedJobId, photoImportStatus.phase]);
 
   // ── Zone handlers ──────────────────────────────────────────────────────
   const addZone = useCallback(() => {
@@ -498,6 +503,27 @@ export default function AnchorInspectionPage({
     [loadedJobId, fetchPhotos],
   );
 
+  // Discards the saved draft for the current job and re-imports everything
+  // fresh from SimPRO — see the identical handler in ConditionReportPage.tsx.
+  const handleResetDraft = useCallback(async () => {
+    if (!loadedJobId) return;
+    if (
+      !window.confirm(
+        "Discard the saved draft and reload this job fresh from SimPRO? Any zones, anchors, or comments typed here will be lost.",
+      )
+    )
+      return;
+    try {
+      await fetch(`/api/anchor-inspection-reports/${loadedJobId}`, {
+        method: "DELETE",
+      });
+    } catch {
+      // Even if the delete fails, re-importing below will just overwrite
+      // the stale draft on the next autosave — not a blocker either way.
+    }
+    handleImport(loadedJobId);
+  }, [loadedJobId, handleImport]);
+
   // "Pull From Job" button — fetches the folder list (if not already
   // fetched) and either shows a folder picker (more than one folder) or
   // imports everything straight away (0 or 1 folder, nothing to choose).
@@ -599,6 +625,14 @@ export default function AnchorInspectionPage({
                   : "Draft saved"}
             </span>
           )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleResetDraft}
+            disabled={!loadedJobId}
+          >
+            Reload from SimPRO
+          </Button>
           <Button
             variant="secondary"
             size="sm"

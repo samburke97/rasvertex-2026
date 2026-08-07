@@ -1,7 +1,7 @@
 "use client";
 // components/reports/condition/OptionsPanel.tsx
 
-import React, { useRef, useMemo } from "react";
+import React, { useMemo } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import ToggleRow from "../shared/ToggleRow";
 import JobImportInput from "../shared/JobImportInput";
@@ -9,7 +9,6 @@ import DatePicker from "@/components/ui/DatePicker";
 import type {
   ImportStatus,
   PhotoFolder,
-  ReportJobDetails,
   ReportPhoto,
   ReportSettings,
   ScheduleCostCenter,
@@ -19,7 +18,6 @@ import type {
 interface OptionsPanelProps {
   settings: ReportSettings;
   photos: ReportPhoto[];
-  job: ReportJobDetails;
   importStatus: ImportStatus;
   scheduleStatus: ScheduleImportStatus;
   onSettings: (s: ReportSettings) => void;
@@ -30,7 +28,6 @@ interface OptionsPanelProps {
   scheduleCostCenters: ScheduleCostCenter[];
   selectedCostCenter: ScheduleCostCenter | null;
   onSelectCostCenter: (costCenter: ScheduleCostCenter | null) => void;
-  onCoverPhoto: (dataUrl: string | null) => void;
 }
 
 // ── Date preset helpers ───────────────────────────────────────────────────────
@@ -92,7 +89,6 @@ function detectPreset(
 export default function OptionsPanel({
   settings,
   photos,
-  job,
   importStatus,
   scheduleStatus,
   onSettings,
@@ -103,10 +99,7 @@ export default function OptionsPanel({
   scheduleCostCenters,
   selectedCostCenter,
   onSelectCostCenter,
-  onCoverPhoto,
 }: OptionsPanelProps) {
-  const coverInputRef = useRef<HTMLInputElement>(null);
-
   const hasPhotos = photos.length > 0;
   const canFilterByDate = hasPhotos || settings.scheduleLoaded;
 
@@ -133,18 +126,6 @@ export default function OptionsPanel({
     }).length;
   }, [photos, settings.filterByDate, settings.dateFrom, settings.dateTo]);
 
-  const handleCoverPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const result = ev.target?.result;
-      if (typeof result === "string") onCoverPhoto(result);
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
-  };
-
   return (
     <aside className={styles.panel}>
       {/* ── Import ───────────────────────────────────────────────────────── */}
@@ -159,53 +140,6 @@ export default function OptionsPanel({
             />
           </div>
         )}
-      </div>
-
-      {/* ── Cover Photo ──────────────────────────────────────────────────── */}
-      <div className={styles.group}>
-        <div className={styles.groupLabel}>Cover Photo</div>
-        {job.coverPhoto ? (
-          <div className={styles.coverPhotoPreview}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={job.coverPhoto}
-              alt="Cover photo preview"
-              className={styles.coverPhotoThumb}
-            />
-            <div className={styles.coverPhotoActions}>
-              <button
-                className={styles.coverPhotoChange}
-                onClick={() => coverInputRef.current?.click()}
-              >
-                Change
-              </button>
-              <button
-                className={styles.coverPhotoRemove}
-                onClick={() => onCoverPhoto(null)}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            className={styles.coverPhotoUpload}
-            onClick={() => coverInputRef.current?.click()}
-          >
-            <span className={styles.coverPhotoUploadIcon}>↑</span>
-            <span className={styles.coverPhotoUploadText}>Upload photo</span>
-            <span className={styles.coverPhotoUploadSub}>
-              JPG, PNG — shown behind cover design
-            </span>
-          </button>
-        )}
-        <input
-          ref={coverInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          className={styles.hiddenInput}
-          onChange={handleCoverPhotoChange}
-        />
       </div>
 
       {/* ── Photos ───────────────────────────────────────────────────────── */}
@@ -379,6 +313,13 @@ export default function OptionsPanel({
             </p>
           </>
         )}
+
+        <ToggleRow
+          label="Include comments & recommendations"
+          sub="Summary page with comments and recommendations"
+          checked={settings.showSummary}
+          onChange={(v) => set({ showSummary: v })}
+        />
       </div>
     </aside>
   );
