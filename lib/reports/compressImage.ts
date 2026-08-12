@@ -11,10 +11,15 @@
 // Client-only (uses Image/canvas) — only ever called from "use client" report
 // pages, right when a photo is fetched.
 
-const MAX_DIMENSION = 1600;
-const JPEG_QUALITY = 0.8;
+// Tuned to keep photo-heavy reports under Vercel's payload cap without an
+// artificial photo-count limit. Grid cells in the PDF top out around
+// 390x390 (see PHOTO_LAYOUTS in photos.ts), so 1280px source + q0.65 is
+// still crisp at that display size while cutting typical output well
+// below the old 1600px/q0.8 setting.
+const MAX_DIMENSION = 1280;
+const JPEG_QUALITY = 0.65;
 // Below this we skip re-encoding entirely — not worth the CPU/quality cost.
-const SKIP_BELOW_BYTES = 400_000;
+const SKIP_BELOW_BYTES = 150_000;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {

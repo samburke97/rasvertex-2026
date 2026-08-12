@@ -33,7 +33,7 @@ interface ConditionReportPageProps {
   onBack: () => void;
 }
 
-type SaveStatus = "idle" | "saving" | "saved" | "error";
+type SaveStatus = "idle" | "saving" | "saved" | "error" | "too-large";
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 const AUTOSAVE_RETRY_MS = 5000;
 
@@ -445,7 +445,9 @@ export default function ConditionReportPage({
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
 
     const delay =
-      saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
+      saveStatus === "error" || saveStatus === "too-large"
+        ? AUTOSAVE_RETRY_MS
+        : AUTOSAVE_DEBOUNCE_MS;
     autosaveTimer.current = setTimeout(async () => {
       setSaveStatus("saving");
       try {
@@ -454,7 +456,11 @@ export default function ConditionReportPage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(report),
         });
-        setSaveStatus(res.ok ? "saved" : "error");
+        // 413 means this exact draft can never save as-is — it needs fewer
+        // photos, not another retry — so it's tracked separately from a
+        // transient "error" to show an accurate, actionable status instead
+        // of retrying forever with a message that implies it might resolve.
+        setSaveStatus(res.ok ? "saved" : res.status === 413 ? "too-large" : "error");
       } catch {
         setSaveStatus("error");
       }
@@ -632,14 +638,18 @@ export default function ConditionReportPage({
           {loadedJobId && saveStatus !== "idle" && (
             <span
               className={`${styles.draftStatus} ${
-                saveStatus === "error" ? styles.draftStatusError : ""
+                saveStatus === "error" || saveStatus === "too-large"
+                  ? styles.draftStatusError
+                  : ""
               }`}
             >
               {saveStatus === "saving"
                 ? "Saving draft…"
                 : saveStatus === "error"
                   ? "Draft save failed — retrying"
-                  : "Draft saved"}
+                  : saveStatus === "too-large"
+                    ? "Too many photos to save — remove some to continue"
+                    : "Draft saved"}
             </span>
           )}
           <Button

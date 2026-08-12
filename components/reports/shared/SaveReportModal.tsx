@@ -107,7 +107,25 @@ export default function SaveReportModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
+
+      // A payload over the platform's request-size limit (e.g. too many
+      // embedded photos) never reaches our route handler — the platform
+      // rejects it and returns a plain-text body, not JSON. Guard the parse
+      // so that shows a clear message instead of crashing on "Unexpected
+      // token" from trying to JSON.parse plain text.
+      let data: { error?: string; filename?: string; job?: DestinationResult; site?: DestinationResult };
+      try {
+        data = await res.json();
+      } catch {
+        setModalState({
+          phase: "error",
+          message:
+            res.status === 413
+              ? "This report is too large to save — it likely has too many photos. Remove some photos and try again."
+              : `Save failed (server returned ${res.status}). Please try again.`,
+        });
+        return;
+      }
 
       if (!res.ok) {
         setModalState({
@@ -142,7 +160,7 @@ export default function SaveReportModal({
 
       setModalState({
         phase: "success",
-        filename: data.filename,
+        filename: data.filename ?? trimmed,
         job: destinations.job,
         site: destinations.site,
       });
