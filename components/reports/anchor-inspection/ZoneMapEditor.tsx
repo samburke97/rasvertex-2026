@@ -18,6 +18,7 @@ import {
   ANCHOR_TYPE_SUBTYPES,
   computeStaticLineEdges,
   generateId,
+  DEFAULT_MAP_RATIO,
   type AnchorPoint,
   type AnchorSubtype,
   type AnchorType,
@@ -80,6 +81,25 @@ async function urlToDataUrl(url: string): Promise<string> {
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
+  });
+}
+
+// Uploaded photos aren't cropped to any fixed shape (compressImageDataUrl
+// only ever downscales proportionally) — their real aspect ratio just needs
+// recording so the editor and PDF can size the image box to match instead
+// of assuming 8:5 and cropping whatever doesn't fit.
+function getImageNaturalRatio(dataUrl: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      if (!img.naturalWidth || !img.naturalHeight) {
+        reject(new Error("Image has no natural dimensions"));
+        return;
+      }
+      resolve(img.naturalWidth / img.naturalHeight);
+    };
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = dataUrl;
   });
 }
 
@@ -464,6 +484,7 @@ export default function ZoneMapEditor({
         ...localZone,
         name: zoneName,
         mapImageUrl: dataUrl,
+        mapImageRatio: PREVIEW_WIDTH / PREVIEW_HEIGHT,
         mapZoom: capturedZoom,
         mapLat: capturedLat ?? localZone.mapLat,
         mapLng: capturedLng ?? localZone.mapLng,
@@ -501,7 +522,12 @@ export default function ZoneMapEditor({
     reader.onload = async (ev) => {
       const raw = ev.target?.result as string;
       const url = await compressImageDataUrl(raw);
-      const updated: Zone = { ...localZone, mapImageUrl: url };
+      const ratio = await getImageNaturalRatio(url).catch(() => undefined);
+      const updated: Zone = {
+        ...localZone,
+        mapImageUrl: url,
+        mapImageRatio: ratio,
+      };
       setLocalZone(updated);
       save(updated);
       setCaptured(true);
@@ -732,7 +758,7 @@ export default function ZoneMapEditor({
   const subtypeOptions = ANCHOR_TYPE_SUBTYPES[selectedType];
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${captured ? styles.fullscreen : ""}`}>
       {/* Top bar */}
       <div className={styles.topBar}>
         <IconButton
@@ -1095,6 +1121,7 @@ export default function ZoneMapEditor({
               <div
                 ref={frozenMapRef}
                 className={styles.mapCanvas}
+                style={{ aspectRatio: localZone.mapImageRatio ?? DEFAULT_MAP_RATIO }}
                 onClick={handleMapClick}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}

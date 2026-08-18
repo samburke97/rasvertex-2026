@@ -49,11 +49,22 @@ export interface Zone {
   id: string;
   name: string;
   mapImageUrl: string | null;
+  // width/height of mapImageUrl's own native dimensions — captured aerials
+  // are always exactly DEFAULT_MAP_RATIO (they're fetched at a fixed pixel
+  // size), but an uploaded photo can be any shape, so the editor and PDF
+  // both size their image box to this ratio instead of assuming 8:5 and
+  // cropping whatever doesn't fit. Absent on zones saved before this field
+  // existed — callers fall back to DEFAULT_MAP_RATIO.
+  mapImageRatio?: number;
   mapLat?: number;
   mapLng?: number;
   mapZoom?: number;
   anchors: AnchorPoint[];
 }
+
+// Captured aerials are always fetched at this pixel size (8:5) — the
+// fallback ratio for zones/images with no mapImageRatio recorded.
+export const DEFAULT_MAP_RATIO = 8 / 5;
 
 export interface AnchorReportJob {
   // Cover page

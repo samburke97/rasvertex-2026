@@ -1,0 +1,121 @@
+/* components/reports/proposal/AccessMapEditor.module.css */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.zoomControls {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin-left: 0.25rem;
+}
+
+.zoomLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted, #888);
+}
+
+.error {
+  font-size: 0.8125rem;
+  color: #b91c1c;
+}
+
+.emptyHint {
+  font-size: 0.8125rem;
+  color: var(--text-muted, #888);
+  padding: 0.5rem 0;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: var(--text-muted, #888);
+}
+
+.imageWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-page, #f5f3ef);
+  cursor: crosshair;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+.pin {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  margin-left: -12px;
+  margin-top: -12px;
+  border-radius: 50%;
+  background: var(--brand-primary, #900c40);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: default;
+}
+
+.pointList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.pointRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.625rem;
+}
+
+.pointNumber {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--brand-primary, #900c40);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.pointNote {
+  flex: 1;
+}
+
+.stageSelect {
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #d8d8d8);
+  padding: 0 0.625rem;
+  font-size: 0.875rem;
+  background: #fff;
+  flex-shrink: 0;
+  max-width: 200px;
+}

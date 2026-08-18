@@ -1,11 +1,9 @@
-// app/api/simpro/jobs/[jobId]/attachments/route.ts
-// Changes from original:
-//   - photo event now includes dateAdded (ISO string from SimPRO's DateAdded field)
-//   - fixed: removed duplicate controller.close() calls before early returns
-//            (finally block handles close in all cases)
-//   - rate-limit handling: lower concurrency, retry on 429 with exponential
-//     backoff, respect Retry-After header. Prevents SimPRO from rejecting
-//     downloads on jobs with many attachments.
+// app/api/simpro/quotes/[quoteId]/attachments/route.ts
+//
+// Streams a quote's image attachments as they're fetched from SimPRO, same
+// SSE shape/pattern as app/api/simpro/jobs/[jobId]/attachments/route.ts —
+// see that file for the concurrency/retry/backoff rationale. This is the
+// quote-scoped equivalent, used by the Proposal report's photo picker.
 
 import { NextRequest, NextResponse } from "next/server";
 
@@ -17,10 +15,8 @@ const REQUEST_TIMEOUT_MS = 15000;
 const MAX_RETRIES = 4;
 const BASE_BACKOFF_MS = 1000;
 const PER_WORKER_DELAY_MS = 100;
-// SimPRO hard-caps pageSize at 250 per request (see their API docs) — a
-// single request can never return more than that regardless of what's
-// asked for, so jobs with more attachments than one page need multiple
-// requests, paged via `page=`, concatenated together.
+// SimPRO hard-caps pageSize at 250 per request — jobs/quotes with more
+// attachments than one page need multiple requests, paged via `page=`.
 const SIMPRO_PAGE_SIZE = 250;
 const MAX_ATTACHMENTS = 500;
 
@@ -109,9 +105,9 @@ function sseEvent(event: string, data: unknown): string {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ jobId: string }> },
+  { params }: { params: Promise<{ quoteId: string }> },
 ) {
-  const { jobId } = await params;
+  const { quoteId } = await params;
   const { searchParams } = new URL(request.url);
   const companyId = parseInt(searchParams.get("companyId") || "0", 10);
   const folderIdParam = searchParams.get("folderId");
@@ -129,20 +125,20 @@ export async function GET(
     );
   }
 
-  if (!jobId || jobId === "undefined" || jobId.trim() === "") {
+  if (!quoteId || quoteId === "undefined" || quoteId.trim() === "") {
     return NextResponse.json(
-      { success: false, error: "Invalid job ID.", code: "INVALID_JOB_ID" },
+      { success: false, error: "Invalid quote ID.", code: "INVALID_QUOTE_ID" },
       { status: 400 },
     );
   }
 
-  const parsedJobId = parseInt(jobId, 10);
-  if (isNaN(parsedJobId) || parsedJobId <= 0) {
+  const parsedQuoteId = parseInt(quoteId, 10);
+  if (isNaN(parsedQuoteId) || parsedQuoteId <= 0) {
     return NextResponse.json(
       {
         success: false,
-        error: "Job ID must be a positive integer.",
-        code: "INVALID_JOB_ID_FORMAT",
+        error: "Quote ID must be a positive integer.",
+        code: "INVALID_QUOTE_ID_FORMAT",
       },
       { status: 400 },
     );
@@ -169,12 +165,10 @@ export async function GET(
             attachmentsList.length < MAX_ATTACHMENTS;
             page++
           ) {
-            const listUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}/attachments/files/?pageSize=${SIMPRO_PAGE_SIZE}&page=${page}&columns=ID,Filename,Folder`;
+            const listUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/quotes/${parsedQuoteId}/attachments/files/?pageSize=${SIMPRO_PAGE_SIZE}&page=${page}&columns=ID,Filename,Folder`;
             const pageItems =
               await simproFetchWithRetry<SimproAttachmentListItem[]>(listUrl);
             attachmentsList.push(...pageItems);
-            // A short page means we've reached the end — no point requesting
-            // another page that'll just come back empty.
             if (pageItems.length < SIMPRO_PAGE_SIZE) break;
           }
           if (attachmentsList.length > MAX_ATTACHMENTS) {
@@ -184,8 +178,8 @@ export async function GET(
           const msg = err instanceof Error ? err.message : String(err);
           if (msg.includes("404")) {
             send("error", {
-              code: "JOB_NOT_FOUND",
-              message: `Job ${parsedJobId} not found in SimPRO.`,
+              code: "QUOTE_NOT_FOUND",
+              message: `Quote ${parsedQuoteId} not found in SimPRO.`,
             });
           } else if (msg.includes("401") || msg.includes("403")) {
             send("error", {
@@ -210,7 +204,7 @@ export async function GET(
             (folderId == null || a.Folder?.ID === folderId),
         );
 
-        send("start", { total: candidates.length, jobId: parsedJobId });
+        send("start", { total: candidates.length, quoteId: parsedQuoteId });
 
         if (candidates.length === 0) {
           send("done", { total: 0, loaded: 0, failed: 0 });
@@ -225,7 +219,7 @@ export async function GET(
           while (index < candidates.length) {
             const i = index++;
             const att = candidates[i];
-            const detailUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}/attachments/files/${att.ID}?display=Base64`;
+            const detailUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/quotes/${parsedQuoteId}/attachments/files/${att.ID}?display=Base64`;
 
             try {
               const detail =
@@ -244,7 +238,7 @@ export async function GET(
             } catch (err) {
               failed++;
               console.warn(
-                `[SimPRO] Attachment ${att.ID} (${att.Filename}) failed:`,
+                `[SimPRO] Quote attachment ${att.ID} (${att.Filename}) failed:`,
                 err instanceof Error ? err.message : err,
               );
             }

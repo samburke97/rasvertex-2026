@@ -9,6 +9,22 @@
   overflow: hidden;
 }
 
+/* Step 2 (Place Anchors) takes over the entire viewport, above the app's
+   own top nav/sidebar — placing pins accurately needs all the screen room
+   it can get, especially for an uploaded photo that isn't 8:5 and would
+   otherwise render small within the normal in-page layout. */
+/* Above the app's own chrome (TopNavbar z-index:1001, Sidebar up to 1050)
+   so it fully replaces them rather than rendering underneath — the app's
+   own topBar (back/name/upload/recapture/delete) becomes the only header,
+   not a second one fighting the real navbar for the same screen space. */
+.fullscreen {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  height: 100vh;
+  z-index: 2000;
+}
+
 /* ── Top bar ──────────────────────────────────────────────────────────────── */
 .topBar {
   display: flex;
@@ -548,18 +564,20 @@
   height: 100%;
 }
 
-/* Fixed to the captured image's own ratio (PREVIEW_WIDTH x PREVIEW_HEIGHT =
-   640x400 = 8:5), rather than stretching to fill whatever height happens to
-   be available. Pin x/y are stored as percentages of this box — if its
-   rendered aspect ratio varied by viewport (iPad vs desktop, portrait vs
-   landscape), the same percentage landed on a different point on the image
-   on each device, which is what made pins visibly drift between them. The
-   PDF's .zone-map-wrap uses the same fixed ratio so a pin lands in the same
-   spot in the export as it did in the editor, on every device. */
+/* Locked to the captured/uploaded image's own native aspect ratio (see
+   Zone.mapImageRatio, applied as an inline style — falls back to
+   DEFAULT_MAP_RATIO/8:5 for zones saved before that field existed), rather
+   than a hardcoded ratio or stretching to fill whatever height happens to
+   be available. Pin x/y are stored as percentages of this box — its
+   rendered aspect ratio has to be a fixed, device-independent value or the
+   same percentage lands on a different point on different viewports; using
+   the image's own true ratio satisfies that (it doesn't vary by device)
+   while also meaning nothing ever gets cropped out of view. The PDF's
+   .zone-map-wrap sizes to the same ratio per zone so a pin lands in the
+   same spot in the export as it did in the editor. */
 .mapCanvas {
   position: relative;
   width: 100%;
-  aspect-ratio: 8 / 5;
   flex-shrink: 0;
   overflow: hidden;
   cursor: crosshair;
@@ -571,7 +589,8 @@
   width: 100%;
   height: 100%;
   pointer-events: none;
-  object-fit: cover;
+  object-fit: contain;
+  background: #e5e7eb;
 }
 
 .legendOverlay {

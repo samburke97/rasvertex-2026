@@ -24,6 +24,10 @@ const HoursBreakdownPage = dynamic(
   () => import("./hours-breakdown/HoursBreakdownPage"),
   { loading: () => <ReportLoading />, ssr: false },
 );
+const ProposalPage = dynamic(() => import("./proposal/ProposalPage"), {
+  loading: () => <ReportLoading />,
+  ssr: false,
+});
 
 function ReportLoading() {
   return (
@@ -33,14 +37,18 @@ function ReportLoading() {
   );
 }
 
-type ReportTypeId = "condition" | "anchor-inspection" | "hours-breakdown";
+type ReportTypeId =
+  | "condition"
+  | "anchor-inspection"
+  | "hours-breakdown"
+  | "proposal";
 
 interface ReportType {
   id: ReportTypeId;
   label: string;
   description: string;
   available: boolean;
-  category: "inspection" | "finance";
+  category: "inspection" | "finance" | "proposal";
   icon: React.ReactNode;
 }
 
@@ -118,12 +126,37 @@ const REPORT_TYPES: ReportType[] = [
       </svg>
     ),
   },
+  {
+    id: "proposal",
+    label: "Proposal",
+    description:
+      "Rich sales proposal with findings, scope, access plan and pricing.",
+    available: true,
+    category: "proposal",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M9 12h6M9 16h6M9 8h1" />
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+      </svg>
+    ),
+  },
 ];
 
 const inspectionReports = REPORT_TYPES.filter(
   (r) => r.category === "inspection",
 );
 const financeReports = REPORT_TYPES.filter((r) => r.category === "finance");
+const proposalReports = REPORT_TYPES.filter((r) => r.category === "proposal");
 
 // ── Category Section ───────────────────────────────────────────────────────
 function CategorySection({
@@ -186,6 +219,10 @@ export default function ReportSelector() {
     return <HoursBreakdownPage onBack={() => setActive(null)} />;
   }
 
+  if (active === "proposal") {
+    return <ProposalPage onBack={() => setActive(null)} />;
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -196,6 +233,11 @@ export default function ReportSelector() {
       <CategorySection
         label="Inspection"
         reports={inspectionReports}
+        onSelect={setActive}
+      />
+      <CategorySection
+        label="Proposal"
+        reports={proposalReports}
         onSelect={setActive}
       />
       <CategorySection

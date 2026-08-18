@@ -4,11 +4,13 @@
 // Single cover page component used by all reports that have a cover page.
 // Replaces condition/sections/CoverSection.tsx and anchor-inspection/sections/AnchorCoverSection.tsx
 //
-// The hero background is a fixed app asset (no per-report upload) — see
-// lib/reports/condition.print.ts for the matching PDF-side render.
+// The hero background defaults to a fixed app asset, but can be overridden
+// per-report (coverPhoto) — see lib/reports/condition.print.ts for the
+// matching PDF-side render, which applies the same fallback.
 //
 // Usage:
 //   <CoverSection
+//     coverPhoto={job.coverPhoto}
 //     reportType={job.reportType}
 //     metaRows={[{ label: "Prepared For", value: job.preparedFor, onChange: (v) => ... }, ...]}
 //     intro={<RichTextEditor ... />}   ← optional; omit for plain text reports
@@ -26,6 +28,8 @@ export interface MetaRow {
 }
 
 interface CoverSectionProps {
+  /** Custom hero background — falls back to the default app background when null/omitted. */
+  coverPhoto?: string | null;
   reportType: string;
   onReportTypeChange: (v: string) => void;
   metaRows: MetaRow[];
@@ -34,6 +38,7 @@ interface CoverSectionProps {
 }
 
 export default function CoverSection({
+  coverPhoto,
   reportType,
   onReportTypeChange,
   metaRows,
@@ -46,7 +51,9 @@ export default function CoverSection({
         <div className={styles.heroNavy} />
         <div
           className={styles.heroCoverPhoto}
-          style={{ backgroundImage: "url(/images/backgrounds/condition-bg.jpeg)" }}
+          style={{
+            backgroundImage: `url(${coverPhoto || "/images/backgrounds/condition-bg.jpeg"})`,
+          }}
         />
         <div className={styles.heroOverlay} />
         <div className={styles.heroLogo}>

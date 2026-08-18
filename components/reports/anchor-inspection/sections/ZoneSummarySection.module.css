@@ -79,14 +79,14 @@
   gap: 0.5rem;
 }
 
-/* Fixed to 8:5, matching ZoneMapEditor's .mapCanvas and the PDF's
-   .zone-map-wrap — pins are positioned as x/y percentages of this box, so
-   all three have to share the same rendered aspect ratio or a pin shows in
-   a different spot depending on which view you're looking at. */
+/* Sized per-zone via an inline aspect-ratio style (zone.mapImageRatio),
+   matching ZoneMapEditor's .mapCanvas and the PDF's .zone-map-wrap — pins
+   are positioned as x/y percentages of this box, so all three have to
+   share the same rendered aspect ratio or a pin shows in a different spot
+   depending on which view you're looking at. */
 .mapCanvas {
   position: relative;
   width: 100%;
-  aspect-ratio: 8 / 5;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid #e5e7eb;
@@ -96,7 +96,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #e5e7eb;
 }
 
 .mapEmpty {

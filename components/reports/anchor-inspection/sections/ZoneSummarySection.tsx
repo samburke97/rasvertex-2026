@@ -11,6 +11,7 @@ import {
   ANCHOR_TYPE_COLOURS,
   anchorTypeDisplayLabel,
   computeStaticLineEdges,
+  DEFAULT_MAP_RATIO,
   type Zone,
 } from "@/lib/reports/anchor.types";
 
@@ -66,7 +67,10 @@ export default function ZoneSummarySection({
         <div className={styles.mapSection}>
           {zone.mapImageUrl ? (
             <div className={styles.mapWrap}>
-              <div className={styles.mapCanvas}>
+              <div
+                className={styles.mapCanvas}
+                style={{ aspectRatio: zone.mapImageRatio ?? DEFAULT_MAP_RATIO }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={zone.mapImageUrl}

@@ -61,6 +61,7 @@ const DEFAULT_REPORT: ConditionReportData = {
       "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
     project: "",
     date: new Date().toLocaleDateString("en-AU"),
+    coverPhoto: null,
     siteId: "",
   },
   photos: [],
@@ -119,6 +120,19 @@ export default function ConditionReportPage({
     },
     [],
   );
+
+  const updateCoverPhoto = useCallback((dataUrl: string | null) => {
+    if (!dataUrl) {
+      setReport((prev) => ({ ...prev, job: { ...prev.job, coverPhoto: null } }));
+      return;
+    }
+    compressImageDataUrl(dataUrl).then((compressed) => {
+      setReport((prev) => ({
+        ...prev,
+        job: { ...prev.job, coverPhoto: compressed },
+      }));
+    });
+  }, []);
 
   const removePhoto = useCallback((id: string) => {
     setReport((prev) => ({
@@ -538,16 +552,20 @@ export default function ConditionReportPage({
 
       // Self-healing safety net (mirrors AnchorInspectionPage) — recompresses
       // whatever is in state right before it leaves the browser, so a photo
-      // from before compression was added doesn't need a manual re-import
-      // to export cleanly. Cheap when already small.
+      // or cover image from before compression was added doesn't need a
+      // manual re-import to export cleanly. Cheap when already small.
       const photoData: Record<string, string> = {};
       await Promise.all(
         photosToExport.map(async (p) => {
           if (p.url) photoData[p.id] = await compressImageDataUrl(p.url);
         }),
       );
+      const compressedCoverPhoto = report.job.coverPhoto
+        ? await compressImageDataUrl(report.job.coverPhoto)
+        : report.job.coverPhoto;
       const strippedReport: ConditionReportData = {
         ...report,
+        job: { ...report.job, coverPhoto: compressedCoverPhoto },
         photos: photosToExport.map((p) => ({ ...p, url: "" })),
         schedule: scheduleToExport,
       };
@@ -684,6 +702,7 @@ export default function ConditionReportPage({
         <OptionsPanel
           settings={report.settings}
           photos={report.photos}
+          job={report.job}
           importStatus={importStatus}
           scheduleStatus={scheduleStatus}
           onSettings={updateSettings}
@@ -697,11 +716,13 @@ export default function ConditionReportPage({
           scheduleCostCenters={scheduleCostCenters}
           selectedCostCenter={selectedCostCenter}
           onSelectCostCenter={selectCostCenter}
+          onCoverPhoto={updateCoverPhoto}
         />
 
         <div className={styles.canvas}>
           <div className={styles.pageLabel}>Cover Page</div>
           <CoverSection
+            coverPhoto={report.job.coverPhoto}
             reportType={report.job.reportType}
             onReportTypeChange={(v) => updateJobField("reportType", v)}
             metaRows={[
@@ -834,6 +855,9 @@ export default function ConditionReportPage({
                 dateAdded,
               })),
             );
+            const compressedCoverPhoto = report.job.coverPhoto
+              ? await compressImageDataUrl(report.job.coverPhoto)
+              : report.job.coverPhoto;
 
             return {
               filename,
@@ -843,6 +867,7 @@ export default function ConditionReportPage({
               destinations,
               report: {
                 ...report,
+                job: { ...report.job, coverPhoto: compressedCoverPhoto },
                 photos: compressedPhotos,
                 schedule: scheduleToSave,
               },

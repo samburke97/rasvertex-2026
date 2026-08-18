@@ -44,6 +44,9 @@ export interface ReportJobDetails {
   intro: string;
   project: string;
   date: string;
+  /** Custom cover hero background — falls back to the default app background
+   *  (conditionBg) when null. */
+  coverPhoto: string | null;
   /** SimPRO Site ID, used only for the Save-to-Site export path — not rendered. */
   siteId: string;
 }
@@ -100,6 +103,7 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
       "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
     project: job.name,
     date: job.date,
+    coverPhoto: null,
     siteId: job.siteId,
   };
 }

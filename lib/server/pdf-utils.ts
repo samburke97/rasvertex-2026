@@ -12,6 +12,9 @@ export interface ReportAssets {
   conditionBg: string;
   bebasNeueFont: string;
   interFont: string;
+  // caveatFont falls back to a plain (non-existent) path until the real
+  // Caveat.woff2 is supplied — see proposal.print.ts's font-face fallback.
+  caveatFont: string;
   associations: {
     communitySelect: string;
     dulux: string;
@@ -19,6 +22,36 @@ export interface ReportAssets {
     mpa: string;
     qbcc: string;
     smartStrata: string;
+  };
+  proposal: {
+    // logoFull and photo* fall back to a plain path until real files are
+    // supplied (raster images can't be captured from a chat upload the way
+    // the SVGs below were — see proposal.print.ts for the placeholder
+    // treatment used until then).
+    logoFull: string;
+    workCover: string;
+    dulux: string;
+    iconPlus: string;
+    iconCross: string;
+    // Same lockup as the app's own top-left nav (public/ras.png) — used in
+    // the proposal's page header.
+    navLogo: string;
+    // Association-logo strip (Community Select/Dulux/Haymes/MPA/QBCC/Smart
+    // Strata) used in the proposal's repeating page footer.
+    footerLogos: string;
+    // Full-page certificate scans appended at the end of the proposal.
+    workCoverCert: string;
+    publicLiabilityCert: string;
+    // Real crew/site photos for the fixed company sections (Team,
+    // Why Our Prep Is Different, Recent Projects, Support Plans).
+    teamCaroline: string;
+    projectMooloolaba: string;
+    projectAlexandraHeadland: string;
+    whyPrep1: string;
+    whyPrep2: string;
+    supportWashDown: string;
+    supportInspection: string;
+    supportTouchUp: string;
   };
 }
 
@@ -55,6 +88,7 @@ export function loadReportAssets(): ReportAssets {
     conditionBg: readPublicAsBase64("images/backgrounds/condition-bg.jpeg"),
     bebasNeueFont: readPublicAsBase64("fonts/bebas-neue.woff2"),
     interFont: readPublicAsBase64("fonts/inter.woff2"),
+    caveatFont: readPublicAsBase64("fonts/caveat.woff2"),
     associations: {
       communitySelect: readPublicAsBase64(
         "reports/associations/communityselect.png",
@@ -64,6 +98,29 @@ export function loadReportAssets(): ReportAssets {
       mpa: readPublicAsBase64("reports/associations/mpa.png"),
       qbcc: readPublicAsBase64("reports/associations/qbcc.png"),
       smartStrata: readPublicAsBase64("reports/associations/smartstrata.png"),
+    },
+    proposal: {
+      logoFull: readPublicAsBase64("reports/proposal/logo-full.png"),
+      workCover: readPublicAsBase64("reports/proposal/work-cover.svg"),
+      dulux: readPublicAsBase64("reports/proposal/dulux.svg"),
+      iconPlus: readPublicAsBase64("reports/proposal/icon-plus.svg"),
+      iconCross: readPublicAsBase64("reports/proposal/icon-cross.svg"),
+      navLogo: readPublicAsBase64("ras.png"),
+      footerLogos: readPublicAsBase64("reports/proposal/footer.png"),
+      workCoverCert: readPublicAsBase64("reports/proposal/certs/work-cover.png"),
+      publicLiabilityCert: readPublicAsBase64(
+        "reports/proposal/certs/public-liability.png",
+      ),
+      teamCaroline: readPublicAsBase64("reports/proposal/assets/people-caro.jpg"),
+      projectMooloolaba: readPublicAsBase64("reports/proposal/assets/project-1.jpeg"),
+      projectAlexandraHeadland: readPublicAsBase64(
+        "reports/proposal/assets/project-2.jpeg",
+      ),
+      whyPrep1: readPublicAsBase64("reports/proposal/assets/nav-maintenance.png"),
+      whyPrep2: readPublicAsBase64("reports/proposal/assets/nav-painting.png"),
+      supportWashDown: readPublicAsBase64("reports/proposal/assets/nav-cleaning.png"),
+      supportInspection: readPublicAsBase64("reports/proposal/assets/nav-height.png"),
+      supportTouchUp: readPublicAsBase64("reports/proposal/assets/rope-access.png"),
     },
   };
   return _cachedAssets;
@@ -145,7 +202,25 @@ async function getBrowser(): Promise<import("puppeteer-core").Browser> {
   }
 }
 
-export async function renderPDF(htmlContent: string): Promise<Buffer> {
+export interface RenderPDFOptions {
+  // In CSS units (e.g. "64px") — reserves space for headerTemplate/
+  // footerTemplate content. Reports that draw their own in-content
+  // header/footer (condition/anchor/hours) leave this at 0 (the default).
+  margin?: { top?: string; right?: string; bottom?: string; left?: string };
+  // Puppeteer repeats these on every physical page and substitutes
+  // <span class="pageNumber">/<span class="totalPages"> — the only
+  // reliable way to get real per-page numbers into a printed PDF (Chromium
+  // doesn't support CSS Paged Media's counter(page) for this). Must be
+  // fully self-contained HTML with inline styles — external stylesheets
+  // don't apply inside header/footer frames.
+  headerTemplate?: string;
+  footerTemplate?: string;
+}
+
+export async function renderPDF(
+  htmlContent: string,
+  options?: RenderPDFOptions,
+): Promise<Buffer> {
   const browser = await getBrowser();
   const page = await browser.newPage();
 
@@ -163,10 +238,20 @@ export async function renderPDF(htmlContent: string): Promise<Buffer> {
     await page.setContent(htmlContent, { waitUntil: "load", timeout: 30000 });
     await page.evaluate(() => document.fonts.ready);
 
+    const hasHeaderFooter = !!(options?.headerTemplate || options?.footerTemplate);
+
     const pdfData = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      margin: {
+        top: options?.margin?.top ?? 0,
+        right: options?.margin?.right ?? 0,
+        bottom: options?.margin?.bottom ?? 0,
+        left: options?.margin?.left ?? 0,
+      },
+      displayHeaderFooter: hasHeaderFooter,
+      headerTemplate: options?.headerTemplate ?? "<div></div>",
+      footerTemplate: options?.footerTemplate ?? "<div></div>",
     });
 
     return Buffer.from(pdfData);

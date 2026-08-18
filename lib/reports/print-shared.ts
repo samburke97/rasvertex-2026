@@ -45,6 +45,12 @@ export function buildPrintFontFaceCSS(assets: ReportAssets): string {
       font-weight: 100 900;
       font-style: normal;
     }
+    @font-face {
+      font-family: 'Caveat';
+      src: url(${assets.caveatFont}) format('woff2');
+      font-weight: 500 600;
+      font-style: normal;
+    }
   `;
 }
 
@@ -67,6 +73,7 @@ export const DEFAULT_PRINT_ASSETS: ReportAssets = {
   conditionBg: "/images/backgrounds/condition-bg.jpeg",
   bebasNeueFont: "/fonts/bebas-neue.woff2",
   interFont: "/fonts/inter.woff2",
+  caveatFont: "/fonts/caveat.woff2",
   associations: {
     communitySelect: "/reports/associations/communityselect.png",
     dulux: "/reports/associations/dulux.png",
@@ -74,6 +81,25 @@ export const DEFAULT_PRINT_ASSETS: ReportAssets = {
     mpa: "/reports/associations/mpa.png",
     qbcc: "/reports/associations/qbcc.png",
     smartStrata: "/reports/associations/smartstrata.png",
+  },
+  proposal: {
+    logoFull: "/reports/proposal/logo-full.png",
+    workCover: "/reports/proposal/work-cover.svg",
+    dulux: "/reports/proposal/dulux.svg",
+    iconPlus: "/reports/proposal/icon-plus.svg",
+    iconCross: "/reports/proposal/icon-cross.svg",
+    navLogo: "/ras.png",
+    footerLogos: "/reports/proposal/footer.png",
+    workCoverCert: "/reports/proposal/certs/work-cover.png",
+    publicLiabilityCert: "/reports/proposal/certs/public-liability.png",
+    teamCaroline: "/reports/proposal/assets/people-caro.jpg",
+    projectMooloolaba: "/reports/proposal/assets/project-1.jpeg",
+    projectAlexandraHeadland: "/reports/proposal/assets/project-2.jpeg",
+    whyPrep1: "/reports/proposal/assets/nav-maintenance.png",
+    whyPrep2: "/reports/proposal/assets/nav-painting.png",
+    supportWashDown: "/reports/proposal/assets/nav-cleaning.png",
+    supportInspection: "/reports/proposal/assets/nav-height.png",
+    supportTouchUp: "/reports/proposal/assets/rope-access.png",
   },
 };
 

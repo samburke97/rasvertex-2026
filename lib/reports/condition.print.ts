@@ -613,8 +613,9 @@ export function buildPrintHTML(
     : "";
 
   // ── Cover page ────────────────────────────────────────────────────────────
-  // Fixed app background — no per-report upload (see shared/CoverSection.tsx).
-  const coverPhotoLayer = `<div class="cover-hero-photo" style="background-image:url('${a.conditionBg}')"></div>`;
+  // Custom per-report upload overrides the default app background — see
+  // shared/CoverSection.tsx for the matching editor-side fallback.
+  const coverPhotoLayer = `<div class="cover-hero-photo" style="background-image:url('${report.job.coverPhoto || a.conditionBg}')"></div>`;
 
   const metaRows = [
     { label: "Prepared For:", value: report.job.preparedFor },
