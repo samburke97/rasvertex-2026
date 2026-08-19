@@ -2,17 +2,53 @@
 //
 // Print HTML builder for the Proposal report. Unlike condition/anchor/hours
 // (each page a fixed 210mm x 297mm div, manually paginated in JS), this
-// design is a continuous scrolling document — same as the source website
-// HTML it's ported from — and relies on Chrome's native print pagination
-// (page.pdf({format:"A4"}) in pdf-utils.ts) plus the @media print overrides
-// below, exactly as the uploaded source file already does. Don't force this
-// into the fixed-page-div pattern the other reports use; it's a genuinely
-// different, and simpler, document shape.
+// design is a continuous scrolling document — relies on Chrome's native
+// print pagination (page.pdf({format:"A4"}) in pdf-utils.ts) — but it's a
+// deliberately FIXED page structure, not free-flowing: every logical
+// section starts a fresh page (break-before:page), except a small number
+// of pairs that are meant to share one page by design (Your Project +
+// Access & Disruption Plan; Your Project Team + 8-Year Warranty; Who We Are
+// + Insurance & Compliance). Continuous flow was tried and rejected — a
+// heading with no guaranteed room for its content can still get stranded
+// alone at the bottom of a page with its content starting flush at the top
+// of the next one, which reads as broken no matter how generous the page
+// margin is. Forcing a fresh page per section avoids that class of bug
+// entirely: a section's heading and its content are always on the same
+// page it started on.
+//
+// IMPORTANT — CSS Grid does not fragment across printed pages in Chromium:
+// a `display:grid` container is treated as one atomic block, so if it
+// doesn't fit in the remaining space on a page it gets pushed whole to the
+// next one (this is what caused the Appendix and Your Project Team to
+// strand their heading alone on a page during the flowing-document attempt).
+// Even with fixed pages, any block that could plausibly outgrow one page
+// (Site Survey & Findings photo cards, Appendix columns) still uses floated
+// columns instead of grid, since floats fragment correctly if content ever
+// runs long. Fixed, small, non-repeating layouts (e.g. the 4-stat grids
+// nested inside an already-atomic card) are fine as CSS Grid.
 //
 // Fixed company content (team, recent projects, why-our-prep, warranty,
-// support plans, insurance stats, appendix T&Cs) is baked in here as static
+// who-we-are, insurance stats, appendix T&Cs) is baked in here as static
 // HTML, not driven by ProposalData — see the approved plan. Only the
 // genuinely job-specific sections read from `report`.
+//
+// Page map:
+//   1  Cover
+//   2  Table of Contents + "Higher Standards" mark
+//   3  Cover Letter
+//   4  Your Project + Access & Disruption Plan
+//   5  Site Survey & Findings
+//   6  Project Scope: Inclusions & Exclusions
+//   7  Why Our Prep Is Different
+//   8  Your Project Team + 8-Year Warranty
+//   9  Pricing
+//   10 Acceptance
+//   11 Recent Projects
+//   12 Client Testimonial
+//   13 Who We Are + Insurance & Compliance
+//   14 Appendix A — Terms & Conditions
+//   15 WorkCover Certificate of Currency
+//   16 Public Liability Certificate of Currency
 
 import {
   type ProposalData,
@@ -54,12 +90,14 @@ function money(n: number): string {
 
 // ── Section builders ─────────────────────────────────────────────────────────
 
-function buildStickyBar(a: ReportAssets): string {
-  return `
-  <div class="rv-sticky-bar" style="position:sticky;top:0;z-index:20;background:#ffffff;display:flex;align-items:center;padding:14px 48px;">
-    <img src="${esc(a.proposal.navLogo)}" alt="RAS-VERTEX Maintenance Solutions" style="height:40px;width:auto;">
-  </div>`;
-}
+// `position:sticky` only repeats an element across a scrolling browser
+// viewport — Chromium's print pagination doesn't replicate it per physical
+// page, so a sticky bar rendered once in the document body only ever shows
+// up on whichever single page it happens to land on. The old nav-logo
+// sticky bar was dropped for this reason; the rasvertex.com.au mark now
+// lives inline on the Cover Letter page only — see buildCoverLetter below.
+
+// ── Page 1: Cover ──────────────────────────────────────────────────────────
 
 function buildCover(report: ProposalData, a: ReportAssets): string {
   const j = report.job;
@@ -112,27 +150,94 @@ function buildCover(report: ProposalData, a: ReportAssets): string {
   </section>`;
 }
 
-function buildCoverLetter(report: ProposalData): string {
-  const j = report.job;
+// ── Page 2: Table of Contents + Higher Standards mark ───────────────────────
+
+const TOC_ENTRIES: [string, string][] = [
+  ["sec-02", "Introduction"],
+  ["sec-03", "Your Project"],
+  ["sec-06", "Access & Disruption Plan"],
+  ["sec-04", "Site Survey & Findings"],
+  ["sec-05", "Project Scope: Inclusions & Exclusions"],
+  ["sec-09", "Why Our Prep Is Different"],
+  ["sec-10", "Your Project Team"],
+  ["sec-08", "8-Year Warranty"],
+  ["sec-07", "Pricing"],
+  ["sec-16", "Acceptance"],
+  ["sec-11", "Recent Projects"],
+  ["sec-12", "Client Testimonial"],
+  ["sec-14", "Who We Are"],
+  ["sec-15", "Insurance & Compliance"],
+  ["sec-appendix-a", "Appendix A — Terms & Conditions"],
+  ["sec-cert-workcover", "WorkCover Certificate of Currency"],
+  ["sec-cert-liability", "Public Liability Certificate of Currency"],
+];
+
+
+const TOC_SECTION_TOGGLE: Record<string, keyof ProposalSectionToggles> = {
+  "sec-04": "findings",
+  "sec-05": "scope",
+  "sec-06": "accessPlan",
+  "sec-07": "pricing",
+};
+
+function buildTableOfContents(report: ProposalData): string {
+  const entries = TOC_ENTRIES.filter(([id]) => {
+    const toggle = TOC_SECTION_TOGGLE[id];
+    return !toggle || report.sections[toggle];
+  });
+
+  const row = ([id, label]: [string, string]) => {
+    const num = id.startsWith("sec-cert-")
+      ? ""
+      : id === "sec-appendix-a"
+        ? "A"
+        : id.replace("sec-", "");
+    return `
+        <a href="#${id}" style="display:flex;align-items:baseline;gap:20px;padding:14px 0;text-decoration:none;color:${NAVY};break-inside:avoid;">
+          <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1rem;color:rgba(1,25,85,0.35);width:28px;flex-shrink:0;">${esc(num)}</span>
+          <span style="font-size:1.0625rem;">${esc(label)}</span>
+        </a>`;
+  };
+  const half = Math.ceil(entries.length / 2);
+  const col1 = entries.slice(0, half).map(row).join("");
+  const col2 = entries.slice(half).map(row).join("");
+
   return `
-  <section id="sec-02" style="padding:96px 48px;break-before:page;">
+  <section id="sec-toc" style="padding:96px 48px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
-      <div style="overflow:hidden;margin:0 0 40px;">
-        <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:clamp(3rem,16vw,19.5rem);line-height:0.85;letter-spacing:-0.05em;color:#eef0f5;white-space:nowrap;display:block;margin-left:-0.05em;">HIGHER STANDARDS.</span>
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 40px;break-after:avoid;">Contents</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 48px;">
+        <div>${col1}</div>
+        <div>${col2}</div>
       </div>
-      <div style="max-width:680px;">
-        <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:0 0 40px;">${f(j.date, "[DD Month YYYY]")}</p>
-        <p style="font-size:1.0625rem;margin:0 0 24px;">Dear ${f(j.contactName, "[Client First Name]")},</p>
-        <p style="font-size:1.0625rem;margin:0 0 24px;">Thank you for the opportunity to quote on the external repaint and remedial works at ${f(j.buildingName, "[Building Name]")}. I walked the site personally on ${f(j.inspectionDate, "[inspection date]")}. This proposal reflects exactly what I found there, not a generic scope pulled from a template.</p>
-        <p style="font-size:1.0625rem;margin:0 0 24px;">Every trade on this job (painters, waterproofers and our remedial/concrete team) is directly employed under our own licence, run by one project manager from first site visit to warranty sign off. It's the same crew, whatever comes up mid-job.</p>
-        <p style="font-size:1.0625rem;margin:0 0 24px;">Every RAS-VERTEX repaint carries our 8-year written workmanship warranty as standard, with no maintenance contract required to unlock it.</p>
-        <p style="font-size:1.0625rem;margin:0 0 40px;">Any questions at all, call or text me directly on ${esc(COMPANY_PHONE)}. I'll pick up.</p>
-        <p style="font-family:'Caveat','Brush Script MT',cursive;font-size:2.25rem;color:${NAVY};margin:0 0 2px;">${f(j.preparedByName, "[Project Manager Name]")}</p>
-        <p style="font-size:1.0625rem;margin:0;font-weight:700;">${f(j.preparedByName, "[Project Manager Name]")}<br><span style="font-weight:400;color:rgba(1,25,85,0.65);">Project Manager, RAS-VERTEX Maintenance Solutions</span></p>
+      <div style="overflow:hidden;margin-top:56px;">
+        <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:clamp(3rem,14vw,16rem);line-height:0.85;letter-spacing:-0.05em;color:#eef0f5;white-space:nowrap;display:block;margin-left:-0.05em;">HIGHER STANDARDS.</span>
       </div>
     </div>
   </section>`;
 }
+
+// ── Page 3: Cover Letter ─────────────────────────────────────────────────────
+
+function buildCoverLetter(report: ProposalData, a: ReportAssets): string {
+  const j = report.job;
+  return `
+  <section id="sec-02" style="padding:96px 48px;break-before:page;position:relative;">
+    <img src="${esc(a.linkBlue)}" alt="rasvertex.com.au" style="position:absolute;top:48px;right:48px;height:16px;width:auto;">
+    <div style="max-width:680px;margin:0 auto;">
+      <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:0 0 40px;">${f(j.date, "[DD Month YYYY]")}</p>
+      <p style="font-size:1.0625rem;margin:0 0 24px;">Dear ${f(j.contactName, "[Client First Name]")},</p>
+      <p style="font-size:1.0625rem;margin:0 0 24px;">Thank you for the opportunity to quote on the external repaint and remedial works at ${f(j.buildingName, "[Building Name]")}. I walked the site personally on ${f(j.inspectionDate, "[inspection date]")}. This proposal reflects exactly what I found there, not a generic scope pulled from a template.</p>
+      <p style="font-size:1.0625rem;margin:0 0 24px;">Every trade on this job (painters, waterproofers and our remedial/concrete team) is directly employed under our own licence, run by one project manager from first site visit to warranty sign off. It's the same crew, whatever comes up mid-job.</p>
+      <p style="font-size:1.0625rem;margin:0 0 24px;">Every RAS-VERTEX repaint carries our 8-year written workmanship warranty as standard, with no maintenance contract required to unlock it.</p>
+      <p style="font-size:1.0625rem;margin:0 0 40px;">Any questions at all, call or text me directly on ${esc(COMPANY_PHONE)}. I'll pick up.</p>
+      <p style="font-family:'Caveat','Brush Script MT',cursive;font-size:2.25rem;color:${NAVY};margin:0 0 2px;">${f(j.preparedByName, "[Project Manager Name]")}</p>
+      <p style="font-size:1.0625rem;margin:0;font-weight:700;">${f(j.preparedByName, "[Project Manager Name]")}<br><span style="font-weight:400;color:rgba(1,25,85,0.65);">Project Manager, RAS-VERTEX</span></p>
+    </div>
+  </section>`;
+}
+
+// ── Page 4: Your Project + Access & Disruption Plan ─────────────────────────
 
 function buildYourProject(report: ProposalData): string {
   const j = report.job;
@@ -140,30 +245,113 @@ function buildYourProject(report: ProposalData): string {
     ? esc(j.conditionSummary)
     : `Our site walk identified [key condition summary, e.g. coastal chalking, cracking to the north stair core, overgrown vegetation at ground-floor access points].`;
   return `
-  <section id="sec-03" style="padding:96px 48px;background:rgba(1,25,85,0.03);break-before:page;">
+  <section id="sec-03" style="padding:96px 48px 40px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 20px;break-after:avoid;">Your Project</h2>
-      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:760px;margin:0;">${f(j.buildingName, "[Building Name]")} sits ${f(j.distanceFromCoast, "[distance from coastline]")} from the water at ${f(j.siteAddress, "[address]")}, which means salt air and UV exposure drive how we've specified this job. ${conditionSummary} ${f(j.accessConstraint, "[Access constraint, e.g. limited car parking, no scaffold permits available]")} is exactly why rope access, not scaffolding, suits this site.</p>
+      <div style="background:rgba(1,25,85,0.035);border-radius:32px;padding:48px;break-inside:avoid;">
+        <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 20px;break-after:avoid;">Your Project</h2>
+        <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:760px;margin:0;">${f(j.buildingName, "[Building Name]")} sits ${f(j.distanceFromCoast, "[distance from coastline]")} from the water at ${f(j.siteAddress, "[address]")}, which means salt air and UV exposure drive how we've specified this job. ${conditionSummary} ${f(j.accessConstraint, "[Access constraint, e.g. limited car parking, no scaffold permits available]")} is exactly why rope access, not scaffolding, suits this site.</p>
 
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid rgba(1,25,85,0.15);margin-top:48px;">
-        ${[
-          ["Building Type", f(j.buildingType, "[Type, e.g. residential high-rise]")],
-          ["Storeys", f(j.storeys, "[N]")],
-          ["Access Method", "Rope access"],
-          ["Target Start", f(j.targetStart, "[Month YYYY]")],
-        ]
-          .map(
-            ([label, value], i) => `
-        <div style="padding:24px ${i < 3 ? "24px" : "0"} 0 ${i > 0 ? "24px" : "0"};${i < 3 ? "border-right:1px solid rgba(1,25,85,0.15);" : ""}">
-          <div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(1,25,85,0.45);">${label}</div>
-          <div style="font-size:1.125rem;font-weight:700;margin-top:6px;">${value}</div>
-        </div>`,
-          )
-          .join("")}
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid rgba(1,25,85,0.15);margin-top:40px;">
+          ${[
+            ["Building Type", f(j.buildingType, "[Type, e.g. residential high-rise]")],
+            ["Storeys", f(j.storeys, "[N]")],
+            ["Access Method", "Rope access"],
+            ["Target Start", f(j.targetStart, "[Month YYYY]")],
+          ]
+            .map(
+              ([label, value], i) => `
+          <div style="padding:20px ${i < 3 ? "20px" : "0"} 0 ${i > 0 ? "20px" : "0"};${i < 3 ? "border-right:1px solid rgba(1,25,85,0.15);" : ""}break-inside:avoid;">
+            <div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(1,25,85,0.45);">${label}</div>
+            <div style="font-size:1.125rem;font-weight:700;margin-top:6px;">${value}</div>
+          </div>`,
+            )
+            .join("")}
+        </div>
       </div>
     </div>
   </section>`;
 }
+
+function buildAccessPlan(report: ProposalData): string {
+  const stages = report.accessPlan.stages.length ? report.accessPlan.stages : [];
+  const map = report.accessPlan.map;
+  const points = map.points;
+  const pointsByStage = new Map<string, number[]>();
+  points.forEach((p, i) => {
+    if (!p.stageId) return;
+    if (!pointsByStage.has(p.stageId)) pointsByStage.set(p.stageId, []);
+    pointsByStage.get(p.stageId)!.push(i + 1);
+  });
+
+  const mapHTML = map.imageUrl
+    ? `
+      <div style="margin-top:32px;break-inside:avoid;">
+        <div style="position:relative;width:100%;aspect-ratio:8/5;border-radius:16px;overflow:hidden;background:${PALE_BLUE};">
+          <img src="${esc(map.imageUrl)}" alt="Site aerial with drop points" style="width:100%;height:100%;object-fit:cover;">
+          ${points
+            .map(
+              (p, i) => `
+          <div style="position:absolute;left:${p.x}%;top:${p.y}%;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:${RED};color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">${i + 1}</div>`,
+            )
+            .join("")}
+        </div>
+        ${
+          points.length
+            ? `
+        <ul style="list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:8px;">
+          ${points
+            .map(
+              (p, i) => `
+          <li style="display:flex;gap:12px;align-items:baseline;font-size:0.875rem;color:rgba(1,25,85,0.75);">
+            <span style="flex-shrink:0;width:20px;height:20px;border-radius:50%;background:${RED};color:#fff;font-size:0.625rem;font-weight:700;display:flex;align-items:center;justify-content:center;">${i + 1}</span>
+            <span>${esc(p.note) || `Drop point ${i + 1}`}${
+                p.stageId
+                  ? ` — <span style="color:rgba(1,25,85,0.5);">${esc(stages.find((s) => s.id === p.stageId)?.label ?? "")}</span>`
+                  : ""
+              }</span>
+          </li>`,
+            )
+            .join("")}
+        </ul>`
+            : ""
+        }
+      </div>`
+    : "";
+
+  return `
+  <section id="sec-06" style="padding:40px 48px 72px;">
+    <div style="max-width:1400px;margin:0 auto;">
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 20px;break-after:avoid;">Access &amp; Disruption Plan</h2>
+      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:760px;margin:0 0 32px;">Rope access is our real structural advantage over most competitors: no scaffolding, no blocked car parks, no scaffold permits. On most buildings, we're on site the same day.</p>
+
+      ${mapHTML}
+
+      <div style="margin-top:32px;">
+        ${(() => {
+          const n = Math.max(stages.length, 1);
+          const gap = 16;
+          return stages
+            .map(
+              (s, i) => `
+        <div style="float:left;width:calc((100% - ${gap * (n - 1)}px) / ${n});margin-right:${i === stages.length - 1 ? "0" : `${gap}px`};box-sizing:border-box;background:#ffffff;border:1px solid rgba(1,25,85,0.12);border-radius:16px;padding:24px;break-inside:avoid;">
+          <div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(1,25,85,0.45);">${esc(s.label)}</div>
+          <div style="font-size:1rem;font-weight:700;margin-top:8px;">${esc(s.description)}</div>
+          ${
+            pointsByStage.get(s.id)?.length
+              ? `<div style="font-size:0.8125rem;color:rgba(1,25,85,0.5);margin-top:10px;">Drop point${pointsByStage.get(s.id)!.length > 1 ? "s" : ""} ${pointsByStage.get(s.id)!.join(", ")}</div>`
+              : ""
+          }
+        </div>`,
+            )
+            .join("");
+        })()}
+        <div style="clear:both;"></div>
+      </div>
+    </div>
+  </section>`;
+}
+
+// ── Page 5: Site Survey & Findings ───────────────────────────────────────────
 
 function buildFindings(report: ProposalData): string {
   const findings = report.findings.slice(0, 6);
@@ -175,12 +363,16 @@ function buildFindings(report: ProposalData): string {
     description: "[What this means for the scope of works]",
   }))).map((find, i) => {
     const photo = find.photoId ? photoById.get(find.photoId) : null;
+    // Floated (not grid) so Chromium's print engine can fragment the card
+    // grid across pages — CSS Grid renders as one atomic block and won't
+    // break, which matters once this list grows to dozens of photos.
+    const marginRight = i % 3 !== 2 ? "32px" : "0";
     return `
-        <div style="display:flex;flex-direction:column;gap:16px;break-inside:avoid;">
+        <div style="float:left;width:calc((100% - 64px) / 3);margin:0 ${marginRight} 32px 0;break-inside:avoid;">
           <div style="width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:rgba(1,25,85,0.08);">
             ${photo ? `<img src="${esc(photo.url)}" alt="${esc(find.title)}" style="width:100%;height:100%;object-fit:cover;">` : ""}
           </div>
-          <div>
+          <div style="margin-top:16px;">
             <p style="font-weight:700;font-size:1rem;margin:0 0 4px;">${String(i + 1).padStart(2, "0")}. ${esc(find.title) || "[Defect, location]"}</p>
             <p style="font-size:0.875rem;color:rgba(1,25,85,0.6);margin:0;">${esc(find.description) || "[What this means for the scope of works]"}</p>
           </div>
@@ -188,14 +380,16 @@ function buildFindings(report: ProposalData): string {
   }).join("");
 
   return `
-  <section id="sec-04" style="padding:96px 48px;break-before:page;">
+  <section id="sec-04" style="padding:72px 48px 40px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
       <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 20px;break-after:avoid;">Site Survey &amp; Findings</h2>
-      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:760px;margin:0 0 48px;">We don't quote from a desk. ${f(report.job.preparedByName, "[Project Manager Name]")} inspected ${f(report.job.buildingName, "[Building Name]")} on ${f(report.job.inspectionDate, "[inspection date]")}. Here's exactly what was found, and what it means for the job.</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px;">${cells}</div>
+      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:760px;margin:0 0 40px;">We don't quote from a desk. ${f(report.job.preparedByName, "[Project Manager Name]")} inspected ${f(report.job.buildingName, "[Building Name]")} on ${f(report.job.inspectionDate, "[inspection date]")}. Here's exactly what was found, and what it means for the job.</p>
+      <div>${cells}<div style="clear:both;"></div></div>
     </div>
   </section>`;
 }
+
+// ── Page 6: Project Scope ────────────────────────────────────────────────────
 
 function scopeIconHTML(kind: "plus" | "cross", a: ReportAssets): string {
   const src = kind === "plus" ? a.proposal.iconPlus : a.proposal.iconCross;
@@ -224,96 +418,143 @@ function buildScope(report: ProposalData, a: ReportAssets): string {
       </ul>`;
 
   return `
-  <section id="sec-05" style="padding:96px 48px;background:rgba(1,25,85,0.03);break-before:page;">
+  <section id="sec-05" style="padding:72px 48px 40px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 40px;break-after:avoid;">Project Scope: Inclusions &amp; Exclusions</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(1,25,85,0.12);border-radius:24px;overflow:hidden;border:1px solid rgba(1,25,85,0.12);">
-        <div style="background:#ffffff;padding:40px;break-inside:avoid;">
-          <h3 style="font-size:1.375rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0 0 24px;">Included</h3>
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 32px;break-after:avoid;">Project Scope: Inclusions &amp; Exclusions</h2>
+      <div>
+        <div style="float:left;width:calc(50% - 24px);margin-right:48px;padding:8px 0 0;border-top:2px solid rgba(1,25,85,0.12);">
+          <h3 style="font-size:1.375rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:16px 0 24px;break-after:avoid;">Included</h3>
           ${list(included, "plus", false)}
         </div>
-        <div style="background:#ffffff;padding:40px;break-inside:avoid;">
-          <h3 style="font-size:1.375rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0 0 24px;">Excluded</h3>
+        <div style="float:left;width:calc(50% - 24px);padding:8px 0 0;border-top:2px solid rgba(1,25,85,0.12);">
+          <h3 style="font-size:1.375rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:16px 0 24px;break-after:avoid;">Excluded</h3>
           ${list(excluded, "cross", true)}
         </div>
+        <div style="clear:both;"></div>
       </div>
     </div>
   </section>`;
 }
 
-function buildAccessPlan(report: ProposalData): string {
-  const stages = report.accessPlan.stages.length ? report.accessPlan.stages : [];
-  const map = report.accessPlan.map;
-  const points = map.points;
-  const pointsByStage = new Map<string, number[]>();
-  points.forEach((p, i) => {
-    if (!p.stageId) return;
-    if (!pointsByStage.has(p.stageId)) pointsByStage.set(p.stageId, []);
-    pointsByStage.get(p.stageId)!.push(i + 1);
-  });
+// ── Page 7: Why Our Prep Is Different ────────────────────────────────────────
 
-  const mapHTML = map.imageUrl
-    ? `
-      <div style="margin-top:40px;break-inside:avoid;">
-        <div style="position:relative;width:100%;aspect-ratio:8/5;border-radius:16px;overflow:hidden;background:${PALE_BLUE};">
-          <img src="${esc(map.imageUrl)}" alt="Site aerial with drop points" style="width:100%;height:100%;object-fit:cover;">
-          ${points
-            .map(
-              (p, i) => `
-          <div style="position:absolute;left:${p.x}%;top:${p.y}%;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:${RED};color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">${i + 1}</div>`,
-            )
-            .join("")}
-        </div>
-        ${
-          points.length
-            ? `
-        <ul style="list-style:none;margin:20px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;">
-          ${points
-            .map(
-              (p, i) => `
-          <li style="display:flex;gap:12px;align-items:baseline;font-size:0.9375rem;color:rgba(1,25,85,0.75);">
-            <span style="flex-shrink:0;width:22px;height:22px;border-radius:50%;background:${RED};color:#fff;font-size:0.6875rem;font-weight:700;display:flex;align-items:center;justify-content:center;">${i + 1}</span>
-            <span>${esc(p.note) || `Drop point ${i + 1}`}${
-                p.stageId
-                  ? ` — <span style="color:rgba(1,25,85,0.5);">${esc(stages.find((s) => s.id === p.stageId)?.label ?? "")}</span>`
-                  : ""
-              }</span>
-          </li>`,
-            )
-            .join("")}
-        </ul>`
-            : ""
-        }
-      </div>`
-    : "";
-
+function buildWhyPrepDifferent(a: ReportAssets): string {
+  const cards = [
+    {
+      n: "01",
+      title: "We repair before we coat.",
+      body: "We repair cracks and substrate defects properly before any coating goes on top. A patch job over a damaged surface never lasts long, so that's simply not how we do it. In this industry it's common for painters to subcontract repairs out to whoever's available; ours don't. Our painters, waterproofers and remedial/concrete teams are all direct employees under one licence, so when a crack, delaminating render or rusted bracket turns up mid-job, it's fixed by our own qualified team to spec.",
+      img: a.proposal.whyPrep1,
+    },
+    {
+      n: "02",
+      title: "Coastal systems, not generic ones.",
+      body: "Salt air, UV degradation and humidity cycles behave differently within 5km of the water. That's why our coating systems and prep (flexible topcoats, environmentally friendly pressure cleaning) are specified differently for coastal buildings than inland ones. We don't apply the same system regardless of exposure.",
+      img: a.proposal.whyPrep2,
+    },
+  ];
   return `
-  <section id="sec-06" style="padding:96px 48px;break-before:page;">
+  <section id="sec-09" style="padding:72px 48px 40px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 20px;break-after:avoid;">Access &amp; Disruption Plan</h2>
-      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:760px;margin:0 0 40px;">Rope access is our real structural advantage over most competitors: no scaffolding, no blocked car parks, no scaffold permits. On most buildings, we're on site the same day. The numbered drop points below show exactly where we'll be working, and when.</p>
-
-      ${mapHTML}
-
-      <div style="display:grid;grid-template-columns:repeat(${Math.max(stages.length, 1)},1fr);gap:1px;background:rgba(1,25,85,0.12);border:1px solid rgba(1,25,85,0.12);border-radius:16px;overflow:hidden;margin-top:40px;">
-        ${stages
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 32px;break-after:avoid;">Why Our Prep Is Different</h2>
+      <div>
+        ${cards
           .map(
-            (s) => `
-        <div style="background:#ffffff;padding:28px;break-inside:avoid;">
-          <div style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(1,25,85,0.45);">${esc(s.label)}</div>
-          <div style="font-size:1rem;font-weight:700;margin-top:8px;">${esc(s.description)}</div>
-          ${
-            pointsByStage.get(s.id)?.length
-              ? `<div style="font-size:0.8125rem;color:rgba(1,25,85,0.5);margin-top:10px;">Drop point${pointsByStage.get(s.id)!.length > 1 ? "s" : ""} ${pointsByStage.get(s.id)!.join(", ")}</div>`
-              : ""
-          }
+            (c, i) => `
+        <div style="float:left;width:calc(50% - 20px);margin-right:${i === 0 ? "40px" : "0"};break-inside:avoid;">
+          <div style="width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:rgba(1,25,85,0.08);">
+            <img src="${esc(c.img)}" alt="" style="width:100%;height:100%;object-fit:cover;">
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:24px;">
+            <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1.25rem;letter-spacing:0.05em;color:rgba(1,25,85,0.4);">${c.n}</span>
+            <h3 style="font-size:1.5rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">${c.title}</h3>
+            <p style="font-size:1.0625rem;color:rgba(1,25,85,0.6);margin:0;">${c.body}</p>
+          </div>
         </div>`,
           )
           .join("")}
+        <div style="clear:both;"></div>
       </div>
     </div>
   </section>`;
 }
+
+// ── Page 8: Your Project Team + 8-Year Warranty ─────────────────────────────
+
+function buildProjectTeam(report: ProposalData, a: ReportAssets): string {
+  const j = report.job;
+  const avatar = (initials: string, photo?: string) =>
+    photo
+      ? `
+        <div style="width:120px;height:120px;border-radius:20px;overflow:hidden;">
+          <img src="${esc(photo)}" alt="" style="width:100%;height:100%;object-fit:cover;">
+        </div>`
+      : `
+        <div style="width:120px;height:120px;border-radius:20px;background:${PALE_BLUE};display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',Arial,sans-serif;font-size:2.25rem;color:${NAVY};letter-spacing:0.05em;">${esc(initials)}</div>`;
+  return `
+  <section id="sec-10" style="padding:72px 48px 24px;break-before:page;">
+    <div style="max-width:1400px;margin:0 auto;">
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 12px;break-after:avoid;">Your Project Team</h2>
+      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:640px;margin:0 0 32px;">One phone number, one face, accountable from quote to sign-off.</p>
+      <div>
+        <div style="float:left;width:calc((100% - 80px) / 3);margin-right:40px;break-inside:avoid;">
+          ${avatar(f(j.preparedByName, "PM").slice(0, 2).toUpperCase())}
+          <div style="margin-top:14px;">
+            <p style="font-weight:700;font-size:1.0625rem;margin:0;">${f(j.preparedByName, "[Project Manager Name]")}</p>
+            <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:4px 0 0;">Project Manager, on site from first visit to sign-off</p>
+          </div>
+        </div>
+        <div style="float:left;width:calc((100% - 80px) / 3);margin-right:40px;break-inside:avoid;">
+          ${avatar("PC")}
+          <div style="margin-top:14px;">
+            <p style="font-weight:700;font-size:1.0625rem;margin:0;">Phil Clark</p>
+            <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:4px 0 0;">Founder, Height Safety &amp; Rope Access</p>
+          </div>
+        </div>
+        <div style="float:left;width:calc((100% - 80px) / 3);break-inside:avoid;">
+          ${avatar("C", a.proposal.teamCaroline)}
+          <div style="margin-top:14px;">
+            <p style="font-weight:700;font-size:1.0625rem;margin:0;">Caroline</p>
+            <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:4px 0 0;">Client Support, in the office for job updates &amp; scheduling</p>
+          </div>
+        </div>
+        <div style="clear:both;"></div>
+      </div>
+      <div style="margin-top:28px;padding-top:20px;border-top:1px solid rgba(1,25,85,0.12);">
+        <p style="font-size:1rem;">Direct line: <a href="tel:${COMPANY_PHONE_TEL}" style="font-weight:700;color:${NAVY};">${esc(COMPANY_PHONE)}</a> &nbsp;&middot;&nbsp; <a href="mailto:${esc(j.preparedByEmail)}" style="font-weight:700;color:${NAVY};">${f(j.preparedByEmail, "[email address]")}</a></p>
+      </div>
+    </div>
+  </section>`;
+}
+
+function buildWarranty(a: ReportAssets): string {
+  return `
+  <section id="sec-08" style="padding:24px 48px 72px;">
+    <div style="max-width:1400px;margin:0 auto;">
+      <div style="background:${PALE_BLUE};border-radius:24px;padding:56px;display:flex;align-items:center;gap:56px;flex-wrap:wrap;break-inside:avoid;">
+        <div style="flex-shrink:0;width:260px;display:flex;flex-direction:column;gap:32px;">
+          <div style="display:flex;align-items:flex-end;gap:12px;">
+            <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:clamp(6rem,9vw,8rem);letter-spacing:-0.04em;color:${NAVY};line-height:0.85;">8</span>
+            <span style="font-size:0.8125rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.65);line-height:1.4;">Year<br>Warranty</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <h3 style="font-size:1.125rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">Backed by the best.</h3>
+            <div style="display:flex;align-items:center;gap:20px;">
+              <img src="${esc(a.associations.haymes)}" alt="Haymes Paint" style="height:26px;width:auto;object-fit:contain;">
+              <img src="${esc(a.proposal.dulux)}" alt="Dulux" style="height:22px;width:auto;object-fit:contain;">
+            </div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px;">
+          <h2 style="font-size:clamp(1.5rem,2.5vw,2rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0;break-after:avoid;">Standing by our team, and our products.</h2>
+          <p style="font-size:0.9375rem;color:rgba(1,25,85,0.65);margin:0;">Most workmanship warranties in this industry run two to five years, and the longer terms usually come with a catch: an ongoing paid maintenance contract you have to commit to first. Every RAS-VERTEX repaint carries an 8-year written workmanship warranty as standard. No maintenance contract to sign, no conditions attached.</p>
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+
+// ── Page 9: Pricing ──────────────────────────────────────────────────────────
 
 function buildPricing(report: ProposalData): string {
   const items = report.pricing.items;
@@ -340,36 +581,37 @@ function buildPricing(report: ProposalData): string {
     groups.get(key)!.push(item);
   }
 
+  // Flat rows throughout — no boxed/background cards around cost-centre
+  // groups. A group's name renders as a plain bold row with its own
+  // subtotal, styled exactly like every other row, just bold; its line
+  // items follow directly underneath with the same border-top divider as
+  // everything else. Matches the source design's plain repeating-row list.
   const itemRow = (item: (typeof rows)[number]) => `
-        <div style="display:grid;grid-template-columns:1fr auto;padding:16px 20px;border-top:1px solid rgba(1,25,85,0.12);break-inside:avoid;">
-          <span style="font-size:1rem;">${esc(item.label)}</span>
-          <span style="font-size:1rem;font-weight:600;">$${money(item.amountExTax)}</span>
+        <div style="display:grid;grid-template-columns:1fr auto;padding:20px 0;border-top:1px solid rgba(1,25,85,0.15);break-inside:avoid;">
+          <span style="font-size:1.0625rem;">${esc(item.label)}</span>
+          <span style="font-size:1.0625rem;font-weight:600;">$${money(item.amountExTax)}</span>
         </div>`;
 
   const groupsHtml = order
     .map((key) => {
       const groupItems = groups.get(key)!;
       const rowsHtml = groupItems.map(itemRow).join("");
-      if (!key) {
-        return `<div style="margin-bottom:20px;">${rowsHtml}</div>`;
-      }
+      if (!key) return rowsHtml;
       const groupSubtotal = pricingSubtotal(groupItems);
       return `
-      <div style="border:1px solid rgba(1,25,85,0.12);border-radius:10px;overflow:hidden;margin-bottom:20px;break-inside:avoid;">
-        <div style="display:grid;grid-template-columns:1fr auto;padding:14px 20px;background:rgba(1,25,85,0.06);">
-          <span style="font-size:0.9375rem;font-weight:700;">${esc(key)}</span>
-          <span style="font-size:0.9375rem;font-weight:700;">$${money(groupSubtotal)}</span>
-        </div>
-        ${rowsHtml}
-      </div>`;
+      <div style="display:grid;grid-template-columns:1fr auto;padding:20px 0;border-top:1px solid rgba(1,25,85,0.15);break-inside:avoid;">
+        <span style="font-size:1.0625rem;font-weight:700;">${esc(key)}</span>
+        <span style="font-size:1.0625rem;font-weight:700;">$${money(groupSubtotal)}</span>
+      </div>
+      ${rowsHtml}`;
     })
     .join("");
 
   return `
-  <section id="sec-07" style="padding:96px 48px;break-before:page;">
+  <section id="sec-07" style="padding:72px 48px 40px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 40px;break-after:avoid;">Pricing</h2>
-      <div style="max-width:760px;">
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 32px;break-after:avoid;">Pricing</h2>
+      <div style="max-width:80%;">
         ${groupsHtml}
         <div style="display:grid;grid-template-columns:1fr auto;padding:20px 0;border-top:2px solid rgba(1,25,85,0.35);break-inside:avoid;">
           <span style="font-size:1.0625rem;font-weight:700;">Combined Total</span>
@@ -384,136 +626,82 @@ function buildPricing(report: ProposalData): string {
           <span style="font-size:1.375rem;font-weight:700;">$${money(total)}</span>
         </div>
 
-        <a href="#sec-16" style="display:block;margin-top:16px;padding:18px 28px;background:#e3f7ea;border-radius:16px;text-decoration:none;break-inside:avoid;">
-          <span style="font-size:1.0625rem;font-weight:700;color:#1a7a42;">Ready to proceed? Turn to Acceptance.</span>
+        <a href="#sec-16" style="display:inline-flex;align-items:center;margin-top:20px;padding:10px 18px;background:#dcf2e3;border-radius:12px;text-decoration:none;break-inside:avoid;">
+          <span style="font-size:0.9375rem;font-weight:600;color:#1f7a4d;">Ready to proceed? Turn to Acceptance.</span>
         </a>
-
-        <div style="margin-top:48px;break-inside:avoid;">
-          <h3 style="font-size:1.125rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0 0 16px;">Notes</h3>
-          <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;">
-            <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">Deposit: ${report.pricing.depositPct}% on acceptance of this proposal.</li>
-            <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">Progress claims: ${esc(report.pricing.progressTerms)}</li>
-            <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">Final payment: on completion &amp; sign-off.</li>
-            <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">Workmanship warranty: 8 years, written, unconditional. See next page.</li>
-            <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">QBCC Home Warranty Scheme: applies where the building is 3 storeys or under and contract value exceeds $3,300; collected on the owner's behalf.</li>
-          </ul>
-        </div>
       </div>
     </div>
   </section>`;
 }
 
-function buildWarranty(a: ReportAssets): string {
+// ── Page 10: Acceptance ──────────────────────────────────────────────────────
+
+function signatureBlockHTML(
+  title: string,
+  nameHTML: string,
+  positionHTML: string,
+  last: boolean,
+): string {
   return `
-  <section id="sec-08" style="padding:96px 48px;break-before:page;">
-    <div style="max-width:1400px;margin:0 auto;">
-      <div style="background:${PALE_BLUE};border-radius:24px;padding:64px;display:flex;align-items:flex-end;gap:64px;flex-wrap:wrap;break-inside:avoid;">
-        <div style="flex-shrink:0;display:flex;flex-direction:column;gap:24px;">
-          <div style="display:flex;align-items:flex-end;gap:16px;">
-            <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:clamp(10rem,16vw,17rem);letter-spacing:-0.04em;color:${NAVY};line-height:0.85;">8</span>
-            <span style="font-size:0.875rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.65);line-height:1.4;">Year<br>Warranty</span>
+        <div style="float:left;width:calc(50% - 20px);margin-right:${last ? "0" : "40px"};box-sizing:border-box;background:#ffffff;border:1px solid rgba(1,25,85,0.12);border-radius:24px;padding:40px;display:flex;flex-direction:column;gap:24px;break-inside:avoid;">
+          <h3 style="font-size:1.125rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">${esc(title)}</h3>
+          ${nameHTML}
+          ${positionHTML}
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <span style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.45);">Signature</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;border:1px dashed rgba(1,25,85,0.25);border-radius:8px;background:rgba(1,25,85,0.08);height:52px;padding:0 16px;">
+              <span style="font-family:'Caveat','Brush Script MT',cursive;font-size:1.5rem;color:rgba(1,25,85,0.35);">Sign here</span>
+            </div>
           </div>
-        </div>
-        <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:16px;">
-          <h2 style="font-size:clamp(1.75rem,3vw,2.5rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0;break-after:avoid;">Standing by our team,<br>and our products.</h2>
-          <p style="font-size:1.0625rem;color:rgba(1,25,85,0.65);margin:0;">Most workmanship warranties in this industry run two to five years, and the longer terms usually come with a catch: an ongoing paid maintenance contract you have to commit to first. Every RAS-VERTEX repaint carries an 8-year written workmanship warranty as standard. No maintenance contract to sign, no conditions attached.</p>
-        </div>
-        <div style="flex-shrink:0;width:260px;display:flex;flex-direction:column;gap:16px;">
-          <h3 style="font-size:1.375rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">Backed by the best.</h3>
-          <div style="display:flex;align-items:center;gap:24px;">
-            <img src="${esc(a.associations.haymes)}" alt="Haymes Paint" style="height:32px;width:auto;object-fit:contain;">
-            <img src="${esc(a.proposal.dulux)}" alt="Dulux" style="height:28px;width:auto;object-fit:contain;">
+          <div style="background:rgba(1,25,85,0.08);border-radius:12px;padding:12px 48px;min-height:52px;display:flex;align-items:center;">
+            <span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(1,25,85,0.45);">Date</span>
           </div>
-        </div>
-      </div>
-    </div>
-  </section>`;
+        </div>`;
 }
 
-function buildWhyPrepDifferent(a: ReportAssets): string {
-  const cards = [
-    {
-      n: "01",
-      title: "We repair before we coat.",
-      body: "We repair cracks and substrate defects properly before any coating goes on top. A patch job over a damaged surface never lasts long, so that's simply not how we do it. In this industry it's common for painters to subcontract repairs out to whoever's available; ours don't. Our painters, waterproofers and remedial/concrete teams are all direct employees under one licence, so when a crack, delaminating render or rusted bracket turns up mid-job, it's fixed by our own qualified team to spec.",
-      img: a.proposal.whyPrep1,
-    },
-    {
-      n: "02",
-      title: "Coastal systems, not generic ones.",
-      body: "Salt air, UV degradation and humidity cycles behave differently within 5km of the water. That's why our coating systems and prep (flexible topcoats, environmentally friendly pressure cleaning) are specified differently for coastal buildings than inland ones. We don't apply the same system regardless of exposure.",
-      img: a.proposal.whyPrep2,
-    },
-  ];
-  return `
-  <section id="sec-09" style="padding:96px 48px;break-before:page;">
-    <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 40px;break-after:avoid;">Why Our Prep Is Different</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">
-        ${cards
-          .map(
-            (c) => `
-        <div style="display:flex;flex-direction:column;gap:24px;break-inside:avoid;">
-          <div style="width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:rgba(1,25,85,0.08);">
-            <img src="${esc(c.img)}" alt="" style="width:100%;height:100%;object-fit:cover;">
-          </div>
-          <div style="display:flex;flex-direction:column;gap:12px;">
-            <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1.25rem;letter-spacing:0.05em;color:rgba(1,25,85,0.4);">${c.n}</span>
-            <h3 style="font-size:1.5rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">${c.title}</h3>
-            <p style="font-size:1.0625rem;color:rgba(1,25,85,0.6);margin:0;">${c.body}</p>
-          </div>
-        </div>`,
-          )
-          .join("")}
-      </div>
-    </div>
-  </section>`;
-}
-
-function buildProjectTeam(report: ProposalData, a: ReportAssets): string {
+function buildAcceptance(report: ProposalData): string {
   const j = report.job;
-  const avatar = (initials: string, photo?: string) =>
-    photo
-      ? `
-        <div style="width:140px;height:140px;border-radius:50%;overflow:hidden;">
-          <img src="${esc(photo)}" alt="" style="width:100%;height:100%;object-fit:cover;">
-        </div>`
-      : `
-        <div style="width:140px;height:140px;border-radius:50%;background:${PALE_BLUE};display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',Arial,sans-serif;font-size:2.5rem;color:${NAVY};letter-spacing:0.05em;">${esc(initials)}</div>`;
+  const clientBlock = signatureBlockHTML(
+    "On behalf of the Client",
+    `<div style="background:rgba(1,25,85,0.08);border-radius:12px;padding:12px 48px;min-height:52px;display:flex;align-items:center;"><span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(1,25,85,0.45);">Name</span></div>`,
+    `<div style="background:rgba(1,25,85,0.08);border-radius:12px;padding:12px 48px;min-height:52px;display:flex;align-items:center;"><span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(1,25,85,0.45);">Position</span></div>`,
+    false,
+  );
+  const rasBlock = signatureBlockHTML(
+    "On behalf of RAS-VERTEX",
+    `<div><div style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.45);margin-bottom:6px;">Name</div><div style="font-size:1rem;font-weight:700;padding-bottom:8px;">${f(j.preparedByName, "[Project Manager Name]")}</div></div>`,
+    `<div><div style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.45);margin-bottom:6px;">Position</div><div style="font-size:1rem;padding-bottom:8px;">Project Manager</div></div>`,
+    true,
+  );
   return `
-  <section id="sec-10" style="padding:96px 48px;break-before:page;">
+  <section id="sec-16" style="padding:72px 48px 40px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 12px;break-after:avoid;">Your Project Team</h2>
-      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:640px;margin:0 0 48px;">One phone number, one face, accountable from quote to sign-off.</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:40px;">
-        <div style="display:flex;flex-direction:column;gap:16px;break-inside:avoid;">
-          ${avatar(f(j.preparedByName, "PM").slice(0, 2).toUpperCase())}
-          <div>
-            <p style="font-weight:700;font-size:1.0625rem;margin:0;">${f(j.preparedByName, "[Project Manager Name]")}</p>
-            <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:4px 0 0;">Project Manager, on site from first visit to sign-off</p>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:16px;break-inside:avoid;">
-          ${avatar("PC")}
-          <div>
-            <p style="font-weight:700;font-size:1.0625rem;margin:0;">Phil Clark</p>
-            <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:4px 0 0;">Founder, Height Safety &amp; Rope Access</p>
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:16px;break-inside:avoid;">
-          ${avatar("C", a.proposal.teamCaroline)}
-          <div>
-            <p style="font-weight:700;font-size:1.0625rem;margin:0;">Caroline</p>
-            <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:4px 0 0;">Client Support, in the office for job updates &amp; scheduling</p>
-          </div>
-        </div>
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 12px;break-after:avoid;">Acceptance</h2>
+      <p style="font-size:1.0625rem;color:rgba(1,25,85,0.65);max-width:640px;margin:0 0 48px;">Return a signed copy to accept this proposal (including the Terms &amp; Conditions set out in Appendix A), or contact us with any questions before signing.</p>
+      <div>
+        ${clientBlock}
+        ${rasBlock}
+        <div style="clear:both;"></div>
       </div>
-      <div style="margin-top:40px;padding-top:24px;border-top:1px solid rgba(1,25,85,0.12);">
-        <p style="font-size:1rem;">Direct line: <a href="tel:${COMPANY_PHONE_TEL}" style="font-weight:700;color:${NAVY};">${esc(COMPANY_PHONE)}</a> &nbsp;&middot;&nbsp; <a href="mailto:${esc(j.preparedByEmail)}" style="font-weight:700;color:${NAVY};">${f(j.preparedByEmail, "[email address]")}</a></p>
+      <p style="font-size:0.8125rem;color:rgba(1,25,85,0.45);margin-top:16px;">Accepted electronically or by hand, both carry equal effect under this agreement.</p>
+
+      <div style="margin-top:40px;break-inside:avoid;">
+        <h3 style="font-size:1.125rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0 0 16px;">Notes</h3>
+        <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;">
+          <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">Deposit: ${report.pricing.depositPct}% on acceptance of this proposal.</li>
+          <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">Progress claims: ${esc(report.pricing.progressTerms)}</li>
+          <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">Final payment: on completion &amp; sign-off.</li>
+          <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">Workmanship warranty: 8 years, written, unconditional.</li>
+          <li style="font-size:0.9375rem;color:rgba(1,25,85,0.65);">QBCC Home Warranty Scheme: applies where the building is 3 storeys or under and contract value exceeds $3,300; collected on the owner's behalf.</li>
+        </ul>
       </div>
     </div>
   </section>`;
 }
+
+// ── Page 11: Recent Projects ─────────────────────────────────────────────────
 
 function buildRecentProjects(a: ReportAssets): string {
   const projects = [
@@ -542,32 +730,34 @@ function buildRecentProjects(a: ReportAssets): string {
       ],
     },
   ];
-  const row = (p: (typeof projects)[number], reverse: boolean) => `
-      <div style="display:flex;gap:48px;align-items:flex-start;margin-bottom:48px;break-inside:avoid;">
-        <div style="flex:1 1 0;min-width:0;width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:rgba(1,25,85,0.08);order:${reverse ? 2 : 1};">
+  const row = (p: (typeof projects)[number], reverse: boolean, last: boolean) => `
+      <div style="display:flex;gap:36px;align-items:flex-start;margin-bottom:${last ? 0 : 28}px;break-inside:avoid;">
+        <div style="flex:0.9 1 0;min-width:0;width:100%;aspect-ratio:16/10;border-radius:16px;overflow:hidden;background:rgba(1,25,85,0.08);order:${reverse ? 2 : 1};">
           <img src="${esc(p.img)}" alt="" style="width:100%;height:100%;object-fit:cover;">
         </div>
-        <div style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:16px;padding-top:8px;order:${reverse ? 1 : 2};">
-          <h3 style="font-size:1.5rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">${p.title}</h3>
-          <p style="font-size:0.9375rem;color:rgba(1,25,85,0.45);margin:0;">${p.meta}</p>
-          <ul style="list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;">
-            ${p.bullets.map((b) => `<li style="font-size:1rem;color:rgba(1,25,85,0.7);">&bull; ${esc(b)}</li>`).join("")}
+        <div style="flex:1.1 1 0;min-width:0;display:flex;flex-direction:column;gap:10px;order:${reverse ? 1 : 2};">
+          <h3 style="font-size:1.25rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">${p.title}</h3>
+          <p style="font-size:0.875rem;color:rgba(1,25,85,0.45);margin:0;">${p.meta}</p>
+          <ul style="list-style:none;margin:4px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;">
+            ${p.bullets.map((b) => `<li style="font-size:0.875rem;line-height:1.4;color:rgba(1,25,85,0.7);">&bull; ${esc(b)}</li>`).join("")}
           </ul>
         </div>
       </div>`;
   return `
-  <section id="sec-11" style="padding:96px 48px;background:rgba(1,25,85,0.03);break-before:page;">
+  <section id="sec-11" style="padding:64px 48px 40px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 40px;break-after:avoid;">Recent Projects</h2>
-      ${row(projects[0], false)}
-      ${row(projects[1], true)}
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 28px;break-after:avoid;">Recent Projects</h2>
+      ${row(projects[0], false, false)}
+      ${row(projects[1], true, true)}
     </div>
   </section>`;
 }
 
+// ── Page 12: Client Testimonial ──────────────────────────────────────────────
+
 function buildTestimonial(): string {
   return `
-  <section id="sec-12" style="padding:96px 48px;break-before:page;">
+  <section id="sec-12" style="padding:96px 48px;break-before:page;min-height:100vh;box-sizing:border-box;display:flex;align-items:center;">
     <div style="max-width:820px;margin:0 auto;display:flex;flex-direction:column;align-items:center;gap:24px;text-align:center;">
       <span style="font-size:3.5rem;font-weight:700;line-height:0.6;color:#6b1f24;">&ldquo;</span>
       <p style="font-size:1.875rem;font-weight:300;line-height:1.4;letter-spacing:-0.015em;margin:0;">RAS-VERTEX carried out a full external repaint, including a thorough building wash and remedial works beforehand. Great communication and planning, with the high standards that Phil, Shane and Jason set, and the flexibility to fix issues as they came up.</p>
@@ -579,40 +769,11 @@ function buildTestimonial(): string {
   </section>`;
 }
 
-function buildSupportPlans(a: ReportAssets): string {
-  const plans = [
-    { title: "Annual Wash-Down", body: "Removes salt build-up and mould growth before it stains or degrades the coating system.", img: a.proposal.supportWashDown },
-    { title: "Annual Inspection", body: "A short report flagging anything worth watching, before it becomes a bigger job.", img: a.proposal.supportInspection },
-    { title: "Touch-Up Cover", body: "Minor scuffs and marks addressed as they appear, at a pre-agreed call-out rate.", img: a.proposal.supportTouchUp },
-  ];
-  return `
-  <section id="sec-13" style="padding:96px 48px;background:rgba(1,25,85,0.03);break-before:page;">
-    <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 12px;break-after:avoid;">Support &amp; Maintenance Plans</h2>
-      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:700px;margin:0 0 48px;">Entirely optional, and they don't affect your 8-year warranty either way, whether you take one out or not.</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px;">
-        ${plans
-          .map(
-            (p) => `
-        <div style="display:flex;flex-direction:column;gap:16px;break-inside:avoid;">
-          <div style="width:100%;aspect-ratio:3/4;border-radius:16px;overflow:hidden;background:rgba(1,25,85,0.08);">
-            <img src="${esc(p.img)}" alt="" style="width:100%;height:100%;object-fit:cover;">
-          </div>
-          <div>
-            <p style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1.375rem;letter-spacing:0.05em;text-transform:uppercase;margin:0 0 8px;">${p.title}</p>
-            <p style="font-size:0.875rem;color:rgba(1,25,85,0.6);margin:0;">${p.body}</p>
-          </div>
-        </div>`,
-          )
-          .join("")}
-      </div>
-    </div>
-  </section>`;
-}
+// ── Page 13: Who We Are + Insurance & Compliance ────────────────────────────
 
 function buildWhoWeAre(): string {
   return `
-  <section id="sec-14" style="padding:96px 48px;break-before:page;">
+  <section id="sec-14" style="padding:72px 48px 40px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
       <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 20px;break-after:avoid;">Who We Are</h2>
       <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:780px;margin:0;">Founded in 2009 when Phil brought 15 years of UK rope access experience to the Sunshine Coast. In 2023, RAS merged with Vertex Access Solutions to become RAS-VERTEX. Today: 25+ directly employed specialists across painting, waterproofing, height safety and remedial work. No subbies, one team, every trade.</p>
@@ -628,85 +789,39 @@ function buildInsuranceCompliance(a: ReportAssets): string {
     ["Years on the Coast", "25+", "Noosa to Caloundra, every suburb"],
   ];
   return `
-  <section id="sec-15" style="background:${PALE_BLUE};padding:96px 48px;break-before:page;">
+  <section id="sec-15" style="padding:32px 48px 72px;">
     <div style="max-width:1400px;margin:0 auto;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:end;margin-bottom:40px;">
-        <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0;break-after:avoid;">Licensed, certified,<br>and fully insured.</h2>
-        <p style="font-size:1.0625rem;color:rgba(1,25,85,0.65);margin:0;">Every certificate is current. Every technician is directly employed. Certificates of currency are issued automatically at quote stage, with no chasing and no surprises for your committee.</p>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid rgba(1,25,85,0.15);">
-        ${stats
-          .map(
-            ([label, big, sub], i) => `
-        <div style="display:flex;flex-direction:column;gap:8px;padding:32px ${i < 3 ? "32px" : "0"} 32px ${i > 0 ? "32px" : "0"};${i < 3 ? "border-right:1px solid rgba(1,25,85,0.15);" : ""}break-inside:avoid;">
-          <span style="font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(1,25,85,0.45);">${label}</span>
-          <span style="font-size:2.25rem;font-weight:700;letter-spacing:-0.03em;line-height:1;">${big}</span>
-          <span style="font-size:0.875rem;color:rgba(1,25,85,0.55);">${sub}</span>
-        </div>`,
-          )
-          .join("")}
-      </div>
-      <div style="display:flex;align-items:center;gap:32px;margin-top:40px;">
-        <img src="${esc(a.associations.qbcc)}" alt="QBCC" style="height:32px;width:auto;object-fit:contain;">
-        <img src="${esc(a.proposal.workCover)}" alt="WorkCover Queensland" style="height:28px;width:auto;object-fit:contain;">
+      <div style="background:${PALE_BLUE};border-radius:24px;padding:40px;break-inside:avoid;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:end;margin-bottom:32px;">
+          <h2 style="font-size:clamp(1.75rem,3vw,2.5rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0;break-after:avoid;">Licensed, certified, and fully insured.</h2>
+          <p style="font-size:1rem;color:rgba(1,25,85,0.65);margin:0;">Every certificate is current. Every technician is directly employed. Certificates of currency are issued automatically at quote stage, with no chasing and no surprises for your committee.</p>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid rgba(1,25,85,0.15);">
+          ${stats
+            .map(
+              ([label, big, sub], i) => `
+          <div style="display:flex;flex-direction:column;gap:6px;padding:24px ${i < 3 ? "24px" : "0"} 0 ${i > 0 ? "24px" : "0"};${i < 3 ? "border-right:1px solid rgba(1,25,85,0.15);" : ""}break-inside:avoid;">
+            <span style="font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(1,25,85,0.45);">${label}</span>
+            <span style="font-size:1.875rem;font-weight:700;letter-spacing:-0.03em;line-height:1;">${big}</span>
+            <span style="font-size:0.8125rem;color:rgba(1,25,85,0.55);">${sub}</span>
+          </div>`,
+            )
+            .join("")}
+        </div>
+        <div style="display:flex;align-items:center;gap:32px;margin-top:32px;">
+          <img src="${esc(a.associations.qbcc)}" alt="QBCC" style="height:28px;width:auto;object-fit:contain;">
+          <img src="${esc(a.proposal.workCover)}" alt="WorkCover Queensland" style="height:24px;width:auto;object-fit:contain;">
+        </div>
       </div>
     </div>
   </section>`;
 }
 
-function signatureBlockHTML(title: string, nameHTML: string, positionHTML: string): string {
-  return `
-        <div style="background:#ffffff;padding:40px;display:flex;flex-direction:column;gap:24px;break-inside:avoid;">
-          <h3 style="font-size:1.125rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">${esc(title)}</h3>
-          ${nameHTML}
-          ${positionHTML}
-          <div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-              <span style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.45);">Signature</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;border:1px dashed rgba(1,25,85,0.25);border-radius:8px;background:rgba(1,25,85,0.08);height:52px;padding:0 16px;">
-              <span style="font-family:'Caveat','Brush Script MT',cursive;font-size:1.5rem;color:rgba(1,25,85,0.35);">Sign here</span>
-            </div>
-          </div>
-          <div style="background:rgba(1,25,85,0.08);border-radius:12px;padding:12px 48px;min-height:52px;display:flex;align-items:center;">
-            <span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(1,25,85,0.45);">Date</span>
-          </div>
-        </div>`;
-}
+// ── Page 14: Appendix A — Terms & Conditions (compact, one page) ───────────
 
-function buildAcceptance(report: ProposalData): string {
-  const j = report.job;
-  const clientBlock = signatureBlockHTML(
-    "On behalf of the Client",
-    `<div style="background:rgba(1,25,85,0.08);border-radius:12px;padding:12px 48px;min-height:52px;display:flex;align-items:center;"><span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(1,25,85,0.45);">Name</span></div>`,
-    `<div style="background:rgba(1,25,85,0.08);border-radius:12px;padding:12px 48px;min-height:52px;display:flex;align-items:center;"><span style="font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:rgba(1,25,85,0.45);">Position</span></div>`,
-  );
-  const rasBlock = signatureBlockHTML(
-    "On behalf of RAS-VERTEX",
-    `<div><div style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.45);margin-bottom:6px;">Name</div><div style="font-size:1rem;font-weight:700;padding-bottom:8px;">${f(j.preparedByName, "[Project Manager Name]")}</div></div>`,
-    `<div><div style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.45);margin-bottom:6px;">Position</div><div style="font-size:1rem;padding-bottom:8px;">Project Manager</div></div>`,
-  );
-  return `
-  <section id="sec-16" style="padding:96px 48px;background:rgba(1,25,85,0.03);break-before:page;">
-    <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 12px;break-after:avoid;">Acceptance</h2>
-      <p style="font-size:1.0625rem;color:rgba(1,25,85,0.65);max-width:640px;margin:0 0 48px;">Return a signed copy to accept this proposal (including the Terms &amp; Conditions set out in Appendix A), or contact us with any questions before signing.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(1,25,85,0.12);border:1px solid rgba(1,25,85,0.12);border-radius:24px;overflow:hidden;">
-        ${clientBlock}
-        ${rasBlock}
-      </div>
-      <p style="font-size:0.8125rem;color:rgba(1,25,85,0.45);margin-top:16px;">Accepted electronically or by hand, both carry equal effect under this agreement.</p>
-    </div>
-  </section>`;
-}
-
-// Flat, in column-major reading order (was previously three hardcoded
-// 8/7/7 arrays laid out as independent CSS Grid columns in one row — that
-// meant a print page break had to cut all three columns at the same pixel
-// position, landing at a different item boundary in each one and orphaning
-// headings. CSS multi-column below reflows this list the same way (fills
-// column 1 top-to-bottom, then column 2, then column 3) but lets each page
-// break fall between items instead of through them.
+// Flat, in column-major reading order — split into 3 fixed columns below
+// (explicit CSS grid, not CSS multi-column) so it renders predictably as a
+// single page alongside the heading.
 const APPENDIX_ITEMS: { title: string; body: string }[] = [
   { title: "General", body: "All services by RAS-VERTEX (Contractor) to client (Principal) are subject to these Terms and Conditions unless otherwise agreed." },
   { title: "Acceptance", body: "Quote valid 60 days from date. Acceptance subject to credit approval." },
@@ -715,10 +830,7 @@ const APPENDIX_ITEMS: { title: string; body: string }[] = [
   { title: "Access and Equipment", body: "Work performed via rope access from rooftops, with possible unit access. May use EWP, scaffolds, trestles and ladders." },
   { title: "Site Amenities", body: "Client provides storage, electricity, toilet facilities and water throughout the project." },
   { title: "External Cleaning", body: "RAS-VERTEX cannot guarantee removal of all stains from environmental factors, age or poor maintenance. Client is responsible for drainage and waste disposal compliance." },
-  { title: "Painting Services", body: "Price excludes rectifying defects, delamination, or major substrate repairs unless pre-identified. Similar colour schemes only, colour changes may incur extra costs." },
   { title: "Painting Specifications", body: "Work complies with manufacturer specifications, which override our procedures for warranty. Manufacturer representatives conduct quality checks." },
-  { title: "Height Safety", body: "Anchor services comply with AS1891. Client ensures only qualified personnel use systems after risk assessment and training per WHS legislation." },
-  { title: "Building Inspections", body: "Visual inspection only, cannot detect concealed defects. Liability limited to re-inspection of identified defects, excludes consequential damages." },
   { title: "Waterproofing", body: "Work per Australian Standards. Client ensures proper drainage and maintenance. Warranty excludes structural movement or poor maintenance damage." },
   { title: "Payment Terms", body: "Payment due within 7 days of invoice. Progress claims at agreed intervals. Late payment: 5% penalty plus 12% per annum interest at RAS-VERTEX discretion." },
   { title: "Variations", body: "Client-requested variations entitle price variation and time extension. All variations require written agreement." },
@@ -733,22 +845,92 @@ const APPENDIX_ITEMS: { title: string; body: string }[] = [
   { title: "Marketing", body: "RAS-VERTEX may send promotional offers (unsubscribe available) and use project images for marketing (no identifiable individuals)." },
 ];
 
+// Splits a sequence into `k` CONTIGUOUS groups (preserving reading order —
+// column 1 top-to-bottom, then column 2, etc.) while minimizing the tallest
+// group's estimated height. A plain count-based split (e.g. 8/7/7 items)
+// looks balanced but isn't: item body lengths vary a lot, so one column can
+// end up visibly taller than the others and overflow past the page margin
+// while its neighbours have room to spare. Classic "book allocation" binary
+// search over the max-group-weight, O(n log(total weight)).
+function balanceIntoColumns<T extends { title: string; body: string }>(
+  items: T[],
+  k: number,
+): T[][] {
+  const COLUMN_CHARS_PER_LINE = 32;
+  const weight = (it: T) => 40 + Math.ceil(it.body.length / COLUMN_CHARS_PER_LINE) * 18;
+  const weights = items.map(weight);
+  const n = items.length;
+  const fitsWithin = (limit: number): boolean => {
+    let groups = 1;
+    let sum = 0;
+    for (const w of weights) {
+      if (sum + w > limit) {
+        groups++;
+        sum = w;
+        if (w > limit) return false;
+      } else {
+        sum += w;
+      }
+    }
+    return groups <= k;
+  };
+  let lo = Math.max(...weights);
+  let hi = weights.reduce((a, b) => a + b, 0);
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (fitsWithin(mid)) hi = mid;
+    else lo = mid + 1;
+  }
+  const groups: T[][] = [];
+  let current: T[] = [];
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    if (sum + weights[i] > lo && current.length) {
+      groups.push(current);
+      current = [];
+      sum = 0;
+    }
+    current.push(items[i]);
+    sum += weights[i];
+  }
+  if (current.length) groups.push(current);
+  while (groups.length < k) groups.push([]);
+  return groups;
+}
+
 function buildAppendix(): string {
-  const items = APPENDIX_ITEMS.map(
-    (it) => `
-        <div style="break-inside:avoid;margin:0 0 24px;">
-          <h4 style="font-size:1rem;font-weight:700;line-height:1.25;letter-spacing:-0.03em;margin:0 0 6px;">${esc(it.title)}</h4>
-          <p style="font-size:0.9375rem;color:rgba(1,25,85,0.6);margin:0;">${esc(it.body)}</p>
+  const [col1, col2, col3] = balanceIntoColumns(APPENDIX_ITEMS, 3);
+  // Floated (not grid) — CSS Grid renders as one atomic, non-fragmenting
+  // block in Chromium's print engine, which is what stranded the heading
+  // alone on a page while the whole grid jumped to the next one. Floated
+  // columns are ordinary block flow and paginate normally.
+  const renderCol = (col: { title: string; body: string }[], last: boolean) =>
+    `<div style="float:left;width:calc((100% - 56px) / 3);margin-right:${last ? "0" : "28px"};">${col
+      .map(
+        (it) => `
+        <div style="margin:0 0 17px;break-inside:avoid;">
+          <h4 style="font-size:0.8125rem;font-weight:700;line-height:1.3;letter-spacing:-0.01em;margin:0 0 3px;">${esc(it.title)}</h4>
+          <p style="font-size:0.75rem;line-height:1.5;color:rgba(1,25,85,0.6);margin:0;">${esc(it.body)}</p>
         </div>`,
-  ).join("");
+      )
+      .join("")}</div>`;
   return `
-  <section id="sec-appendix-a" style="padding:96px 48px;break-before:page;">
+  <section id="sec-appendix-a" style="padding:64px 48px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 40px;break-after:avoid;">Terms &amp; Conditions</h2>
-      <div style="column-count:3;column-gap:40px;column-fill:auto;">${items}</div>
+      <div style="display:flex;align-items:center;gap:16px;margin:0 0 12px;">
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(1,25,85,0.45);white-space:nowrap;">Appendix A</span>
+        <span style="flex:1;height:1px;background:rgba(1,25,85,0.15);"></span>
+      </div>
+      <h2 style="font-size:clamp(1.5rem,2.5vw,2rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 24px;">Terms &amp; Conditions</h2>
+      <div>
+        ${renderCol(col1, false)}${renderCol(col2, false)}${renderCol(col3, true)}
+        <div style="clear:both;"></div>
+      </div>
     </div>
   </section>`;
 }
+
+// ── Pages 15–16: Certificates ─────────────────────────────────────────────
 
 function buildCertificatePage(id: string, src: string, alt: string): string {
   return `
@@ -771,68 +953,6 @@ export function buildProposalFooterTemplate(assets: ReportAssets): string {
   </div>`;
 }
 
-const TOC_ENTRIES: [string, string][] = [
-  ["sec-02", "Introduction"],
-  ["sec-03", "Your Project"],
-  ["sec-04", "Site Survey & Findings"],
-  ["sec-05", "Project Scope: Inclusions & Exclusions"],
-  ["sec-06", "Access & Disruption Plan"],
-  ["sec-07", "Pricing"],
-  ["sec-08", "8-Year Warranty"],
-  ["sec-09", "Why Our Prep Is Different"],
-  ["sec-10", "Your Project Team"],
-  ["sec-11", "Recent Projects"],
-  ["sec-12", "Client Testimonial"],
-  ["sec-13", "Support & Maintenance Plans"],
-  ["sec-14", "Who We Are"],
-  ["sec-15", "Insurance & Compliance"],
-  ["sec-16", "Acceptance"],
-  ["sec-appendix-a", "Appendix A — Terms & Conditions"],
-  ["sec-cert-workcover", "WorkCover Certificate of Currency"],
-  ["sec-cert-liability", "Public Liability Certificate of Currency"],
-];
-
-const TOC_SECTION_TOGGLE: Record<string, keyof ProposalSectionToggles> = {
-  "sec-04": "findings",
-  "sec-05": "scope",
-  "sec-06": "accessPlan",
-  "sec-07": "pricing",
-};
-
-function buildTableOfContents(report: ProposalData): string {
-  const entries = TOC_ENTRIES.filter(([id]) => {
-    const toggle = TOC_SECTION_TOGGLE[id];
-    return !toggle || report.sections[toggle];
-  });
-
-  const row = ([id, label]: [string, string]) => {
-    const num = id.startsWith("sec-cert-")
-      ? ""
-      : id === "sec-appendix-a"
-        ? "A"
-        : id.replace("sec-", "");
-    return `
-        <a href="#${id}" style="display:flex;align-items:baseline;gap:20px;padding:18px 0;text-decoration:none;color:${NAVY};break-inside:avoid;">
-          <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1rem;color:rgba(1,25,85,0.35);width:28px;flex-shrink:0;">${esc(num)}</span>
-          <span style="font-size:1.0625rem;">${esc(label)}</span>
-        </a>`;
-  };
-  const half = Math.ceil(entries.length / 2);
-  const col1 = entries.slice(0, half).map(row).join("");
-  const col2 = entries.slice(half).map(row).join("");
-
-  return `
-  <section id="sec-toc" style="padding:96px 48px;break-before:page;">
-    <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 40px;break-after:avoid;">Contents</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 48px;">
-        <div>${col1}</div>
-        <div>${col2}</div>
-      </div>
-    </div>
-  </section>`;
-}
-
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function buildProposalPrintHTML(
@@ -842,35 +962,33 @@ export function buildProposalPrintHTML(
   const a = assets ?? DEFAULT_PRINT_ASSETS;
 
   const body = [
-    buildStickyBar(a),
-    buildCover(report, a),
-    buildCoverLetter(report),
-    buildTableOfContents(report),
-    buildYourProject(report),
-    report.sections.findings ? buildFindings(report) : "",
-    report.sections.scope ? buildScope(report, a) : "",
-    report.sections.accessPlan ? buildAccessPlan(report) : "",
-    report.sections.pricing ? buildPricing(report) : "",
-    buildWarranty(a),
-    buildWhyPrepDifferent(a),
-    buildProjectTeam(report, a),
-    buildRecentProjects(a),
-    buildTestimonial(),
-    buildSupportPlans(a),
-    buildWhoWeAre(),
-    buildInsuranceCompliance(a),
-    buildAcceptance(report),
-    buildAppendix(),
+    buildCover(report, a), // 1
+    buildTableOfContents(report), // 2
+    buildCoverLetter(report, a), // 3
+    buildYourProject(report), // 4a
+    report.sections.accessPlan ? buildAccessPlan(report) : "", // 4b
+    report.sections.findings ? buildFindings(report) : "", // 5
+    report.sections.scope ? buildScope(report, a) : "", // 6
+    buildWhyPrepDifferent(a), // 7
+    buildProjectTeam(report, a), // 8a
+    buildWarranty(a), // 8b
+    report.sections.pricing ? buildPricing(report) : "", // 9
+    buildAcceptance(report), // 10
+    buildRecentProjects(a), // 11
+    buildTestimonial(), // 12
+    buildWhoWeAre(), // 13a
+    buildInsuranceCompliance(a), // 13b
+    buildAppendix(), // 14
     buildCertificatePage(
       "sec-cert-workcover",
       a.proposal.workCoverCert,
       "WorkCover Queensland Certificate of Currency",
-    ),
+    ), // 15
     buildCertificatePage(
       "sec-cert-liability",
       a.proposal.publicLiabilityCert,
       "Public & Products Liability Certificate of Currency",
-    ),
+    ), // 16
   ].join("\n");
 
   return `<!DOCTYPE html>
@@ -889,7 +1007,6 @@ export function buildProposalPrintHTML(
 
   @media print {
     @page { size: A4; margin: 0; }
-    .rv-sticky-bar { position: static !important; }
   }
 </style>
 </head>

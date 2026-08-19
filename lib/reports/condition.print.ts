@@ -207,7 +207,7 @@ const PRINT_STYLES = `
   .cover-hero-overlay { position:absolute; inset:0; background:rgba(13,28,69,0.45); z-index:2; }
   .cover-logo { position:absolute; top:2.5rem; left:2.75rem; z-index:3; }
   .cover-logo img { height:48px; width:auto; display:block; }
-  .cover-web { position:absolute; bottom:2rem; right:2.75rem; z-index:3; }
+  .cover-web { position:absolute; top:2.5rem; right:2.75rem; z-index:3; }
   .cover-web img { height:18px; width:auto; display:block; opacity:0.85; }
   .cover-body { flex:1; display:flex; flex-direction:column; padding:2.5rem 2.75rem 0; overflow:hidden; }
   .cover-title-group { flex-shrink:0; margin-bottom:1.5rem; }

@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       // Symmetric top/bottom so every page has the same breathing room
       // above its first line as below its last, whether or not that page
       // happens to start mid-flow after a natural page break.
-      margin: { top: "56px", right: "0", bottom: "56px", left: "0" },
+      margin: { top: "80px", right: "0", bottom: "80px", left: "0" },
       footerTemplate: buildProposalFooterTemplate(assets),
     });
     return pdfDownloadResponse(buffer, filename);
