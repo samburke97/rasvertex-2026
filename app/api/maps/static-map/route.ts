@@ -25,12 +25,22 @@ export async function GET(req: NextRequest) {
   const zoom = req.nextUrl.searchParams.get("zoom") ?? "19";
   const size = req.nextUrl.searchParams.get("size") ?? "640x400";
 
-  const url =
-    `https://maps.googleapis.com/maps/api/staticmap` +
-    `?center=${encodeURIComponent(center)}` +
-    `&zoom=${encodeURIComponent(zoom)}` +
-    `&size=${encodeURIComponent(size)}` +
-    `&scale=2&maptype=satellite&key=${apiKey}`;
+  // Google's own `visible`-bounds auto-fit was tried here and reverted —
+  // it doesn't tightly fit the given points, it applies its own much more
+  // generous padding heuristic and can shift the effective center, which
+  // made captures far more zoomed-out (and shifted) than what was actually
+  // framed. The caller now computes the exact zoom itself (see
+  // lib/reports/staticMapZoom.ts) and always sends an explicit zoom.
+  const params = new URLSearchParams({
+    center,
+    zoom,
+    size,
+    scale: "2",
+    maptype: "satellite",
+    key: apiKey,
+  });
+
+  const url = `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
 
   const res = await fetch(url);
   if (!res.ok) {

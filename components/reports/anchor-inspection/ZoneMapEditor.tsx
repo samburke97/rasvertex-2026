@@ -9,7 +9,8 @@ import IconButton from "@/components/ui/IconButton";
 import AnchorPinModal from "./AnchorPinModal";
 import MapLegend from "./MapLegend";
 import { loadGoogleMaps } from "@/lib/reports/googleMapsLoader";
-import { compressImageDataUrl } from "@/lib/reports/compressImage";
+import { compressMapImageDataUrl } from "@/lib/reports/compressImage";
+import { zoomToFitBounds } from "@/lib/reports/staticMapZoom";
 import {
   ANCHOR_SUBTYPE_LABELS,
   ANCHOR_TYPE_COLOURS,
@@ -442,24 +443,28 @@ export default function ZoneMapEditor({
       let capturedZoom: number;
 
       if (HAS_LIVE_MAPS && liveMapRef.current) {
-        const center = liveMapRef.current.getCenter();
-        if (!center) throw new Error("Map not ready");
-        const liveZoom = liveMapRef.current.getZoom() ?? DEFAULT_ZOOM;
+        const liveMap = liveMapRef.current;
+        const center = liveMap.getCenter();
+        const bounds = liveMap.getBounds();
+        if (!center || !bounds) throw new Error("Map not ready");
         capturedLat = center.lat();
         capturedLng = center.lng();
 
-        // The static capture is a much smaller image than the live map's
-        // on-screen size, and a Google zoom level defines real-world-area
-        // per pixel — reusing the same zoom number on a smaller image shows
-        // a smaller slice of the world (looks "more zoomed in" than what
-        // was actually framed). Compensate by the size ratio so the capture
-        // matches what was on screen.
-        const containerWidth =
-          liveMapContainerRef.current?.clientWidth || PREVIEW_WIDTH;
-        const zoomAdjust = Math.log2(PREVIEW_WIDTH / containerWidth);
-        capturedZoom = Math.max(
-          1,
-          Math.min(21, Math.round(liveZoom + zoomAdjust)),
+        // Compute the exact integer zoom that fits the live map's current
+        // viewport into the capture's target size, from the real Web
+        // Mercator projection — not Static Maps' own `visible`-bounds
+        // auto-fit (tried and reverted: it pads far more generously than
+        // the actual viewport and can shift the center), and not a zoom
+        // level reverse-engineered from container pixel widths (drifted
+        // out of sync with what was actually on screen). Center is passed
+        // through unchanged, so it never moves either.
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        capturedZoom = zoomToFitBounds(
+          { lat: sw.lat(), lng: sw.lng() },
+          { lat: ne.lat(), lng: ne.lng() },
+          PREVIEW_WIDTH,
+          PREVIEW_HEIGHT,
         );
 
         url = buildStaticUrl({
@@ -478,7 +483,7 @@ export default function ZoneMapEditor({
       if (mapRotation !== 0) {
         dataUrl = await rotateImageToDataUrl(dataUrl, mapRotation);
       }
-      dataUrl = await compressImageDataUrl(dataUrl);
+      dataUrl = await compressMapImageDataUrl(dataUrl);
 
       const updated: Zone = {
         ...localZone,
@@ -521,7 +526,7 @@ export default function ZoneMapEditor({
     const reader = new FileReader();
     reader.onload = async (ev) => {
       const raw = ev.target?.result as string;
-      const url = await compressImageDataUrl(raw);
+      const url = await compressMapImageDataUrl(raw);
       const ratio = await getImageNaturalRatio(url).catch(() => undefined);
       const updated: Zone = {
         ...localZone,
@@ -1078,7 +1083,8 @@ export default function ZoneMapEditor({
                       disabled={zoomLevel <= MIN_ZOOM}
                       aria-label="Zoom out"
                     >
-                      −
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/icons/utility-outline/minus.svg" alt="" width={14} height={14} />
                     </button>
                     <span className={styles.zoomLevel}>{zoomLevel}</span>
                     <button
@@ -1089,7 +1095,8 @@ export default function ZoneMapEditor({
                       disabled={zoomLevel >= MAX_ZOOM}
                       aria-label="Zoom in"
                     >
-                      +
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/icons/utility-outline/plus.svg" alt="" width={14} height={14} />
                     </button>
                   </div>
                 </div>

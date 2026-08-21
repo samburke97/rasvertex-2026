@@ -95,11 +95,17 @@ export const DEFAULT_PRINT_ASSETS: ReportAssets = {
     teamCaroline: "/reports/proposal/assets/people-caro.jpg",
     projectMooloolaba: "/reports/proposal/assets/project-1.jpeg",
     projectAlexandraHeadland: "/reports/proposal/assets/project-2.jpeg",
+    projectRoofMembrane: "/reports/proposal/assets/nav-waterproofing.png",
     whyPrep1: "/reports/proposal/assets/nav-maintenance.png",
     whyPrep2: "/reports/proposal/assets/nav-painting.png",
     supportWashDown: "/reports/proposal/assets/nav-cleaning.png",
     supportInspection: "/reports/proposal/assets/nav-height.png",
     supportTouchUp: "/reports/proposal/assets/rope-access.png",
+    serviceCleaning: "/reports/proposal/assets/nav-cleaning.png",
+    serviceWindowCleaning: "/reports/proposal/assets/rope-access.png",
+    serviceHeightSafety: "/reports/proposal/assets/nav-height.png",
+    serviceWaterproofing: "/reports/proposal/assets/nav-waterproofing.png",
+    serviceMaintenance: "/reports/proposal/assets/nav-maintenance.png",
   },
 };
 

@@ -6,7 +6,10 @@ import styles from "../shared/ReportPage.module.css";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
 import SaveReportModal from "../shared/SaveReportModal";
-import { compressImageDataUrl } from "@/lib/reports/compressImage";
+import {
+  compressImageDataUrl,
+  compressMapImageDataUrl,
+} from "@/lib/reports/compressImage";
 import SavedBadge from "../shared/SavedBadge";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
@@ -103,8 +106,13 @@ export default function AnchorInspectionPage({
   // compressed at capture/upload time (see ZoneMapEditor.tsx) — re-compresses
   // whatever is currently in state right before it leaves the browser, so an
   // old draft with a multi-MB uncompressed map doesn't need a manual
-  // re-upload to export or save cleanly. Cheap when already small:
-  // compressImageDataUrl skips its own re-encode below ~400KB.
+  // re-upload to export or save cleanly. Cheap when already small: both
+  // compressors skip their own re-encode below ~150KB. Map images use the
+  // higher-quality compressMapImageDataUrl (not the photo-thumbnail
+  // compressImageDataUrl) — the map is a full-bleed background shown near
+  // page width, not a small grid cell, so re-running it through the
+  // thumbnail settings here would silently undo ZoneMapEditor's capture
+  // quality on every save/export.
   const compressReportForTransfer = useCallback(
     async (r: AnchorReportData): Promise<AnchorReportData> => ({
       ...r,
@@ -112,7 +120,7 @@ export default function AnchorInspectionPage({
         r.zones.map(async (zone) => ({
           ...zone,
           mapImageUrl: zone.mapImageUrl
-            ? await compressImageDataUrl(zone.mapImageUrl)
+            ? await compressMapImageDataUrl(zone.mapImageUrl)
             : zone.mapImageUrl,
         })),
       ),

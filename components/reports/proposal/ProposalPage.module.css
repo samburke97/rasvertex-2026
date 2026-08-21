@@ -107,6 +107,15 @@
   gap: 0.875rem;
 }
 
+.zoneCard {
+  border: 1px solid var(--border-color, #e2e2e2);
+  border-radius: 8px;
+  padding: 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
 .priceGroup + .priceGroup {
   margin-top: 0.875rem;
 }

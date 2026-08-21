@@ -44,7 +44,6 @@
 .imageWrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 8 / 5;
   border-radius: 8px;
   overflow: hidden;
   background: var(--bg-page, #f5f3ef);
@@ -54,9 +53,108 @@
 .image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   pointer-events: none;
+}
+
+/* ── Live map capture (pre-capture) ──────────────────────────────────────── */
+
+.addressBar {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.addressInput {
+  flex: 1;
+  height: 34px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border-color, #d8d8d8);
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.addressInput:focus {
+  border-color: var(--brand-primary, #900c40);
+}
+
+.addressLocateBtn {
+  height: 34px;
+  padding: 0 1rem;
+  border-radius: 7px;
+  border: 1px solid var(--border-color, #d8d8d8);
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.addressLocateBtn:hover:not(:disabled) {
+  border-color: var(--brand-primary, #900c40);
+}
+
+.addressLocateBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.statusBar {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.statusInfo {
+  font-size: 0.8125rem;
+  color: var(--text-muted, #888);
+}
+
+.statusInfo strong {
+  color: inherit;
+  font-weight: 700;
+}
+
+.statusError {
+  font-size: 0.8125rem;
+  color: #b91c1c;
+}
+
+.captureArea {
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-page, #f5f3ef);
+}
+
+.liveMapWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.liveMapContainer {
+  width: 100%;
+  height: 100%;
+}
+
+.previewWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 8 / 5;
+}
+
+.previewImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .pin {
@@ -66,7 +164,6 @@
   margin-left: -12px;
   margin-top: -12px;
   border-radius: 50%;
-  background: var(--brand-primary, #900c40);
   color: #fff;
   font-size: 0.75rem;
   font-weight: 700;
@@ -75,7 +172,14 @@
   justify-content: center;
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  cursor: default;
+  cursor: grab;
+  touch-action: none;
+}
+
+.pinDragging {
+  cursor: grabbing;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  z-index: 2;
 }
 
 .pointList {
@@ -95,7 +199,6 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--brand-primary, #900c40);
   color: #fff;
   font-size: 0.75rem;
   font-weight: 700;

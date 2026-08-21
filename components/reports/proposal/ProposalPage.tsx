@@ -21,12 +21,14 @@ import PhotoPickerModal, { type PhotosImportStatus } from "./PhotoPickerModal";
 import { compressImageDataUrl } from "@/lib/reports/compressImage";
 import {
   DEFAULT_PROPOSAL,
+  newAccessZone,
   pricingSubtotal,
   pricingGst,
   pricingTotal,
   type ProposalData,
   type ProposalSectionToggles,
   type ProposalFinding,
+  type ProposalAccessMap,
   type ProposalAccessStage,
   type ProposalPricingItem,
   type ReportPhoto,
@@ -409,10 +411,53 @@ export default function ProposalPage({ onBack }: Props) {
     }));
   }, []);
 
-  const updateAccessMap = useCallback((map: ProposalData["accessPlan"]["map"]) => {
+  // A site can have more than one building/zone — same idea as Anchor
+  // Inspection's zones. Each carries its own aerial capture and drop points;
+  // stages (the project timeline) stay shared across all of them.
+  const [expandedZoneId, setExpandedZoneId] = useState<string | null>(
+    DEFAULT_PROPOSAL.accessPlan.zones[0]?.id ?? null,
+  );
+
+  const addZone = useCallback(() => {
+    const zone = newAccessZone(`Building ${report.accessPlan.zones.length + 1}`);
     setReport((prev) => ({
       ...prev,
-      accessPlan: { ...prev.accessPlan, map },
+      accessPlan: { ...prev.accessPlan, zones: [...prev.accessPlan.zones, zone] },
+    }));
+    setExpandedZoneId(zone.id);
+  }, [report.accessPlan.zones.length]);
+
+  const renameZone = useCallback((id: string, name: string) => {
+    setReport((prev) => ({
+      ...prev,
+      accessPlan: {
+        ...prev.accessPlan,
+        zones: prev.accessPlan.zones.map((z) => (z.id === id ? { ...z, name } : z)),
+      },
+    }));
+  }, []);
+
+  const removeZone = useCallback(
+    (id: string) => {
+      setReport((prev) => ({
+        ...prev,
+        accessPlan: {
+          ...prev.accessPlan,
+          zones: prev.accessPlan.zones.filter((z) => z.id !== id),
+        },
+      }));
+      setExpandedZoneId((current) => (current === id ? null : current));
+    },
+    [],
+  );
+
+  const updateZoneMap = useCallback((id: string, map: ProposalAccessMap) => {
+    setReport((prev) => ({
+      ...prev,
+      accessPlan: {
+        ...prev.accessPlan,
+        zones: prev.accessPlan.zones.map((z) => (z.id === id ? { ...z, map } : z)),
+      },
     }));
   }, []);
 
@@ -742,13 +787,54 @@ export default function ProposalPage({ onBack }: Props) {
             </div>
             <Button variant="outline" size="sm" onClick={addStage}>Add stage</Button>
 
-            <div className={styles.sectionTitle}>Drop Points</div>
-            <AccessMapEditor
-              map={report.accessPlan.map}
-              stages={report.accessPlan.stages}
-              siteAddress={report.job.siteAddress}
-              onChange={updateAccessMap}
-            />
+            <div className={styles.sectionTitle}>Buildings &amp; Drop Points</div>
+            <div className={styles.list}>
+              {report.accessPlan.zones.map((zone) => {
+                const expanded = expandedZoneId === zone.id;
+                return (
+                  <div key={zone.id} className={styles.zoneCard}>
+                    <div className={styles.row}>
+                      <TextInput
+                        id={`zone-name-${zone.id}`}
+                        label="Building / Zone name"
+                        value={zone.name}
+                        onChange={(e) => renameZone(zone.id, e.target.value)}
+                        className={styles.rowGrow}
+                      />
+                      <div className={styles.rowActions}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setExpandedZoneId(expanded ? null : zone.id)}
+                        >
+                          {expanded ? "Collapse" : "Edit"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm(`Delete "${zone.name || "this building"}" and its drop points?`)) {
+                              removeZone(zone.id);
+                            }
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                    {expanded && (
+                      <AccessMapEditor
+                        map={zone.map}
+                        stages={report.accessPlan.stages}
+                        siteAddress={report.job.siteAddress}
+                        onChange={(map) => updateZoneMap(zone.id, map)}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <Button variant="outline" size="sm" onClick={addZone}>Add building</Button>
           </div>
 
           {/* ── Pricing ── */}
@@ -790,6 +876,18 @@ export default function ProposalPage({ onBack }: Props) {
               </div>
             ))}
             <Button variant="outline" size="sm" onClick={addPricingItem}>Add line item</Button>
+
+            <ToggleRow
+              label="Break into line items"
+              sub="Off shows one total per cost centre in the PDF; on lists every individual line item"
+              checked={report.pricing.showLineItems}
+              onChange={(v) =>
+                setReport((prev) => ({
+                  ...prev,
+                  pricing: { ...prev.pricing, showLineItems: v },
+                }))
+              }
+            />
 
             <div className={styles.pricingSummary}>
               <div className={styles.pricingSummaryRow}><span>Subtotal (ex GST)</span><span>{currency(subtotal)}</span></div>

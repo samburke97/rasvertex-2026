@@ -47,11 +47,17 @@ export interface ReportAssets {
     teamCaroline: string;
     projectMooloolaba: string;
     projectAlexandraHeadland: string;
+    projectRoofMembrane: string;
     whyPrep1: string;
     whyPrep2: string;
     supportWashDown: string;
     supportInspection: string;
     supportTouchUp: string;
+    serviceCleaning: string;
+    serviceWindowCleaning: string;
+    serviceHeightSafety: string;
+    serviceWaterproofing: string;
+    serviceMaintenance: string;
   };
 }
 
@@ -116,11 +122,23 @@ export function loadReportAssets(): ReportAssets {
       projectAlexandraHeadland: readPublicAsBase64(
         "reports/proposal/assets/project-2.jpeg",
       ),
+      projectRoofMembrane: readPublicAsBase64(
+        "reports/proposal/assets/nav-waterproofing.png",
+      ),
       whyPrep1: readPublicAsBase64("reports/proposal/assets/nav-maintenance.png"),
       whyPrep2: readPublicAsBase64("reports/proposal/assets/nav-painting.png"),
       supportWashDown: readPublicAsBase64("reports/proposal/assets/nav-cleaning.png"),
       supportInspection: readPublicAsBase64("reports/proposal/assets/nav-height.png"),
       supportTouchUp: readPublicAsBase64("reports/proposal/assets/rope-access.png"),
+      serviceCleaning: readPublicAsBase64("reports/proposal/assets/nav-cleaning.png"),
+      serviceWindowCleaning: readPublicAsBase64("reports/proposal/assets/rope-access.png"),
+      serviceHeightSafety: readPublicAsBase64("reports/proposal/assets/nav-height.png"),
+      serviceWaterproofing: readPublicAsBase64(
+        "reports/proposal/assets/nav-waterproofing.png",
+      ),
+      serviceMaintenance: readPublicAsBase64(
+        "reports/proposal/assets/nav-maintenance.png",
+      ),
     },
   };
   return _cachedAssets;

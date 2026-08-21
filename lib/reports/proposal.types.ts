@@ -70,12 +70,47 @@ export interface AccessDropPoint {
   stageId: string | null; // references ProposalAccessStage.id
 }
 
+// Pins are coloured by the stage they're tied to (first colour — the same
+// green as the "Ready to proceed" pill — for the first stage or any
+// unassigned point) so it's visually obvious which week a drop point
+// belongs to, both in the editor and the printed plan.
+export const STAGE_PIN_COLORS = ["#1f7a4d", "#2563a8", "#c7242e", "#b8860b", "#7c3aed"];
+
+export function colorForStage(
+  stageId: string | null,
+  stages: ProposalAccessStage[],
+): string {
+  if (!stageId) return STAGE_PIN_COLORS[0];
+  const idx = stages.findIndex((s) => s.id === stageId);
+  return idx === -1 ? STAGE_PIN_COLORS[0] : STAGE_PIN_COLORS[idx % STAGE_PIN_COLORS.length];
+}
+
 export interface ProposalAccessMap {
   imageUrl: string | null; // captured aerial (data URL) or uploaded image
+  imageRatio?: number; // native aspect ratio — see anchor.types.ts's mapImageRatio
   lat: number | null;
   lng: number | null;
   zoom: number;
   points: AccessDropPoint[];
+}
+
+// A site can be more than one physical building — same idea as Anchor
+// Inspection's zones, just named for buildings/areas instead of anchor
+// groupings. Each zone carries its own aerial capture and its own drop
+// points; stages (the project timeline) stay project-wide, shared across
+// every zone.
+export interface ProposalAccessZone {
+  id: string;
+  name: string;
+  map: ProposalAccessMap;
+}
+
+export function newAccessZone(name: string): ProposalAccessZone {
+  return {
+    id: Math.random().toString(36).slice(2, 10),
+    name,
+    map: { imageUrl: null, lat: null, lng: null, zoom: 20, points: [] },
+  };
 }
 
 export type PricingItemSource = "simpro" | "manual";
@@ -95,6 +130,10 @@ export interface ProposalPricing {
   items: ProposalPricingItem[];
   depositPct: number;
   progressTerms: string;
+  // Off by default — the printed pricing table shows one row per cost
+  // centre (its own total only). Switching this on expands every cost
+  // centre back out into its individual SimPRO line items.
+  showLineItems: boolean;
 }
 
 // Not every proposal needs every job-specific section (e.g. a job with no
@@ -113,7 +152,7 @@ export interface ProposalData {
   sections: ProposalSectionToggles;
   findings: ProposalFinding[]; // up to 6
   scope: ProposalScope;
-  accessPlan: { stages: ProposalAccessStage[]; map: ProposalAccessMap }; // stages default to 3 rows
+  accessPlan: { stages: ProposalAccessStage[]; zones: ProposalAccessZone[] }; // stages default to 3 rows
   pricing: ProposalPricing;
   photos: ReportPhoto[]; // imported from the quote/job's SimPRO attachments
 }
@@ -152,9 +191,9 @@ export const DEFAULT_PROPOSAL: ProposalData = {
   scope: { included: [], excluded: [] },
   accessPlan: {
     stages: DEFAULT_ACCESS_STAGES,
-    map: { imageUrl: null, lat: null, lng: null, zoom: 20, points: [] },
+    zones: [newAccessZone("Building 1")],
   },
-  pricing: { items: [], depositPct: 20, progressTerms: "Fortnightly against works completed." },
+  pricing: { items: [], depositPct: 20, progressTerms: "Fortnightly against works completed.", showLineItems: false },
   photos: [],
 };
 
