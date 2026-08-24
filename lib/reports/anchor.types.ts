@@ -9,8 +9,16 @@ export type AnchorType =
   | "access-hatch"
   | "wire-rope-sling"
   | "static-line"
+  | "walkway-line"
   | "harness"
   | "rope-access-anchor";
+
+// Anchor types whose pins connect to each other via a drawn line (see
+// AnchorPoint.connectsTo / computeLineEdges) rather than standing alone.
+export const LINE_TYPES: AnchorType[] = ["static-line", "walkway-line"];
+export function isLineType(type: AnchorType): boolean {
+  return LINE_TYPES.includes(type);
+}
 
 export type PassFail = "PASSED" | "FAILED" | "N/A";
 
@@ -37,11 +45,15 @@ export interface AnchorPoint {
   result: PassFail;
   x: number;
   y: number;
-  // Static-line only — ids of other static-line anchors this one has a
-  // cable segment to. Placing anchors back-to-back auto-connects them into
-  // a chain; closing a loop (or any non-sequential connection) adds an
-  // explicit edge on top of that. Each edge is stored once, on one side
-  // only — see computeStaticLineEdges.
+  // Line types only (LINE_TYPES) — ids of other same-type anchors this one
+  // has a line segment to. For static-line, placing anchors back-to-back
+  // auto-connects them into a chain; closing a loop (or any non-sequential
+  // connection) adds an explicit edge on top of that. Walkway-line pairs
+  // instead — each pin auto-connects to the previous one only if that
+  // previous pin isn't already part of a pair, so placement alternates
+  // start, end, start, end into independent 2-point segments rather than
+  // one continuous run. Each edge is stored once, on one side only — see
+  // computeLineEdges.
   connectsTo?: string[];
 }
 
@@ -110,6 +122,7 @@ export const ANCHOR_TYPE_COLOURS: Record<AnchorType, string> = {
   "access-hatch": "#ec4899",
   "wire-rope-sling": "#f97316",
   "static-line": "#6366f1",
+  "walkway-line": "#eab308",
   harness: "#14b8a6",
   "rope-access-anchor": "#8b5cf6",
 };
@@ -120,6 +133,7 @@ export const ANCHOR_TYPE_LABELS: Record<AnchorType, string> = {
   "access-hatch": "Access Hatch",
   "wire-rope-sling": "Wire Rope Sling",
   "static-line": "Static Line",
+  "walkway-line": "Walkway Line",
   harness: "Harness",
   "rope-access-anchor": "Rope Access Anchor",
 };
@@ -133,14 +147,16 @@ export const ANCHOR_TYPE_OPTIONS: { value: AnchorType; label: string }[] =
 // Only fall-arrest and rope-access anchors are load-rated fall-arrest
 // points (certified to a kN rating under AS/NZS 1891.4) — everything else
 // (ladder brackets, access hatches, wire rope slings, static lines,
-// harnesses) is access/connector hardware, not a rated anchor itself, and
-// shows "-" instead of a rating on the certification summary table.
+// walkway lines, harnesses) is access/connector hardware, not a rated
+// anchor itself, and shows "-" instead of a rating on the certification
+// summary table.
 export const ANCHOR_TYPE_IS_RATED: Record<AnchorType, boolean> = {
   "fall-arrest-anchor": true,
   "ladder-bracket": false,
   "access-hatch": false,
   "wire-rope-sling": false,
   "static-line": false,
+  "walkway-line": false,
   harness: false,
   "rope-access-anchor": true,
 };
@@ -198,39 +214,51 @@ export function generateId(): string {
 
 // A static line is a fixed safety cable run between anchor points — usually
 // a straight chain, but sometimes it loops back on itself, and there's no
-// way to know that from placement order alone. So connections are explicit
-// (AnchorPoint.connectsTo), not inferred: placing anchors back-to-back
-// auto-connects them (see ZoneMapEditor's placePin), and closing a loop or
-// making any other non-sequential connection adds one more explicit edge.
-// This just resolves those ids to actual points for rendering, dropping any
-// edge whose target no longer exists (deleted) or isn't static-line.
-export interface StaticLineEdge {
+// way to know that from placement order alone. A walkway line is simpler —
+// always a single start-to-end segment, never a chain or loop. Both store
+// connections explicitly (AnchorPoint.connectsTo), not inferred: placing
+// anchors back-to-back auto-connects them (see ZoneMapEditor's placePin),
+// and for static-line, closing a loop or making any other non-sequential
+// connection adds one more explicit edge. This just resolves those ids to
+// actual points for rendering, dropping any edge whose target no longer
+// exists (deleted) or doesn't match the source's type.
+export interface LineEdge {
   from: AnchorPoint;
   to: AnchorPoint;
 }
 
-export function computeStaticLineEdges(anchors: AnchorPoint[]): StaticLineEdge[] {
+function computeLineEdgesForType(
+  anchors: AnchorPoint[],
+  type: AnchorType,
+): LineEdge[] {
   const byId = new Map(anchors.map((a) => [a.id, a]));
-  const edges: StaticLineEdge[] = [];
+  const edges: LineEdge[] = [];
   for (const a of anchors) {
-    if (a.type !== "static-line" || !a.connectsTo) continue;
+    if (a.type !== type || !a.connectsTo) continue;
     for (const targetId of a.connectsTo) {
       const target = byId.get(targetId);
-      if (target && target.type === "static-line") {
+      if (target && target.type === type) {
         edges.push({ from: a, to: target });
       }
     }
   }
-  if (edges.length > 0) return edges;
+  if (edges.length > 0 || type !== "static-line") return edges;
 
-  // Legacy data placed before connectsTo existed has no edges stored at
-  // all — fall back to chaining static-line anchors in placement order so
-  // zones built before this feature don't end up with invisible lines.
-  const lineAnchors = anchors.filter((a) => a.type === "static-line");
+  // Legacy static-line data placed before connectsTo existed has no edges
+  // stored at all — fall back to chaining static-line anchors in placement
+  // order so zones built before this feature don't end up with invisible
+  // lines. Walkway-line has no such legacy data (it never existed without
+  // connectsTo), so it skips this fallback rather than risk chaining pins
+  // that were only ever meant to stand as independent pairs.
+  const lineAnchors = anchors.filter((a) => a.type === type);
   for (let i = 0; i < lineAnchors.length - 1; i++) {
     edges.push({ from: lineAnchors[i], to: lineAnchors[i + 1] });
   }
   return edges;
+}
+
+export function computeLineEdges(anchors: AnchorPoint[]): LineEdge[] {
+  return LINE_TYPES.flatMap((type) => computeLineEdgesForType(anchors, type));
 }
 
 export interface LegendGroup {
@@ -260,13 +288,13 @@ export function buildLegendGroups(
         label: ANCHOR_TYPE_LABELS[type],
         count: anchorsOfType.length,
         colour,
-        icon: type === "static-line" ? "static-line" : "dot",
+        icon: isLineType(type) ? "static-line" : "dot",
       });
       continue;
     }
     // Anchors placed before subtypes existed (or left unset) fall back to
     // one plain row for the parent type, same idea as the static-line
-    // legacy-data fallback in computeStaticLineEdges.
+    // legacy-data fallback in computeLineEdges.
     const noSubtypeCount = anchorsOfType.filter((a) => !a.subtype).length;
     if (noSubtypeCount > 0) {
       groups.push({

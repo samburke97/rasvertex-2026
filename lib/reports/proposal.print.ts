@@ -168,8 +168,7 @@ const TOC_ENTRIES: [string, string][] = [
   ["sec-16", "Acceptance"],
   ["sec-11", "Recent Projects"],
   ["sec-12", "Client Testimonial"],
-  ["sec-support", "Support & Maintenance Plans"],
-  ["sec-services", "Other Services"],
+  ["sec-services-support", "Other Services & Support Plans"],
   ["sec-14", "Who We Are"],
   ["sec-15", "Insurance & Compliance"],
   ["sec-appendix-a", "Appendix A — Terms & Conditions"],
@@ -185,6 +184,33 @@ const TOC_SECTION_TOGGLE: Record<string, keyof ProposalSectionToggles> = {
   "sec-07": "pricing",
 };
 
+// The printed PDF is two separate documents stitched together (see the
+// "Main export" section below) — front matter (Cover, Contents, Cover
+// Letter) carries no footer page number at all, and the numbered document
+// starts its own count fresh at 1 from "Your Project". This mirrors that
+// exactly rather than falling back to each section's own "sec-NN" id, which
+// no longer lines up with any real printed page number now that front
+// matter is unnumbered and the rest restarts from 1. Nominal — assumes no
+// section's content grows past one page (e.g. a very long Scope list still
+// fragments onto extra pages of its own; the numbers below don't shift to
+// account for that, same accepted approximation as before).
+const NUMBERED_PAGE: Record<string, number> = {
+  "sec-03": 1,
+  "sec-10": 1,
+  "sec-06": 2,
+  "sec-04": 3,
+  "sec-05": 4,
+  "sec-09": 5,
+  "sec-08": 5,
+  "sec-07": 6,
+  "sec-16": 7,
+  "sec-11": 8,
+  "sec-12": 9,
+  "sec-services-support": 10,
+  "sec-14": 11,
+  "sec-15": 11,
+};
+
 function buildTableOfContents(report: ProposalData): string {
   const entries = TOC_ENTRIES.filter(([id]) => {
     const toggle = TOC_SECTION_TOGGLE[id];
@@ -192,15 +218,13 @@ function buildTableOfContents(report: ProposalData): string {
   });
 
   const row = ([id, label]: [string, string]) => {
-    const num = id.startsWith("sec-cert-")
+    // sec-02 (Cover Letter) is front matter — no page number, same as
+    // Cover/Contents themselves and the two certificate pages.
+    const num = id.startsWith("sec-cert-") || id === "sec-02"
       ? ""
       : id === "sec-appendix-a"
         ? "A"
-        : id === "sec-support"
-          ? "13"
-          : id === "sec-services"
-            ? "14"
-            : id.replace("sec-", "");
+        : String(NUMBERED_PAGE[id] ?? "");
     return `
         <a href="#${id}" style="display:flex;align-items:baseline;gap:20px;padding:14px 0;text-decoration:none;color:${NAVY};break-inside:avoid;">
           <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1rem;color:rgba(1,25,85,0.35);width:28px;flex-shrink:0;">${esc(num)}</span>
@@ -212,15 +236,15 @@ function buildTableOfContents(report: ProposalData): string {
   const col2 = entries.slice(half).map(row).join("");
 
   return `
-  <section id="sec-toc" style="padding:96px 48px;break-before:page;">
-    <div style="max-width:1400px;margin:0 auto;">
+  <section id="sec-toc" style="padding:96px 48px 48px;break-before:page;min-height:100vh;box-sizing:border-box;display:flex;flex-direction:column;">
+    <div style="max-width:1400px;margin:0 auto;width:100%;flex:1;display:flex;flex-direction:column;">
       <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 40px;break-after:avoid;">Contents</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 48px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px;">
         <div>${col1}</div>
         <div>${col2}</div>
       </div>
-      <div style="overflow:hidden;margin-top:56px;">
-        <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:clamp(3rem,14vw,16rem);line-height:0.85;letter-spacing:-0.05em;color:#eef0f5;white-space:nowrap;display:block;margin-left:-0.05em;">HIGHER STANDARDS.</span>
+      <div style="overflow:hidden;margin-top:auto;">
+        <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:clamp(3.5rem,16vw,19rem);line-height:0.85;letter-spacing:-0.05em;color:#eef0f5;white-space:nowrap;display:block;margin-left:-0.05em;">HIGHER STANDARDS.</span>
       </div>
     </div>
   </section>`;
@@ -232,7 +256,7 @@ function buildCoverLetter(report: ProposalData, a: ReportAssets): string {
   const j = report.job;
   return `
   <section id="sec-02" style="padding:96px 48px;break-before:page;position:relative;">
-    <img src="${esc(a.linkBlue)}" alt="rasvertex.com.au" style="position:absolute;top:48px;right:48px;height:16px;width:auto;">
+    <img src="${esc(a.linkBlue)}" alt="rasvertex.com.au" style="position:absolute;top:48px;right:48px;height:19px;width:auto;">
     <div style="max-width:680px;margin:0 auto;">
       <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:0 0 40px;">${f(j.date, "[DD Month YYYY]")}</p>
       <p style="font-size:1.0625rem;margin:0 0 24px;">Dear ${f(j.contactName, "[Client First Name]")},</p>
@@ -324,8 +348,15 @@ function buildAccessPlan(report: ProposalData): string {
           <img src="${esc(zone.map.imageUrl!)}" alt="Site aerial with drop points" style="width:100%;height:100%;object-fit:contain;">
           ${zone.map.points
             .map(
+              // Centred via negative margin, not `transform:translate(-50%,-50%)` —
+              // Chromium's print/PDF rasteriser has a known bug where box-shadow on a
+              // border-radius:50% element stops being clipped to the circle once a
+              // transform is also present, rendering as a grey square behind the pin
+              // instead of a soft round shadow. Only shows up in the printed PDF, not
+              // on-screen — the live editor's own pin CSS already avoids transform for
+              // the same reason (AccessMapEditor.module.css's .pin uses margin-left/-top).
               (p, i) => `
-          <div style="position:absolute;left:${p.x}%;top:${p.y}%;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:${colorForStage(p.stageId, stages)};color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">${i + 1}</div>`,
+          <div style="position:absolute;left:calc(${p.x}% - 13px);top:calc(${p.y}% - 13px);width:26px;height:26px;border-radius:50%;background:${colorForStage(p.stageId, stages)};color:#fff;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">${i + 1}</div>`,
             )
             .join("")}
         </div>
@@ -433,31 +464,56 @@ function buildScope(report: ProposalData, a: ReportAssets): string {
     : ["Internal painting or works of any kind", "[Optional item, e.g. roof recoat], priced separately, see Item 2", "Structural or engineering-certified remedial work", "Permit & council fees, if required for this site"];
 
   const list = (items: string[], kind: "plus" | "cross", dim: boolean) => `
-      <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:18px;">
+      <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px;">
         ${items
           .map(
             (item) => `
         <li style="display:flex;gap:12px;align-items:flex-start;break-inside:avoid;">
           ${scopeIconHTML(kind, a)}
-          <span style="font-size:1rem;${dim ? `color:rgba(1,25,85,0.65);` : ""}">${esc(item)}</span>
+          <span style="font-size:1rem;line-height:1.5;${dim ? `color:rgba(1,25,85,0.65);` : ""}">${esc(item)}</span>
         </li>`,
           )
           .join("")}
       </ul>`;
 
+  // Floated (not grid) — CSS Grid renders as one atomic, non-fragmenting
+  // block in Chromium's print engine: a grid box taller than the page
+  // doesn't paginate, it overlaps the footer and continues past the page
+  // boundary uncontrolled (see the top-of-file note on Appendix/Findings
+  // for the same class of bug). Two independently floated cards paginate
+  // as ordinary block flow if either one ever runs long.
+  // No break-inside:avoid here (deliberately) — that forces the *whole*
+  // card to jump to the next page the moment it's taller than whatever
+  // space is left, which is what stranded page 1 with nothing but the
+  // title under it: a 16-item card doesn't fit in the leftover space below
+  // a heading, so the entire thing got pushed to page 2. Individual <li>s
+  // still carry their own break-inside:avoid (in `list()` above), so a
+  // single item's icon+text never splits — only the card as a whole is
+  // free to fragment, exactly like Appendix's floated columns.
+  const card = (title: string, items: string[], kind: "plus" | "cross", dim: boolean, last: boolean) => `
+      <div style="float:left;width:calc(50% - 5px);${last ? "" : "margin-right:10px;"}background:#ffffff;border:1px solid rgba(1,25,85,0.12);border-radius:20px;padding:36px 40px;">
+        <h3 style="font-size:1.375rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0 0 20px;">${title}</h3>
+        ${list(items, kind, dim)}
+      </div>`;
+
+  // No hard split — the full Included list renders in one card and, if
+  // it's taller than one page, fragments naturally onto as many further
+  // pages as it needs (real Chromium print layout deciding, not a guess).
+  // There's no "(cont.)" heading on those overflow pages: Chromium's print
+  // engine doesn't implement CSS Paged Media's running-header machinery
+  // (string-set etc.), so there's no reliable way to inject one at
+  // wherever content happens to break — same trade-off Appendix already
+  // makes elsewhere in this file. A tool built on the full Paged Media
+  // spec (e.g. Paged.js) could add that back; not worth pulling in for
+  // one page today.
   return `
   <section id="sec-05" style="padding:72px 48px 40px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
       <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 32px;break-after:avoid;">Project Scope: Inclusions &amp; Exclusions</h2>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(1,25,85,0.12);border-radius:24px;overflow:hidden;border:1px solid rgba(1,25,85,0.12);break-inside:avoid;">
-        <div style="background:#ffffff;padding:40px;">
-          <h3 style="font-size:1.375rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0 0 24px;">Included</h3>
-          ${list(included, "plus", false)}
-        </div>
-        <div style="background:#ffffff;padding:40px;">
-          <h3 style="font-size:1.375rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0 0 24px;">Excluded</h3>
-          ${list(excluded, "cross", true)}
-        </div>
+      <div>
+        ${card("Included", included, "plus", false, false)}
+        ${card("Excluded", excluded, "cross", true, true)}
+        <div style="clear:both;"></div>
       </div>
     </div>
   </section>`;
@@ -488,7 +544,7 @@ function buildWhyPrepDifferent(a: ReportAssets): string {
         ${cards
           .map(
             (c, i) => `
-        <div style="float:left;width:calc(50% - 20px);margin-right:${i === 0 ? "40px" : "0"};break-inside:avoid;">
+        <div style="float:left;width:calc(50% - 5px);margin-right:${i === 0 ? "10px" : "0"};break-inside:avoid;">
           <div style="width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:rgba(1,25,85,0.08);">
             <img src="${esc(c.img)}" alt="" style="width:100%;height:100%;object-fit:cover;">
           </div>
@@ -539,9 +595,9 @@ function buildProjectTeam(report: ProposalData, a: ReportAssets): string {
           </div>
         </div>
         <div style="float:left;width:calc((100% - 80px) / 3);break-inside:avoid;">
-          ${avatar("C", a.proposal.teamCaroline)}
+          ${avatar("CP")}
           <div style="margin-top:14px;">
-            <p style="font-weight:700;font-size:1.0625rem;margin:0;">Caroline</p>
+            <p style="font-weight:700;font-size:1.0625rem;margin:0;">Caroline Park</p>
             <p style="font-size:0.9375rem;color:rgba(1,25,85,0.55);margin:4px 0 0;">Client Support, in the office for job updates &amp; scheduling</p>
           </div>
         </div>
@@ -558,23 +614,21 @@ function buildWarranty(a: ReportAssets): string {
   return `
   <section id="sec-08" style="padding:0 48px 64px;">
     <div style="max-width:1400px;margin:0 auto;">
-      <div style="background:${PALE_BLUE};border-radius:24px;padding:40px;display:flex;align-items:center;gap:40px;flex-wrap:wrap;break-inside:avoid;">
-        <div style="flex-shrink:0;width:220px;display:flex;flex-direction:column;gap:20px;">
-          <div style="display:flex;align-items:flex-end;gap:10px;">
-            <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:clamp(4rem,6vw,5rem);letter-spacing:-0.04em;color:${NAVY};line-height:0.85;">8</span>
-            <span style="font-size:0.75rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.65);line-height:1.4;">Year<br>Warranty</span>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:10px;">
-            <h3 style="font-size:1rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">Backed by the best.</h3>
-            <div style="display:flex;align-items:center;gap:18px;">
-              <img src="${esc(a.associations.haymes)}" alt="Haymes Paint" style="height:22px;width:auto;object-fit:contain;">
-              <img src="${esc(a.proposal.dulux)}" alt="Dulux" style="height:18px;width:auto;object-fit:contain;">
-            </div>
-          </div>
+      <div style="background:${PALE_BLUE};border-radius:24px;padding:40px;display:flex;flex-direction:column;gap:24px;break-inside:avoid;">
+        <div style="display:flex;align-items:flex-end;gap:10px;">
+          <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:clamp(4rem,6vw,5rem);letter-spacing:-0.04em;color:${NAVY};line-height:0.85;">8</span>
+          <span style="font-size:0.75rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.65);line-height:1.4;">Year<br>Warranty</span>
         </div>
-        <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;flex-direction:column;gap:10px;">
           <h2 style="font-size:clamp(1.25rem,2vw,1.625rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0;break-after:avoid;">Standing by our team, and our products.</h2>
           <p style="font-size:0.875rem;color:rgba(1,25,85,0.65);margin:0;">Most workmanship warranties in this industry run two to five years, often with a catch: an ongoing paid maintenance contract. Every RAS-VERTEX repaint carries an 8-year written workmanship warranty as standard — no contract to sign, no conditions attached.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <h3 style="font-size:1rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">Backed by the best.</h3>
+          <div style="display:flex;align-items:center;gap:18px;">
+            <img src="${esc(a.associations.haymes)}" alt="Haymes Paint" style="height:22px;width:auto;object-fit:contain;">
+            <img src="${esc(a.proposal.dulux)}" alt="Dulux" style="height:18px;width:auto;object-fit:contain;">
+          </div>
         </div>
       </div>
     </div>
@@ -871,98 +925,80 @@ function buildTestimonial(): string {
   </section>`;
 }
 
-// ── Page 13: Support & Maintenance Plans ─────────────────────────────────────
+// ── Page 13: Other Services & Support Plans ──────────────────────────────────
+// Merged from two separate pages (Support & Maintenance Plans, Other
+// Services) into one two-column page — same content, half the paper.
 
-function buildSupportPlans(a: ReportAssets): string {
-  const cards = [
-    {
-      img: a.proposal.supportWashDown,
-      title: "Annual Wash-Down",
-      body: "Removes salt build-up and mould growth before it stains or degrades the coating system.",
-    },
-    {
-      img: a.proposal.supportInspection,
-      title: "Annual Inspection",
-      body: "A short report flagging anything worth watching, before it becomes a bigger job.",
-    },
-    {
-      img: a.proposal.supportTouchUp,
-      title: "Touch-Up Cover",
-      body: "Minor scuffs and marks addressed as they appear, at a pre-agreed call-out rate.",
-    },
-  ];
-  return `
-  <section id="sec-support" style="padding:96px 48px;background:rgba(1,25,85,0.03);break-before:page;">
-    <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 12px;break-after:avoid;">Support &amp; Maintenance Plans</h2>
-      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:700px;margin:0 0 48px;">Entirely optional, and they don't affect your 8-year warranty either way, whether you take one out or not.</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px;">
-        ${cards
-          .map(
-            (c) => `
-        <div style="display:flex;flex-direction:column;gap:16px;break-inside:avoid;">
-          <img src="${esc(c.img)}" alt="" style="width:100%;aspect-ratio:3/4;border-radius:16px;object-fit:cover;">
-          <div>
-            <p style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1.375rem;letter-spacing:0.05em;text-transform:uppercase;margin:0 0 8px;">${c.title}</p>
-            <p style="font-size:0.875rem;color:rgba(1,25,85,0.6);margin:0;">${c.body}</p>
-          </div>
-        </div>`,
-          )
-          .join("")}
-      </div>
-    </div>
-  </section>`;
-}
-
-// ── Page 14: Other Services ──────────────────────────────────────────────────
-
-function buildOtherServices(a: ReportAssets): string {
-  const cards = [
+function buildOtherServicesAndSupport(report: ProposalData, a: ReportAssets): string {
+  const j = report.job;
+  const otherServices = [
     {
       img: a.proposal.serviceCleaning,
       title: "External Cleaning",
-      body: "Full building washdowns that clear salt, mould and grime before they stain or degrade the coating system.",
+      body: "Full building washdowns that clear salt, mould and grime.",
     },
     {
       img: a.proposal.serviceWindowCleaning,
       title: "Window Cleaning",
-      body: "Streak-free glass and frames at height, on the same rope access rig, with no scaffold or blocked car parks.",
+      body: "Streak-free glass at height, on the same rope access rig.",
     },
     {
       img: a.proposal.serviceHeightSafety,
       title: "Height Safety",
-      body: "Anchor point install, inspection and certification to AS/NZS 1891, so your building stays access-compliant year round.",
+      body: "Anchor point install, inspection and certification to AS/NZS 1891.",
     },
     {
       img: a.proposal.serviceWaterproofing,
       title: "Waterproofing",
-      body: "Roof, box gutter and balcony membrane works that stop water ingress before it becomes a structural repair.",
+      body: "Roof, box gutter and balcony membrane works.",
     },
     {
       img: a.proposal.serviceMaintenance,
       title: "Maintenance",
-      body: "Scheduled inspections and touch-ups that catch small issues on site, before they turn into bigger jobs.",
+      body: "Scheduled inspections and touch-ups that catch small issues early.",
     },
   ];
-  return `
-  <section id="sec-services" style="padding:96px 48px;background:rgba(1,25,85,0.03);break-before:page;">
-    <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 12px;break-after:avoid;">Other Services</h2>
-      <p style="font-size:1.125rem;color:rgba(1,25,85,0.65);max-width:700px;margin:0 0 48px;">Beyond this scope, we cover the rest of your building's exterior maintenance under the one licence and the one project manager.</p>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:32px;">
-        ${cards
-          .map(
-            (c) => `
-        <div style="display:flex;flex-direction:column;gap:16px;break-inside:avoid;">
-          <img src="${esc(c.img)}" alt="" style="width:100%;aspect-ratio:4/3;border-radius:16px;object-fit:cover;">
+  const supportPlans = [
+    {
+      img: a.proposal.supportWashDown,
+      title: "Annual Wash-Down",
+      body: "Removes salt build-up and mould before it degrades the coating.",
+    },
+    {
+      img: a.proposal.serviceWaterproofing,
+      title: "Annual Inspection",
+      body: "A short report flagging anything worth watching.",
+    },
+    {
+      img: a.proposal.projectMooloolaba,
+      title: "Touch-Up Cover",
+      body: "Minor scuffs addressed as they appear, at a pre-agreed call-out rate.",
+    },
+  ];
+  const row = (c: { img: string; title: string; body: string }, last: boolean) => `
+        <div style="display:flex;gap:18px;align-items:flex-start;padding:16px 0;${last ? "" : "border-bottom:1px solid rgba(1,25,85,0.08);"}break-inside:avoid;">
+          <img src="${esc(c.img)}" alt="" style="width:72px;height:72px;border-radius:12px;object-fit:cover;flex-shrink:0;">
           <div>
-            <p style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1.375rem;letter-spacing:0.05em;text-transform:uppercase;margin:0 0 8px;">${c.title}</p>
-            <p style="font-size:0.9375rem;color:rgba(1,25,85,0.6);margin:0;">${c.body}</p>
+            <p style="font-weight:700;font-size:0.9375rem;margin:0 0 4px;">${c.title}</p>
+            <p style="font-size:0.8125rem;line-height:1.45;color:rgba(1,25,85,0.6);margin:0;">${c.body}</p>
           </div>
-        </div>`,
-          )
-          .join("")}
+        </div>`;
+  const card = (label: string, items: { img: string; title: string; body: string }[]) => `
+      <div style="background:#ffffff;border:1px solid rgba(1,25,85,0.12);border-radius:18px;padding:28px 32px;break-inside:avoid;">
+        <p style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1.0625rem;letter-spacing:0.06em;text-transform:uppercase;color:rgba(1,25,85,0.4);margin:0 0 10px;">${label}</p>
+        ${items.map((it, i) => row(it, i === items.length - 1)).join("")}
+      </div>`;
+  return `
+  <section id="sec-services-support" style="padding:80px 48px 56px;break-before:page;">
+    <div style="max-width:1400px;margin:0 auto;">
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 14px;break-after:avoid;">Other Services &amp; Support Plans</h2>
+      <p style="font-size:1.0625rem;color:rgba(1,25,85,0.65);max-width:700px;margin:0 0 32px;">Beyond this scope, we cover the rest of your building's exterior maintenance under the one licence and the one project manager.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;">
+        ${card("Other Services", otherServices)}
+        ${card("Support &amp; Maintenance Plans", supportPlans)}
       </div>
+      <p style="font-size:1rem;color:rgba(1,25,85,0.65);max-width:820px;margin:32px 0 0;">Combined, these form a tailored plan for ${f(j.buildingName, "[Building Name]")}, covering cleaning, safety, waterproofing and touch-ups on a single schedule with the one project manager.</p>
+      <p style="font-size:0.875rem;color:rgba(1,25,85,0.5);margin:10px 0 0;">Talk to us about setting up a maintenance plan, ask ${f(j.preparedByName, "[Project Manager Name]")} at your walkthrough or call <a href="tel:${COMPANY_PHONE_TEL}" style="font-weight:700;color:${NAVY};">${esc(COMPANY_PHONE)}</a>.</p>
     </div>
   </section>`;
 }
@@ -1148,45 +1184,24 @@ export function buildProposalFooterTemplate(assets: ReportAssets): string {
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
+//
+// Split into two independent HTML documents — front matter (Cover, Contents,
+// Cover Letter) and everything else — rendered as two separate PDFs and
+// stitched together (see export-proposal-pdf/route.ts). This is the only way
+// to get "no page numbers on the first three pages, numbering starts fresh
+// at 1 after Contents": Chromium's footerTemplate applies identically to
+// every physical page of a single page.pdf() call — there's no per-page
+// conditional and no way to offset its pageNumber/totalPages counters from
+// within the template (it doesn't run script). Rendering the numbered
+// sections as their own document makes Chromium's own counter naturally
+// start at 1 there, and the front-matter document simply never gets a
+// footerTemplate at all.
 
-export function buildProposalPrintHTML(
+function wrapProposalHTML(
   report: ProposalData,
-  assets?: ReportAssets,
+  a: ReportAssets,
+  body: string,
 ): string {
-  const a = assets ?? DEFAULT_PRINT_ASSETS;
-
-  const body = [
-    buildCover(report, a), // 1
-    buildTableOfContents(report), // 2
-    buildCoverLetter(report, a), // 3
-    buildYourProject(report), // 4a
-    buildProjectTeam(report, a), // 4b
-    report.sections.accessPlan ? buildAccessPlan(report) : "", // 5
-    report.sections.findings ? buildFindings(report) : "", // 6
-    report.sections.scope ? buildScope(report, a) : "", // 7
-    buildWhyPrepDifferent(a), // 8a
-    buildWarranty(a), // 8b
-    report.sections.pricing ? buildPricing(report) : "", // 9
-    buildAcceptance(report), // 10
-    buildRecentProjects(a), // 11
-    buildTestimonial(), // 12
-    buildSupportPlans(a), // 13
-    buildOtherServices(a), // 14
-    buildWhoWeAre(), // 15a
-    buildInsuranceCompliance(a), // 15b
-    buildAppendix(), // 16
-    buildCertificatePage(
-      "sec-cert-workcover",
-      a.proposal.workCoverCert,
-      "WorkCover Queensland Certificate of Currency",
-    ), // 15
-    buildCertificatePage(
-      "sec-cert-liability",
-      a.proposal.publicLiabilityCert,
-      "Public & Products Liability Certificate of Currency",
-    ), // 16
-  ].join("\n");
-
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1212,4 +1227,57 @@ ${body}
 </div>
 </body>
 </html>`;
+}
+
+// Cover, Contents, Cover Letter — no footerTemplate is ever passed for this
+// document, so these three pages carry no page number at all.
+export function buildProposalFrontMatterHTML(
+  report: ProposalData,
+  assets?: ReportAssets,
+): string {
+  const a = assets ?? DEFAULT_PRINT_ASSETS;
+  const body = [
+    buildCover(report, a),
+    buildTableOfContents(report),
+    buildCoverLetter(report, a),
+  ].join("\n");
+  return wrapProposalHTML(report, a, body);
+}
+
+// Everything from "Your Project" onward — rendered as its own document so
+// Chromium's pageNumber/totalPages counters start fresh at 1 here instead
+// of continuing from the front matter.
+export function buildProposalNumberedHTML(
+  report: ProposalData,
+  assets?: ReportAssets,
+): string {
+  const a = assets ?? DEFAULT_PRINT_ASSETS;
+  const body = [
+    buildYourProject(report), // 1a
+    buildProjectTeam(report, a), // 1b
+    report.sections.accessPlan ? buildAccessPlan(report) : "",
+    report.sections.findings ? buildFindings(report) : "",
+    report.sections.scope ? buildScope(report, a) : "",
+    buildWhyPrepDifferent(a),
+    buildWarranty(a),
+    report.sections.pricing ? buildPricing(report) : "",
+    buildAcceptance(report),
+    buildRecentProjects(a),
+    buildTestimonial(),
+    buildOtherServicesAndSupport(report, a),
+    buildWhoWeAre(),
+    buildInsuranceCompliance(a),
+    buildAppendix(),
+    buildCertificatePage(
+      "sec-cert-workcover",
+      a.proposal.workCoverCert,
+      "WorkCover Queensland Certificate of Currency",
+    ),
+    buildCertificatePage(
+      "sec-cert-liability",
+      a.proposal.publicLiabilityCert,
+      "Public & Products Liability Certificate of Currency",
+    ),
+  ].join("\n");
+  return wrapProposalHTML(report, a, body);
 }

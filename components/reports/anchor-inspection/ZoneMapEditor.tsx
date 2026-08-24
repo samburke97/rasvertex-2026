@@ -17,7 +17,7 @@ import {
   ANCHOR_TYPE_LABELS,
   ANCHOR_TYPE_OPTIONS,
   ANCHOR_TYPE_SUBTYPES,
-  computeStaticLineEdges,
+  computeLineEdges,
   generateId,
   DEFAULT_MAP_RATIO,
   type AnchorPoint,
@@ -54,6 +54,71 @@ const HAS_LIVE_MAPS = !!process.env.NEXT_PUBLIC_GOOGLE_MAPS_JS_KEY;
 // Static-fallback-only zoom bounds.
 const MIN_ZOOM = 17;
 const MAX_ZOOM = 21;
+
+// True once `id` already has a line segment on it — either as the source
+// (its own connectsTo is non-empty) or the target (something else's
+// connectsTo points at it). Used to cap walkway-line pins at one connection
+// each, since a walkway is always exactly two points, never a chain.
+function hasLineConnection(anchors: AnchorPoint[], id: string): boolean {
+  const anchor = anchors.find((a) => a.id === id);
+  if (anchor?.connectsTo?.length) return true;
+  return anchors.some((a) => a.connectsTo?.includes(id));
+}
+
+// Decides whether a newly-placed pin auto-connects to the last one placed.
+// Static-line always chains consecutive same-type pins together. Walkway-
+// line only chains if the previous pin isn't already paired — so placement
+// alternates start, end, start, end into independent 2-point segments
+// rather than one continuous run.
+function autoConnectTarget(
+  selectedType: AnchorType,
+  lastAnchor: AnchorPoint | undefined,
+  anchors: AnchorPoint[],
+): string[] | undefined {
+  if (!lastAnchor || lastAnchor.type !== selectedType) return undefined;
+  if (selectedType === "static-line") return [lastAnchor.id];
+  if (selectedType === "walkway-line" && !hasLineConnection(anchors, lastAnchor.id)) {
+    return [lastAnchor.id];
+  }
+  return undefined;
+}
+
+// Auto-generated labels this editor hands out — a plain "A{n}" for most
+// pins, or "A{n}-S"/"A{n}-E" for the two ends of one walkway-line segment
+// (they share a number since they're one asset, not two). Anything else is
+// a label a tech has manually retyped, and is left alone by both the
+// placement numbering below and the delete-renumbering in handlePinDelete.
+const AUTO_LABEL_RE = /^A\d+$/;
+const AUTO_WALKWAY_START_RE = /^A(\d+)-S$/;
+
+// The next placement's asset number. Walkway-line end pins reuse their
+// start pin's number rather than consuming a new one, so the count of
+// "numbers already used" is every anchor except walkway-line ends.
+function nextAssetNumber(anchors: AnchorPoint[]): number {
+  return (
+    anchors.filter((a) => !(a.type === "walkway-line" && a.label.endsWith("-E")))
+      .length + 1
+  );
+}
+
+// Label for a newly-placed pin. `isWalkwayEnd` is true exactly when this
+// placement auto-connected to the previous pin as a walkway-line pair (see
+// autoConnectTarget) — in that case the label reuses the start pin's
+// number with an "-E" suffix instead of taking the next number.
+function nextLabel(
+  selectedType: AnchorType,
+  anchors: AnchorPoint[],
+  lastAnchor: AnchorPoint | undefined,
+  isWalkwayEnd: boolean,
+): string {
+  if (isWalkwayEnd && lastAnchor) {
+    const match = lastAnchor.label.match(AUTO_WALKWAY_START_RE);
+    const n = match ? match[1] : String(nextAssetNumber(anchors) - 1);
+    return `A${n}-E`;
+  }
+  const n = nextAssetNumber(anchors);
+  return selectedType === "walkway-line" ? `A${n}-S` : `A${n}`;
+}
 
 function buildStaticUrl(opts: {
   address?: string;
@@ -444,6 +509,18 @@ export default function ZoneMapEditor({
 
       if (HAS_LIVE_MAPS && liveMapRef.current) {
         const liveMap = liveMapRef.current;
+        // Force the map to re-measure its container immediately before
+        // reading bounds. Google Maps doesn't reliably keep its internal
+        // viewport in sync with the container's actual current size —
+        // if anything shifted it since the map was constructed (a layout
+        // pass settling, a parent resizing), getBounds() below would
+        // silently reflect the map's last-known size rather than what's
+        // really on screen, capturing more (or less) than what was framed.
+        // 'resize' can re-anchor the map to the wrong point, so the center
+        // is pinned back explicitly right after.
+        const preResizeCenter = liveMap.getCenter();
+        google.maps.event.trigger(liveMap, "resize");
+        if (preResizeCenter) liveMap.setCenter(preResizeCenter);
         const center = liveMap.getCenter();
         const bounds = liveMap.getBounds();
         if (!center || !bounds) throw new Error("Map not ready");
@@ -548,23 +625,20 @@ export default function ZoneMapEditor({
   const placePin = useCallback(
     (x: number, y: number) => {
       const lastAnchor = localZone.anchors[localZone.anchors.length - 1];
+      const connectsTo = autoConnectTarget(selectedType, lastAnchor, localZone.anchors);
+      const isWalkwayEnd = selectedType === "walkway-line" && !!connectsTo;
       const anchor: AnchorPoint = {
         id: generateId(),
         x,
         y,
-        label: `A${localZone.anchors.length + 1}`,
+        label: nextLabel(selectedType, localZone.anchors, lastAnchor, isWalkwayEnd),
         type: selectedType,
         subtype: ANCHOR_TYPE_SUBTYPES[selectedType] ? selectedSubtype : undefined,
         commissionDate: "",
         inspectionDate: defaultInspectionDate,
         nextInspection: defaultNextInspection,
         result: "PASSED",
-        // Placing static-line anchors back-to-back auto-connects them into
-        // a chain — closing a loop later (Close Loop) adds an extra edge.
-        connectsTo:
-          selectedType === "static-line" && lastAnchor?.type === "static-line"
-            ? [lastAnchor.id]
-            : undefined,
+        connectsTo,
       };
       const updated: Zone = {
         ...localZone,
@@ -615,26 +689,55 @@ export default function ZoneMapEditor({
   };
 
   // Deleting a pin closes the gap in the numbering (A4 becomes A3, etc.) so
-  // the register never skips a number — but only for labels still on the
-  // default "A{n}" pattern. A label a tech has manually retyped to
-  // something else is left alone rather than silently overwritten.
-  const AUTO_LABEL_RE = /^A\d+$/;
+  // the register never skips a number — but only for labels still on an
+  // auto-generated pattern (AUTO_LABEL_RE / AUTO_WALKWAY_START_RE). A label
+  // a tech has manually retyped to something else is left alone rather than
+  // silently overwritten. If deleting one end of a walkway-line pair
+  // orphans the other, the survivor drops its "-S"/"-E" suffix and rejoins
+  // the plain numbering, since it's no longer part of a pair.
   const handlePinDelete = (anchorId: string) => {
     if (connectingFrom === anchorId) setConnectingFrom(null);
-    let seq = 0;
-    const anchors = localZone.anchors
+
+    const cleaned = localZone.anchors
       .filter((a) => a.id !== anchorId)
       .map((a) => {
-        // Drop any static-line edge pointing at the pin being deleted.
+        // Drop any line edge pointing at the pin being deleted.
         const connectsTo = a.connectsTo?.filter((id) => id !== anchorId);
-        const withCleanEdges =
-          connectsTo?.length !== a.connectsTo?.length
-            ? { ...a, connectsTo }
-            : a;
-        if (!AUTO_LABEL_RE.test(withCleanEdges.label)) return withCleanEdges;
-        seq += 1;
-        return { ...withCleanEdges, label: `A${seq}` };
+        return connectsTo?.length !== a.connectsTo?.length
+          ? { ...a, connectsTo }
+          : a;
       });
+
+    const byId = new Map(cleaned.map((a) => [a.id, a]));
+    const isPairedEnd = (a: AnchorPoint) =>
+      a.type === "walkway-line" &&
+      !!a.connectsTo?.length &&
+      byId.get(a.connectsTo[0])?.type === "walkway-line";
+    const pairedStartIds = new Set(
+      cleaned.filter(isPairedEnd).map((a) => a.connectsTo![0]),
+    );
+    const isPairedStart = (a: AnchorPoint) =>
+      a.type === "walkway-line" && pairedStartIds.has(a.id);
+
+    let seq = 0;
+    const startNumbers = new Map<string, string>();
+    const anchors = cleaned.map((a) => {
+      if (isPairedEnd(a)) {
+        const n = startNumbers.get(a.connectsTo![0]);
+        if (!AUTO_WALKWAY_START_RE.test(a.label) || n === undefined) return a;
+        return { ...a, label: `A${n}-E` };
+      }
+      if (isPairedStart(a)) {
+        if (!AUTO_WALKWAY_START_RE.test(a.label)) return a;
+        seq += 1;
+        startNumbers.set(a.id, String(seq));
+        return { ...a, label: `A${seq}-S` };
+      }
+      if (!AUTO_LABEL_RE.test(a.label)) return a;
+      seq += 1;
+      return { ...a, label: `A${seq}` };
+    });
+
     const updated: Zone = { ...localZone, anchors };
     pushHistory(localZone);
     setLocalZone(updated);
@@ -753,7 +856,7 @@ export default function ZoneMapEditor({
     ...new Set(localZone.anchors.map((a) => a.type)),
   ] as AnchorType[];
 
-  const staticLineEdges = computeStaticLineEdges(localZone.anchors);
+  const lineEdges = computeLineEdges(localZone.anchors);
   const lastAnchor = localZone.anchors[localZone.anchors.length - 1];
   const canCloseLoop =
     selectedType === "static-line" &&
@@ -1139,24 +1242,24 @@ export default function ZoneMapEditor({
                   draggable={false}
                 />
 
-                {/* Static line cable path — every explicit connection
-                    between static-line pins, chain or loop alike. Behind
-                    the pins, ignores pointer events so it never blocks
+                {/* Line-type cable paths — every explicit connection
+                    between static-line or walkway-line pins. Behind the
+                    pins, ignores pointer events so it never blocks
                     placing/dragging. */}
-                {staticLineEdges.length > 0 && (
+                {lineEdges.length > 0 && (
                   <svg
                     className={styles.staticLineOverlay}
                     viewBox="0 0 100 100"
                     preserveAspectRatio="none"
                   >
-                    {staticLineEdges.map((edge, i) => (
+                    {lineEdges.map((edge, i) => (
                       <line
                         key={i}
                         x1={edge.from.x}
                         y1={edge.from.y}
                         x2={edge.to.x}
                         y2={edge.to.y}
-                        stroke={ANCHOR_TYPE_COLOURS["static-line"]}
+                        stroke={ANCHOR_TYPE_COLOURS[edge.from.type]}
                         strokeWidth={0.5}
                         vectorEffect="non-scaling-stroke"
                         strokeLinecap="round"

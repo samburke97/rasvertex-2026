@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { PDFDocument } from "pdf-lib";
 import {
-  buildProposalPrintHTML,
+  buildProposalFrontMatterHTML,
+  buildProposalNumberedHTML,
   buildProposalFooterTemplate,
 } from "@/lib/reports/proposal.print";
 import {
@@ -9,6 +11,23 @@ import {
   pdfDownloadResponse,
 } from "@/lib/server/pdf-utils";
 import type { ProposalData } from "@/lib/reports/proposal.types";
+
+// Front matter (Cover, Contents, Cover Letter) and the numbered body are
+// rendered as two separate PDFs — Puppeteer's footerTemplate has no way to
+// suppress itself on specific pages or offset its own page-number counter,
+// so getting "no numbers on the first three pages, numbering restarts at 1
+// after Contents" means giving the numbered section its own document (its
+// own page.pdf() call naturally starts counting at 1) and stitching the two
+// together here.
+async function mergePDFs(buffers: Buffer[]): Promise<Buffer> {
+  const merged = await PDFDocument.create();
+  for (const buf of buffers) {
+    const doc = await PDFDocument.load(buf);
+    const pages = await merged.copyPages(doc, doc.getPageIndices());
+    pages.forEach((p) => merged.addPage(p));
+  }
+  return Buffer.from(await merged.save());
+}
 
 export async function POST(request: NextRequest) {
   let body: { filename?: string; report?: ProposalData };
@@ -25,14 +44,23 @@ export async function POST(request: NextRequest) {
 
   try {
     const assets = loadReportAssets();
-    const html = buildProposalPrintHTML(report, assets);
-    const buffer = await renderPDF(html, {
-      // Symmetric top/bottom so every page has the same breathing room
-      // above its first line as below its last, whether or not that page
-      // happens to start mid-flow after a natural page break.
-      margin: { top: "80px", right: "0", bottom: "80px", left: "0" },
-      footerTemplate: buildProposalFooterTemplate(assets),
-    });
+    // Same top/bottom margin on both renders so every page — front matter
+    // or numbered — has identical breathing room and the two documents
+    // line up visually once merged.
+    const margin = { top: "80px", right: "0", bottom: "80px", left: "0" };
+
+    const frontMatterHtml = buildProposalFrontMatterHTML(report, assets);
+    const numberedHtml = buildProposalNumberedHTML(report, assets);
+
+    const [frontMatterPdf, numberedPdf] = await Promise.all([
+      renderPDF(frontMatterHtml, { margin }),
+      renderPDF(numberedHtml, {
+        margin,
+        footerTemplate: buildProposalFooterTemplate(assets),
+      }),
+    ]);
+
+    const buffer = await mergePDFs([frontMatterPdf, numberedPdf]);
     return pdfDownloadResponse(buffer, filename);
   } catch (err) {
     console.error("[ExportProposalPDF]", err);

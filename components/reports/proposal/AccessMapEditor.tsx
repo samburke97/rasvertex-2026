@@ -237,6 +237,13 @@ export default function AccessMapEditor({ map, stages, siteAddress, onChange }: 
 
       if (HAS_LIVE_MAPS && liveMapRef.current) {
         const liveMap = liveMapRef.current;
+        // Force the map to re-measure its container immediately before
+        // reading bounds — see ZoneMapEditor's handleCapture for why.
+        // 'resize' can re-anchor the map to the wrong point, so the center
+        // is pinned back explicitly right after.
+        const preResizeCenter = liveMap.getCenter();
+        google.maps.event.trigger(liveMap, "resize");
+        if (preResizeCenter) liveMap.setCenter(preResizeCenter);
         const center = liveMap.getCenter();
         const bounds = liveMap.getBounds();
         if (!center || !bounds) throw new Error("Map not ready");

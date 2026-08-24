@@ -10,7 +10,7 @@ import MapLegend from "../MapLegend";
 import {
   ANCHOR_TYPE_COLOURS,
   anchorTypeDisplayLabel,
-  computeStaticLineEdges,
+  computeLineEdges,
   DEFAULT_MAP_RATIO,
   type Zone,
 } from "@/lib/reports/anchor.types";
@@ -47,7 +47,7 @@ export default function ZoneSummarySection({
   const passed = zone.anchors.filter((a) => a.result === "PASSED").length;
   const failed = zone.anchors.filter((a) => a.result === "FAILED").length;
   const activeTypes = [...new Set(zone.anchors.map((a) => a.type))];
-  const staticLineEdges = computeStaticLineEdges(zone.anchors);
+  const lineEdges = computeLineEdges(zone.anchors);
 
   return (
     <div className={styles.page}>
@@ -77,20 +77,20 @@ export default function ZoneSummarySection({
                   alt={zone.name}
                   className={styles.mapImg}
                 />
-                {staticLineEdges.length > 0 && (
+                {lineEdges.length > 0 && (
                   <svg
                     className={styles.lineOverlay}
                     viewBox="0 0 100 100"
                     preserveAspectRatio="none"
                   >
-                    {staticLineEdges.map((edge, i) => (
+                    {lineEdges.map((edge, i) => (
                       <line
                         key={i}
                         x1={edge.from.x}
                         y1={edge.from.y}
                         x2={edge.to.x}
                         y2={edge.to.y}
-                        stroke={ANCHOR_TYPE_COLOURS["static-line"]}
+                        stroke={ANCHOR_TYPE_COLOURS[edge.from.type]}
                         strokeWidth="1.5"
                         vectorEffect="non-scaling-stroke"
                       />

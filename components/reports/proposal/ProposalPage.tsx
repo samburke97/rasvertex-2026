@@ -7,7 +7,7 @@
 // scope, access plan and pricing, and exports straight to PDF via
 // proposal.print.ts.
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import pageStyles from "../shared/ReportPage.module.css";
 import styles from "./ProposalPage.module.css";
 import Button from "@/components/ui/Button";
@@ -45,6 +45,11 @@ type ImportStatus =
   | { phase: "error"; message: string }
   | { phase: "done" };
 
+type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+const AUTOSAVE_DEBOUNCE_MS = 1500;
+const AUTOSAVE_RETRY_MS = 5000;
+
 function uid(): string {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -65,16 +70,25 @@ export default function ProposalPage({ onBack }: Props) {
   const [importStatus, setImportStatus] = useState<ImportStatus>({
     phase: "idle",
   });
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Import from SimPRO quote ───────────────────────────────────────────
+  // ── Import from SimPRO quote — resumes an existing draft if one exists ──
   const handleImport = useCallback(async (quoteIdInput: string) => {
     const quoteId = quoteIdInput.trim();
     if (!quoteId) return;
 
     setImportStatus({ phase: "fetching-job" });
+    setSaveStatus("idle");
 
-    // Header details and pricing don't depend on each other — fire both now.
+    // Quote header, pricing, and any in-progress draft don't depend on each
+    // other — fire all three now. Checking for a draft here (not just on
+    // page load) is what makes typing the same quote number again resume
+    // the rep's own work instead of silently re-importing a blank slate.
     const pricingPromise = fetch(`/api/simpro/quotes/${quoteId}/pricing`).catch(
+      () => null,
+    );
+    const draftPromise = fetch(`/api/proposal-reports/${quoteId}`).catch(
       () => null,
     );
 
@@ -86,21 +100,42 @@ export default function ProposalPage({ onBack }: Props) {
       }
       const quote: EnrichedQuote = await res.json();
 
-      setReport((prev) => ({
-        ...prev,
-        job: {
-          ...prev.job,
-          buildingName: quote.siteName || prev.job.buildingName,
-          siteAddress: quote.siteAddress || prev.job.siteAddress,
-          clientName: quote.clientName || prev.job.clientName,
-          contactName: quote.contactName || prev.job.contactName,
-          preparedByName: quote.salespersonName || prev.job.preparedByName,
-          preparedByEmail: quote.salespersonName
-            ? deriveEmailFromName(quote.salespersonName)
-            : prev.job.preparedByEmail,
-          quoteId,
-        },
-      }));
+      const draftRes = await draftPromise;
+      const draft: ProposalData | null = draftRes?.ok
+        ? ((await draftRes.json()) as { report: ProposalData }).report
+        : null;
+
+      // Live quote fields win over the draft's (a rep might have fixed the
+      // client name in SimPRO since this draft was last saved), but fall
+      // back to whatever the draft had if the quote is missing something.
+      const jobFields = {
+        buildingName: quote.siteName || draft?.job.buildingName || "",
+        siteAddress: quote.siteAddress || draft?.job.siteAddress || "",
+        clientName: quote.clientName || draft?.job.clientName || "",
+        contactName: quote.contactName || draft?.job.contactName || "",
+        preparedByName:
+          quote.salespersonName || draft?.job.preparedByName || "",
+        preparedByEmail: quote.salespersonName
+          ? deriveEmailFromName(quote.salespersonName)
+          : draft?.job.preparedByEmail || "",
+        quoteId,
+      };
+
+      if (draft) {
+        // Backfills fields added after this draft was first saved — an old
+        // draft's JSON simply doesn't have them, so without this a resumed
+        // draft crashes on whatever new field the rest of the page assumes
+        // exists. Findings/scope/access plan/pricing edits/photos are the
+        // rep's own work — kept from the draft; only the job header
+        // refreshes from the live quote.
+        setReport({
+          ...DEFAULT_PROPOSAL,
+          ...draft,
+          job: { ...DEFAULT_PROPOSAL.job, ...draft.job, ...jobFields },
+        });
+      } else {
+        setReport((prev) => ({ ...prev, job: { ...prev.job, ...jobFields } }));
+      }
     } catch (err) {
       setImportStatus({
         phase: "error",
@@ -139,6 +174,37 @@ export default function ProposalPage({ onBack }: Props) {
 
     setImportStatus({ phase: "done" });
   }, []);
+
+  // ── Autosave the draft, debounced, whenever the report changes ───────────
+  // Keyed on the quote number (the proposal's natural id, editable directly
+  // via the "SimPRO quote #" field) rather than a separate loaded-job flag —
+  // it's the single source of truth already, so there's nothing to keep in
+  // sync. Retries at a longer interval after a failed save.
+  useEffect(() => {
+    const quoteId = report.job.quoteId.trim();
+    if (!quoteId) return;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+
+    const delay = saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
+    autosaveTimer.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      try {
+        const res = await fetch(`/api/proposal-reports/${quoteId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(report),
+        });
+        setSaveStatus(res.ok ? "saved" : "error");
+      } catch {
+        setSaveStatus("error");
+      }
+    }, delay);
+
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report]);
 
   const updateJob = useCallback(
     (patch: Partial<ProposalData["job"]>) => {
@@ -585,6 +651,19 @@ export default function ProposalPage({ onBack }: Props) {
             importStatus={importStatus}
             placeholder="SimPRO quote number"
           />
+          {report.job.quoteId.trim() && saveStatus !== "idle" && (
+            <span
+              className={`${pageStyles.draftStatus} ${
+                saveStatus === "error" ? pageStyles.draftStatusError : ""
+              }`}
+            >
+              {saveStatus === "saving"
+                ? "Saving draft…"
+                : saveStatus === "error"
+                  ? "Draft save failed — retrying"
+                  : "Draft saved"}
+            </span>
+          )}
           <Button
             variant="primary"
             size="sm"
@@ -609,10 +688,12 @@ export default function ProposalPage({ onBack }: Props) {
             </div>
           )}
 
-          <div className={styles.notice}>
-            Save-to-job isn&apos;t wired up yet — export a PDF once the
-            details below are filled in.
-          </div>
+          {!report.job.quoteId.trim() && (
+            <div className={styles.notice}>
+              Enter a SimPRO quote number above to save a draft as you
+              go — until then this only exists in the browser.
+            </div>
+          )}
 
           {/* ── Site photo ── */}
           <div className={styles.section}>

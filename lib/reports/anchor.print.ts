@@ -11,7 +11,7 @@ import {
   ANCHOR_TYPE_LABELS,
   ANCHOR_TYPE_COLOURS,
   ANCHOR_TYPE_IS_RATED,
-  computeStaticLineEdges,
+  computeLineEdges,
   buildLegendGroups,
   anchorTypeDisplayLabel,
   DEFAULT_MAP_RATIO,
@@ -831,17 +831,17 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
     })
     .join("");
 
-  // Static line cable path — every explicit connection between static-line
-  // pins (chain or loop alike), drawn behind the pins. See
-  // computeStaticLineEdges for how connections are determined.
-  const staticLineEdges = computeStaticLineEdges(zone.anchors);
+  // Line-type cable paths — every explicit connection between static-line
+  // or walkway-line pins, drawn behind the pins. See computeLineEdges for
+  // how connections are determined.
+  const lineEdges = computeLineEdges(zone.anchors);
   const staticLineSvg =
-    staticLineEdges.length > 0
+    lineEdges.length > 0
       ? `<svg class="zone-line-overlay" viewBox="0 0 100 100" preserveAspectRatio="none">
-          ${staticLineEdges
+          ${lineEdges
             .map(
               (edge) =>
-                `<line x1="${edge.from.x}" y1="${edge.from.y}" x2="${edge.to.x}" y2="${edge.to.y}" stroke="${ANCHOR_TYPE_COLOURS["static-line"]}" stroke-width="0.5" vector-effect="non-scaling-stroke" stroke-linecap="round" />`,
+                `<line x1="${edge.from.x}" y1="${edge.from.y}" x2="${edge.to.x}" y2="${edge.to.y}" stroke="${ANCHOR_TYPE_COLOURS[edge.from.type]}" stroke-width="0.5" vector-effect="non-scaling-stroke" stroke-linecap="round" />`,
             )
             .join("")}
         </svg>`
