@@ -280,17 +280,37 @@ export async function renderPDF(
 
 // ── PDF download response ─────────────────────────────────────────────────────
 
+// Vercel Functions cap both request AND response bodies at 4.5MB for a
+// buffered (non-streaming) response — same limit that forced photos onto
+// Blob storage, just on the way out instead of the way in. A photo-heavy
+// report's finished PDF (compressed photos re-embedded at full count) can
+// easily clear that on its own even though the export request going in is
+// now tiny. Streaming the response is Vercel's own documented bypass — see
+// https://vercel.com/kb/guide/how-to-bypass-vercel-body-size-limit-serverless-functions.
+// Chunked rather than one big enqueue() so it's genuinely incremental, not
+// just technically a stream wrapping one buffered blob.
+const STREAM_CHUNK_BYTES = 1_000_000;
+
 export function pdfDownloadResponse(
   buffer: Buffer,
   filename: string,
 ): Response {
   const clean = filename.trim().replace(/\.pdf$/i, "") + ".pdf";
-  return new Response(buffer, {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (let offset = 0; offset < buffer.length; offset += STREAM_CHUNK_BYTES) {
+        controller.enqueue(
+          new Uint8Array(buffer.subarray(offset, offset + STREAM_CHUNK_BYTES)),
+        );
+      }
+      controller.close();
+    },
+  });
+  return new Response(stream, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${clean}"`,
-      "Content-Length": buffer.length.toString(),
     },
   });
 }

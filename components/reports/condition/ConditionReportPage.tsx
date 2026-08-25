@@ -14,6 +14,7 @@ import SaveReportModal from "../shared/SaveReportModal";
 import SavedBadge from "../shared/SavedBadge";
 import { compressImageDataUrl } from "@/lib/reports/compressImage";
 import { uploadReportPhoto } from "@/lib/reports/uploadPhoto";
+import { createUploadQueue } from "@/lib/reports/uploadQueue";
 import {
   mapJobToReportDetails,
   filterPhotosByDateRange,
@@ -174,6 +175,15 @@ export default function ConditionReportPage({
           const decoder = new TextDecoder();
           let buffer = "";
 
+          // Photos render the instant they're compressed (same as before) —
+          // the Blob upload runs in the background, several at a time, and
+          // swaps the photo's url from data: to the Blob URL once its own
+          // upload finishes. "done" waits for every queued upload to settle
+          // before flipping importStatus, so autosave (blocked until then)
+          // never persists a photo still sitting on its big base64 string.
+          const scheduleUpload = createUploadQueue(6);
+          const pendingUploads: Promise<void>[] = [];
+
           while (true) {
             if (isStale()) {
               reader.cancel();
@@ -209,24 +219,11 @@ export default function ConditionReportPage({
                   reader.cancel();
                   return;
                 }
-                // Upload to Blob storage rather than keeping the base64
-                // string in report state — see uploadPhoto.ts. Falls back
-                // to the compressed data URL if the upload fails, so a
-                // flaky upload never loses the photo, just risks the
-                // payload-size problem this exists to avoid.
                 const photoId = String(payload.id);
-                const blobUrl = await uploadReportPhoto(
-                  compressedUrl,
-                  `condition-reports/${jobNumber}/${photoId}.jpg`,
-                );
-                if (isStale()) {
-                  reader.cancel();
-                  return;
-                }
                 const photo: ReportPhoto = {
                   id: photoId,
                   name: String(payload.name),
-                  url: blobUrl,
+                  url: compressedUrl,
                   size: Number(payload.size) || 0,
                   dateAdded: payload.dateAdded
                     ? String(payload.dateAdded)
@@ -236,6 +233,30 @@ export default function ConditionReportPage({
                   ...prev,
                   photos: [...prev.photos, photo],
                 }));
+
+                // Upload to Blob storage in the background — see
+                // uploadPhoto.ts for why. Falls back to the compressed data
+                // URL if the upload fails, so a flaky upload never loses the
+                // photo, just risks the payload-size problem this exists to
+                // avoid. Queued rather than awaited here so photos keep
+                // appearing on screen at full speed while uploads catch up
+                // behind them.
+                pendingUploads.push(
+                  scheduleUpload(() =>
+                    uploadReportPhoto(
+                      compressedUrl,
+                      `condition-reports/${jobNumber}/${photoId}.jpg`,
+                    ),
+                  ).then((blobUrl) => {
+                    if (isStale()) return;
+                    setReport((prev) => ({
+                      ...prev,
+                      photos: prev.photos.map((p) =>
+                        p.id === photoId ? { ...p, url: blobUrl } : p,
+                      ),
+                    }));
+                  }),
+                );
               } else if (event === "progress") {
                 if (!isStale())
                   setImportStatus({
@@ -244,6 +265,7 @@ export default function ConditionReportPage({
                     total: Number(payload.total) || 0,
                   });
               } else if (event === "done") {
+                await Promise.all(pendingUploads);
                 if (!isStale()) setImportStatus({ phase: "done" });
               } else if (event === "error") {
                 if (!isStale())
