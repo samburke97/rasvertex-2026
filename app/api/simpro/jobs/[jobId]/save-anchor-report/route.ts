@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildAnchorPrintHTML } from "@/lib/reports/anchor.print";
 import { loadReportAssets, renderPDF } from "@/lib/server/pdf-utils";
 import { saveReportToDestinations, getSimproConfig } from "@/lib/server/simpro";
+import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveReportImages";
 import type { AnchorReportData } from "@/lib/reports/anchor.types";
 
 export async function POST(
@@ -66,10 +67,30 @@ export async function POST(
 
   const cleanFilename = filename.trim().replace(/\.pdf$/i, "") + ".pdf";
 
-  // Build + render PDF once, then fan out to whichever destinations were requested.
+  // Same resolve-and-resize step as export-anchor-pdf's route — see
+  // resolveReportImages.ts — otherwise this path would still hand
+  // Puppeteer raw Blob URLs to fetch one by one, and full-size photos to
+  // embed, undoing both the speed and size fixes made there.
   let buffer: Buffer;
   try {
-    const html = buildAnchorPrintHTML(report, loadReportAssets());
+    const resolve = createImageResolver();
+    const [photos, zones] = await Promise.all([
+      Promise.all(
+        report.photos.map(async (p) => ({
+          ...p,
+          url: await resolve(p.url, GRID_PHOTO_RESIZE),
+        })),
+      ),
+      Promise.all(
+        report.zones.map(async (z) => ({
+          ...z,
+          mapImageUrl: z.mapImageUrl ? await resolve(z.mapImageUrl) : z.mapImageUrl,
+        })),
+      ),
+    ]);
+    const pdfReport: AnchorReportData = { ...report, photos, zones };
+
+    const html = buildAnchorPrintHTML(pdfReport, loadReportAssets());
     buffer = await renderPDF(html);
   } catch (err) {
     console.error("[SaveAnchorReport] PDF failed:", err);

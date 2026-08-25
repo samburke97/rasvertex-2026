@@ -36,14 +36,18 @@ export interface ResizeTo {
 // actually matches print use is the same fix a PDF-compression tool finds
 // after the fact; doing it here means the PDF is small from the start.
 // Benchmarked against a real 256-photo report's actual files (not a
-// guess): this lands at ~5.5MB for that report, matching what an external
-// PDF compressor achieved on the uncompressed version, while staying a
-// visible step above its most aggressive setting since these are
-// inspection/condition photos — detail can matter, not just file size.
-// Cover photos and Anchor zone maps are deliberately NOT resized this way
-// — they render full-bleed near page width, so 1280-1600px is correctly
-// sized already, not oversized like a grid thumbnail is.
-export const GRID_PHOTO_RESIZE: ResizeTo = { maxDimension: 500, quality: 60 };
+// guess): a tighter 500/60 setting matched an external PDF compressor's
+// result (~5.5MB) almost exactly, but these are inspection/condition
+// photos where detail can matter — quality 75 trades some of that size
+// back for visibly better quality, landing at roughly 8.5-9MB for the same
+// report (~7.3MB was measured at quality 65; the jump to 75 is
+// extrapolated from same-dimension quality deltas measured elsewhere,
+// cross-checked against an independently measured 600/68 result landing in
+// the same range). Still under a quarter of the original 37MB. Cover
+// photos and Anchor zone maps are deliberately NOT resized this way — they
+// render full-bleed near page width, so 1280-1600px is correctly sized
+// already, not oversized like a grid thumbnail is.
+export const GRID_PHOTO_RESIZE: ResizeTo = { maxDimension: 560, quality: 75 };
 
 async function resolveOne(
   url: string | null | undefined,

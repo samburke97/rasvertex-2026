@@ -1,9 +1,13 @@
+// app/api/simpro/jobs/[jobId]/save-hours-report/route.ts
+// Mirrors save-anchor-report — Hours Breakdown has no photos, so there's
+// nothing here to resolve from Blob (see resolveReportImages.ts for why
+// that step exists for the other report types).
+
 import { NextRequest, NextResponse } from "next/server";
-import { buildPrintHTML } from "@/lib/reports/condition.print";
+import { buildHoursPrintHTML } from "@/lib/reports/hours.print";
 import { loadReportAssets, renderPDF } from "@/lib/server/pdf-utils";
 import { saveReportToDestinations, getSimproConfig } from "@/lib/server/simpro";
-import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveReportImages";
-import type { ConditionReportData } from "@/lib/reports/condition.types";
+import type { HoursBreakdownData } from "@/lib/reports/hours.types";
 
 export async function POST(
   request: NextRequest,
@@ -26,8 +30,7 @@ export async function POST(
 
   let body: {
     filename?: string;
-    report?: ConditionReportData;
-    photoData?: Record<string, string>;
+    report?: HoursBreakdownData;
     companyId?: number;
     siteId?: string;
     destinations?: { job?: boolean; site?: boolean };
@@ -44,7 +47,6 @@ export async function POST(
   const {
     filename,
     report,
-    photoData = {},
     companyId = 0,
     siteId,
     destinations = { job: true, site: false },
@@ -67,41 +69,12 @@ export async function POST(
 
   const cleanFilename = filename.trim().replace(/\.pdf$/i, "") + ".pdf";
 
-  const stitchedReport: ConditionReportData = {
-    ...report,
-    photos: report.photos.map((p) => ({
-      ...p,
-      url: photoData[p.id] ?? p.url ?? "",
-    })),
-  };
-
-  // Build + render PDF once, then fan out to whichever destinations were
-  // requested. Same resolve-and-resize step as export-pdf's route — see
-  // resolveReportImages.ts — otherwise this path (unlike export) would
-  // still hand Puppeteer raw Blob URLs to fetch one by one, and full-size
-  // photos to embed, undoing both the speed and size fixes made there.
   let buffer: Buffer;
   try {
-    const resolve = createImageResolver();
-    const [photos, coverPhoto] = await Promise.all([
-      Promise.all(
-        stitchedReport.photos.map(async (p) => ({
-          ...p,
-          url: await resolve(p.url, GRID_PHOTO_RESIZE),
-        })),
-      ),
-      resolve(stitchedReport.job.coverPhoto),
-    ]);
-    const pdfReport: ConditionReportData = {
-      ...stitchedReport,
-      photos,
-      job: { ...stitchedReport.job, coverPhoto },
-    };
-
-    const html = buildPrintHTML(pdfReport, loadReportAssets());
+    const html = buildHoursPrintHTML(report, loadReportAssets());
     buffer = await renderPDF(html);
   } catch (err) {
-    console.error("[SaveReport] PDF failed:", err);
+    console.error("[SaveHoursReport] PDF failed:", err);
     return NextResponse.json(
       { error: "PDF generation failed." },
       { status: 500 },
@@ -115,7 +88,7 @@ export async function POST(
     destinations,
     cleanFilename,
     buffer,
-    "[SaveReport]",
+    "[SaveHoursReport]",
   );
 
   return NextResponse.json({ filename: cleanFilename, job, site }, { status: 200 });
