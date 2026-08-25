@@ -13,6 +13,7 @@ import IconButton from "@/components/ui/IconButton";
 import SaveReportModal from "../shared/SaveReportModal";
 import SavedBadge from "../shared/SavedBadge";
 import { compressImageDataUrl } from "@/lib/reports/compressImage";
+import { uploadReportPhoto } from "@/lib/reports/uploadPhoto";
 import {
   mapJobToReportDetails,
   filterPhotosByDateRange,
@@ -208,10 +209,24 @@ export default function ConditionReportPage({
                   reader.cancel();
                   return;
                 }
+                // Upload to Blob storage rather than keeping the base64
+                // string in report state — see uploadPhoto.ts. Falls back
+                // to the compressed data URL if the upload fails, so a
+                // flaky upload never loses the photo, just risks the
+                // payload-size problem this exists to avoid.
+                const photoId = String(payload.id);
+                const blobUrl = await uploadReportPhoto(
+                  compressedUrl,
+                  `condition-reports/${jobNumber}/${photoId}.jpg`,
+                );
+                if (isStale()) {
+                  reader.cancel();
+                  return;
+                }
                 const photo: ReportPhoto = {
-                  id: String(payload.id),
+                  id: photoId,
                   name: String(payload.name),
-                  url: compressedUrl,
+                  url: blobUrl,
                   size: Number(payload.size) || 0,
                   dateAdded: payload.dateAdded
                     ? String(payload.dateAdded)
@@ -448,14 +463,21 @@ export default function ConditionReportPage({
   );
 
   // ── Autosave the draft, debounced, whenever the report changes ───────────
-  // Never persist while photos are still streaming in — every arriving
-  // photo triggers a `report` change, so without this guard a save could
-  // fire (and get resumed from later) with only a handful of photos loaded,
-  // or none at all. Once importStatus leaves "fetching-photos" this effect
-  // re-runs (it's a dependency below) and saves the by-then-complete report.
+  // Only persist once import is fully "done". `loadedJobId` is set (for the
+  // OptionsPanel's onImport callback, see below) before the job/draft fetch
+  // resolves, so `report` sits at the blank DEFAULT_REPORT for a moment on
+  // every load — if autosave weren't blocked here, a save could fire during
+  // that window (or later, while photos are still streaming in) and PATCH a
+  // blank/partial report over a real saved draft. That's exactly what wiped
+  // job 10970's draft. Once importStatus reaches "done" this effect re-runs
+  // (it's a dependency below) and saves the by-then-complete report.
   useEffect(() => {
     if (!loadedJobId) return;
-    if (importStatus.phase === "fetching-photos") return;
+    if (importStatus.phase !== "done") return;
+    // Same guard, for the manual "Refresh from SimPRO" schedule button —
+    // fetchSchedule briefly sets report.schedule to [] while it re-fetches,
+    // and that shouldn't be persisted if the request is slow.
+    if (scheduleStatus.phase === "loading") return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
 
     const delay =
@@ -484,7 +506,7 @@ export default function ConditionReportPage({
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report, loadedJobId, importStatus.phase]);
+  }, [report, loadedJobId, importStatus.phase, scheduleStatus.phase]);
 
   // Discards the saved draft for the current job and re-imports everything
   // fresh from SimPRO — the self-serve fix for a draft that got stuck with
@@ -782,9 +804,21 @@ export default function ConditionReportPage({
 
           {report.settings.showSchedule && (
             <>
-              <div className={styles.pageLabel}>
-                Schedule &middot; {filteredSchedule.length} row
-                {filteredSchedule.length !== 1 ? "s" : ""}
+              <div className={styles.pageLabelRow}>
+                <div className={styles.pageLabel}>
+                  Schedule &middot; {filteredSchedule.length} row
+                  {filteredSchedule.length !== 1 ? "s" : ""}
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => fetchSchedule(loadedJobId, selectedCostCenter)}
+                  disabled={!loadedJobId || scheduleStatus.phase === "loading"}
+                >
+                  {scheduleStatus.phase === "loading"
+                    ? "Refreshing…"
+                    : "Refresh from SimPRO"}
+                </Button>
               </div>
               <ScheduleSection
                 rows={filteredSchedule}

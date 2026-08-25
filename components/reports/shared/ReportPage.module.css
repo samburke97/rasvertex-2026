@@ -114,3 +114,20 @@
   color: #aaa;
   margin-bottom: -1.5rem;
 }
+
+.pageLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-self: flex-start;
+  width: 794px;
+  max-width: 100%;
+  margin-left: max(0px, calc(50% - 397px));
+  margin-bottom: -1.5rem;
+}
+
+.pageLabelRow .pageLabel {
+  margin-left: 0;
+  margin-bottom: 0;
+}
