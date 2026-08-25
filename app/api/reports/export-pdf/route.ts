@@ -5,7 +5,7 @@ import {
   renderPDF,
   pdfDownloadResponse,
 } from "@/lib/server/pdf-utils";
-import { createImageResolver } from "@/lib/server/resolveReportImages";
+import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveReportImages";
 import type { ConditionReportData } from "@/lib/reports/condition.types";
 
 export async function POST(request: NextRequest) {
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       Promise.all(
         stitchedReport.photos.map(async (p) => ({
           ...p,
-          url: await resolve(p.url),
+          url: await resolve(p.url, GRID_PHOTO_RESIZE),
         })),
       ),
       resolve(stitchedReport.job.coverPhoto),

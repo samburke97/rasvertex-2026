@@ -5,7 +5,7 @@ import {
   renderPDF,
   pdfDownloadResponse,
 } from "@/lib/server/pdf-utils";
-import { createImageResolver } from "@/lib/server/resolveReportImages";
+import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveReportImages";
 import type { AnchorReportData } from "@/lib/reports/anchor.types";
 
 export async function POST(request: NextRequest) {
@@ -30,7 +30,10 @@ export async function POST(request: NextRequest) {
     const resolve = createImageResolver();
     const [photos, zones] = await Promise.all([
       Promise.all(
-        report.photos.map(async (p) => ({ ...p, url: await resolve(p.url) })),
+        report.photos.map(async (p) => ({
+          ...p,
+          url: await resolve(p.url, GRID_PHOTO_RESIZE),
+        })),
       ),
       Promise.all(
         report.zones.map(async (z) => ({

@@ -12,22 +12,67 @@
 // to the render step — it never crosses a Vercel Function request/response
 // boundary, so it doesn't reintroduce the payload-size problem this exists
 // to avoid.
+//
+// Grid photos also get resized down here — see GRID_PHOTO_RESIZE below.
 
+import sharp from "sharp";
 import { createUploadQueue } from "@/lib/reports/uploadQueue";
 
 const CONCURRENCY = 16;
 
-async function resolveOne(url: string | null | undefined): Promise<string> {
+export interface ResizeTo {
+  maxDimension: number;
+  quality: number; // 1-100
+}
+
+// compressImage.ts compresses grid photos to 1280px for the on-screen
+// editor, where a tech might view one larger than its grid cell — but the
+// largest a photo ever actually renders in the PDF is a 390x390 grid cell
+// (PHOTO_LAYOUTS.large in lib/reports/photos.ts). Shipping the full 1280px
+// version into the PDF means the file is dominated by resolution nothing
+// ever displays: a 256-photo report came out to 37MB — almost exactly
+// photo-count × the editor-quality file size — because Chromium mostly
+// just sums up whatever it's handed. Re-encoding down to a size that
+// actually matches print use is the same fix a PDF-compression tool finds
+// after the fact; doing it here means the PDF is small from the start.
+// Benchmarked against a real 256-photo report's actual files (not a
+// guess): this lands at ~5.5MB for that report, matching what an external
+// PDF compressor achieved on the uncompressed version, while staying a
+// visible step above its most aggressive setting since these are
+// inspection/condition photos — detail can matter, not just file size.
+// Cover photos and Anchor zone maps are deliberately NOT resized this way
+// — they render full-bleed near page width, so 1280-1600px is correctly
+// sized already, not oversized like a grid thumbnail is.
+export const GRID_PHOTO_RESIZE: ResizeTo = { maxDimension: 500, quality: 60 };
+
+async function resolveOne(
+  url: string | null | undefined,
+  resize?: ResizeTo,
+): Promise<string> {
   if (!url || !url.startsWith("http")) return url ?? "";
   try {
     const res = await fetch(url);
     if (!res.ok) return url;
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const contentType = res.headers.get("content-type") || "image/jpeg";
+    let buffer = Buffer.from(await res.arrayBuffer());
+    let contentType = res.headers.get("content-type") || "image/jpeg";
+
+    if (resize) {
+      buffer = await sharp(buffer)
+        .resize({
+          width: resize.maxDimension,
+          height: resize.maxDimension,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .jpeg({ quality: resize.quality })
+        .toBuffer();
+      contentType = "image/jpeg";
+    }
+
     return `data:${contentType};base64,${buffer.toString("base64")}`;
   } catch {
     // Fall back to the URL itself — Puppeteer will still try to fetch it
-    // directly, just without the speed benefit of doing it in parallel here.
+    // directly, just without the speed/size benefit of resolving it here.
     return url;
   }
 }
@@ -36,9 +81,11 @@ async function resolveOne(url: string | null | undefined): Promise<string> {
  * Returns a resolver function sharing one concurrency-bounded queue — pass
  * every image url in a report through the *same* resolver instance so they
  * all draw from one pool instead of each Promise.all bypassing the limit.
+ * Pass `resize` for grid photos (see GRID_PHOTO_RESIZE); omit it for a
+ * full-bleed image (cover photo, zone map) that's already correctly sized.
  */
 export function createImageResolver() {
   const schedule = createUploadQueue(CONCURRENCY);
-  return (url: string | null | undefined): Promise<string> =>
-    schedule(() => resolveOne(url));
+  return (url: string | null | undefined, resize?: ResizeTo): Promise<string> =>
+    schedule(() => resolveOne(url, resize));
 }

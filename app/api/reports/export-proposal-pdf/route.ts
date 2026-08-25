@@ -10,7 +10,7 @@ import {
   renderPDF,
   pdfDownloadResponse,
 } from "@/lib/server/pdf-utils";
-import { createImageResolver } from "@/lib/server/resolveReportImages";
+import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveReportImages";
 import type { ProposalData } from "@/lib/reports/proposal.types";
 
 // Front matter (Cover, Contents, Cover Letter) and the numbered body are
@@ -49,8 +49,9 @@ export async function POST(request: NextRequest) {
     // so at most 7 photos ever actually render. The pool itself can hold
     // far more (every attachment pulled from the quote), so resolve only
     // what's referenced instead of the whole pool.
+    const coverPhotoId = report.job.sitePhotoId;
     const referencedIds = new Set(
-      [report.job.sitePhotoId, ...report.findings.map((f) => f.photoId)].filter(
+      [coverPhotoId, ...report.findings.map((f) => f.photoId)].filter(
         (id): id is string => !!id,
       ),
     );
@@ -58,7 +59,17 @@ export async function POST(request: NextRequest) {
     const photos = await Promise.all(
       report.photos
         .filter((p) => referencedIds.has(p.id))
-        .map(async (p) => ({ ...p, url: await resolve(p.url) })),
+        .map(async (p) => ({
+          ...p,
+          // The cover photo renders up to ~1400px wide (see buildCover in
+          // proposal.print.ts) — full-bleed, not a grid thumbnail, so it's
+          // deliberately left at its already-correct size. Finding photos
+          // are ~a third of that width, closer to a grid cell.
+          url: await resolve(
+            p.url,
+            p.id === coverPhotoId ? undefined : GRID_PHOTO_RESIZE,
+          ),
+        })),
     );
     const pdfReport: ProposalData = { ...report, photos };
 
