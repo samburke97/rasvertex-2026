@@ -44,9 +44,21 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // The print templates only ever look up a photo by id — the cover via
+    // job.sitePhotoId, each finding via its own photoId (max 6 findings) —
+    // so at most 7 photos ever actually render. The pool itself can hold
+    // far more (every attachment pulled from the quote), so resolve only
+    // what's referenced instead of the whole pool.
+    const referencedIds = new Set(
+      [report.job.sitePhotoId, ...report.findings.map((f) => f.photoId)].filter(
+        (id): id is string => !!id,
+      ),
+    );
     const resolve = createImageResolver();
     const photos = await Promise.all(
-      report.photos.map(async (p) => ({ ...p, url: await resolve(p.url) })),
+      report.photos
+        .filter((p) => referencedIds.has(p.id))
+        .map(async (p) => ({ ...p, url: await resolve(p.url) })),
     );
     const pdfReport: ProposalData = { ...report, photos };
 

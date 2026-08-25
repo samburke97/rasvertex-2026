@@ -14,6 +14,7 @@ import SaveReportModal from "../shared/SaveReportModal";
 import SavedBadge from "../shared/SavedBadge";
 import { compressImageDataUrl } from "@/lib/reports/compressImage";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
+import { uploadReportPhoto, deleteReportPhoto } from "@/lib/reports/uploadPhoto";
 import {
   mapJobToReportDetails,
   filterPhotosByDateRange,
@@ -121,25 +122,47 @@ export default function ConditionReportPage({
     [],
   );
 
-  const updateCoverPhoto = useCallback((dataUrl: string | null) => {
-    if (!dataUrl) {
-      setReport((prev) => ({ ...prev, job: { ...prev.job, coverPhoto: null } }));
-      return;
-    }
-    compressImageDataUrl(dataUrl).then((compressed) => {
+  const updateCoverPhoto = useCallback(
+    (dataUrl: string | null) => {
+      const previous = report.job.coverPhoto;
+      if (previous) deleteReportPhoto(previous);
+
+      if (!dataUrl) {
+        setReport((prev) => ({ ...prev, job: { ...prev.job, coverPhoto: null } }));
+        return;
+      }
+      compressImageDataUrl(dataUrl).then(async (compressed) => {
+        setReport((prev) => ({
+          ...prev,
+          job: { ...prev.job, coverPhoto: compressed },
+        }));
+        // Same reasoning as every other photo — see uploadPhoto.ts. This
+        // was previously the one image left as base64 forever, in the DB
+        // row and every autosave PATCH.
+        const blobUrl = await uploadReportPhoto(
+          compressed,
+          `condition-reports/${loadedJobId || "manual"}/cover-${Date.now()}.jpg`,
+        );
+        setReport((prev) => ({
+          ...prev,
+          job: { ...prev.job, coverPhoto: blobUrl },
+        }));
+      });
+    },
+    [report.job.coverPhoto, loadedJobId],
+  );
+
+  const removePhoto = useCallback(
+    (id: string) => {
+      const removed = report.photos.find((p) => p.id === id);
+      if (removed) deleteReportPhoto(removed.url);
       setReport((prev) => ({
         ...prev,
-        job: { ...prev.job, coverPhoto: compressed },
+        photos: prev.photos.filter((p) => p.id !== id),
       }));
-    });
-  }, []);
-
-  const removePhoto = useCallback((id: string) => {
-    setReport((prev) => ({
-      ...prev,
-      photos: prev.photos.filter((p) => p.id !== id),
-    }));
-  }, []);
+    },
+    [report.photos],
+  );
 
   const renamePhoto = useCallback((id: string, name: string) => {
     setReport((prev) => ({

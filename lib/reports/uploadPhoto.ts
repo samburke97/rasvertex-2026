@@ -47,3 +47,23 @@ export async function uploadReportPhoto(
     return dataUrl;
   }
 }
+
+/**
+ * Deletes a single photo's Blob file — call when a tech removes a photo
+ * from a report so it doesn't sit orphaned in storage forever. Fire-and-
+ * forget from the caller's perspective (best-effort cleanup, never worth
+ * blocking or failing the UI action over); a no-op for anything that isn't
+ * a Blob URL (a legacy base64 photo, or one whose upload never succeeded).
+ */
+export async function deleteReportPhoto(url: string): Promise<void> {
+  if (!url || !url.startsWith("http")) return;
+  try {
+    await fetch("/api/reports/photo-upload", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+  } catch (err) {
+    console.error("[deleteReportPhoto]", err);
+  }
+}

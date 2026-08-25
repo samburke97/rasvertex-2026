@@ -3,6 +3,7 @@
 // Run the migration SQL once to create the table (see bottom of file).
 
 import { neon } from "@neondatabase/serverless";
+import { deleteBlobPhotos } from "@/lib/server/deleteBlobPhotos";
 import type { AnchorReportData } from "../anchor.types";
 
 function sql() {
@@ -44,7 +45,13 @@ export async function getReport(
 export async function deleteReport(jobId: string): Promise<boolean> {
   const db = sql();
   const result = await db`
-    DELETE FROM anchor_inspection_reports WHERE job_id = ${jobId} RETURNING job_id
+    DELETE FROM anchor_inspection_reports WHERE job_id = ${jobId} RETURNING data
   `;
-  return result.length > 0;
+  if (!result.length) return false;
+  const data = result[0].data as AnchorReportData;
+  await deleteBlobPhotos([
+    ...data.photos.map((p) => p.url),
+    ...data.zones.map((z) => z.mapImageUrl),
+  ]);
+  return true;
 }

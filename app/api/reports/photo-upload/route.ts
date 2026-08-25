@@ -8,6 +8,19 @@
 
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
+import { deleteBlobPhotos } from "@/lib/server/deleteBlobPhotos";
+
+// Used when a tech removes a single photo while editing a report — deletes
+// that one blob rather than leaving it orphaned. Report-level deletion
+// (dropping a whole draft) is handled separately in each report type's
+// store.ts, since that already has the full row (and every photo url) in
+// hand right where the DB row itself gets deleted.
+export async function DELETE(request: Request): Promise<NextResponse> {
+  const { url } = (await request.json()) as { url?: string };
+  if (!url) return NextResponse.json({ error: "url is required" }, { status: 400 });
+  await deleteBlobPhotos([url]);
+  return NextResponse.json({ success: true });
+}
 
 export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody;

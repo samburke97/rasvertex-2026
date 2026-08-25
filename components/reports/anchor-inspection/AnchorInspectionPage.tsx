@@ -11,7 +11,7 @@ import {
   compressMapImageDataUrl,
 } from "@/lib/reports/compressImage";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
-import { uploadReportPhoto } from "@/lib/reports/uploadPhoto";
+import { uploadReportPhoto, deleteReportPhoto } from "@/lib/reports/uploadPhoto";
 import SavedBadge from "../shared/SavedBadge";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
@@ -144,7 +144,24 @@ export default function AnchorInspectionPage({
         ? `Anchor Inspection Report - ${report.job.address}`
         : "Anchor Inspection Report";
 
-      const exportReport = await compressReportForTransfer(report);
+      // Match what's actually shown on screen — export the same
+      // enabled/date-filtered photo set as the live preview (filteredPhotos
+      // below), not the full unfiltered pool. Also means the server only
+      // has to resolve/inline photos that will actually appear in the PDF.
+      const photosToExport = !report.photoSettings.enabled
+        ? []
+        : report.photoSettings.filterByDate
+          ? filterPhotosByDateRange(
+              report.photos,
+              report.photoSettings.dateFrom,
+              report.photoSettings.dateTo,
+            )
+          : report.photos;
+
+      const exportReport = await compressReportForTransfer({
+        ...report,
+        photos: photosToExport,
+      });
       const res = await fetch("/api/reports/export-anchor-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -339,21 +356,60 @@ export default function AnchorInspectionPage({
     setView("zone-map");
   }, []);
 
-  const deleteZone = useCallback((zoneId: string) => {
-    setReport((prev) => ({
-      ...prev,
-      zones: prev.zones.filter((z) => z.id !== zoneId),
-    }));
-    setView("editor");
-    setEditingZoneId(null);
-  }, []);
+  const deleteZone = useCallback(
+    (zoneId: string) => {
+      const zone = report.zones.find((z) => z.id === zoneId);
+      if (zone?.mapImageUrl) deleteReportPhoto(zone.mapImageUrl);
+      setReport((prev) => ({
+        ...prev,
+        zones: prev.zones.filter((z) => z.id !== zoneId),
+      }));
+      setView("editor");
+      setEditingZoneId(null);
+    },
+    [report.zones],
+  );
 
-  const handleZoneUpdate = useCallback((updatedZone: Zone) => {
-    setReport((prev) => ({
-      ...prev,
-      zones: prev.zones.map((z) => (z.id === updatedZone.id ? updatedZone : z)),
-    }));
-  }, []);
+  // Zone maps go through the same Blob pipeline as every other photo — see
+  // uploadPhoto.ts. ZoneMapEditor always hands back a fresh data: URL
+  // (freshly captured or uploaded, already compressed) via this one update
+  // path, so it's the single place to upload it and swap the field over.
+  // The mapImageUrl === dataUrl check on the swap-back guards against a
+  // second update landing (e.g. re-cropping again) before the first
+  // upload finishes — don't clobber newer state with a stale result.
+  const handleZoneUpdate = useCallback(
+    (updatedZone: Zone) => {
+      const prevMapUrl = report.zones.find((z) => z.id === updatedZone.id)
+        ?.mapImageUrl;
+
+      setReport((prev) => ({
+        ...prev,
+        zones: prev.zones.map((z) => (z.id === updatedZone.id ? updatedZone : z)),
+      }));
+
+      if (updatedZone.mapImageUrl?.startsWith("data:")) {
+        if (prevMapUrl && prevMapUrl !== updatedZone.mapImageUrl)
+          deleteReportPhoto(prevMapUrl);
+        const dataUrl = updatedZone.mapImageUrl;
+        uploadReportPhoto(
+          dataUrl,
+          `anchor-reports/${loadedJobId || "manual"}/zone-${updatedZone.id}-${Date.now()}.jpg`,
+        ).then((blobUrl) => {
+          setReport((prev) => ({
+            ...prev,
+            zones: prev.zones.map((z) =>
+              z.id === updatedZone.id && z.mapImageUrl === dataUrl
+                ? { ...z, mapImageUrl: blobUrl }
+                : z,
+            ),
+          }));
+        });
+      } else if (!updatedZone.mapImageUrl && prevMapUrl) {
+        deleteReportPhoto(prevMapUrl);
+      }
+    },
+    [report.zones, loadedJobId],
+  );
 
   // ── Supporting photos ──────────────────────────────────────────────────
   // Entirely optional — nothing here fires until the tech turns on "Add
@@ -367,12 +423,17 @@ export default function AnchorInspectionPage({
     [],
   );
 
-  const removePhoto = useCallback((id: string) => {
-    setReport((prev) => ({
-      ...prev,
-      photos: prev.photos.filter((p) => p.id !== id),
-    }));
-  }, []);
+  const removePhoto = useCallback(
+    (id: string) => {
+      const removed = report.photos.find((p) => p.id === id);
+      if (removed) deleteReportPhoto(removed.url);
+      setReport((prev) => ({
+        ...prev,
+        photos: prev.photos.filter((p) => p.id !== id),
+      }));
+    },
+    [report.photos],
+  );
 
   const renamePhoto = useCallback((id: string, name: string) => {
     setReport((prev) => ({

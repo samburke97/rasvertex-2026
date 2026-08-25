@@ -4,6 +4,7 @@
 // Mirrors lib/reports/anchor-inspection/store.ts — same pattern, own table.
 
 import { neon } from "@neondatabase/serverless";
+import { deleteBlobPhotos } from "@/lib/server/deleteBlobPhotos";
 import type { ConditionReportData } from "../condition.types";
 
 function sql() {
@@ -45,7 +46,10 @@ export async function getReport(
 export async function deleteReport(jobId: string): Promise<boolean> {
   const db = sql();
   const result = await db`
-    DELETE FROM condition_reports WHERE job_id = ${jobId} RETURNING job_id
+    DELETE FROM condition_reports WHERE job_id = ${jobId} RETURNING data
   `;
-  return result.length > 0;
+  if (!result.length) return false;
+  const data = result[0].data as ConditionReportData;
+  await deleteBlobPhotos([data.job.coverPhoto, ...data.photos.map((p) => p.url)]);
+  return true;
 }
