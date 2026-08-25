@@ -19,6 +19,8 @@ import ToggleRow from "../shared/ToggleRow";
 import AccessMapEditor from "./AccessMapEditor";
 import PhotoPickerModal, { type PhotosImportStatus } from "./PhotoPickerModal";
 import { compressImageDataUrl } from "@/lib/reports/compressImage";
+import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
+import { uploadReportPhoto } from "@/lib/reports/uploadPhoto";
 import {
   DEFAULT_PROPOSAL,
   newAccessZone,
@@ -72,6 +74,10 @@ export default function ProposalPage({ onBack }: Props) {
   });
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // ── Photo pool (shared by the cover photo and every finding's photo) ────
+  const [photosImportStatus, setPhotosImportStatus] =
+    useState<PhotosImportStatus>({ phase: "idle" });
+  const photoLoadId = useRef(0);
 
   // ── Import from SimPRO quote — resumes an existing draft if one exists ──
   const handleImport = useCallback(async (quoteIdInput: string) => {
@@ -183,6 +189,11 @@ export default function ProposalPage({ onBack }: Props) {
   useEffect(() => {
     const quoteId = report.job.quoteId.trim();
     if (!quoteId) return;
+    // Same guard as Condition/Anchor Inspection's autosave — never persist
+    // while the quote's photo pool is still streaming in, or a save could
+    // catch it mid-import (partial pool, or a photo still on its large
+    // pre-upload data: URL).
+    if (photosImportStatus.phase === "loading") return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
 
     const delay = saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
@@ -204,7 +215,7 @@ export default function ProposalPage({ onBack }: Props) {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report]);
+  }, [report, photosImportStatus.phase]);
 
   const updateJob = useCallback(
     (patch: Partial<ProposalData["job"]>) => {
@@ -233,11 +244,6 @@ export default function ProposalPage({ onBack }: Props) {
     }));
   }, []);
 
-  // ── Photo pool (shared by the cover photo and every finding's photo) ────
-  const [photosImportStatus, setPhotosImportStatus] =
-    useState<PhotosImportStatus>({ phase: "idle" });
-  const photoLoadId = useRef(0);
-
   function readFileAsPhoto(file: File): Promise<ReportPhoto> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -265,94 +271,38 @@ export default function ProposalPage({ onBack }: Props) {
   // why — large jobs/quotes can have a lot of photos, so they stream in
   // rather than one big blocking response) and appends any not already in
   // the pool.
-  const fetchQuotePhotos = useCallback(async () => {
+  const fetchQuotePhotos = useCallback(() => {
     const quoteId = report.job.quoteId.trim();
-    if (!quoteId) return;
+    if (!quoteId) return Promise.resolve();
     const myGen = ++photoLoadId.current;
     const isStale = () => photoLoadId.current !== myGen;
 
     setPhotosImportStatus({ phase: "loading", loaded: 0, total: 0 });
-    try {
-      const response = await fetch(
-        `/api/simpro/quotes/${quoteId}/attachments?companyId=0`,
-      );
-      if (isStale()) return;
-      if (!response.ok || !response.body) throw new Error("Stream connect failed");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        if (isStale()) {
-          reader.cancel();
-          return;
-        }
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const frames = buffer.split("\n\n");
-        buffer = frames.pop() ?? "";
-
-        for (const frame of frames) {
-          if (isStale()) {
-            reader.cancel();
-            return;
-          }
-          const eventMatch = frame.match(/^event:\s*(.+)$/m);
-          const dataMatch = frame.match(/^data:\s*(.+)$/m);
-          if (!eventMatch || !dataMatch) continue;
-          const event = eventMatch[1].trim();
-          let payload: Record<string, unknown>;
-          try {
-            payload = JSON.parse(dataMatch[1]);
-          } catch {
-            continue;
-          }
-
-          if (event === "photo") {
-            const compressedUrl = await compressImageDataUrl(String(payload.url));
-            if (isStale()) {
-              reader.cancel();
-              return;
-            }
-            const photo: ReportPhoto = {
-              id: String(payload.id),
-              name: String(payload.name),
-              url: compressedUrl,
-              size: Number(payload.size) || 0,
-              dateAdded: payload.dateAdded ? String(payload.dateAdded) : null,
-            };
-            setReport((prev) =>
-              prev.photos.some((p) => p.id === photo.id)
-                ? prev
-                : { ...prev, photos: [...prev.photos, photo] },
-            );
-          } else if (event === "progress") {
-            if (!isStale())
-              setPhotosImportStatus({
-                phase: "loading",
-                loaded: Number(payload.loaded) || 0,
-                total: Number(payload.total) || 0,
-              });
-          } else if (event === "done") {
-            if (!isStale()) setPhotosImportStatus({ phase: "done" });
-          } else if (event === "error") {
-            if (!isStale())
-              setPhotosImportStatus({
-                phase: "error",
-                message: String(payload.message ?? "Photo import failed"),
-              });
-          }
-        }
-      }
-    } catch (err) {
-      if (isStale()) return;
-      setPhotosImportStatus({
-        phase: "error",
-        message: err instanceof Error ? err.message : "Photo import failed",
-      });
-    }
+    return streamPhotoImport(
+      `/api/simpro/quotes/${quoteId}/attachments?companyId=0`,
+      (photoId) => `proposal-reports/${quoteId}/${photoId}.jpg`,
+      {
+        isStale,
+        onPhoto: (photo) =>
+          setReport((prev) =>
+            prev.photos.some((p) => p.id === photo.id)
+              ? prev
+              : { ...prev, photos: [...prev.photos, photo] },
+          ),
+        onPhotoUploaded: (id, blobUrl) =>
+          setReport((prev) => ({
+            ...prev,
+            photos: prev.photos.map((p) =>
+              p.id === id ? { ...p, url: blobUrl } : p,
+            ),
+          })),
+        onProgress: (loaded, total) =>
+          setPhotosImportStatus({ phase: "loading", loaded, total }),
+        onDone: () => setPhotosImportStatus({ phase: "done" }),
+        onError: (message) =>
+          setPhotosImportStatus({ phase: "error", message }),
+      },
+    );
   }, [report.job.quoteId]);
 
   // ── Photo picker (shared modal — targets either the cover or a finding) ──
@@ -389,8 +339,21 @@ export default function ProposalPage({ onBack }: Props) {
       const photo = await readFileAsPhoto(file);
       addPhotoToPool(photo);
       handlePickerSelect(photo.id);
+
+      // Same instant-display-then-background-upload pattern as
+      // fetchQuotePhotos above — swap in the Blob URL once it's ready.
+      const blobUrl = await uploadReportPhoto(
+        photo.url,
+        `proposal-reports/${report.job.quoteId.trim() || "manual"}/${photo.id}.jpg`,
+      );
+      setReport((prev) => ({
+        ...prev,
+        photos: prev.photos.map((p) =>
+          p.id === photo.id ? { ...p, url: blobUrl } : p,
+        ),
+      }));
     },
-    [addPhotoToPool, handlePickerSelect],
+    [addPhotoToPool, handlePickerSelect, report.job.quoteId],
   );
 
   // ── Findings ────────────────────────────────────────────────────────────

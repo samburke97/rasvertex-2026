@@ -30,6 +30,7 @@ interface OptionsPanelProps {
   scheduleCostCenters: ScheduleCostCenter[];
   selectedCostCenter: ScheduleCostCenter | null;
   onSelectCostCenter: (costCenter: ScheduleCostCenter | null) => void;
+  onRefreshSchedule: () => void;
   onCoverPhoto: (dataUrl: string | null) => void;
 }
 
@@ -103,6 +104,7 @@ export default function OptionsPanel({
   scheduleCostCenters,
   selectedCostCenter,
   onSelectCostCenter,
+  onRefreshSchedule,
   onCoverPhoto,
 }: OptionsPanelProps) {
   const coverInputRef = useRef<HTMLInputElement>(null);
@@ -335,7 +337,19 @@ export default function OptionsPanel({
 
       {/* ── Schedule ─────────────────────────────────────────────────────── */}
       <div className={styles.group}>
-        <div className={styles.groupLabel}>Schedule</div>
+        <div className={styles.groupLabelRow}>
+          <div className={styles.groupLabel}>Schedule</div>
+          {settings.scheduleLoaded && (
+            <button
+              type="button"
+              className={styles.presetBtn}
+              onClick={onRefreshSchedule}
+              disabled={scheduleStatus.phase === "loading"}
+            >
+              {scheduleStatus.phase === "loading" ? "Refreshing…" : "Refresh"}
+            </button>
+          )}
+        </div>
 
         {scheduleCostCenters.length > 0 && (
           <>

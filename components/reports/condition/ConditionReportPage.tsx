@@ -13,8 +13,7 @@ import IconButton from "@/components/ui/IconButton";
 import SaveReportModal from "../shared/SaveReportModal";
 import SavedBadge from "../shared/SavedBadge";
 import { compressImageDataUrl } from "@/lib/reports/compressImage";
-import { uploadReportPhoto } from "@/lib/reports/uploadPhoto";
-import { createUploadQueue } from "@/lib/reports/uploadQueue";
+import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import {
   mapJobToReportDetails,
   filterPhotosByDateRange,
@@ -23,7 +22,6 @@ import {
   type ImportStatus,
   type PhotoFolder,
   type ReportJobDetails,
-  type ReportPhoto,
   type ReportSettings,
   type ScheduleCostCenter,
   type ScheduleImportStatus,
@@ -158,132 +156,29 @@ export default function ConditionReportPage({
     (jobNumber: string, folderId: number | null) => {
       const myGen = ++photoLoadId.current;
       const isStale = () => photoLoadId.current !== myGen;
-      return (async () => {
-        if (isStale()) return;
-        setReport((prev) => ({ ...prev, photos: [] }));
-        setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
-        try {
-          const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
-          const response = await fetch(
-            `/api/simpro/jobs/${jobNumber}/attachments?companyId=0${folderQuery}`,
-          );
-          if (isStale()) return;
-          if (!response.ok || !response.body)
-            throw new Error("Stream connect failed");
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-
-          // Photos render the instant they're compressed (same as before) —
-          // the Blob upload runs in the background, several at a time, and
-          // swaps the photo's url from data: to the Blob URL once its own
-          // upload finishes. "done" waits for every queued upload to settle
-          // before flipping importStatus, so autosave (blocked until then)
-          // never persists a photo still sitting on its big base64 string.
-          const scheduleUpload = createUploadQueue(6);
-          const pendingUploads: Promise<void>[] = [];
-
-          while (true) {
-            if (isStale()) {
-              reader.cancel();
-              return;
-            }
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const frames = buffer.split("\n\n");
-            buffer = frames.pop() ?? "";
-
-            for (const frame of frames) {
-              if (isStale()) {
-                reader.cancel();
-                return;
-              }
-              const eventMatch = frame.match(/^event:\s*(.+)$/m);
-              const dataMatch = frame.match(/^data:\s*(.+)$/m);
-              if (!eventMatch || !dataMatch) continue;
-              const event = eventMatch[1].trim();
-              let payload: Record<string, unknown>;
-              try {
-                payload = JSON.parse(dataMatch[1]);
-              } catch {
-                continue;
-              }
-
-              if (event === "photo") {
-                const compressedUrl = await compressImageDataUrl(
-                  String(payload.url),
-                );
-                if (isStale()) {
-                  reader.cancel();
-                  return;
-                }
-                const photoId = String(payload.id);
-                const photo: ReportPhoto = {
-                  id: photoId,
-                  name: String(payload.name),
-                  url: compressedUrl,
-                  size: Number(payload.size) || 0,
-                  dateAdded: payload.dateAdded
-                    ? String(payload.dateAdded)
-                    : null,
-                };
-                setReport((prev) => ({
-                  ...prev,
-                  photos: [...prev.photos, photo],
-                }));
-
-                // Upload to Blob storage in the background — see
-                // uploadPhoto.ts for why. Falls back to the compressed data
-                // URL if the upload fails, so a flaky upload never loses the
-                // photo, just risks the payload-size problem this exists to
-                // avoid. Queued rather than awaited here so photos keep
-                // appearing on screen at full speed while uploads catch up
-                // behind them.
-                pendingUploads.push(
-                  scheduleUpload(() =>
-                    uploadReportPhoto(
-                      compressedUrl,
-                      `condition-reports/${jobNumber}/${photoId}.jpg`,
-                    ),
-                  ).then((blobUrl) => {
-                    if (isStale()) return;
-                    setReport((prev) => ({
-                      ...prev,
-                      photos: prev.photos.map((p) =>
-                        p.id === photoId ? { ...p, url: blobUrl } : p,
-                      ),
-                    }));
-                  }),
-                );
-              } else if (event === "progress") {
-                if (!isStale())
-                  setImportStatus({
-                    phase: "fetching-photos",
-                    loaded: Number(payload.loaded) || 0,
-                    total: Number(payload.total) || 0,
-                  });
-              } else if (event === "done") {
-                await Promise.all(pendingUploads);
-                if (!isStale()) setImportStatus({ phase: "done" });
-              } else if (event === "error") {
-                if (!isStale())
-                  setImportStatus({
-                    phase: "error",
-                    message: String(payload.message ?? "Photo import failed"),
-                  });
-              }
-            }
-          }
-        } catch (err) {
-          if (isStale()) return;
-          setImportStatus({
-            phase: "error",
-            message: err instanceof Error ? err.message : "Photo import failed",
-          });
-        }
-      })();
+      setReport((prev) => ({ ...prev, photos: [] }));
+      setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
+      const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
+      return streamPhotoImport(
+        `/api/simpro/jobs/${jobNumber}/attachments?companyId=0${folderQuery}`,
+        (photoId) => `condition-reports/${jobNumber}/${photoId}.jpg`,
+        {
+          isStale,
+          onPhoto: (photo) =>
+            setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] })),
+          onPhotoUploaded: (id, blobUrl) =>
+            setReport((prev) => ({
+              ...prev,
+              photos: prev.photos.map((p) =>
+                p.id === id ? { ...p, url: blobUrl } : p,
+              ),
+            })),
+          onProgress: (loaded, total) =>
+            setImportStatus({ phase: "fetching-photos", loaded, total }),
+          onDone: () => setImportStatus({ phase: "done" }),
+          onError: (message) => setImportStatus({ phase: "error", message }),
+        },
+      );
     },
     [],
   );
@@ -760,6 +655,7 @@ export default function ConditionReportPage({
           scheduleCostCenters={scheduleCostCenters}
           selectedCostCenter={selectedCostCenter}
           onSelectCostCenter={selectCostCenter}
+          onRefreshSchedule={() => fetchSchedule(loadedJobId, selectedCostCenter)}
           onCoverPhoto={updateCoverPhoto}
         />
 
@@ -826,21 +722,9 @@ export default function ConditionReportPage({
 
           {report.settings.showSchedule && (
             <>
-              <div className={styles.pageLabelRow}>
-                <div className={styles.pageLabel}>
-                  Schedule &middot; {filteredSchedule.length} row
-                  {filteredSchedule.length !== 1 ? "s" : ""}
-                </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => fetchSchedule(loadedJobId, selectedCostCenter)}
-                  disabled={!loadedJobId || scheduleStatus.phase === "loading"}
-                >
-                  {scheduleStatus.phase === "loading"
-                    ? "Refreshing…"
-                    : "Refresh from SimPRO"}
-                </Button>
+              <div className={styles.pageLabel}>
+                Schedule &middot; {filteredSchedule.length} row
+                {filteredSchedule.length !== 1 ? "s" : ""}
               </div>
               <ScheduleSection
                 rows={filteredSchedule}

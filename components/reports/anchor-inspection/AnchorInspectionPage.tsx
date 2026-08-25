@@ -10,6 +10,8 @@ import {
   compressImageDataUrl,
   compressMapImageDataUrl,
 } from "@/lib/reports/compressImage";
+import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
+import { uploadReportPhoto } from "@/lib/reports/uploadPhoto";
 import SavedBadge from "../shared/SavedBadge";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
@@ -379,27 +381,46 @@ export default function AnchorInspectionPage({
     }));
   }, []);
 
-  // Manual upload — reads each file as a data URL, so uploaded photos need
-  // zero network requests both in the live preview and in the Puppeteer PDF
-  // render (same reasoning as the cover photo upload in Condition Report).
-  const handleUploadPhotos = useCallback((files: FileList) => {
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const result = ev.target?.result;
-        if (typeof result !== "string") return;
-        const photo: ReportPhoto = {
-          id: generateId(),
-          name: file.name,
-          url: result,
-          size: file.size,
-          dateAdded: new Date().toISOString(),
+  // Manual upload — compresses each file, shows it immediately, then
+  // uploads it to Blob in the background and swaps in that URL once ready.
+  // Same reasoning as fetchPhotos below: uncompressed camera photos here
+  // were the worst offender for payload size (SimPRO photos at least got
+  // compressed on the way in) since this stored the raw FileReader result
+  // straight into state with no compression at all.
+  const handleUploadPhotos = useCallback(
+    (files: FileList) => {
+      Array.from(files).forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const result = ev.target?.result;
+          if (typeof result !== "string") return;
+          const compressedUrl = await compressImageDataUrl(result);
+          const photoId = generateId();
+          const photo: ReportPhoto = {
+            id: photoId,
+            name: file.name,
+            url: compressedUrl,
+            size: file.size,
+            dateAdded: new Date().toISOString(),
+          };
+          setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] }));
+
+          const blobUrl = await uploadReportPhoto(
+            compressedUrl,
+            `anchor-reports/${loadedJobId || "manual"}/${photoId}.jpg`,
+          );
+          setReport((prev) => ({
+            ...prev,
+            photos: prev.photos.map((p) =>
+              p.id === photoId ? { ...p, url: blobUrl } : p,
+            ),
+          }));
         };
-        setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] }));
-      };
-      reader.readAsDataURL(file);
-    });
-  }, []);
+        reader.readAsDataURL(file);
+      });
+    },
+    [loadedJobId],
+  );
 
   // Pull from job — streams photos in via SSE, same protocol/endpoint as
   // Condition Report's photo import (lib/reports/condition.types.ts's
@@ -408,97 +429,30 @@ export default function AnchorInspectionPage({
     (jobNumber: string, folderId: number | null) => {
       const myGen = ++photoLoadId.current;
       const isStale = () => photoLoadId.current !== myGen;
-      return (async () => {
-        if (isStale()) return;
-        setReport((prev) => ({ ...prev, photos: [] }));
-        setPhotoImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
-        try {
-          const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
-          const response = await fetch(
-            `/api/simpro/jobs/${jobNumber}/attachments?companyId=0${folderQuery}`,
-          );
-          if (isStale()) return;
-          if (!response.ok || !response.body)
-            throw new Error("Stream connect failed");
-
-          const reader = response.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-
-          while (true) {
-            if (isStale()) {
-              reader.cancel();
-              return;
-            }
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const frames = buffer.split("\n\n");
-            buffer = frames.pop() ?? "";
-
-            for (const frame of frames) {
-              if (isStale()) {
-                reader.cancel();
-                return;
-              }
-              const eventMatch = frame.match(/^event:\s*(.+)$/m);
-              const dataMatch = frame.match(/^data:\s*(.+)$/m);
-              if (!eventMatch || !dataMatch) continue;
-              const event = eventMatch[1].trim();
-              let payload: Record<string, unknown>;
-              try {
-                payload = JSON.parse(dataMatch[1]);
-              } catch {
-                continue;
-              }
-
-              if (event === "photo") {
-                const compressedUrl = await compressImageDataUrl(
-                  String(payload.url),
-                );
-                if (isStale()) {
-                  reader.cancel();
-                  return;
-                }
-                const photo: ReportPhoto = {
-                  id: String(payload.id),
-                  name: String(payload.name),
-                  url: compressedUrl,
-                  size: Number(payload.size) || 0,
-                  dateAdded: payload.dateAdded
-                    ? String(payload.dateAdded)
-                    : null,
-                };
-                setReport((prev) => ({
-                  ...prev,
-                  photos: [...prev.photos, photo],
-                }));
-              } else if (event === "progress") {
-                if (!isStale())
-                  setPhotoImportStatus({
-                    phase: "fetching-photos",
-                    loaded: Number(payload.loaded) || 0,
-                    total: Number(payload.total) || 0,
-                  });
-              } else if (event === "done") {
-                if (!isStale()) setPhotoImportStatus({ phase: "done" });
-              } else if (event === "error") {
-                if (!isStale())
-                  setPhotoImportStatus({
-                    phase: "error",
-                    message: String(payload.message ?? "Photo import failed"),
-                  });
-              }
-            }
-          }
-        } catch (err) {
-          if (isStale()) return;
-          setPhotoImportStatus({
-            phase: "error",
-            message: err instanceof Error ? err.message : "Photo import failed",
-          });
-        }
-      })();
+      setReport((prev) => ({ ...prev, photos: [] }));
+      setPhotoImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
+      const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
+      return streamPhotoImport(
+        `/api/simpro/jobs/${jobNumber}/attachments?companyId=0${folderQuery}`,
+        (photoId) => `anchor-reports/${jobNumber}/${photoId}.jpg`,
+        {
+          isStale,
+          onPhoto: (photo) =>
+            setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] })),
+          onPhotoUploaded: (id, blobUrl) =>
+            setReport((prev) => ({
+              ...prev,
+              photos: prev.photos.map((p) =>
+                p.id === id ? { ...p, url: blobUrl } : p,
+              ),
+            })),
+          onProgress: (loaded, total) =>
+            setPhotoImportStatus({ phase: "fetching-photos", loaded, total }),
+          onDone: () => setPhotoImportStatus({ phase: "done" }),
+          onError: (message) =>
+            setPhotoImportStatus({ phase: "error", message }),
+        },
+      );
     },
     [],
   );
