@@ -5,6 +5,7 @@ import {
   renderPDF,
   pdfDownloadResponse,
 } from "@/lib/server/pdf-utils";
+import { createImageResolver } from "@/lib/server/resolveReportImages";
 import type { ConditionReportData } from "@/lib/reports/condition.types";
 
 export async function POST(request: NextRequest) {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
       { status: 400 },
     );
 
-  const pdfReport: ConditionReportData = {
+  const stitchedReport: ConditionReportData = {
     ...report,
     photos: report.photos.map((p) => ({
       ...p,
@@ -38,6 +39,22 @@ export async function POST(request: NextRequest) {
   };
 
   try {
+    const resolve = createImageResolver();
+    const [photos, coverPhoto] = await Promise.all([
+      Promise.all(
+        stitchedReport.photos.map(async (p) => ({
+          ...p,
+          url: await resolve(p.url),
+        })),
+      ),
+      resolve(stitchedReport.job.coverPhoto),
+    ]);
+    const pdfReport: ConditionReportData = {
+      ...stitchedReport,
+      photos,
+      job: { ...stitchedReport.job, coverPhoto },
+    };
+
     const html = buildPrintHTML(pdfReport, loadReportAssets());
     const buffer = await renderPDF(html);
     return pdfDownloadResponse(buffer, filename);

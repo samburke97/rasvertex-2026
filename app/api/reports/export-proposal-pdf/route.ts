@@ -10,6 +10,7 @@ import {
   renderPDF,
   pdfDownloadResponse,
 } from "@/lib/server/pdf-utils";
+import { createImageResolver } from "@/lib/server/resolveReportImages";
 import type { ProposalData } from "@/lib/reports/proposal.types";
 
 // Front matter (Cover, Contents, Cover Letter) and the numbered body are
@@ -43,14 +44,20 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const resolve = createImageResolver();
+    const photos = await Promise.all(
+      report.photos.map(async (p) => ({ ...p, url: await resolve(p.url) })),
+    );
+    const pdfReport: ProposalData = { ...report, photos };
+
     const assets = loadReportAssets();
     // Same top/bottom margin on both renders so every page — front matter
     // or numbered — has identical breathing room and the two documents
     // line up visually once merged.
     const margin = { top: "80px", right: "0", bottom: "80px", left: "0" };
 
-    const frontMatterHtml = buildProposalFrontMatterHTML(report, assets);
-    const numberedHtml = buildProposalNumberedHTML(report, assets);
+    const frontMatterHtml = buildProposalFrontMatterHTML(pdfReport, assets);
+    const numberedHtml = buildProposalNumberedHTML(pdfReport, assets);
 
     const [frontMatterPdf, numberedPdf] = await Promise.all([
       renderPDF(frontMatterHtml, { margin }),

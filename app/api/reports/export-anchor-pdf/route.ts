@@ -5,6 +5,7 @@ import {
   renderPDF,
   pdfDownloadResponse,
 } from "@/lib/server/pdf-utils";
+import { createImageResolver } from "@/lib/server/resolveReportImages";
 import type { AnchorReportData } from "@/lib/reports/anchor.types";
 
 export async function POST(request: NextRequest) {
@@ -26,7 +27,21 @@ export async function POST(request: NextRequest) {
     );
 
   try {
-    const html = buildAnchorPrintHTML(report, loadReportAssets());
+    const resolve = createImageResolver();
+    const [photos, zones] = await Promise.all([
+      Promise.all(
+        report.photos.map(async (p) => ({ ...p, url: await resolve(p.url) })),
+      ),
+      Promise.all(
+        report.zones.map(async (z) => ({
+          ...z,
+          mapImageUrl: z.mapImageUrl ? await resolve(z.mapImageUrl) : z.mapImageUrl,
+        })),
+      ),
+    ]);
+    const pdfReport: AnchorReportData = { ...report, photos, zones };
+
+    const html = buildAnchorPrintHTML(pdfReport, loadReportAssets());
     const buffer = await renderPDF(html);
     return pdfDownloadResponse(buffer, filename);
   } catch (err) {
