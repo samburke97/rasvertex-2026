@@ -25,7 +25,13 @@ interface CertificationSectionProps {
 function buildAnchorRows(zones: Zone[]) {
   const map = new Map<
     string,
-    { label: string; qty: number; rating: string; passed: number; failed: number }
+    {
+      label: string;
+      qty: number;
+      rating: string;
+      passed: number;
+      failed: number;
+    }
   >();
   for (const zone of zones) {
     for (const anchor of zone.anchors) {
@@ -121,12 +127,12 @@ export default function CertificationSection({
               {
                 label: "Inspection Date:",
                 field: "inspectionDate" as keyof AnchorReportJob,
-                placeholder: "e.g. 5th March 2026",
+                placeholder: "e.g. 05.06.2026",
               },
               {
                 label: "Next Inspection Date:",
                 field: "nextInspectionDate" as keyof AnchorReportJob,
-                placeholder: "e.g. 5th March 2027",
+                placeholder: "e.g. 05.06.2027",
               },
               {
                 label: "Authorised By:",

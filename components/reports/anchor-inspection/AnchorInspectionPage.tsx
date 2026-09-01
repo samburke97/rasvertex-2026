@@ -30,6 +30,11 @@ import {
   type Zone,
 } from "@/lib/reports/anchor.types";
 import { filterPhotosByDateRange } from "@/lib/reports/photos";
+import {
+  formatReportDate,
+  formatReportDateText,
+  parseReportDate,
+} from "@/lib/reports/format-report-date";
 import type { EnrichedJob } from "@/lib/simpro/types";
 
 interface AnchorInspectionPageProps {
@@ -53,29 +58,6 @@ type PhotoLoadStatus =
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 const AUTOSAVE_RETRY_MS = 5000;
-
-// "11th March 2026" from a Date
-function formatOrdinalDate(d: Date): string {
-  const day = d.getDate();
-  const suffix =
-    day % 10 === 1 && day !== 11
-      ? "st"
-      : day % 10 === 2 && day !== 12
-        ? "nd"
-        : day % 10 === 3 && day !== 13
-          ? "rd"
-          : "th";
-  const month = d.toLocaleDateString("en-AU", { month: "long" });
-  return `${day}${suffix} ${month} ${d.getFullYear()}`;
-}
-
-// Parse en-AU "DD/MM/YYYY" → Date
-function parseAuDate(s: string): Date | null {
-  const p = s.split("/");
-  if (p.length !== 3) return null;
-  const d = new Date(+p[2], +p[1] - 1, +p[0]);
-  return isNaN(d.getTime()) ? null : d;
-}
 
 export default function AnchorInspectionPage({
   onBack,
@@ -208,18 +190,20 @@ export default function AnchorInspectionPage({
     (jobData: EnrichedJob, fallback: AnchorReportJob): AnchorReportJob => {
       let inspectionDate = fallback.inspectionDate;
       let nextInspectionDate = fallback.nextInspectionDate;
-      const d = parseAuDate(jobData.date);
+      const d = parseReportDate(jobData.date);
       if (d) {
-        inspectionDate = formatOrdinalDate(d);
+        inspectionDate = formatReportDate(d);
         const ny = new Date(d);
         ny.setFullYear(ny.getFullYear() + 1);
-        nextInspectionDate = formatOrdinalDate(ny);
+        nextInspectionDate = formatReportDate(ny);
       }
       return {
         ...fallback,
         preparedFor: jobData.preparedFor || "",
         address: jobData.siteAddress || "",
-        date: jobData.date || fallback.date,
+        date: jobData.date
+          ? formatReportDateText(jobData.date)
+          : fallback.date,
         certNumber: jobData.jobNo?.replace(/^#/, "") || "",
         buildingName: jobData.siteName || "",
         inspectionDate,

@@ -157,7 +157,7 @@ export default function AnchorPinModal({
           label="Commission Date"
           value={form.commissionDate ?? ""}
           onChange={(e) => set("commissionDate", e.target.value)}
-          placeholder="01 Jul 2017"
+          placeholder="05.06.2017"
         />
 
         <TextInput
@@ -165,7 +165,7 @@ export default function AnchorPinModal({
           label="Inspection Date"
           value={form.inspectionDate}
           onChange={(e) => set("inspectionDate", e.target.value)}
-          placeholder="07 Jan 2026"
+          placeholder="05.06.2026"
         />
 
         <TextInput
@@ -173,7 +173,7 @@ export default function AnchorPinModal({
           label="Next Inspection"
           value={form.nextInspection}
           onChange={(e) => set("nextInspection", e.target.value)}
-          placeholder="07 Jan 2027"
+          placeholder="05.06.2027"
         />
       </div>
 

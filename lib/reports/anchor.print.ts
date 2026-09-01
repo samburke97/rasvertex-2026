@@ -26,6 +26,7 @@ import {
   type ReportAssets,
 } from "./print-shared";
 import { PHOTO_LAYOUTS, buildPhotoPages, stripExt } from "./photos";
+import { formatReportDateText } from "./format-report-date";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,13 +57,16 @@ const PRINT_STYLES = `
   /* ── Page shell ── */
   .page {
     width: 210mm;
+    height: 297mm;
     min-height: 297mm;
+    max-height: 297mm;
     display: flex;
     flex-direction: column;
     page-break-after: always;
     break-after: page;
     overflow: hidden;
     background: #fff;
+    box-sizing: border-box;
   }
   .page:last-of-type { page-break-after: avoid; break-after: avoid; }
 
@@ -196,6 +200,7 @@ const PRINT_STYLES = `
   .zone-body {
     padding: 2rem 2.75rem 2rem;
     flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -253,7 +258,7 @@ const PRINT_STYLES = `
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  .zone-table { width: 100%; border-collapse: collapse; }
+  .zone-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   .zone-th {
     padding: 0.45rem 0.5rem;
     background: #f8fafc;
@@ -273,6 +278,12 @@ const PRINT_STYLES = `
     vertical-align: middle;
     font-size: 0.72rem;
   }
+  .zone-td-date { white-space: nowrap; }
+  .zone-col-asset { width: 12%; }
+  .zone-col-type { width: 34%; }
+  .zone-col-date { width: 13%; }
+  .zone-col-next { width: 15%; }
+  .zone-col-result { width: 13%; }
   /* ── Zone legend — compact wrapped chips, matches the live editor ── */
   .zone-legend {
     display: flex;
@@ -398,6 +409,8 @@ const PRINT_STYLES = `
   .cert-body {
     padding: 2.5rem 2.75rem 2rem;
     flex: 1;
+    min-height: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
@@ -524,6 +537,8 @@ const PRINT_STYLES = `
   .summary-body {
     padding: 2.5rem 2.75rem 2rem;
     flex: 1;
+    min-height: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -566,7 +581,7 @@ const PRINT_STYLES = `
      PHOTO PAGES — mirrors shared/PhotoSection.tsx / PhotoSection.module.css
      (same classes/values as condition.print.ts's photo pages)
   ───────────────────────────────────────────────────────────────────────── */
-  .photo-page { width:210mm; min-height:297mm; break-before:page; page-break-before:always; display:flex; flex-direction:column; justify-content:space-between; padding:2.75rem; }
+  .photo-page { width:210mm; height:297mm; min-height:297mm; max-height:297mm; box-sizing:border-box; overflow:hidden; break-before:page; page-break-before:always; display:flex; flex-direction:column; justify-content:space-between; padding:2.75rem; }
   .photo-page-inner { display:flex; flex-direction:column; gap:0.875rem; flex:1; }
   .photo-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:0.875rem; align-items:start; }
   .photo-item { display:flex; flex-direction:column; gap:0; min-width:0; width:100%; }
@@ -649,7 +664,7 @@ function buildCoverPage(
     { label: "Prepared For", value: job.preparedFor },
     { label: "Prepared By", value: job.preparedBy },
     { label: "Address", value: job.address },
-    { label: "Date", value: job.date },
+    { label: "Date", value: formatReportDateText(job.date) },
   ]
     .map(
       (r) =>
@@ -682,7 +697,9 @@ function buildCoverPage(
 // asset rows fit on the first page than on a continuation page (which is
 // just a repeated header + table). Splitting explicitly here — rather than
 // letting one unbounded div overflow and get auto-sliced by the printer —
-// is what keeps rows from being cut in half across a page boundary.
+// is what keeps rows from being cut in half across a page boundary, and
+// (with .page locked to 297mm) what keeps the footer from being pushed
+// onto the next sheet.
 //
 // The map and stats banner are fixed-height, but the legend is not — its
 // chips wrap (same compact layout as the live editor), so it grows by one
@@ -692,13 +709,11 @@ function buildCoverPage(
 // sized for a short legend silently overflows the page for a tall one,
 // pushing the footer onto its own orphaned page — so the first-page row
 // count is computed per zone from how much of the page the map/legend/
-// stats banner actually consume, rather than assumed constant. Pixel
-// estimates below come from the print CSS (map max-height, legend/stats
-// padding + row heights, A4 content height minus top bar/footer) with a
-// small safety margin.
-const ZONE_ROWS_CONTINUATION = 28;
-
-const ZONE_BODY_AVAILABLE_PX = 820; // A4 content height minus top-bar, footer, body padding
+// stats banner actually consume, rather than assumed constant. Continuation
+// pages use the same leftover-height math. Pixel estimates below come from
+// the print CSS (map max-height, legend/stats padding + row heights, A4
+// content height minus top bar/footer) with a safety margin.
+const ZONE_BODY_AVAILABLE_PX = 800; // A4 content height minus top-bar, footer, body padding (safety margin)
 const ZONE_BODY_GAP_PX = 24; // 1.5rem gap between each stacked block
 // .zone-map-wrap is width:100% at the zone's own mapImageRatio. Content
 // width = 210mm (~793.7px @96dpi) minus .zone-body's 2.75rem left/right
@@ -711,8 +726,17 @@ const ZONE_LEGEND_ROW_PX = 22; // per wrapped legend row, gap included
 const ZONE_LEGEND_TYPES_PER_ROW = 3; // conservative — "Fall Arrest Anchor"-length chips at page width
 const ZONE_REGISTER_LABEL_PX = 28;
 const ZONE_TABLE_HEADER_PX = 26;
-const ZONE_TABLE_ROW_PX = 26;
-const ZONE_ROWS_FIRST_PAGE_MAX = 12;
+const ZONE_TABLE_ROW_PX = 28;
+const ZONE_ROWS_FIRST_PAGE_MAX = 10;
+
+function computeRowBudget(consumedAboveTablePx: number): number {
+  const availableForRows =
+    ZONE_BODY_AVAILABLE_PX -
+    consumedAboveTablePx -
+    ZONE_REGISTER_LABEL_PX -
+    ZONE_TABLE_HEADER_PX;
+  return Math.max(1, Math.floor(availableForRows / ZONE_TABLE_ROW_PX));
+}
 
 function computeFirstPageRowBudget(
   mapRatio: number | null,
@@ -732,32 +756,26 @@ function computeFirstPageRowBudget(
     [mapPx, legendPx, statsPx].filter((h) => h > 0).length + 2;
   const gapsPx = (blockCount - 1) * ZONE_BODY_GAP_PX;
 
-  const availableForRows =
-    ZONE_BODY_AVAILABLE_PX -
-    mapPx -
-    legendPx -
-    statsPx -
-    gapsPx -
-    ZONE_REGISTER_LABEL_PX -
-    ZONE_TABLE_HEADER_PX;
-
-  return Math.max(
-    1,
-    Math.min(
-      ZONE_ROWS_FIRST_PAGE_MAX,
-      Math.floor(availableForRows / ZONE_TABLE_ROW_PX),
-    ),
+  return Math.min(
+    ZONE_ROWS_FIRST_PAGE_MAX,
+    computeRowBudget(mapPx + legendPx + statsPx + gapsPx),
   );
+}
+
+function computeContinuationRowBudget(): number {
+  // Continuation pages are register label + table only.
+  const gapsPx = ZONE_BODY_GAP_PX;
+  return computeRowBudget(gapsPx);
 }
 
 function buildAssetTableHead(): string {
   return `<thead><tr>
-           <th class="zone-th">Asset No.</th>
-           <th class="zone-th">Type</th>
-           <th class="zone-th">Commission</th>
-           <th class="zone-th">Inspection</th>
-           <th class="zone-th">Next Inspection</th>
-           <th class="zone-th">Pass/Fail</th>
+           <th class="zone-th zone-col-asset">Asset No.</th>
+           <th class="zone-th zone-col-type">Type</th>
+           <th class="zone-th zone-col-date">Commission</th>
+           <th class="zone-th zone-col-date">Inspection</th>
+           <th class="zone-th zone-col-next">Next Inspection</th>
+           <th class="zone-th zone-col-result">Pass/Fail</th>
          </tr></thead>`;
 }
 
@@ -806,13 +824,13 @@ function buildAssetTableRows(
         </div>
       </td>
       <td class="zone-td">${esc(anchorTypeDisplayLabel(a))}</td>
-      <td class="zone-td">${
+      <td class="zone-td zone-td-date">${
         a.commissionDate
-          ? esc(a.commissionDate)
+          ? esc(formatReportDateText(a.commissionDate))
           : `<span style="display:block;text-align:center;">-</span>`
       }</td>
-      <td class="zone-td">${esc(a.inspectionDate || "")}</td>
-      <td class="zone-td">${esc(a.nextInspection || "")}</td>
+      <td class="zone-td zone-td-date">${esc(formatReportDateText(a.inspectionDate || ""))}</td>
+      <td class="zone-td zone-td-date">${esc(formatReportDateText(a.nextInspection || ""))}</td>
       <td class="zone-td">${passFail}</td>
     </tr>`;
     })
@@ -930,9 +948,10 @@ function buildZonePages(zone: Zone, assets: ReportAssets): string {
   <div class="footer">${assocLogosHTML(assets)}</div>
 </div>`;
 
+  const continuationRowBudget = computeContinuationRowBudget();
   const continuationPages: string[] = [];
-  for (let i = 0; i < remainingAnchors.length; i += ZONE_ROWS_CONTINUATION) {
-    const chunk = remainingAnchors.slice(i, i + ZONE_ROWS_CONTINUATION);
+  for (let i = 0; i < remainingAnchors.length; i += continuationRowBudget) {
+    const chunk = remainingAnchors.slice(i, i + continuationRowBudget);
     continuationPages.push(`
 <div class="page">
   <div class="top-bar">
@@ -1035,8 +1054,8 @@ function buildCertificationPage(
         <tr><td class="cert-lbl">Attention:</td><td class="cert-val">${esc(job.preparedFor)}</td></tr>
         <tr><td class="cert-lbl">Building Name:</td><td class="cert-val">${esc(job.buildingName)}</td></tr>
         <tr><td class="cert-lbl">Building Address:</td><td class="cert-val">${esc(job.address)}</td></tr>
-        <tr><td class="cert-lbl">Inspection Date:</td><td class="cert-val">${esc(job.inspectionDate)}</td></tr>
-        <tr><td class="cert-lbl">Next Inspection Date:</td><td class="cert-val">${esc(job.nextInspectionDate)}</td></tr>
+        <tr><td class="cert-lbl">Inspection Date:</td><td class="cert-val">${esc(formatReportDateText(job.inspectionDate))}</td></tr>
+        <tr><td class="cert-lbl">Next Inspection Date:</td><td class="cert-val">${esc(formatReportDateText(job.nextInspectionDate))}</td></tr>
         <tr><td class="cert-lbl">Authorised By:</td><td class="cert-val">${esc(job.authorisedBy)}</td></tr>
       </tbody>
     </table>

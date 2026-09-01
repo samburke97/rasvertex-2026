@@ -14,6 +14,7 @@ import {
   DEFAULT_MAP_RATIO,
   type Zone,
 } from "@/lib/reports/anchor.types";
+import { formatReportDateText } from "@/lib/reports/format-report-date";
 
 interface ZoneSummarySectionProps {
   zone: Zone;
@@ -201,12 +202,18 @@ export default function ZoneSummarySection({
                         {anchorTypeDisplayLabel(anchor)}
                       </td>
                       <td className={styles.td}>
-                        {anchor.commissionDate || (
+                        {anchor.commissionDate ? (
+                          formatReportDateText(anchor.commissionDate)
+                        ) : (
                           <span className={styles.emptyDash}>-</span>
                         )}
                       </td>
-                      <td className={styles.td}>{anchor.inspectionDate}</td>
-                      <td className={styles.td}>{anchor.nextInspection}</td>
+                      <td className={styles.td}>
+                        {formatReportDateText(anchor.inspectionDate)}
+                      </td>
+                      <td className={styles.td}>
+                        {formatReportDateText(anchor.nextInspection)}
+                      </td>
                       <td className={styles.td}>
                         <span
                           className={`${styles.badge} ${
