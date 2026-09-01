@@ -65,7 +65,7 @@
 /* Dark-mode overrides, scoped to this component's own classes only — Modal
    is also used by the older (non-rv) Reports/Recurring Jobs screens, which
    don't otherwise participate in dark mode, so this intentionally doesn't
-   touch the shared --bg-card/--for-*/--out-* tokens themselves. */
+/* ... touch the shared --bg-card, --for-*, or --out-* tokens themselves. */
 :root[data-theme="dark"] .overlay {
   background: rgba(0, 0, 0, 0.6);
 }
