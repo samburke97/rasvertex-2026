@@ -43,11 +43,22 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     email?: string | null;
     phone?: string | null;
     stage?: LeadStage;
+    chasing?: boolean;
+    customFields?: Record<string, string>;
   };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  if (
+    body.customFields !== undefined &&
+    (typeof body.customFields !== "object" ||
+      body.customFields === null ||
+      Array.isArray(body.customFields))
+  ) {
+    return NextResponse.json({ error: "Invalid customFields" }, { status: 400 });
   }
 
   if (body.stage && !(LEAD_STAGES as readonly string[]).includes(body.stage)) {

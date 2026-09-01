@@ -1,98 +1,71 @@
-/* TopNavbar.module.css — plain white bar, maroon avatar badge */
+/* TopNavbar.module.css — slim utility bar inside the floating card */
 
 .topNav {
-  grid-area: header;
-  background: var(--bg-card, #fff);
-  border-bottom: 1px solid var(--out-light, #edf0f0);
+  height: 56px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 24px 0 0;
-  z-index: 1001;
-}
-
-.leftSection {
-  display: flex;
-  align-items: center;
-  margin-left: 24px;
-}
-
-.logoContainer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.logoIcon {
-  width: 60px;
-  height: 60px;
-}
-
-.rightSection {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--rv-line-strong, rgba(var(--rv-mix-rgb), 0.06));
 }
 
 .iconButton {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  background: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: transparent;
-  border-radius: var(--border-radius-full, 9999px);
   cursor: pointer;
-  transition: background 0.15s;
+  color: var(--rv-ink-60, rgba(var(--rv-ink-rgb), 0.62));
+  transition: background 120ms ease-out;
 }
 
 .iconButton:hover {
-  background: var(--con-light, #fafafa);
+  background: var(--rv-fill, rgba(var(--rv-mix-rgb), 0.04));
 }
 
-.icon {
-  width: 24px;
-  height: 24px;
+/* The search/notification icons are static SVG assets with a hardcoded
+   dark-grey stroke baked in (not currentColor-aware since they're rendered
+   as <img>, not inline) — invert them in dark mode so they stay legible. */
+:root[data-theme="dark"] .iconButton img {
+  filter: invert(1) brightness(1.5);
 }
 
 .profileBadge {
-  display: flex;
-  width: 42px;
-  height: 42px;
+  width: 28px;
+  height: 28px;
   padding: 0;
-  flex-direction: column;
+  border: none;
+  border-radius: 999px;
+  background: var(--rv-green, #1f6d4c);
+  color: #fff;
+  display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 1/1;
-  border-radius: var(--border-radius-full, 9999px);
-  border: none;
-  background: var(--brand-primary, #900c40);
   cursor: pointer;
-  transition: transform 0.15s;
   overflow: hidden;
-  position: relative;
+  flex-shrink: 0;
+  transition: background 120ms ease-out;
 }
 
 .profileBadge:hover {
-  background: var(--brand-primary-hover, #66082d);
-}
-
-.profileBadge:active {
-  transform: scale(0.96);
+  background: var(--rv-green-hover, #195a3f);
 }
 
 .profileImage {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: var(--border-radius-full, 9999px);
 }
 
 .profileInitials {
-  font-size: 14px;
+  font-size: 10.5px;
   font-weight: 600;
-  color: #fff;
   text-transform: uppercase;
   user-select: none;
 }

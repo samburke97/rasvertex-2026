@@ -1,0 +1,374 @@
+/* components/layouts/WorkspacePanel.module.css */
+
+.panel {
+  width: 244px;
+  flex-shrink: 0;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 12px 20px 0;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.newBtnWrap {
+  position: relative;
+}
+
+.newBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  border-radius: var(--rv-r-sm);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--rv-ink-60);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: background 120ms ease-out;
+}
+
+.newBtn:hover {
+  background: rgba(var(--rv-mix-rgb), 0.05);
+  color: var(--rv-ink);
+}
+
+.caret {
+  opacity: 0.5;
+}
+
+.newMenu {
+  position: absolute;
+  left: 0;
+  top: 34px;
+  width: 212px;
+  padding: 5px;
+  z-index: 80;
+  background: var(--rv-surface);
+  border: 1px solid rgba(var(--rv-mix-rgb), 0.08);
+  border-radius: 11px;
+  box-shadow: var(--rv-shadow-pop);
+}
+
+.newMenuRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 9px;
+  border-radius: var(--rv-r-sm);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 100ms ease-out;
+}
+
+.newMenuRow:hover {
+  background: rgba(var(--rv-mix-rgb), 0.04);
+}
+
+.newMenuRow > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: rgba(var(--rv-ink-rgb), 0.45);
+}
+
+.newMenuText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.newMenuText b {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--rv-ink);
+}
+
+.newMenuText i {
+  font-size: 11px;
+  font-style: normal;
+  color: rgba(var(--rv-ink-rgb), 0.42);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 4px;
+  background: rgba(var(--rv-mix-rgb), 0.04);
+  border-radius: var(--rv-r-md);
+  padding: 7px 10px;
+  flex-shrink: 0;
+}
+
+.search svg {
+  flex-shrink: 0;
+  color: rgba(var(--rv-ink-rgb), 0.35);
+}
+
+.search input {
+  border: 0;
+  background: none;
+  outline: none;
+  width: 100%;
+  font-size: 12.5px;
+  color: var(--rv-ink);
+  font-family: inherit;
+}
+
+.tree {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 4px;
+  border-radius: var(--rv-r-md);
+  transition: background 120ms ease-out;
+}
+
+.treeDragOver {
+  background: rgba(var(--rv-mix-rgb), 0.03);
+  outline: 1.5px dashed rgba(var(--rv-ink-rgb), 0.18);
+  outline-offset: -2px;
+}
+
+.loading {
+  font-size: 12px;
+  color: var(--rv-ink-40);
+  padding: 8px 10px;
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--rv-r-md);
+  cursor: pointer;
+  transition: background 120ms ease-out;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgba(var(--rv-ink-rgb), 0.66);
+}
+
+.row:hover {
+  background: rgba(var(--rv-mix-rgb), 0.035);
+}
+
+.rowChild {
+  padding-left: 26px;
+}
+
+.rowActive,
+.rowActive:hover {
+  background: var(--rv-green-tint);
+  color: var(--rv-ink);
+  font-weight: 600;
+}
+
+.rowDragging {
+  opacity: 0.4;
+}
+
+.rowDragOver {
+  background: var(--rv-green-tint);
+  box-shadow: inset 0 0 0 1.5px var(--rv-green);
+}
+
+.row > svg:not(.chev) {
+  flex-shrink: 0;
+  color: rgba(var(--rv-ink-rgb), 0.38);
+}
+
+.rowActive > svg:not(.chev) {
+  color: var(--rv-green);
+}
+
+.row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chev {
+  flex-shrink: 0;
+  color: rgba(var(--rv-ink-rgb), 0.28);
+  transition: transform 150ms ease-out;
+}
+
+.chevOpen {
+  transform: rotate(90deg);
+}
+
+.chevSpacer {
+  width: 10px;
+  flex-shrink: 0;
+}
+
+.renameInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: var(--rv-surface);
+  box-shadow: 0 0 0 2px var(--rv-green);
+  border-radius: 5px;
+  padding: 2px 5px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--rv-ink);
+}
+
+.newPage {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 4px;
+  padding: 7px 10px;
+  border-radius: var(--rv-r-md);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: rgba(var(--rv-ink-rgb), 0.45);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  transition:
+    background 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.newPage:hover {
+  background: rgba(var(--rv-mix-rgb), 0.035);
+  color: var(--rv-ink);
+}
+
+/* ── Right-click context menu ────────────────────────────────────────────── */
+.ctxMenu {
+  position: fixed;
+  width: 196px;
+  padding: 5px;
+  background: var(--rv-surface);
+  border: 1px solid rgba(var(--rv-mix-rgb), 0.08);
+  border-radius: 11px;
+  box-shadow: var(--rv-shadow-pop);
+  z-index: 90;
+}
+
+.ctxLabel {
+  padding: 7px 10px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(var(--rv-ink-rgb), 0.35);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctxRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--rv-r-sm);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: rgba(var(--rv-ink-rgb), 0.75);
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: background 100ms ease-out;
+}
+
+.ctxRow:hover {
+  background: rgba(var(--rv-mix-rgb), 0.04);
+}
+
+.ctxDanger {
+  color: var(--rv-red);
+}
+
+.ctxDanger:hover {
+  background: var(--rv-red-tint);
+}
+
+/* ── Delete confirm (rendered inside the shared Modal) ──────────────────── */
+.confirmBody {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--rv-ink-60);
+  margin: 0;
+}
+
+.confirmBody strong {
+  font-weight: 600;
+  color: var(--rv-ink);
+}
+
+.confirmActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 16px;
+}
+
+.confirmCancel {
+  height: 36px;
+  padding: 0 15px;
+  border-radius: var(--rv-r-md);
+  border: 1px solid rgba(var(--rv-mix-rgb), 0.1);
+  background: var(--rv-surface);
+  color: var(--rv-ink);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.confirmCancel:hover {
+  background: var(--rv-fill-hover);
+}
+
+.confirmDanger {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--rv-r-md);
+  border: 0;
+  background: var(--rv-red);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.confirmDanger:hover {
+  background: #9e3d23;
+}
+
+/* Mobile: hide the workspace panel entirely, matching the rail. */
+@media (max-width: 768px) {
+  .panel {
+    display: none;
+  }
+}

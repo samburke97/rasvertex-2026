@@ -101,7 +101,13 @@ export default function DataTable<T>({
               return (
                 <tr
                   key={rowId}
-                  onClick={() => onRowClick && onRowClick(row)}
+                  onClick={() => {
+                    // A text-selection drag (e.g. copying an email address
+                    // out of a cell) still ends in a click on mouseup —
+                    // don't treat that as "open this row" too.
+                    if (window.getSelection()?.toString()) return;
+                    onRowClick && onRowClick(row);
+                  }}
                   className={`${onRowClick ? styles.clickableRow : ""} ${
                     isSelected ? styles.selected : ""
                   } ${rowClassName ? rowClassName(row) : ""}`}

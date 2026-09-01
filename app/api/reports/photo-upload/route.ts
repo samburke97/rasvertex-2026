@@ -33,10 +33,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         allowedContentTypes: ["image/jpeg", "image/png", "image/webp"],
         addRandomSuffix: true,
       }),
-      onUploadCompleted: async () => {
-        // Nothing to persist here — the caller stores the returned URL on
-        // the report itself, same as any other photo field.
-      },
+      // No onUploadCompleted — there's nothing to persist here (the caller
+      // stores the returned URL on the report itself), and providing one
+      // makes the SDK require a publicly reachable callback URL, which
+      // logs a warning on every single upload in local dev where there
+      // isn't one.
     });
     return NextResponse.json(jsonResponse);
   } catch (error) {

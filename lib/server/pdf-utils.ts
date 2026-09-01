@@ -306,11 +306,19 @@ export function pdfDownloadResponse(
       controller.close();
     },
   });
+  // HTTP header values are Latin-1 only — the Response constructor throws
+  // if `clean` has so much as one en-dash or smart quote in it (common in
+  // a job/project name pasted from Word or SimPRO). filename* (RFC 5987)
+  // carries the real UTF-8 name for browsers that read it (all current
+  // ones do); the plain filename stays a pure-ASCII fallback so the header
+  // itself can never fail to encode, whatever the report's actual name is.
+  const asciiFilename = clean.replace(/[^\x20-\x7E]/g, "") || "report.pdf";
+  const contentDisposition = `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(clean)}`;
   return new Response(stream, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${clean}"`,
+      "Content-Disposition": contentDisposition,
     },
   });
 }

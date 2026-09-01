@@ -61,3 +61,32 @@
 .body {
   padding: 1.5rem;
 }
+
+/* Dark-mode overrides, scoped to this component's own classes only — Modal
+   is also used by the older (non-rv) Reports/Recurring Jobs screens, which
+   don't otherwise participate in dark mode, so this intentionally doesn't
+   touch the shared --bg-card/--for-*/--out-* tokens themselves. */
+:root[data-theme="dark"] .overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme="dark"] .modal {
+  background: var(--rv-surface);
+}
+
+:root[data-theme="dark"] .header {
+  background: var(--rv-surface);
+  border-bottom-color: var(--rv-line);
+}
+
+:root[data-theme="dark"] .title {
+  color: var(--rv-ink);
+}
+
+:root[data-theme="dark"] .closeBtn {
+  color: var(--rv-ink-60);
+}
+
+:root[data-theme="dark"] .closeBtn:hover {
+  background: var(--rv-fill);
+}

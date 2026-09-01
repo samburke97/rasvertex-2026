@@ -1,0 +1,241 @@
+/* components/workspace/DocEditor.module.css */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  cursor: text;
+}
+
+/* ── Bubble menu (shown on text selection) ──────────────────────────────── */
+.bubbleMenu {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 4px;
+  background: #18181b;
+  border-radius: var(--rv-r-md);
+  box-shadow: var(--rv-shadow-pop);
+  z-index: 60;
+}
+
+.bubbleDivider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.16);
+  margin: 0 3px;
+  flex-shrink: 0;
+}
+
+.bubbleBtn,
+.bubbleBtnActive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: none;
+  border: 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.bubbleBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.bubbleBtnActive {
+  background: var(--rv-green);
+  color: #fff;
+}
+
+/* ── Slash-command menu (typing "/") ─────────────────────────────────────── */
+.slashMenu {
+  width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--rv-surface);
+  border: 1px solid rgba(var(--rv-mix-rgb), 0.08);
+  border-radius: var(--rv-r-lg);
+  box-shadow: var(--rv-shadow-pop);
+}
+
+.slashItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: var(--rv-r-sm);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.slashItemActive {
+  background: var(--rv-fill);
+}
+
+.slashIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: var(--rv-fill);
+  color: var(--rv-ink-60);
+}
+
+.slashIconGlyph {
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.slashText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.slashText b {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--rv-ink);
+}
+
+.slashText i {
+  font-size: 11px;
+  font-style: normal;
+  color: var(--rv-ink-40);
+}
+
+.editorWrap {
+  flex: 1;
+  min-height: 200px;
+}
+
+/* ── Tiptap editable content — matches leads.css's doc block typography ──── */
+.editorContent {
+  outline: none;
+  font-family: inherit;
+  color: var(--rv-ink);
+  min-height: 200px;
+}
+
+.editorContent.isEmpty p:first-child::before {
+  content: attr(data-placeholder);
+  color: rgba(var(--rv-ink-rgb), 0.32);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+.editorContent p {
+  font-size: 15px;
+  line-height: 1.72;
+  color: rgba(var(--rv-ink-rgb), 0.78);
+  margin: 0 0 3px;
+}
+
+.editorContent h2 {
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.022em;
+  margin: 20px 0 4px;
+  color: var(--rv-ink);
+}
+
+.editorContent h2:first-child {
+  margin-top: 0;
+}
+
+.editorContent strong {
+  font-weight: 600;
+}
+
+.editorContent em {
+  font-style: italic;
+}
+
+.editorContent blockquote {
+  border-left: 2.5px solid rgba(var(--rv-ink-rgb), 0.2);
+  padding-left: 16px;
+  margin: 8px 0;
+}
+
+.editorContent blockquote p {
+  font-style: italic;
+  color: rgba(var(--rv-ink-rgb), 0.62);
+}
+
+.editorContent hr {
+  border: 0;
+  height: 1px;
+  background: rgba(var(--rv-mix-rgb), 0.08);
+  margin: 14px 0;
+}
+
+.editorContent ul,
+.editorContent ol {
+  padding-left: 1.4em;
+  margin: 4px 0 8px;
+}
+
+.editorContent ul {
+  list-style-type: disc;
+}
+
+.editorContent ol {
+  list-style-type: decimal;
+}
+
+.editorContent li {
+  font-size: 15px;
+  line-height: 1.7;
+  color: rgba(var(--rv-ink-rgb), 0.78);
+  margin-bottom: 3px;
+}
+
+.editorContent li p {
+  margin: 0;
+}
+
+/* Task list (checklist) */
+.editorContent ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.editorContent li[data-type="taskItem"] {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.editorContent li[data-type="taskItem"] > label {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.editorContent li[data-type="taskItem"] input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--rv-green);
+  cursor: pointer;
+}
+
+.editorContent li[data-type="taskItem"][data-checked="true"] > div {
+  color: rgba(var(--rv-ink-rgb), 0.38);
+  text-decoration: line-through;
+}

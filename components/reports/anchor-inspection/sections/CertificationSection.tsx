@@ -18,26 +18,34 @@ interface CertificationSectionProps {
   onUpdate: (field: keyof AnchorReportJob, value: string | null) => void;
 }
 
-// Aggregate anchor types across all zones → one row per type
+// Aggregate anchor types across all zones → one row per type. Tracks actual
+// passed/failed counts — a single "did any of this type fail" verdict
+// applied to the whole qty is misleading at scale (e.g. 28 failed out of 60
+// Rope Access Anchors read as "60 ... Fail", implying all 60 failed).
 function buildAnchorRows(zones: Zone[]) {
   const map = new Map<
     string,
-    { label: string; qty: number; rating: string; anyFail: boolean }
+    { label: string; qty: number; rating: string; passed: number; failed: number }
   >();
   for (const zone of zones) {
     for (const anchor of zone.anchors) {
       const existing = map.get(anchor.type);
-      if (existing) {
-        existing.qty += 1;
-        if (anchor.result === "FAILED") existing.anyFail = true;
-      } else {
-        map.set(anchor.type, {
-          label: ANCHOR_TYPE_LABELS[anchor.type],
-          qty: 1,
-          rating: ANCHOR_TYPE_IS_RATED[anchor.type] ? "15kn" : "-",
-          anyFail: anchor.result === "FAILED",
-        });
-      }
+      const row =
+        existing ??
+        (() => {
+          const created = {
+            label: ANCHOR_TYPE_LABELS[anchor.type],
+            qty: 0,
+            rating: ANCHOR_TYPE_IS_RATED[anchor.type] ? "15kn" : "-",
+            passed: 0,
+            failed: 0,
+          };
+          map.set(anchor.type, created);
+          return created;
+        })();
+      row.qty += 1;
+      if (anchor.result === "PASSED") row.passed += 1;
+      else if (anchor.result === "FAILED") row.failed += 1;
     }
   }
   return [...map.values()];
@@ -172,7 +180,8 @@ export default function CertificationSection({
                 <th className={styles.atHead}>Anchor Type</th>
                 <th className={styles.atHead}>QTY</th>
                 <th className={styles.atHead}>Rating</th>
-                <th className={styles.atHead}>Pass Or Fail</th>
+                <th className={styles.atHead}>Passed</th>
+                <th className={styles.atHead}>Failed</th>
               </tr>
             </thead>
             <tbody>
@@ -182,11 +191,14 @@ export default function CertificationSection({
                   <td className={styles.atCell}>{row.qty}</td>
                   <td className={styles.atCell}>{row.rating}</td>
                   <td
-                    className={`${styles.atCell} ${
-                      row.anyFail ? styles.atFail : styles.atPass
-                    }`}
+                    className={`${styles.atCell} ${row.passed > 0 ? styles.atPass : ""}`}
                   >
-                    {row.anyFail ? "Fail" : "Pass"}
+                    {row.passed}
+                  </td>
+                  <td
+                    className={`${styles.atCell} ${row.failed > 0 ? styles.atFail : ""}`}
+                  >
+                    {row.failed}
                   </td>
                 </tr>
               ))}

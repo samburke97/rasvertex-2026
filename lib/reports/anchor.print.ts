@@ -958,24 +958,32 @@ function buildCertificationPage(
   zones: Zone[],
   assets: ReportAssets,
 ): string {
-  // Aggregate anchor types across all zones
+  // Aggregate anchor types across all zones. Tracks actual passed/failed
+  // counts per type — a single "did any of this type fail" verdict applied
+  // to the whole qty is misleading at scale (e.g. 28 failed out of 60 Rope
+  // Access Anchors read as "60 ... Fail", implying all 60 failed).
   const typeMap = new Map<
     string,
-    { label: string; qty: number; anyFail: boolean }
+    { label: string; qty: number; passed: number; failed: number }
   >();
   for (const zone of zones) {
     for (const anchor of zone.anchors) {
       const existing = typeMap.get(anchor.type);
-      if (existing) {
-        existing.qty += 1;
-        if (anchor.result === "FAILED") existing.anyFail = true;
-      } else {
-        typeMap.set(anchor.type, {
-          label: ANCHOR_TYPE_LABELS[anchor.type],
-          qty: 1,
-          anyFail: anchor.result === "FAILED",
-        });
-      }
+      const row =
+        existing ??
+        (() => {
+          const created = {
+            label: ANCHOR_TYPE_LABELS[anchor.type],
+            qty: 0,
+            passed: 0,
+            failed: 0,
+          };
+          typeMap.set(anchor.type, created);
+          return created;
+        })();
+      row.qty += 1;
+      if (anchor.result === "PASSED") row.passed += 1;
+      else if (anchor.result === "FAILED") row.failed += 1;
     }
   }
 
@@ -986,7 +994,8 @@ function buildCertificationPage(
       <td class="at-cell">${esc(row.label)}</td>
       <td class="at-cell">${row.qty}</td>
       <td class="at-cell">${ANCHOR_TYPE_IS_RATED[type as keyof typeof ANCHOR_TYPE_IS_RATED] ? "15kn" : "-"}</td>
-      <td class="at-cell ${row.anyFail ? "at-fail" : "at-pass"}">${row.anyFail ? "Fail" : "Pass"}</td>
+      <td class="at-cell ${row.passed > 0 ? "at-pass" : ""}">${row.passed}</td>
+      <td class="at-cell ${row.failed > 0 ? "at-fail" : ""}">${row.failed}</td>
     </tr>`,
     )
     .join("");
@@ -998,7 +1007,8 @@ function buildCertificationPage(
             <th class="at-head">Anchor Type</th>
             <th class="at-head">QTY</th>
             <th class="at-head">Rating</th>
-            <th class="at-head">Pass Or Fail</th>
+            <th class="at-head">Passed</th>
+            <th class="at-head">Failed</th>
           </tr></thead>
           <tbody>${anchorTableRows}</tbody>
         </table>`

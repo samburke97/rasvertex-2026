@@ -20,8 +20,23 @@ function sql(): NeonQueryFunction<false, false> {
 //   email       TEXT,
 //   phone       TEXT,
 //   stage       TEXT NOT NULL DEFAULT 'cold',
+//   chasing     BOOLEAN NOT NULL DEFAULT FALSE,
 //   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 //   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+// );
+//
+// -- Existing DB, adding the "chase" star toggle to a table created before it existed:
+// ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS chasing BOOLEAN NOT NULL DEFAULT FALSE;
+//
+// -- Custom (Monday-style) status columns on the leads table:
+// ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS custom_fields JSONB NOT NULL DEFAULT '{}';
+//
+// CREATE TABLE IF NOT EXISTS crm_custom_columns (
+//   id          SERIAL PRIMARY KEY,
+//   label       TEXT NOT NULL,
+//   options     JSONB NOT NULL DEFAULT '[]', -- [{ id, label, color }]
+//   position    INTEGER NOT NULL DEFAULT 0,
+//   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 // );
 //
 // CREATE TABLE IF NOT EXISTS crm_lead_activity (
@@ -54,10 +69,10 @@ export const LEAD_STAGES = [
 export type LeadStage = (typeof LEAD_STAGES)[number];
 
 export const LEAD_STAGE_LABELS: Record<LeadStage, string> = {
-  cold: "Cold",
+  cold: "New leads",
   contacted: "Contacted",
-  qualified: "Qualified",
-  quoted: "Quoted",
+  qualified: "Follow up",
+  quoted: "Opportunities",
   won: "Won",
   lost: "Lost",
 };
@@ -69,8 +84,29 @@ export interface Lead {
   email: string | null;
   phone: string | null;
   stage: LeadStage;
+  chasing: boolean;
+  customFields: Record<string, string>;
   createdAt: string;
   updatedAt: string;
+}
+
+// ── Custom columns ───────────────────────────────────────────────────────────
+// User-defined "status"-style columns on the leads table (Monday.com-style):
+// a set of labelled, coloured options, with the chosen option id stored per
+// lead in Lead.customFields[column.id].
+
+export interface CustomColumnOption {
+  id: string;
+  label: string;
+  color: string;
+}
+
+export interface CustomColumn {
+  id: number;
+  label: string;
+  options: CustomColumnOption[];
+  position: number;
+  createdAt: string;
 }
 
 export type ActivityType = "note" | "email" | "stage_change";
@@ -103,8 +139,21 @@ function mapLead(r: any): Lead {
     email: r.email,
     phone: r.phone,
     stage: r.stage,
+    chasing: r.chasing,
+    customFields: r.custom_fields ?? {},
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapCustomColumn(r: any): CustomColumn {
+  return {
+    id: r.id,
+    label: r.label,
+    options: r.options ?? [],
+    position: r.position,
+    createdAt: r.created_at,
   };
 }
 
@@ -172,6 +221,10 @@ export interface UpdateLeadInput {
   email?: string | null;
   phone?: string | null;
   stage?: LeadStage;
+  chasing?: boolean;
+  // Shallow-merged into the existing custom_fields, so patching one custom
+  // column's value never clobbers another's.
+  customFields?: Record<string, string>;
 }
 
 // Writes a 'stage_change' activity row whenever `stage` actually changes, so
@@ -187,6 +240,9 @@ export async function updateLead(
   if (!existing) return null;
 
   const next = { ...existing, ...patch };
+  const mergedCustomFields = patch.customFields
+    ? { ...existing.customFields, ...patch.customFields }
+    : existing.customFields;
   const rows = await db`
     UPDATE crm_leads
     SET name = ${next.name},
@@ -194,6 +250,8 @@ export async function updateLead(
         email = ${next.email},
         phone = ${next.phone},
         stage = ${next.stage},
+        chasing = ${next.chasing},
+        custom_fields = ${JSON.stringify(mergedCustomFields)},
         updated_at = NOW()
     WHERE id = ${id}
     RETURNING *
@@ -207,6 +265,64 @@ export async function updateLead(
   }
 
   return mapLead(rows[0]);
+}
+
+// ── Custom columns ───────────────────────────────────────────────────────────
+
+export async function listCustomColumns(): Promise<CustomColumn[]> {
+  const db = sql();
+  const rows = await db`
+    SELECT * FROM crm_custom_columns ORDER BY position ASC, id ASC
+  `;
+  return rows.map(mapCustomColumn);
+}
+
+export async function createCustomColumn(
+  label: string,
+  options: CustomColumnOption[],
+): Promise<CustomColumn> {
+  const db = sql();
+  const [{ next_position }] = await db`
+    SELECT COALESCE(MAX(position), -1) + 1 AS next_position FROM crm_custom_columns
+  `;
+  const rows = await db`
+    INSERT INTO crm_custom_columns (label, options, position)
+    VALUES (${label}, ${JSON.stringify(options)}, ${next_position})
+    RETURNING *
+  `;
+  return mapCustomColumn(rows[0]);
+}
+
+export interface UpdateCustomColumnInput {
+  label?: string;
+  options?: CustomColumnOption[];
+}
+
+export async function updateCustomColumn(
+  id: number,
+  patch: UpdateCustomColumnInput,
+): Promise<CustomColumn | null> {
+  const db = sql();
+  const existing = await db`SELECT * FROM crm_custom_columns WHERE id = ${id}`;
+  if (!existing.length) return null;
+  const current = mapCustomColumn(existing[0]);
+
+  const rows = await db`
+    UPDATE crm_custom_columns
+    SET label = ${patch.label ?? current.label},
+        options = ${JSON.stringify(patch.options ?? current.options)}
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return mapCustomColumn(rows[0]);
+}
+
+export async function deleteCustomColumn(id: number): Promise<boolean> {
+  const db = sql();
+  const rows = await db`
+    DELETE FROM crm_custom_columns WHERE id = ${id} RETURNING id
+  `;
+  return rows.length > 0;
 }
 
 // ── Activity ─────────────────────────────────────────────────────────────────

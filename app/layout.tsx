@@ -28,6 +28,13 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} ${plusJakartaSans.variable}`}>
+        {/* Sets data-theme before first paint so a stored "dark" preference
+            never flashes light on load. Static string, no user input. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{if(localStorage.getItem("rv-theme")==="dark"){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}})();`,
+          }}
+        />
         {children}
         <Analytics />
       </body>

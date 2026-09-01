@@ -1,27 +1,63 @@
-/* Sidebar.module.css — slim icon rail, Vanguard-style red active indicator */
+/* Sidebar.module.css — icon rail */
 
-.sidebar {
-  grid-area: sidebar;
-  background: var(--bg-card, #fff);
-  border-right: 1px solid var(--out-light, #edf0f0);
+.rail {
+  width: 76px;
+  flex-shrink: 0;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 0;
-  z-index: 1000;
-  overflow: visible; /* allow tooltips to escape the rail */
+  gap: 28px;
+  padding: 20px 0;
+}
+
+.logo {
   position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--rv-surface, #fafaf9);
+  border: 1px solid var(--rv-line-strong, rgba(var(--rv-mix-rgb), 0.07));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.logo span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--rv-ink);
+}
+
+.collapseBadge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--rv-ink);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.collapseBadge svg {
+  transition: transform 180ms ease-out;
 }
 
 .navItems {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   align-items: center;
-  flex: 1;
-  margin-top: 24px;
-  overflow: visible;
 }
 
 .navItemWrapper {
@@ -29,116 +65,107 @@
   width: 100%;
   display: flex;
   justify-content: center;
-  overflow: visible;
-}
-
-/* Active indicator — a maroon bar flush against the sidebar's left edge */
-.navItemWrapper::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 28px;
-  border-radius: 0 3px 3px 0;
-  background: var(--brand-primary, #900c40);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.navItemWrapper.activeWrapper::before {
-  opacity: 1;
 }
 
 .navItem {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
   display: flex;
-  padding: 14px;
-  flex-direction: column;
-  justify-content: center;
   align-items: center;
-  gap: 10px;
-  border-radius: var(--border-radius-lg, 12px);
+  justify-content: center;
   text-decoration: none;
-  transition: background 0.15s;
-  position: relative;
-  width: 56px;
-  height: 56px;
+  color: var(--rv-ink-42, rgba(var(--rv-ink-rgb), 0.42));
+  transition:
+    background 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.navItem:focus-visible {
+  outline: 2px solid var(--rv-green);
+  outline-offset: 2px;
 }
 
 .navItem.hovered {
-  background: var(--con-light, #fafafa);
+  background: var(--rv-fill, rgba(var(--rv-mix-rgb), 0.04));
+  color: var(--rv-ink);
 }
 
 .navItem.active {
-  background: var(--con-light, #fafafa);
+  background: var(--rv-green-nav, #f0f5f2);
+  color: var(--rv-ink);
 }
 
 .iconContainer {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 21px;
+  height: 21px;
 }
 
 .icon {
-  width: 28px;
-  height: 28px;
-  transition: filter 0.2s ease;
+  width: 21px;
+  height: 21px;
 }
 
-.iconActive {
-  filter: brightness(0) saturate(100%);
+/* Static SVG assets with a hardcoded dark-grey stroke (not currentColor-
+   aware, rendered as <img>) — invert them in dark mode so they stay legible. */
+:root[data-theme="dark"] .icon {
+  filter: invert(1) brightness(1.5);
 }
 
 /* Tooltip */
 .tooltip {
   position: absolute;
-  left: calc(100% + 16px);
+  left: 56px;
   top: 50%;
   transform: translateY(-50%);
-  background: var(--grey-900, #141414);
-  color: #ffffff;
-  padding: 10px 16px;
-  border-radius: var(--border-radius-md, 8px);
-  font-size: 14px;
+  background: #18181b;
+  color: #fff;
+  font-size: 13px;
   font-weight: 500;
+  padding: 7px 14px;
+  border-radius: var(--rv-r-md, 9px);
   white-space: nowrap;
-  z-index: 1050;
-  opacity: 0;
+  z-index: 60;
   pointer-events: none;
-  animation: fadeIn 0.2s ease forwards;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--rv-shadow-pop);
 }
 
-.tooltip::before {
-  content: "";
-  position: absolute;
-  left: -8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 0;
-  height: 0;
-  border-top: 8px solid transparent;
-  border-bottom: 8px solid transparent;
-  border-right: 8px solid var(--grey-900, #141414);
+.spacer {
+  flex: 1;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-50%) translateX(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0);
-  }
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--rv-green-tint, #e7f3ec);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  cursor: pointer;
 }
 
-/* Mobile: hide sidebar completely */
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
+}
+
+.avatarInitials {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--rv-green, #1f6d4c);
+}
+
+/* Mobile: hide rail completely */
 @media (max-width: 768px) {
-  .sidebar {
+  .rail {
     display: none;
   }
 }

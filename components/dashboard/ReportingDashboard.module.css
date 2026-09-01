@@ -1,0 +1,568 @@
+/* components/dashboard/ReportingDashboard.module.css */
+/* --dash-* is a thin alias layer over the app-wide --rv-* tokens (kept so
+   this file's selectors read clearly) — it carries no dark-mode logic of
+   its own any more. Dark mode is a single global toggle (top nav) that
+   redefines --rv-* at :root; since every alias below points at an --rv-*
+   token, this page just follows along automatically. */
+
+.root {
+  --dash-page: transparent;
+  --dash-card: var(--rv-surface);
+  --dash-border: var(--rv-line);
+  --dash-divider: var(--rv-line);
+  --dash-text: var(--rv-ink);
+  --dash-text-strong: rgba(var(--rv-ink-rgb), 0.9);
+  --dash-text-secondary: var(--rv-ink-60);
+  --dash-text-tertiary: var(--rv-ink-40);
+  --dash-fill: var(--rv-fill);
+  --dash-brand: var(--rv-green);
+  --dash-red: var(--rv-red);
+  --dash-red-tint: var(--rv-red-tint);
+  --dash-gold: var(--rv-gold);
+  --dash-gold-tint: var(--rv-gold-tint);
+  --dash-green-tint: var(--rv-green-tint);
+  --dash-grid-line: var(--rv-line);
+
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  color: var(--dash-text);
+  background: var(--dash-page);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.headerText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 13.5px;
+  color: var(--dash-text-secondary);
+  margin: 0;
+}
+
+.headerTools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.segment {
+  display: flex;
+  background: var(--dash-fill);
+  border-radius: var(--rv-r-md, 9px);
+  padding: 3px;
+  gap: 2px;
+}
+
+.segment button {
+  border: 0;
+  background: none;
+  color: var(--dash-text-secondary);
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 12.5px;
+  padding: 6px 13px;
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.segOn {
+  background: var(--dash-card);
+  color: var(--dash-text);
+  box-shadow: 0 1px 3px rgba(var(--rv-mix-rgb), 0.15);
+}
+
+/* ── Insight bar ─────────────────────────────────────────────────────────── */
+.insight {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: var(--dash-fill);
+  border: 1px solid var(--dash-border);
+}
+
+.insightIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--dash-card);
+  color: var(--dash-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.insight p {
+  font-size: 13.5px;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  color: var(--dash-text-secondary);
+}
+
+.insight strong {
+  color: var(--dash-text);
+  font-weight: 600;
+}
+
+.dismiss {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--dash-text-secondary);
+  flex-shrink: 0;
+}
+
+.dismiss:hover {
+  background: rgba(var(--rv-mix-rgb), 0.06);
+}
+
+.demoBadge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--dash-gold-tint);
+  color: var(--dash-gold);
+  vertical-align: middle;
+}
+
+/* ── KPI grid ────────────────────────────────────────────────────────────── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.kpiCard {
+  background: var(--dash-card);
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition:
+    box-shadow 150ms ease-out,
+    transform 150ms ease-out;
+}
+
+.kpiCard:hover {
+  box-shadow: 0 6px 16px rgba(var(--rv-mix-rgb), 0.06);
+  transform: translateY(-2px);
+}
+
+.kpiTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--dash-brand);
+}
+
+.kpiIcon {
+  flex-shrink: 0;
+}
+
+.sparkline {
+  opacity: 0.9;
+}
+
+.kpiBody {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.kpiLabel {
+  font-size: 12.5px;
+  color: var(--dash-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kpiValue {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.kpiLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  width: fit-content;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--dash-text);
+  color: var(--dash-card);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.kpiDelta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.deltaGood {
+  background: var(--dash-green-tint);
+  color: #3f8f68;
+}
+
+.deltaBad {
+  background: var(--dash-red-tint);
+  color: var(--dash-red);
+}
+
+/* ── Charts ──────────────────────────────────────────────────────────────── */
+.chartsRow {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 14px;
+}
+
+.card {
+  background: var(--dash-card);
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cardHead h3 {
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.areaChart {
+  width: 100%;
+  height: 200px;
+  overflow: visible;
+}
+
+.monthLabels {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 10px;
+}
+
+.monthLabels span {
+  font-size: 11px;
+  text-align: center;
+  color: var(--dash-text-tertiary);
+}
+
+.donutWrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+  flex: 1;
+}
+
+.donut {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.donutCenter {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.donutBig {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.donutSmall {
+  font-size: 11px;
+  color: var(--dash-text-secondary);
+}
+
+.legendList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legendSq {
+  width: 8px;
+  height: 8px;
+  border-radius: 2.5px;
+  flex-shrink: 0;
+}
+
+.legendName {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--dash-text-strong);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendPct {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dash-text-secondary);
+  background: var(--dash-fill);
+  padding: 2px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+/* ── Overdue invoices ────────────────────────────────────────────────────── */
+.invoicesSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sectionHead h3 {
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.sectionHead p {
+  font-size: 12.5px;
+  color: var(--dash-text-secondary);
+  margin: 4px 0 0;
+}
+
+.agingGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.agingCard {
+  background: var(--dash-card);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agingLabel {
+  font-size: 11.5px;
+  color: var(--dash-text-secondary);
+}
+
+.agingAmount {
+  font-size: 16.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--dash-text);
+}
+
+.agingAmountWarn {
+  color: var(--dash-red);
+}
+
+.agingCount {
+  font-size: 11px;
+  color: var(--dash-text-tertiary);
+}
+
+.table {
+  background: var(--dash-card);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.tableHead,
+.tableRow {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 0.9fr;
+  min-width: 620px;
+  padding: 12px 18px;
+  align-items: center;
+}
+
+.tableHead {
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--dash-divider);
+}
+
+.tableHead span {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--dash-text-secondary);
+}
+
+.tableRow {
+  border-bottom: 1px solid var(--dash-divider);
+  transition: background 120ms ease-out;
+}
+
+.tableRow:last-child {
+  border-bottom: none;
+}
+
+.tableRow:hover {
+  background: var(--dash-fill);
+}
+
+.clientCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.clientAvatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.clientInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.clientName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dash-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clientSuburb {
+  font-size: 11.5px;
+  color: var(--dash-text-secondary);
+}
+
+.cellSecondary {
+  font-size: 13px;
+  color: var(--dash-text-secondary);
+}
+
+.cellStrong {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--dash-text-strong);
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.statusOverdue {
+  background: var(--dash-red-tint);
+  color: var(--dash-red);
+}
+
+.statusDuesoon {
+  background: var(--dash-gold-tint);
+  color: var(--dash-gold);
+}
+
+@media (max-width: 900px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .chartsRow {
+    grid-template-columns: 1fr;
+  }
+  .agingGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

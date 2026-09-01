@@ -177,6 +177,99 @@ body {
   /* Layout */
   --sidebar-width: 100px;
   --header-height: 80px;
+
+  /* ── Redesign palette ────────────────────────────────────────────────────
+     Green/ink system for the app shell (rail nav) and each screen as it gets
+     redesigned — see CrmDashboard for the first full application. Additive:
+     existing --brand-primary (maroon) usages are untouched until their own
+     component is redesigned in turn. */
+  --rv-page: #f6f6f4;
+  --rv-surface: #ffffff;
+  --rv-surface-soft: #fbfbfa;
+  --rv-ink: #17171a;
+  /* Bare R,G,B channels for the app's ink colour — every rgba(23, 23, 26, X)
+     literal sprinkled through the rv-* component CSS is written as
+     rgba(var(--rv-ink-rgb), X) instead, so it inverts correctly in dark mode
+     without needing a dedicated --rv-ink-NN token for every one-off alpha. */
+  --rv-ink-rgb: 23, 23, 26;
+  /* Same idea for black-based hairline borders/fills (rgba(0, 0, 0, X)) —
+     in dark mode these become white-based instead. */
+  --rv-mix-rgb: 0, 0, 0;
+  --rv-ink-70: rgba(23, 23, 26, 0.7);
+  --rv-ink-60: rgba(23, 23, 26, 0.6);
+  --rv-ink-50: rgba(23, 23, 26, 0.5);
+  --rv-ink-42: rgba(23, 23, 26, 0.42);
+  --rv-ink-40: rgba(23, 23, 26, 0.4);
+  --rv-ink-34: rgba(23, 23, 26, 0.34);
+  --rv-ink-30: rgba(23, 23, 26, 0.3);
+  --rv-line: rgba(23, 23, 26, 0.05);
+  --rv-line-strong: rgba(0, 0, 0, 0.09);
+  --rv-fill: rgba(0, 0, 0, 0.045);
+  --rv-fill-hover: rgba(0, 0, 0, 0.035);
+
+  --rv-green: #1f6d4c;
+  --rv-green-hover: #195a3f;
+  --rv-green-tint: #e7f3ec;
+  --rv-green-tint-2: #eef4f0;
+  --rv-green-nav: #f0f5f2;
+  --rv-slate: #4b6b7e;
+  --rv-slate-tint: #edf2f5;
+  --rv-gold: #96731f;
+  --rv-gold-tint: #fbf4e5;
+  --rv-red: #b8492b;
+  --rv-red-tint: #fbeeea;
+
+  --rv-r-sm: 8px;
+  --rv-r-md: 9px;
+  --rv-r-lg: 12px;
+  --rv-r-xl: 16px;
+  --rv-r-2xl: 18px;
+  --rv-shadow-card:
+    0 1px 2px rgba(23, 23, 26, 0.04), 0 8px 24px -8px rgba(23, 23, 26, 0.08);
+  --rv-shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Dark theme ──────────────────────────────────────────────────────────────
+   Global toggle (top nav), applies to <html data-theme="dark">. Every rv-*
+   component reads these same tokens, so redefining them here is enough to
+   flip the whole app shell/CRM/workspace/dashboard at once. Reports and
+   Recurring Jobs still run on the older --for-/--out-/--brand- token system
+   (predates this redesign) and intentionally aren't touched — retheming
+   those production report-builders wasn't part of this pass. */
+:root[data-theme="dark"] {
+  --rv-page: #0b0b0c;
+  --rv-surface: #18181b;
+  --rv-surface-soft: #1c1c1f;
+  --rv-ink: #f2f2f0;
+  --rv-ink-rgb: 242, 242, 240;
+  --rv-mix-rgb: 255, 255, 255;
+  --rv-ink-70: rgba(242, 242, 240, 0.72);
+  --rv-ink-60: rgba(242, 242, 240, 0.62);
+  --rv-ink-50: rgba(242, 242, 240, 0.52);
+  --rv-ink-42: rgba(242, 242, 240, 0.44);
+  --rv-ink-40: rgba(242, 242, 240, 0.42);
+  --rv-ink-34: rgba(242, 242, 240, 0.36);
+  --rv-ink-30: rgba(242, 242, 240, 0.32);
+  --rv-line: rgba(255, 255, 255, 0.08);
+  --rv-line-strong: rgba(255, 255, 255, 0.14);
+  --rv-fill: rgba(255, 255, 255, 0.07);
+  --rv-fill-hover: rgba(255, 255, 255, 0.05);
+
+  --rv-green: #2f8f66;
+  --rv-green-hover: #279e70;
+  --rv-green-tint: rgba(47, 143, 102, 0.18);
+  --rv-green-tint-2: rgba(47, 143, 102, 0.14);
+  --rv-green-nav: rgba(47, 143, 102, 0.16);
+  --rv-slate: #8fb2c4;
+  --rv-slate-tint: rgba(143, 178, 196, 0.16);
+  --rv-gold: #d3ad5c;
+  --rv-gold-tint: rgba(211, 173, 92, 0.16);
+  --rv-red: #e08669;
+  --rv-red-tint: rgba(224, 134, 105, 0.16);
+
+  --rv-shadow-card:
+    0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  --rv-shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.55);
 }
 
 h1 {

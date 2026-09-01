@@ -14,7 +14,7 @@ interface SidebarItem {
 }
 
 const sidebarItems: SidebarItem[] = [
-  { icon: "/icons/menu/home.svg", href: "/dashboard", label: "Home" },
+  { icon: "/icons/menu/home.svg", href: "/dashboard", label: "Dashboard" },
   { icon: "/icons/menu/reports.svg", href: "/reports", label: "Reports" },
   {
     icon: "/icons/menu/calendar.svg",
@@ -27,7 +27,7 @@ const sidebarItems: SidebarItem[] = [
     // Inline — no /icons/menu/crm.svg asset exists yet, and svgIcon avoids
     // needing one (or a -filled variant) just for this one nav entry.
     svgIcon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
         <circle cx="9" cy="8" r="3.25" stroke="currentColor" strokeWidth="1.6" />
         <path
           d="M3.5 19c0-3.038 2.462-5.5 5.5-5.5s5.5 2.462 5.5 5.5"
@@ -44,18 +44,19 @@ const sidebarItems: SidebarItem[] = [
       </svg>
     ),
   },
-  // { icon: "/icons/menu/sales.svg", href: "/sales", label: "Sales" },
-  // { icon: "/icons/menu/inventory.svg", href: "/inventory", label: "Inventory" },
-  // {
-  //   icon: "/icons/menu/marketplace.svg",
-  //   href: "/marketplace",
-  //   label: "Marketplace",
-  // },
-  // { icon: "/icons/menu/players.svg", href: "/players", label: "Players" },
-  // { icon: "/icons/menu/settings.svg", href: "/settings", label: "Settings" },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  showWorkspaceToggle: boolean;
+  workspaceCollapsed: boolean;
+  onToggleWorkspace: () => void;
+}
+
+export default function Sidebar({
+  showWorkspaceToggle,
+  workspaceCollapsed,
+  onToggleWorkspace,
+}: SidebarProps) {
   const pathname = usePathname();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
@@ -66,25 +67,40 @@ export default function Sidebar() {
     return pathname?.startsWith(href);
   };
 
-  const getIconPath = (iconPath: string, active: boolean) => {
-    if (active) {
-      return iconPath.replace(".svg", "-filled.svg");
-    }
-    return iconPath;
-  };
+  const getProfileInitials = () => "U"; // Ultimate fallback — no auth session wired up yet
+  const getProfileImage = (): string | null => null; // OAuth profile image, once wired up
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={styles.rail}>
+      <div className={styles.logo} title="RAS-VERTEX">
+        <span>RV</span>
+        {showWorkspaceToggle && (
+          <button
+            type="button"
+            className={styles.collapseBadge}
+            onClick={onToggleWorkspace}
+            aria-label={workspaceCollapsed ? "Expand workspace panel" : "Collapse workspace panel"}
+          >
+            <svg
+              width="8"
+              height="8"
+              viewBox="0 0 24 24"
+              fill="none"
+              style={{ transform: workspaceCollapsed ? "rotate(0deg)" : "rotate(180deg)" }}
+            >
+              <path d="M9 5L16 12L9 19" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+      </div>
+
       <nav className={styles.navItems}>
         {sidebarItems.map((item) => {
           const itemIsActive = isActive(item.href);
           const isHovered = hoveredItem === item.href;
 
           return (
-            <div
-              key={item.href}
-              className={`${styles.navItemWrapper} ${itemIsActive ? styles.activeWrapper : ""}`}
-            >
+            <div key={item.href} className={styles.navItemWrapper}>
               <Link
                 href={item.href}
                 className={`${styles.navItem} ${itemIsActive ? styles.active : ""} ${isHovered ? styles.hovered : ""}`}
@@ -93,36 +109,35 @@ export default function Sidebar() {
               >
                 <div className={styles.iconContainer}>
                   {item.svgIcon ? (
-                    <span
-                      style={{
-                        color: itemIsActive ? "#111827" : "#6b7280",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 28,
-                        height: 28,
-                      }}
-                    >
-                      {item.svgIcon}
-                    </span>
+                    item.svgIcon
                   ) : item.icon ? (
                     <Image
-                      src={getIconPath(item.icon, itemIsActive)}
+                      src={item.icon}
                       alt={item.label}
-                      width={28}
-                      height={28}
-                      className={`${styles.icon} ${itemIsActive ? styles.iconActive : ""}`}
+                      width={21}
+                      height={21}
+                      className={styles.icon}
                     />
                   ) : null}
                 </div>
               </Link>
 
-              {/* Tooltip */}
               {isHovered && <div className={styles.tooltip}>{item.label}</div>}
             </div>
           );
         })}
       </nav>
+
+      <div className={styles.spacer} />
+
+      <button className={styles.avatar} title="Account" type="button">
+        {getProfileImage() ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={getProfileImage()!} alt="Profile" className={styles.avatarImage} />
+        ) : (
+          <span className={styles.avatarInitials}>{getProfileInitials()}</span>
+        )}
+      </button>
     </aside>
   );
 }
