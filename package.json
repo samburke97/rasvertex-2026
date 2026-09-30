@@ -21,6 +21,7 @@
     "@hookform/resolvers": "^4.1.3",
     "@neondatabase/serverless": "^1.0.2",
     "@prisma/client": "^6.11.1",
+    "@react-pdf/renderer": "^4.9.0",
     "@sparticuz/chromium": "^147.0.0",
     "@tailwindcss/cli": "^4.1.11",
     "@tiptap/extension-placeholder": "^3.20.0",

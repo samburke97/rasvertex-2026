@@ -799,6 +799,7 @@ function legendIconHTML(icon: LegendIconShape, colour: string): string {
     square: `<rect x="2" y="2" width="10" height="10" rx="1.5" fill="${colour}" />`,
     triangle: `<polygon points="7,1.5 13,12.5 1,12.5" fill="${colour}" />`,
     diamond: `<polygon points="7,1 13,7 7,13 1,7" fill="${colour}" />`,
+    bar: `<rect x="1" y="4.5" width="12" height="5" rx="1" fill="${colour}" />`,
   };
   return `<svg class="zone-legend-shape-icon" width="14" height="14" viewBox="0 0 14 14">${shapes[icon] ?? ""}</svg>`;
 }

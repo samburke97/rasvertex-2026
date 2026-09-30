@@ -44,6 +44,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     phone?: string | null;
     stage?: LeadStage;
     chasing?: boolean;
+    salesperson?: string | null;
+    suburb?: string | null;
+    industry?: string | null;
     customFields?: Record<string, string>;
   };
   try {

@@ -31,6 +31,19 @@ function sql(): NeonQueryFunction<false, false> {
 // -- Custom (Monday-style) status columns on the leads table:
 // ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS custom_fields JSONB NOT NULL DEFAULT '{}';
 //
+// -- Filter-panel attributes (salesperson/suburb/industry chips):
+// ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS salesperson TEXT;
+// ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS suburb TEXT;
+// ALTER TABLE crm_leads ADD COLUMN IF NOT EXISTS industry TEXT;
+//
+// -- Per-stage group header colour (the colour-picker popover on each group
+// -- square). One row per customised stage; a stage with no row here just
+// -- falls back to STAGE_COLORS in CrmDashboard.tsx.
+// CREATE TABLE IF NOT EXISTS crm_group_colors (
+//   stage  TEXT PRIMARY KEY,
+//   color  TEXT NOT NULL
+// );
+//
 // CREATE TABLE IF NOT EXISTS crm_custom_columns (
 //   id          SERIAL PRIMARY KEY,
 //   label       TEXT NOT NULL,
@@ -85,6 +98,9 @@ export interface Lead {
   phone: string | null;
   stage: LeadStage;
   chasing: boolean;
+  salesperson: string | null;
+  suburb: string | null;
+  industry: string | null;
   customFields: Record<string, string>;
   createdAt: string;
   updatedAt: string;
@@ -140,6 +156,9 @@ function mapLead(r: any): Lead {
     phone: r.phone,
     stage: r.stage,
     chasing: r.chasing,
+    salesperson: r.salesperson,
+    suburb: r.suburb,
+    industry: r.industry,
     customFields: r.custom_fields ?? {},
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -197,18 +216,24 @@ export interface CreateLeadInput {
   email?: string | null;
   phone?: string | null;
   stage?: LeadStage;
+  salesperson?: string | null;
+  suburb?: string | null;
+  industry?: string | null;
 }
 
 export async function createLead(input: CreateLeadInput): Promise<Lead> {
   const db = sql();
   const rows = await db`
-    INSERT INTO crm_leads (name, company, email, phone, stage)
+    INSERT INTO crm_leads (name, company, email, phone, stage, salesperson, suburb, industry)
     VALUES (
       ${input.name},
       ${input.company ?? null},
       ${input.email ?? null},
       ${input.phone ?? null},
-      ${input.stage ?? "cold"}
+      ${input.stage ?? "cold"},
+      ${input.salesperson ?? null},
+      ${input.suburb ?? null},
+      ${input.industry ?? null}
     )
     RETURNING *
   `;
@@ -222,6 +247,9 @@ export interface UpdateLeadInput {
   phone?: string | null;
   stage?: LeadStage;
   chasing?: boolean;
+  salesperson?: string | null;
+  suburb?: string | null;
+  industry?: string | null;
   // Shallow-merged into the existing custom_fields, so patching one custom
   // column's value never clobbers another's.
   customFields?: Record<string, string>;
@@ -251,6 +279,9 @@ export async function updateLead(
         phone = ${next.phone},
         stage = ${next.stage},
         chasing = ${next.chasing},
+        salesperson = ${next.salesperson},
+        suburb = ${next.suburb},
+        industry = ${next.industry},
         custom_fields = ${JSON.stringify(mergedCustomFields)},
         updated_at = NOW()
     WHERE id = ${id}
@@ -433,3 +464,28 @@ export const markClicked = (resendEmailId: string) =>
   markEmailEventOnce(resendEmailId, "clicked_at");
 export const markBounced = (resendEmailId: string) =>
   markEmailEventOnce(resendEmailId, "bounced_at");
+
+// ── Group (stage) header colours ────────────────────────────────────────────
+// User overrides for the group-header square colour, set via the colour
+// picker popover. Keyed by stage; a stage with no row here uses the
+// STAGE_COLORS default in CrmDashboard.tsx.
+
+export async function listGroupColors(): Promise<Record<string, string>> {
+  const db = sql();
+  const rows = await db`SELECT stage, color FROM crm_group_colors`;
+  const out: Record<string, string> = {};
+  for (const r of rows) out[r.stage as string] = r.color as string;
+  return out;
+}
+
+export async function setGroupColor(
+  stage: LeadStage,
+  color: string,
+): Promise<void> {
+  const db = sql();
+  await db`
+    INSERT INTO crm_group_colors (stage, color)
+    VALUES (${stage}, ${color})
+    ON CONFLICT (stage) DO UPDATE SET color = EXCLUDED.color
+  `;
+}

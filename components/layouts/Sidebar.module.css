@@ -82,7 +82,7 @@
 }
 
 .navItem:focus-visible {
-  outline: 2px solid var(--rv-green);
+  outline: 2px solid var(--rv-accent);
   outline-offset: 2px;
 }
 
@@ -92,7 +92,7 @@
 }
 
 .navItem.active {
-  background: var(--rv-green-nav, #f0f5f2);
+  background: var(--rv-accent-nav, #edf4fa);
   color: var(--rv-ink);
 }
 
@@ -141,7 +141,7 @@
   width: 34px;
   height: 34px;
   border-radius: 999px;
-  background: var(--rv-green-tint, #e7f3ec);
+  background: var(--rv-accent-tint, #e9f2f9);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,7 +160,7 @@
 .avatarInitials {
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--rv-green, #1f6d4c);
+  color: var(--rv-accent-ink, #2f6a94);
 }
 
 /* Mobile: hide rail completely */

@@ -50,7 +50,7 @@
 }
 
 .bubbleBtnActive {
-  background: var(--rv-green);
+  background: var(--rv-accent);
   color: #fff;
 }
 
@@ -231,7 +231,7 @@
 .editorContent li[data-type="taskItem"] input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  accent-color: var(--rv-green);
+  accent-color: var(--rv-accent);
   cursor: pointer;
 }
 

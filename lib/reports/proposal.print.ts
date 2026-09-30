@@ -526,29 +526,29 @@ function buildWhyPrepDifferent(a: ReportAssets): string {
     {
       n: "01",
       title: "We repair before we coat.",
-      body: "Cracks and substrate defects get repaired properly before any coating goes on — never a patch job. Our painters, waterproofers and remedial teams are all direct employees under one licence, so whatever turns up mid-job is fixed to spec by our own crew, not a subbie.",
+      body: "We repair cracks and substrate defects before any coating goes on — never a patch job. Our painters, waterproofers and remedial teams are all direct employees under one licence, so issues are fixed to spec by our own crew, not a subbie.",
       img: a.proposal.whyPrep1,
     },
     {
       n: "02",
       title: "Coastal systems, not generic ones.",
-      body: "Salt air, UV and humidity behave differently within 5km of the water, so our coating systems and prep are specified for that exposure — not the same system regardless of where the building sits.",
+      body: "Salt air, UV and humidity behave differently within 5km of the water, so our coating systems and prep are specified for that exposure, not applied the same regardless of where the building sits.",
       img: a.proposal.whyPrep2,
     },
   ];
   return `
-  <section id="sec-09" style="padding:64px 48px 32px;break-before:page;">
+  <section id="sec-09" style="padding:48px 48px 20px;break-before:page;">
     <div style="max-width:1400px;margin:0 auto;">
-      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 28px;break-after:avoid;">Why Our Prep Is Different</h2>
+      <h2 style="font-size:clamp(2rem,3.5vw,3rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0 0 20px;break-after:avoid;">Why Our Prep Is Different</h2>
       <div>
         ${cards
           .map(
             (c, i) => `
         <div style="float:left;width:calc(50% - 5px);margin-right:${i === 0 ? "10px" : "0"};break-inside:avoid;">
-          <div style="width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:rgba(1,25,85,0.08);">
+          <div style="width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:rgba(1,25,85,0.08);">
             <img src="${esc(c.img)}" alt="" style="width:100%;height:100%;object-fit:cover;">
           </div>
-          <div style="display:flex;flex-direction:column;gap:12px;margin-top:24px;">
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px;">
             <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:1.25rem;letter-spacing:0.05em;color:rgba(1,25,85,0.4);">${c.n}</span>
             <h3 style="font-size:1.5rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">${c.title}</h3>
             <p style="font-size:1.0625rem;color:rgba(1,25,85,0.6);margin:0;">${c.body}</p>
@@ -612,18 +612,18 @@ function buildProjectTeam(report: ProposalData, a: ReportAssets): string {
 
 function buildWarranty(a: ReportAssets): string {
   return `
-  <section id="sec-08" style="padding:0 48px 64px;">
+  <section id="sec-08" style="padding:0 48px 48px;">
     <div style="max-width:1400px;margin:0 auto;">
-      <div style="background:${PALE_BLUE};border-radius:24px;padding:40px;display:flex;flex-direction:column;gap:24px;break-inside:avoid;">
+      <div style="background:${PALE_BLUE};border-radius:24px;padding:28px 32px;display:flex;flex-direction:column;gap:16px;break-inside:avoid;">
         <div style="display:flex;align-items:flex-end;gap:10px;">
           <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:clamp(4rem,6vw,5rem);letter-spacing:-0.04em;color:${NAVY};line-height:0.85;">8</span>
           <span style="font-size:0.75rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(1,25,85,0.65);line-height:1.4;">Year<br>Warranty</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
           <h2 style="font-size:clamp(1.25rem,2vw,1.625rem);font-weight:700;line-height:1.1;letter-spacing:-0.05em;margin:0;break-after:avoid;">Standing by our team, and our products.</h2>
-          <p style="font-size:0.875rem;color:rgba(1,25,85,0.65);margin:0;">Most workmanship warranties in this industry run two to five years, often with a catch: an ongoing paid maintenance contract. Every RAS-VERTEX repaint carries an 8-year written workmanship warranty as standard — no contract to sign, no conditions attached.</p>
+          <p style="font-size:0.875rem;color:rgba(1,25,85,0.65);margin:0;">Most workmanship warranties run two to five years, often tied to a paid maintenance contract. Every RAS-VERTEX repaint carries an 8-year written warranty as standard — no contract, no conditions.</p>
         </div>
-        <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;flex-direction:column;gap:8px;">
           <h3 style="font-size:1rem;font-weight:700;line-height:1.2;letter-spacing:-0.04em;margin:0;">Backed by the best.</h3>
           <div style="display:flex;align-items:center;gap:18px;">
             <img src="${esc(a.associations.haymes)}" alt="Haymes Paint" style="height:22px;width:auto;object-fit:contain;">

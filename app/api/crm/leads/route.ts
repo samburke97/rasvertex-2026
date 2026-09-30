@@ -35,6 +35,9 @@ export async function POST(request: NextRequest) {
     email?: string | null;
     phone?: string | null;
     stage?: LeadStage;
+    salesperson?: string | null;
+    suburb?: string | null;
+    industry?: string | null;
   };
   try {
     body = await request.json();
@@ -59,6 +62,9 @@ export async function POST(request: NextRequest) {
       email: body.email ?? null,
       phone: body.phone ?? null,
       stage: body.stage,
+      salesperson: body.salesperson ?? null,
+      suburb: body.suburb ?? null,
+      industry: body.industry ?? null,
     });
     return NextResponse.json({ lead }, { status: 201 });
   } catch (err) {

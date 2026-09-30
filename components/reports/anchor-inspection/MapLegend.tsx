@@ -69,6 +69,9 @@ function LegendIcon({
       {shape === "diamond" && (
         <polygon points="7,1 13,7 7,13 1,7" fill={colour} />
       )}
+      {shape === "bar" && (
+        <rect x="1" y="4.5" width="12" height="5" rx="1" fill={colour} />
+      )}
     </svg>
   );
 }

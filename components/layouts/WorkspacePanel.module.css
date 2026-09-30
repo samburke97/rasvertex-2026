@@ -177,7 +177,7 @@
 
 .rowActive,
 .rowActive:hover {
-  background: var(--rv-green-tint);
+  background: var(--rv-accent-tint);
   color: var(--rv-ink);
   font-weight: 600;
 }
@@ -187,8 +187,8 @@
 }
 
 .rowDragOver {
-  background: var(--rv-green-tint);
-  box-shadow: inset 0 0 0 1.5px var(--rv-green);
+  background: var(--rv-accent-tint);
+  box-shadow: inset 0 0 0 1.5px var(--rv-accent);
 }
 
 .row > svg:not(.chev) {
@@ -197,7 +197,7 @@
 }
 
 .rowActive > svg:not(.chev) {
-  color: var(--rv-green);
+  color: var(--rv-accent-ink);
 }
 
 .row span {
@@ -227,7 +227,7 @@
   border: 0;
   outline: none;
   background: var(--rv-surface);
-  box-shadow: 0 0 0 2px var(--rv-green);
+  box-shadow: 0 0 0 2px var(--rv-accent);
   border-radius: 5px;
   padding: 2px 5px;
   font: inherit;

@@ -42,7 +42,7 @@
   padding: 0;
   border: none;
   border-radius: 999px;
-  background: var(--rv-green, #1f6d4c);
+  background: var(--rv-accent, #3e7fb0);
   color: #fff;
   display: flex;
   align-items: center;
@@ -54,7 +54,7 @@
 }
 
 .profileBadge:hover {
-  background: var(--rv-green-hover, #195a3f);
+  background: var(--rv-accent-hover, #26567c);
 }
 
 .profileImage {

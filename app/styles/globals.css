@@ -179,10 +179,15 @@ body {
   --header-height: 80px;
 
   /* ── Redesign palette ────────────────────────────────────────────────────
-     Green/ink system for the app shell (rail nav) and each screen as it gets
+     Blue/ink system for the app shell (rail nav) and each screen as it gets
      redesigned — see CrmDashboard for the first full application. Additive:
      existing --brand-primary (maroon) usages are untouched until their own
-     component is redesigned in turn. */
+     component is redesigned in turn.
+
+     --rv-accent vs --rv-accent-ink: split on purpose. --rv-accent is
+     ~3.8:1 on white — fine for fills, strokes, gradients, charts, but NOT
+     text. --rv-accent-ink is ~5.8:1 on white (AA) — use it for every piece
+     of accent-coloured text and small accent icons. */
   --rv-page: #f6f6f4;
   --rv-surface: #ffffff;
   --rv-surface-soft: #fbfbfa;
@@ -207,15 +212,20 @@ body {
   --rv-fill: rgba(0, 0, 0, 0.045);
   --rv-fill-hover: rgba(0, 0, 0, 0.035);
 
-  --rv-green: #1f6d4c;
-  --rv-green-hover: #195a3f;
-  --rv-green-tint: #e7f3ec;
-  --rv-green-tint-2: #eef4f0;
-  --rv-green-nav: #f0f5f2;
+  --rv-accent: #3e7fb0;
+  --rv-accent-ink: #2f6a94;
+  --rv-accent-hover: #26567c;
+  --rv-accent-tint: #e9f2f9;
+  --rv-accent-tint-2: #eaf2f9;
+  --rv-accent-nav: #edf4fa;
+  --rv-accent-soft: #f2f8fc;
+  --rv-accent-grad: linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%);
   --rv-slate: #4b6b7e;
   --rv-slate-tint: #edf2f5;
   --rv-gold: #96731f;
   --rv-gold-tint: #fbf4e5;
+  --rv-good: #3f8f68;
+  --rv-good-tint: #e9f5ef;
   --rv-red: #b8492b;
   --rv-red-tint: #fbeeea;
 
@@ -255,15 +265,20 @@ body {
   --rv-fill: rgba(255, 255, 255, 0.07);
   --rv-fill-hover: rgba(255, 255, 255, 0.05);
 
-  --rv-green: #2f8f66;
-  --rv-green-hover: #279e70;
-  --rv-green-tint: rgba(47, 143, 102, 0.18);
-  --rv-green-tint-2: rgba(47, 143, 102, 0.14);
-  --rv-green-nav: rgba(47, 143, 102, 0.16);
+  --rv-accent: #5b9bc7;
+  --rv-accent-ink: #9fcdea;
+  --rv-accent-hover: #7db6da;
+  --rv-accent-tint: rgba(91, 155, 199, 0.18);
+  --rv-accent-tint-2: rgba(91, 155, 199, 0.14);
+  --rv-accent-nav: rgba(91, 155, 199, 0.16);
+  --rv-accent-soft: rgba(91, 155, 199, 0.12);
+  --rv-accent-grad: linear-gradient(180deg, #5b9bc7 0%, #3e7fb0 100%);
   --rv-slate: #8fb2c4;
   --rv-slate-tint: rgba(143, 178, 196, 0.16);
   --rv-gold: #d3ad5c;
   --rv-gold-tint: rgba(211, 173, 92, 0.16);
+  --rv-good: #4cae82;
+  --rv-good-tint: rgba(76, 174, 130, 0.16);
   --rv-red: #e08669;
   --rv-red-tint: rgba(224, 134, 105, 0.16);
 

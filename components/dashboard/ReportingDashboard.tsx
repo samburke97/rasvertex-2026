@@ -297,7 +297,7 @@ function RevenueChart() {
 }
 
 const DONUT_SEGMENTS = [
-  { name: "Body Corporate Painting", pct: 34, color: "#1f6d4c" },
+  { name: "Body Corporate Painting", pct: 34, color: "#3e7fb0" },
   { name: "Commercial Painting", pct: 22, color: "#6e8ca0" },
   { name: "Height Safety & Rope Access", pct: 18, color: "#3d6b9e" },
   { name: "Waterproofing", pct: 12, color: "#8aacc9" },

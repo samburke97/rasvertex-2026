@@ -13,7 +13,7 @@
 // There's no inbound-reply capture in this app, so the thread only ever
 // shows what was actually sent, not simulated replies.
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./LeadDetailPanel.module.css";
 import { type Lead, type LeadActivity } from "@/lib/crm/store";
 
@@ -106,6 +106,27 @@ export default function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProp
     }
   };
 
+  const updateField = async (
+    field: "salesperson" | "suburb" | "industry",
+    value: string,
+  ) => {
+    if (!lead) return;
+    const next = value.trim() || null;
+    const prev = lead[field];
+    setLead({ ...lead, [field]: next });
+    try {
+      const res = await fetch(`/api/crm/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: next }),
+      });
+      if (!res.ok) throw new Error(`Failed to update ${field}`);
+    } catch (err) {
+      console.error(`[CRM] update ${field} failed:`, err);
+      setLead((prevLead) => (prevLead ? { ...prevLead, [field]: prev } : prevLead));
+    }
+  };
+
   const handleAddNote = async () => {
     if (!noteBody.trim()) return;
     setSavingNote(true);
@@ -145,7 +166,29 @@ export default function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProp
           <div className={styles.headAvatar}>{initials(lead.name)}</div>
           <div className={styles.headWho}>
             <b>{lead.name}</b>
-            <span>{lead.company || "No company on file"}</span>
+            <span>
+              {lead.company || "No company on file"}
+              {lead.suburb ? ` · ${lead.suburb}` : ""}
+            </span>
+            <div className={styles.headMeta}>
+              <MetaField
+                label="Salesperson"
+                value={lead.salesperson}
+                onSave={(v) => updateField("salesperson", v)}
+              />
+              <span className={styles.headMetaDot}>·</span>
+              <MetaField
+                label="Suburb"
+                value={lead.suburb}
+                onSave={(v) => updateField("suburb", v)}
+              />
+              <span className={styles.headMetaDot}>·</span>
+              <MetaField
+                label="Industry"
+                value={lead.industry}
+                onSave={(v) => updateField("industry", v)}
+              />
+            </div>
           </div>
           {lead.phone && (
             <a className={styles.headCall} href={`tel:${lead.phone}`} title="Call this lead">
@@ -292,6 +335,68 @@ export default function LeadDetailPanel({ leadId, onClose }: LeadDetailPanelProp
         )}
       </div>
     </div>
+  );
+}
+
+// ── Header meta field (click-to-edit Salesperson/Suburb/Industry) ───────────
+
+function MetaField({
+  label,
+  value,
+  onSave,
+}: {
+  label: string;
+  value: string | null;
+  onSave: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed !== (value ?? "")) onSave(trimmed);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        className={styles.headMetaInput}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setEditing(false);
+            setDraft(value ?? "");
+          }
+        }}
+        placeholder={label}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={styles.headMetaBtn}
+      onClick={() => {
+        setDraft(value ?? "");
+        setEditing(true);
+      }}
+    >
+      {value || <span className={styles.headMetaPlaceholder}>+ {label}</span>}
+    </button>
   );
 }
 

@@ -15,12 +15,12 @@
   --dash-text-secondary: var(--rv-ink-60);
   --dash-text-tertiary: var(--rv-ink-40);
   --dash-fill: var(--rv-fill);
-  --dash-brand: var(--rv-green);
+  --dash-brand: var(--rv-accent);
   --dash-red: var(--rv-red);
   --dash-red-tint: var(--rv-red-tint);
   --dash-gold: var(--rv-gold);
   --dash-gold-tint: var(--rv-gold-tint);
-  --dash-green-tint: var(--rv-green-tint);
+  --dash-green-tint: var(--rv-accent-tint);
   --dash-grid-line: var(--rv-line);
 
   display: flex;

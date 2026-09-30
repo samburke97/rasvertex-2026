@@ -31,7 +31,8 @@ export type AnchorSubtype =
   | "eye-bolt"
   | "through-bolt"
   | "screw-in"
-  | "tensile";
+  | "tensile"
+  | "purlin";
 
 export interface AnchorPoint {
   id: string;
@@ -167,18 +168,20 @@ export const ANCHOR_SUBTYPE_LABELS: Record<AnchorSubtype, string> = {
   "through-bolt": "Through Bolt",
   "screw-in": "Screw In",
   tensile: "Tensile",
+  purlin: "Purlin",
 };
 
 // Only these anchor types offer a mounting sub-choice; anything absent
 // here places directly, no sub-picker shown.
 export const ANCHOR_TYPE_SUBTYPES: Partial<Record<AnchorType, AnchorSubtype[]>> = {
-  "fall-arrest-anchor": ["surface-mount", "eye-bolt"],
+  "fall-arrest-anchor": ["surface-mount", "eye-bolt", "purlin"],
   "rope-access-anchor": [
     "surface-mount",
     "eye-bolt",
     "through-bolt",
     "screw-in",
     "tensile",
+    "purlin",
   ],
 };
 
@@ -191,7 +194,8 @@ export type LegendIconShape =
   | "ring"
   | "square"
   | "triangle"
-  | "diamond";
+  | "diamond"
+  | "bar";
 
 export const ANCHOR_SUBTYPE_ICONS: Record<AnchorSubtype, LegendIconShape> = {
   "surface-mount": "circle",
@@ -199,6 +203,7 @@ export const ANCHOR_SUBTYPE_ICONS: Record<AnchorSubtype, LegendIconShape> = {
   "through-bolt": "square",
   "screw-in": "triangle",
   tensile: "diamond",
+  purlin: "bar",
 };
 
 export function anchorTypeDisplayLabel(anchor: AnchorPoint): string {

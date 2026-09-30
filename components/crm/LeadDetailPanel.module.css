@@ -47,8 +47,8 @@
   height: 34px;
   border-radius: var(--rv-r-md);
   flex-shrink: 0;
-  background: var(--rv-green-nav);
-  color: var(--rv-green);
+  background: var(--rv-accent-nav);
+  color: var(--rv-accent-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -82,6 +82,59 @@
   white-space: nowrap;
 }
 
+.headMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  overflow: hidden;
+}
+
+.headMetaDot {
+  font-size: 11px;
+  color: var(--rv-ink-30);
+  flex-shrink: 0;
+}
+
+.headMetaBtn {
+  border: 0;
+  background: none;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--rv-ink-50);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 100ms ease-out;
+}
+
+.headMetaBtn:hover {
+  background: var(--rv-fill);
+  color: var(--rv-ink);
+}
+
+.headMetaPlaceholder {
+  color: var(--rv-ink-30);
+}
+
+.headMetaInput {
+  width: 90px;
+  border: 0;
+  outline: none;
+  box-shadow: 0 0 0 1.5px var(--rv-accent);
+  border-radius: 5px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--rv-ink);
+  background: var(--rv-surface);
+}
+
 .headCall {
   width: 34px;
   height: 34px;
@@ -97,9 +150,9 @@
 }
 
 .headCall:hover {
-  background: var(--rv-green-tint);
-  border-color: rgba(31, 109, 76, 0.25);
-  color: var(--rv-green);
+  background: var(--rv-accent-tint);
+  border-color: rgba(62, 127, 176, 0.25);
+  color: var(--rv-accent-ink);
 }
 
 .headClose {
@@ -165,14 +218,14 @@
 }
 
 .tabOn {
-  border-bottom-color: var(--rv-green);
+  border-bottom-color: var(--rv-accent);
   color: var(--rv-ink);
   font-weight: 600;
 }
 
 .tabOn b {
-  color: var(--rv-green);
-  background: var(--rv-green-tint);
+  color: var(--rv-accent-ink);
+  background: var(--rv-accent-tint);
 }
 
 /* ── Panes ───────────────────────────────────────────────────────────────── */
@@ -263,8 +316,8 @@
 }
 
 .tagSent {
-  color: var(--rv-green);
-  background: var(--rv-green-tint);
+  color: var(--rv-accent-ink);
+  background: var(--rv-accent-tint);
 }
 
 .tagOpen {
@@ -337,7 +390,7 @@
 }
 
 .composerBody:focus {
-  border-color: var(--rv-green);
+  border-color: var(--rv-accent);
 }
 
 .composerFoot {
@@ -354,7 +407,7 @@
 
 .sendBtn {
   border: 0;
-  background: linear-gradient(180deg, #238059 0%, #1f6d4c 100%);
+  background: linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%);
   color: #fff;
   font-weight: 500;
   font-size: 12.5px;
@@ -393,7 +446,7 @@
 }
 
 .notesNew textarea:focus {
-  border-color: var(--rv-green);
+  border-color: var(--rv-accent);
 }
 
 .notesFoot {
@@ -403,8 +456,8 @@
 
 .addNoteBtn {
   border: 0;
-  background: var(--rv-green-tint-2);
-  color: var(--rv-green);
+  background: var(--rv-accent-tint-2);
+  color: var(--rv-accent-ink);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
@@ -417,7 +470,7 @@
 }
 
 .addNoteBtn:hover {
-  background: var(--rv-green);
+  background: var(--rv-accent);
   color: #fff;
 }
 
@@ -470,8 +523,8 @@
 }
 
 .tlIconEmail {
-  background: var(--rv-green-tint);
-  color: var(--rv-green);
+  background: var(--rv-accent-tint);
+  color: var(--rv-accent-ink);
 }
 
 .tlIconNote {

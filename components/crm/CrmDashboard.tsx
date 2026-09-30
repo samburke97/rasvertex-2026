@@ -1,11 +1,13 @@
 "use client";
 // components/crm/CrmDashboard.tsx
 //
-// Leads grouped by pipeline stage, with client-side search and a "chasing"
-// star toggle. Fetches the full list once (plain useState/fetch, matching
-// ReportSelector.tsx's idiom — no data-fetching library exists in this app)
-// and filters/groups client-side, since a small business's lead count
-// doesn't warrant a round trip per filter click.
+// Leads grouped by pipeline stage, with client-side search, a Filter panel
+// (company/salesperson/suburb/industry), and a favourite-star toggle
+// (backed by the `chasing` column/field — renamed at the UI layer only, to
+// avoid an unnecessary DB rename). Fetches the full list once (plain
+// useState/fetch, matching ReportSelector.tsx's idiom — no data-fetching
+// library exists in this app) and filters/groups client-side, since a small
+// business's lead count doesn't warrant a round trip per filter click.
 //
 // Also supports Monday.com-style custom "status" columns: users can add a
 // column (via the "Columns" menu at the top right of the table), give it a
@@ -14,10 +16,15 @@
 // groups; each lead stores its chosen option id per column in customFields.
 // The Columns menu also toggles which of those columns are currently shown.
 //
-// Row checkboxes support bulk actions (chase / convert) via a floating bar,
-// and Opportunities-stage rows get a per-row "Convert to job" action, which
-// simply closes the deal by moving the lead to the (existing) "won" stage —
-// there's no separate Jobs system in this app to hand off to.
+// Each stage group's header square opens a colour picker (GroupSwatch),
+// persisted per-stage via /api/crm/group-colors. The Automate button opens
+// AutomationsModal — an interactive UI shell with no automation engine
+// behind it yet (see that file's header comment).
+//
+// Row checkboxes support bulk actions (favourite / convert) via a floating
+// bar, and Opportunities-stage rows get a per-row "Convert to job" action,
+// which simply closes the deal by moving the lead to the (existing) "won"
+// stage — there's no separate Jobs system in this app to hand off to.
 
 import React, {
   useCallback,
@@ -28,6 +35,8 @@ import React, {
 } from "react";
 import styles from "./CrmDashboard.module.css";
 import LeadDetailPanel from "./LeadDetailPanel";
+import AutomationsModal from "./AutomationsModal";
+import Toast from "@/components/ui/Toast";
 import {
   LEAD_STAGES,
   LEAD_STAGE_LABELS,
@@ -37,24 +46,55 @@ import {
   type CustomColumnOption,
 } from "@/lib/crm/store";
 
+// Preset swatches offered in the group-colour picker, plus the free-text
+// hex/rgb(a) input below them.
+const GROUP_COLOR_PRESETS = [
+  "#2F6A94",
+  "#3E7FB0",
+  "#9FCDEA",
+  "#4B6B7E",
+  "#3F8F68",
+  "#C9A34B",
+  "#B8492B",
+  "#7A6BA8",
+  "#17171A",
+];
+
+const HEX_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+const RGB_RE = /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*(,\s*[\d.]+\s*)?\)$/i;
+const BARE_RGB_RE = /^\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}$/;
+
+function isValidColorInput(value: string): boolean {
+  return HEX_RE.test(value) || RGB_RE.test(value) || BARE_RGB_RE.test(value);
+}
+
+function normalizeColorInput(value: string): string {
+  const trimmed = value.trim();
+  return BARE_RGB_RE.test(trimmed) ? `rgb(${trimmed})` : trimmed;
+}
+
+// Default group-header square colours, matching the leads.html reference
+// 1:1 for the four stages it covers. These are only the fallback — each is
+// overridable per-stage via the colour-picker popover on the group header
+// and persisted in crm_group_colors.
 const STAGE_COLORS: Record<LeadStage, string> = {
-  cold: "#6b7280",
-  contacted: "#2563eb",
-  qualified: "#7c3aed",
-  quoted: "#d97706",
-  won: "#16a34a",
-  lost: "#dc2626",
+  cold: "#9AA0B4",
+  contacted: "#6E8CA0",
+  qualified: "#C9A34B",
+  quoted: "#3E7FB0",
+  won: "#3F8F68",
+  lost: "#B8492B",
 };
 
 // Stage pill tint/text colours, reusing the app's existing design tokens
-// (these map 1:1 onto the leads.css reference's --slate/--gold/--green/--red
+// (these map 1:1 onto the leads.css reference's --slate/--gold/--accent/--red
 // families already present in globals.css).
 const STAGE_PILL_STYLE: Record<LeadStage, { background: string; color: string }> = {
   cold: { background: "rgba(23, 23, 26, 0.05)", color: "var(--rv-ink-60)" },
   contacted: { background: "var(--rv-slate-tint)", color: "var(--rv-slate)" },
   qualified: { background: "var(--rv-gold-tint)", color: "var(--rv-gold)" },
-  quoted: { background: "var(--rv-green-tint)", color: "var(--rv-green)" },
-  won: { background: "var(--rv-green-tint)", color: "var(--rv-green)" },
+  quoted: { background: "var(--rv-accent-tint)", color: "var(--rv-accent-ink)" },
+  won: { background: "var(--rv-good-tint)", color: "var(--rv-good)" },
   lost: { background: "var(--rv-red-tint)", color: "var(--rv-red)" },
 };
 
@@ -110,17 +150,93 @@ function matchesSearch(lead: Lead, query: string): boolean {
   );
 }
 
+// Distinct, sorted values for a lead attribute — powers the Filter panel's
+// Salesperson/Suburb/Industry chip groups, so they only ever show chips for
+// data that's actually been entered rather than a fixed hardcoded set.
+function distinctValues(
+  leads: Lead[],
+  key: "salesperson" | "suburb" | "industry",
+): string[] {
+  const set = new Set<string>();
+  for (const lead of leads) {
+    const value = lead[key];
+    if (value && value.trim()) set.add(value.trim());
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
+interface LeadFilters {
+  company: string;
+  salespeople: Set<string>;
+  suburbs: Set<string>;
+  industries: Set<string>;
+}
+
+function matchesFilters(lead: Lead, filters: LeadFilters): boolean {
+  if (filters.company.trim() && !(lead.company ?? "").toLowerCase().includes(filters.company.trim().toLowerCase())) {
+    return false;
+  }
+  if (filters.salespeople.size > 0 && !(lead.salesperson && filters.salespeople.has(lead.salesperson))) {
+    return false;
+  }
+  if (filters.suburbs.size > 0 && !(lead.suburb && filters.suburbs.has(lead.suburb))) {
+    return false;
+  }
+  if (filters.industries.size > 0 && !(lead.industry && filters.industries.has(lead.industry))) {
+    return false;
+  }
+  return true;
+}
+
+function filterActiveCount(filters: LeadFilters): number {
+  return (
+    (filters.company.trim() ? 1 : 0) +
+    filters.salespeople.size +
+    filters.suburbs.size +
+    filters.industries.size
+  );
+}
+
 export default function CrmDashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [columns, setColumns] = useState<CustomColumn[]>([]);
   const [hiddenColumnIds, setHiddenColumnIds] = useState<Set<number>>(new Set());
+  const [groupColors, setGroupColors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [view, setView] = useState<"all" | "chasing">("all");
+  const [view, setView] = useState<"all" | "favourites">("all");
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<LeadStage>>(new Set());
   const [isAddingRow, setIsAddingRow] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [automationsOpen, setAutomationsOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const [filterCompany, setFilterCompany] = useState("");
+  const [filterSalespeople, setFilterSalespeople] = useState<Set<string>>(new Set());
+  const [filterSuburbs, setFilterSuburbs] = useState<Set<string>>(new Set());
+  const [filterIndustries, setFilterIndustries] = useState<Set<string>>(new Set());
+  const filters: LeadFilters = useMemo(
+    () => ({
+      company: filterCompany,
+      salespeople: filterSalespeople,
+      suburbs: filterSuburbs,
+      industries: filterIndustries,
+    }),
+    [filterCompany, filterSalespeople, filterSuburbs, filterIndustries],
+  );
+  const activeFilterCount = filterActiveCount(filters);
+  const clearFilters = useCallback(() => {
+    setFilterCompany("");
+    setFilterSalespeople(new Set());
+    setFilterSuburbs(new Set());
+    setFilterIndustries(new Set());
+  }, []);
+  const clearAllFilters = useCallback(() => {
+    clearFilters();
+    setQuery("");
+    setView("all");
+  }, [clearFilters]);
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -144,17 +260,47 @@ export default function CrmDashboard() {
     }
   }, []);
 
+  const fetchGroupColors = useCallback(async () => {
+    try {
+      const res = await fetch("/api/crm/group-colors");
+      if (!res.ok) throw new Error("Failed to fetch group colours");
+      const data = await res.json();
+      setGroupColors(data.colors ?? {});
+    } catch (err) {
+      console.error("[CRM] fetchGroupColors failed:", err);
+    }
+  }, []);
+
   useEffect(() => {
-    Promise.all([fetchLeads(), fetchColumns()]).finally(() =>
+    Promise.all([fetchLeads(), fetchColumns(), fetchGroupColors()]).finally(() =>
       setIsLoading(false),
     );
-  }, [fetchLeads, fetchColumns]);
+  }, [fetchLeads, fetchColumns, fetchGroupColors]);
 
-  // Selection is scoped to the current filter — switching views/search with
-  // a stale selection referencing hidden rows would be confusing.
+  const setGroupColor = async (stage: LeadStage, color: string) => {
+    const prev = groupColors[stage];
+    setGroupColors((p) => ({ ...p, [stage]: color }));
+    try {
+      const res = await fetch("/api/crm/group-colors", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage, color }),
+      });
+      if (!res.ok) throw new Error("Failed to save colour");
+    } catch (err) {
+      console.error("[CRM] setGroupColor failed:", err);
+      setGroupColors((p) => ({ ...p, [stage]: prev ?? STAGE_COLORS[stage] }));
+      throw err;
+    }
+  };
+
+  // Selection is scoped to the current filter — switching views/search/filter
+  // criteria with a stale selection referencing hidden rows would be
+  // confusing.
+  const filterKey = `${filterCompany}|${[...filterSalespeople].sort().join(",")}|${[...filterSuburbs].sort().join(",")}|${[...filterIndustries].sort().join(",")}`;
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [view, query]);
+  }, [view, query, filterKey]);
 
   const visibleColumns = useMemo(
     () => columns.filter((c) => !hiddenColumnIds.has(c.id)),
@@ -170,12 +316,14 @@ export default function CrmDashboard() {
 
   const rowMinWidth = 948 + visibleColumns.length * 130;
 
-  const chasingCount = useMemo(() => leads.filter((l) => l.chasing).length, [leads]);
+  const favouritesCount = useMemo(() => leads.filter((l) => l.chasing).length, [leads]);
 
   const visibleLeads = useMemo(() => {
-    const base = view === "chasing" ? leads.filter((l) => l.chasing) : leads;
-    return base.filter((l) => matchesSearch(l, query));
-  }, [leads, view, query]);
+    const base = view === "favourites" ? leads.filter((l) => l.chasing) : leads;
+    return base
+      .filter((l) => matchesSearch(l, query))
+      .filter((l) => matchesFilters(l, filters));
+  }, [leads, view, query, filters]);
 
   const groups = useMemo(() => {
     const byStage = new Map<LeadStage, Lead[]>();
@@ -421,9 +569,9 @@ export default function CrmDashboard() {
     <div className={styles.page}>
       <div className={styles.head}>
         <div className={styles.headText}>
-          <h1 className={styles.title}>CRM</h1>
+          <h1 className={styles.title}>Leads</h1>
           <p className={styles.subtitle}>
-            Track cold leads and move them through your pipeline
+            Track cold outreach, then chase the ones ready to become a job.
           </p>
         </div>
         <div className={styles.headTools}>
@@ -435,10 +583,10 @@ export default function CrmDashboard() {
               All <b>{leads.length}</b>
             </button>
             <button
-              className={view === "chasing" ? styles.segOn : ""}
-              onClick={() => setView("chasing")}
+              className={view === "favourites" ? styles.segOn : ""}
+              onClick={() => setView("favourites")}
             >
-              Chasing <b>{chasingCount}</b>
+              Favourites <b>{favouritesCount}</b>
             </button>
           </div>
           <div className={styles.search}>
@@ -476,7 +624,45 @@ export default function CrmDashboard() {
 
       {!isLoading && (
         <div className={styles.toolbar}>
+          <FilterMenu
+            leads={leads}
+            company={filterCompany}
+            onCompanyChange={setFilterCompany}
+            salespeople={filterSalespeople}
+            onSalespeopleChange={setFilterSalespeople}
+            suburbs={filterSuburbs}
+            onSuburbsChange={setFilterSuburbs}
+            industries={filterIndustries}
+            onIndustriesChange={setFilterIndustries}
+            matchCount={visibleLeads.length}
+            totalCount={leads.length}
+            onClear={clearFilters}
+          />
           <div className={styles.toolbarSpacer} />
+          <button
+            type="button"
+            className={styles.automate}
+            onClick={() => setAutomationsOpen(true)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <defs>
+                <linearGradient id="autoBolt" x1="4" y1="2" x2="19" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#9FCDEA" />
+                  <stop offset="52%" stopColor="#3E7FB0" />
+                  <stop offset="100%" stopColor="#2F6A94" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M13 2L4.5 13.5H11L10 22l8.5-11.5H12L13 2z"
+                fill="url(#autoBolt)"
+                fillOpacity="0.16"
+                stroke="url(#autoBolt)"
+                strokeWidth="1.7"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Automate
+          </button>
           <ColumnsMenu
             columns={columns}
             hiddenColumnIds={hiddenColumnIds}
@@ -494,11 +680,26 @@ export default function CrmDashboard() {
       ) : (
         <div className={styles.groups}>
           {groups.length === 0 ? (
-            <div className={styles.empty}>
-              {leads.length === 0
-                ? "No leads yet — add your first one to get started."
-                : "No leads match this filter."}
-            </div>
+            leads.length === 0 ? (
+              <div className={styles.emptySimple}>
+                No leads yet — add your first one to get started.
+              </div>
+            ) : (
+              <div className={styles.emptyFiltered}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M3 5h18l-7 8v6l-4 2v-8L3 5z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className={styles.emptyFilteredTitle}>No leads match these filters</span>
+                <button type="button" className={styles.emptyFilteredClear} onClick={clearAllFilters}>
+                  Clear all filters
+                </button>
+              </div>
+            )
           ) : (
             groups.map(({ stage, leads: stageLeads }) => (
               <StageGroup
@@ -510,6 +711,8 @@ export default function CrmDashboard() {
                 rowMinWidth={rowMinWidth}
                 isCollapsed={collapsed.has(stage)}
                 selectedIds={selectedIds}
+                color={groupColors[stage] ?? STAGE_COLORS[stage]}
+                onColorChange={(color) => setGroupColor(stage, color)}
                 onToggle={() => toggleGroup(stage)}
                 onSelect={setSelectedLeadId}
                 onToggleChasing={toggleChasing}
@@ -544,6 +747,18 @@ export default function CrmDashboard() {
       {selectedLeadId != null && (
         <LeadDetailPanel leadId={selectedLeadId} onClose={() => setSelectedLeadId(null)} />
       )}
+
+      {automationsOpen && (
+        <AutomationsModal
+          boardLabel="Leads"
+          onClose={() => setAutomationsOpen(false)}
+          onPickRecipe={() =>
+            setToast("Automations aren't wired up yet — this is a preview of what's coming.")
+          }
+        />
+      )}
+
+      {toast && <Toast message={toast} type="success" onClose={() => setToast(null)} />}
     </div>
   );
 }
@@ -558,6 +773,8 @@ function StageGroup({
   rowMinWidth,
   isCollapsed,
   selectedIds,
+  color,
+  onColorChange,
   onToggle,
   onSelect,
   onToggleChasing,
@@ -581,6 +798,8 @@ function StageGroup({
   rowMinWidth: number;
   isCollapsed: boolean;
   selectedIds: Set<number>;
+  color: string;
+  onColorChange: (color: string) => Promise<void>;
   onToggle: () => void;
   onSelect: (id: number) => void;
   onToggleChasing: (lead: Lead) => void;
@@ -611,7 +830,18 @@ function StageGroup({
 
   return (
     <div className={styles.group}>
-      <button className={styles.groupHead} onClick={onToggle} type="button">
+      <div
+        className={styles.groupHead}
+        onClick={onToggle}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+      >
         <svg
           className={`${styles.groupChev} ${isCollapsed ? styles.groupCollapsed : ""}`}
           width="10"
@@ -627,10 +857,10 @@ function StageGroup({
             strokeLinejoin="round"
           />
         </svg>
-        <span className={styles.groupDot} style={{ background: STAGE_COLORS[stage] }} />
+        <GroupSwatch color={color} onColorChange={onColorChange} />
         <span className={styles.groupTitle}>{LEAD_STAGE_LABELS[stage]}</span>
         <span className={styles.groupCount}>{leads.length}</span>
-      </button>
+      </div>
 
       {!isCollapsed && (
         <div className={styles.table} style={{ minWidth: rowMinWidth }}>
@@ -675,7 +905,7 @@ function StageGroup({
                 )}
               </span>
             ))}
-            <span>Chase</span>
+            <span />
             <span />
           </div>
           {stage === "cold" && showDraftRow && (
@@ -738,7 +968,7 @@ function StageGroup({
               ))}
               <button
                 className={`${styles.star} ${lead.chasing ? styles.starOn : ""}`}
-                title={lead.chasing ? "Stop chasing" : "Chase this lead"}
+                title={lead.chasing ? "Remove from favourites" : "Add to favourites"}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -938,7 +1168,7 @@ function BulkActionBar({
       <span className={styles.bulkBarCount}>{count} selected</span>
       <div className={styles.bulkBarActions}>
         <button type="button" className={styles.bulkBarBtn} onClick={onChase}>
-          Add to chase
+          Add to favourites
         </button>
         {canConvert && (
           <button type="button" className={styles.bulkBarBtn} onClick={onConvert}>
@@ -956,6 +1186,256 @@ function BulkActionBar({
           <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       </button>
+    </div>
+  );
+}
+
+// ── Filter dropdown (company / salesperson / suburb / industry) ─────────────
+
+function toggleInSet<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
+}
+
+function FilterMenu({
+  leads,
+  company,
+  onCompanyChange,
+  salespeople,
+  onSalespeopleChange,
+  suburbs,
+  onSuburbsChange,
+  industries,
+  onIndustriesChange,
+  matchCount,
+  totalCount,
+  onClear,
+}: {
+  leads: Lead[];
+  company: string;
+  onCompanyChange: (value: string) => void;
+  salespeople: Set<string>;
+  onSalespeopleChange: (value: Set<string>) => void;
+  suburbs: Set<string>;
+  onSuburbsChange: (value: Set<string>) => void;
+  industries: Set<string>;
+  onIndustriesChange: (value: Set<string>) => void;
+  matchCount: number;
+  totalCount: number;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const salespeopleOptions = useMemo(() => distinctValues(leads, "salesperson"), [leads]);
+  const suburbOptions = useMemo(() => distinctValues(leads, "suburb"), [leads]);
+  const industryOptions = useMemo(() => distinctValues(leads, "industry"), [leads]);
+  const activeCount = filterActiveCount({ company, salespeople, suburbs, industries });
+
+  return (
+    <div className={styles.pop} ref={ref}>
+      <button
+        type="button"
+        className={`${styles.filterBtn} ${activeCount > 0 ? styles.filterBtnOn : ""}`}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+          <path d="M3 5h18l-7 8v6l-4 2v-8L3 5z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+        </svg>
+        Filter
+        {activeCount > 0 && <span className={styles.filterBadge}>{activeCount}</span>}
+      </button>
+
+      {open && (
+        <div className={styles.filterPanel}>
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>Company</span>
+            <input
+              className={styles.filterInput}
+              placeholder="Type a company name"
+              value={company}
+              onChange={(e) => onCompanyChange(e.target.value)}
+            />
+          </div>
+
+          {salespeopleOptions.length > 0 && (
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>Salesperson</span>
+              <div className={styles.filterChips}>
+                {salespeopleOptions.map((name) => (
+                  <div
+                    key={name}
+                    className={`${styles.fchip} ${salespeople.has(name) ? styles.fchipOn : ""}`}
+                    title={name}
+                    onClick={() => onSalespeopleChange(toggleInSet(salespeople, name))}
+                  >
+                    {initials(name)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {suburbOptions.length > 0 && (
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>Suburb</span>
+              <div className={styles.filterChips}>
+                {suburbOptions.map((suburb) => (
+                  <div
+                    key={suburb}
+                    className={`${styles.fchip} ${suburbs.has(suburb) ? styles.fchipOn : ""}`}
+                    onClick={() => onSuburbsChange(toggleInSet(suburbs, suburb))}
+                  >
+                    {suburb}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {industryOptions.length > 0 && (
+            <div className={styles.filterGroup}>
+              <span className={styles.filterLabel}>Industry</span>
+              <div className={styles.filterChips}>
+                {industryOptions.map((industry) => (
+                  <div
+                    key={industry}
+                    className={`${styles.fchip} ${industries.has(industry) ? styles.fchipOn : ""}`}
+                    onClick={() => onIndustriesChange(toggleInSet(industries, industry))}
+                  >
+                    {industry}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className={styles.filterFoot}>
+            <span className={styles.filterCount}>
+              {matchCount} of {totalCount} leads
+            </span>
+            <div className={styles.filterClear} onClick={onClear}>
+              Clear all
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Group-header colour picker (swatch + popover) ────────────────────────────
+
+function GroupSwatch({
+  color,
+  onColorChange,
+}: {
+  color: string;
+  onColorChange: (color: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [input, setInput] = useState(color);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setInput(color);
+    setError(null);
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const applyColor = async (value: string) => {
+    setSaving(true);
+    setError(null);
+    try {
+      await onColorChange(value);
+      setOpen(false);
+    } catch {
+      setError("Failed to save that colour — try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSet = () => {
+    const trimmed = input.trim();
+    if (!isValidColorInput(trimmed)) {
+      setError("Not a valid colour — try #3E7FB0 or 62,127,176");
+      return;
+    }
+    applyColor(normalizeColorInput(trimmed));
+  };
+
+  return (
+    <div className={styles.swatchwrap} ref={ref}>
+      <button
+        type="button"
+        className={styles.groupSquare}
+        style={{ background: color }}
+        title="Change colour"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+      />
+      {open && (
+        <div className={styles.cpick} onClick={(e) => e.stopPropagation()}>
+          <span className={styles.cpickLabel}>Group colour</span>
+          <div className={styles.cpickGrid}>
+            {GROUP_COLOR_PRESETS.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                className={`${styles.cpickSw} ${preset.toLowerCase() === color.toLowerCase() ? styles.cpickSwOn : ""}`}
+                style={{ background: preset, color: preset }}
+                disabled={saving}
+                onClick={() => applyColor(preset)}
+                aria-label={preset}
+              />
+            ))}
+          </div>
+          <div className={styles.cpickRow}>
+            <input
+              className={`${styles.cpickInput} ${error ? styles.cpickInputError : ""}`}
+              placeholder="#3E7FB0 or 62,127,176"
+              value={input}
+              disabled={saving}
+              onChange={(e) => {
+                setInput(e.target.value);
+                setError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSet();
+                }
+              }}
+            />
+            <button type="button" className={styles.cpickSet} onClick={handleSet} disabled={saving}>
+              Set
+            </button>
+          </div>
+          {error && <span className={styles.cpickError}>{error}</span>}
+        </div>
+      )}
     </div>
   );
 }
@@ -1388,7 +1868,7 @@ function SkeletonGroup({ rows }: { rows: number }) {
   return (
     <div className={styles.group}>
       <div className={styles.skelGroupHead}>
-        <span className={`${styles.skelBar} ${styles.groupDot}`} />
+        <span className={`${styles.skelBar} ${styles.groupSquare}`} />
         <span className={styles.skelBar} style={{ width: 70, height: 11 }} />
         <span className={styles.skelBar} style={{ width: 16, height: 11 }} />
       </div>
@@ -1419,7 +1899,7 @@ function SkeletonGroup({ rows }: { rows: number }) {
 // identically to a real row (no tint, no save/cancel buttons) — you just
 // type a name. Committing it (Enter or blur) with a non-empty name creates
 // the lead immediately and the row becomes a normal, fully-editable row from
-// then on; committing empty discards it. Company/Status/Chase aren't
+// then on; committing empty discards it. Company/Status/Favourite aren't
 // editable yet at this point — there's no lead to attach them to until the
 // name is committed.
 

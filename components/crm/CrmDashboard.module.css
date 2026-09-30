@@ -120,7 +120,7 @@
   border-radius: var(--rv-r-md);
   border: 0;
   cursor: pointer;
-  background: linear-gradient(180deg, #238059 0%, #1f6d4c 100%);
+  background: linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%);
   color: #fff;
   font-weight: 500;
   font-size: 13px;
@@ -128,7 +128,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 1px 2px rgba(31, 109, 76, 0.15);
+  box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
   transition:
     transform 150ms ease-out,
     box-shadow 150ms ease-out;
@@ -137,7 +137,7 @@
 
 .primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(31, 109, 76, 0.25);
+  box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
 }
 
 .primary:disabled {
@@ -147,16 +147,179 @@
   cursor: default;
 }
 
-/* ── Columns toolbar ─────────────────────────────────────────────────────── */
+/* ── Toolbar: Filter, Automate, Columns ──────────────────────────────────── */
 .toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   margin-top: -8px;
+  flex-wrap: wrap;
 }
 
 .toolbarSpacer {
   flex: 1;
+}
+
+/* ── Filter dropdown ─────────────────────────────────────────────────────── */
+.pop {
+  position: relative;
+}
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--rv-line-strong);
+  background: var(--rv-surface);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--rv-ink-60);
+  transition: background 120ms ease-out;
+  font-family: inherit;
+}
+
+.filterBtn:hover {
+  background: var(--rv-fill-hover);
+}
+
+.filterBtnOn {
+  background: var(--rv-accent-tint);
+  color: var(--rv-accent-ink);
+  border-color: rgba(47, 106, 148, 0.28);
+}
+
+.filterBadge {
+  font-size: 10.5px;
+  font-weight: 700;
+  background: var(--rv-accent-ink);
+  color: #fff;
+  border-radius: 999px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filterPanel {
+  position: absolute;
+  left: 0;
+  top: 40px;
+  width: 328px;
+  z-index: 70;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-line);
+  border-radius: 13px;
+  box-shadow: var(--rv-shadow-pop);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.filterLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--rv-ink-34);
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.filterInput {
+  width: 100%;
+  border: 1px solid var(--rv-line-strong);
+  background: var(--rv-surface-soft);
+  border-radius: var(--rv-r-md);
+  padding: 8px 11px;
+  font-size: 12.5px;
+  color: var(--rv-ink);
+  outline: none;
+  font-family: inherit;
+}
+
+.filterChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.fchip {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: var(--rv-r-sm);
+  cursor: pointer;
+  background: var(--rv-fill);
+  color: var(--rv-ink-60);
+  transition: background 120ms ease-out;
+  white-space: nowrap;
+}
+
+.fchip:hover {
+  background: rgba(var(--rv-mix-rgb), 0.08);
+}
+
+.fchipOn,
+.fchipOn:hover {
+  background: var(--rv-accent-ink);
+  color: #fff;
+}
+
+.filterFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(var(--rv-mix-rgb), 0.06);
+}
+
+.filterCount {
+  font-size: 11.5px;
+  color: var(--rv-ink-50);
+}
+
+.filterClear {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--rv-ink-50);
+  cursor: pointer;
+}
+
+.filterClear:hover {
+  color: var(--rv-ink);
+}
+
+/* ── Automate button ─────────────────────────────────────────────────────── */
+.automate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--rv-line-strong);
+  background: var(--rv-surface);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--rv-ink-60);
+  transition: background 120ms ease-out;
+  font-family: inherit;
+}
+
+.automate:hover {
+  background: var(--rv-fill-hover);
+  color: var(--rv-ink);
 }
 
 .colmenu {
@@ -288,8 +451,8 @@
 }
 
 .colmenuRowOn .colmenuTick {
-  background: var(--rv-green);
-  border-color: var(--rv-green);
+  background: var(--rv-accent);
+  border-color: var(--rv-accent);
 }
 
 .colmenuAddRow {
@@ -297,7 +460,7 @@
   text-align: left;
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--rv-green);
+  color: var(--rv-accent-ink);
   background: none;
   border: 0;
   padding: 8px 9px;
@@ -306,7 +469,7 @@
 }
 
 .colmenuAddRow:hover {
-  background: var(--rv-green-tint-2);
+  background: var(--rv-accent-tint-2);
 }
 
 /* ── Groups / table ──────────────────────────────────────────────────────── */
@@ -345,11 +508,128 @@
   transform: rotate(0deg);
 }
 
-.groupDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
+/* ── Group colour swatch + picker popover ───────────────────────────────── */
+
+.swatchwrap {
+  position: relative;
   flex-shrink: 0;
+  display: flex;
+}
+
+.groupSquare {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    transform 130ms ease-out,
+    box-shadow 130ms ease-out;
+}
+
+.groupSquare:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 3px rgba(var(--rv-mix-rgb), 0.06);
+}
+
+.cpick {
+  position: absolute;
+  left: -8px;
+  top: 22px;
+  width: 212px;
+  z-index: 75;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-line);
+  border-radius: var(--rv-r-lg);
+  box-shadow: 0 16px 40px rgba(var(--rv-mix-rgb), 0.16);
+  padding: 13px;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.cpickLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--rv-ink-34);
+}
+
+.cpickGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+}
+
+.cpickSw {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--rv-r-sm, 5px);
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 120ms ease-out;
+}
+
+.cpickSw:hover {
+  transform: scale(1.1);
+}
+
+.cpickSwOn {
+  box-shadow:
+    0 0 0 2px var(--rv-surface),
+    0 0 0 3.5px currentColor;
+}
+
+.cpickRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cpickInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--rv-line-strong);
+  background: var(--rv-surface-soft);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 12px;
+  color: var(--rv-ink);
+  outline: none;
+  font-family: inherit;
+}
+
+.cpickInputError {
+  border-color: var(--rv-red);
+}
+
+.cpickSet {
+  border: 0;
+  background: var(--rv-accent-ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 11px;
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+
+.cpickSet:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cpickError {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--rv-red);
 }
 
 .groupTitle {
@@ -389,7 +669,7 @@
 .checkbox {
   width: 15px;
   height: 15px;
-  accent-color: var(--rv-green);
+  accent-color: var(--rv-accent);
   cursor: pointer;
 }
 
@@ -426,8 +706,8 @@
   flex-shrink: 0;
   border: 0;
   padding: 0;
-  background: var(--rv-green-tint-2);
-  color: var(--rv-green);
+  background: var(--rv-accent-tint-2);
+  color: var(--rv-accent-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -438,7 +718,7 @@
 }
 
 .leadAvatar:hover {
-  box-shadow: 0 0 0 2px rgba(31, 109, 76, 0.3);
+  box-shadow: 0 0 0 2px rgba(62, 127, 176, 0.3);
 }
 
 .leadMeta {
@@ -501,7 +781,7 @@
   margin: -4px -6px;
   border: 0;
   outline: none;
-  box-shadow: 0 0 0 2px var(--rv-green);
+  box-shadow: 0 0 0 2px var(--rv-accent);
   border-radius: 6px;
   padding: 4px 6px;
   font: inherit;
@@ -543,8 +823,8 @@
 
 .convert {
   border: 0;
-  background: var(--rv-green-tint-2);
-  color: var(--rv-green);
+  background: var(--rv-accent-tint-2);
+  color: var(--rv-accent-ink);
   cursor: pointer;
   font-size: 11.5px;
   font-weight: 500;
@@ -557,7 +837,7 @@
 }
 
 .convert:hover {
-  background: var(--rv-green);
+  background: var(--rv-accent);
   color: #fff;
 }
 
@@ -693,7 +973,7 @@
 }
 
 .colPopoverName:focus {
-  border-color: var(--rv-green);
+  border-color: var(--rv-accent);
 }
 
 .colPopoverOptions {
@@ -760,7 +1040,7 @@
 }
 
 .colPopoverOptionInput:focus {
-  border-color: var(--rv-green);
+  border-color: var(--rv-accent);
 }
 
 .colPopoverRemove {
@@ -793,7 +1073,7 @@
 }
 
 .colPopoverAddOption:hover {
-  color: var(--rv-green);
+  color: var(--rv-accent-ink);
 }
 
 .colPopoverActions {
@@ -838,7 +1118,7 @@
   font-size: 12.5px;
   font-weight: 500;
   color: #fff;
-  background: var(--rv-green);
+  background: var(--rv-accent);
   border: 0;
   border-radius: 7px;
   padding: 6px 14px;
@@ -846,7 +1126,7 @@
 }
 
 .colPopoverSave:hover {
-  background: var(--rv-green-hover);
+  background: var(--rv-accent-hover);
 }
 
 .colPopoverSave:disabled,
@@ -933,7 +1213,7 @@
   padding: 6px 8px;
 }
 
-.empty {
+.emptySimple {
   padding: 48px 22px;
   text-align: center;
   font-size: 13px;
@@ -941,6 +1221,44 @@
   background: var(--rv-surface);
   border: 1px solid var(--rv-line);
   border-radius: var(--rv-r-xl);
+}
+
+/* Groups with 0 rows are hidden while any filter is active; when nothing
+   matches at all, this replaces the group list. */
+.emptyFiltered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 72px 24px;
+  background: var(--rv-surface);
+  border: 1px solid var(--rv-line);
+  border-radius: var(--rv-r-xl);
+}
+
+.emptyFiltered svg {
+  color: var(--rv-ink-30);
+}
+
+.emptyFilteredTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--rv-ink);
+}
+
+.emptyFilteredClear {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--rv-accent-ink);
+  cursor: pointer;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+}
+
+.emptyFilteredClear:hover {
+  text-decoration: underline;
 }
 
 /* ── Loading skeleton ────────────────────────────────────────────────────── */
