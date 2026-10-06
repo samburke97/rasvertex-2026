@@ -4,7 +4,7 @@
 
 import { neon } from "@neondatabase/serverless";
 import { deleteBlobPhotos } from "@/lib/server/deleteBlobPhotos";
-import type { ProposalData } from "../proposal.types";
+import { isProposalData, type ProposalData } from "../proposal.types";
 
 function sql() {
   const url = process.env.DATABASE_URL;
@@ -31,6 +31,8 @@ export async function saveReport(
   `;
 }
 
+// Drafts saved by the previous single-form proposal editor have a different
+// shape — they aren't loaded (the builder starts fresh from the quote).
 export async function getReport(
   quoteId: string,
 ): Promise<ProposalData | null> {
@@ -39,7 +41,7 @@ export async function getReport(
     SELECT data FROM proposal_reports WHERE quote_id = ${quoteId}
   `;
   if (!rows.length) return null;
-  return rows[0].data as ProposalData;
+  return isProposalData(rows[0].data) ? rows[0].data : null;
 }
 
 export async function deleteReport(quoteId: string): Promise<boolean> {
@@ -48,7 +50,7 @@ export async function deleteReport(quoteId: string): Promise<boolean> {
     DELETE FROM proposal_reports WHERE quote_id = ${quoteId} RETURNING data
   `;
   if (!result.length) return false;
-  const data = result[0].data as ProposalData;
-  await deleteBlobPhotos(data.photos.map((p) => p.url));
+  const data = result[0].data as { photos?: { url: string }[] };
+  await deleteBlobPhotos((data.photos ?? []).map((p) => p.url));
   return true;
 }

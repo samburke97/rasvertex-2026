@@ -110,9 +110,15 @@ export async function GET(
   const { quoteId } = await params;
   const { searchParams } = new URL(request.url);
   const companyId = parseInt(searchParams.get("companyId") || "0", 10);
+  // "all"/absent = every folder, "none" = unfiled attachments only (see
+  // ./folders/route.ts, which reports unfiled photos under that id).
   const folderIdParam = searchParams.get("folderId");
-  const folderId =
-    folderIdParam && folderIdParam !== "all" ? parseInt(folderIdParam, 10) : null;
+  const matchesFolder = (a: SimproAttachmentListItem) =>
+    !folderIdParam || folderIdParam === "all"
+      ? true
+      : folderIdParam === "none"
+        ? !a.Folder
+        : String(a.Folder?.ID) === folderIdParam;
 
   if (!SIMPRO_BASE_URL || !SIMPRO_ACCESS_TOKEN) {
     return NextResponse.json(
@@ -199,9 +205,7 @@ export async function GET(
         const imageExtensions =
           /\.(jpg|jpeg|png|gif|webp|bmp|tiff|heic|heif)$/i;
         const candidates = attachmentsList.filter(
-          (a) =>
-            imageExtensions.test(a.Filename) &&
-            (folderId == null || a.Folder?.ID === folderId),
+          (a) => imageExtensions.test(a.Filename) && matchesFolder(a),
         );
 
         send("start", { total: candidates.length, quoteId: parsedQuoteId });

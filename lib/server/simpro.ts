@@ -171,6 +171,33 @@ export async function saveJobAttachment(
   return uploadPDFToJob(companyId, jobId, filename, pdfBuffer);
 }
 
+// Proposals are built from a quote, not a job, so the exported PDF lands on
+// the quote's attachments. Same replace-in-place behaviour as above.
+export async function saveQuoteAttachment(
+  companyId: number,
+  quoteId: number,
+  filename: string,
+  pdfBuffer: Buffer,
+): Promise<unknown> {
+  const { baseUrl } = getSimproConfig();
+  const base = `${baseUrl}/api/v1.0/companies/${companyId}/quotes/${quoteId}/attachments/files/`;
+  const existing = await findAttachmentByFilename(`${base}?pageSize=250`, filename);
+  if (existing) await deleteAttachment(`${base}${existing.ID}`);
+  return simproFetch(
+    base,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        Filename: filename,
+        Base64Data: pdfBuffer.toString("base64"),
+        Public: false,
+        Email: false,
+      }),
+    },
+    SIMPRO_UPLOAD_TIMEOUT_MS,
+  );
+}
+
 export async function saveSiteAttachment(
   companyId: number,
   siteId: number,

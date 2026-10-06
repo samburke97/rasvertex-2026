@@ -13,7 +13,7 @@ export interface ReportAssets {
   bebasNeueFont: string;
   interFont: string;
   // caveatFont falls back to a plain (non-existent) path until the real
-  // Caveat.woff2 is supplied — see proposal.print.ts's font-face fallback.
+  // Caveat.woff2 is supplied.
   caveatFont: string;
   associations: {
     communitySelect: string;
@@ -26,8 +26,7 @@ export interface ReportAssets {
   proposal: {
     // logoFull and photo* fall back to a plain path until real files are
     // supplied (raster images can't be captured from a chat upload the way
-    // the SVGs below were — see proposal.print.ts for the placeholder
-    // treatment used until then).
+    // the SVGs below were).
     logoFull: string;
     workCover: string;
     dulux: string;
@@ -61,7 +60,7 @@ export interface ReportAssets {
   };
 }
 
-function readPublicAsBase64(relativePath: string): string {
+export function readPublicAsBase64(relativePath: string): string {
   const fullPath = path.join(process.cwd(), "public", relativePath);
   try {
     const buffer = fs.readFileSync(fullPath);
@@ -233,6 +232,9 @@ export interface RenderPDFOptions {
   // don't apply inside header/footer frames.
   headerTemplate?: string;
   footerTemplate?: string;
+  // Custom page size (CSS units) instead of A4 — the Painting proposal is a
+  // 1440px-wide document, printed onto 1440px pages of A4 proportion.
+  pageSize?: { width: string; height: string };
 }
 
 export async function renderPDF(
@@ -259,7 +261,9 @@ export async function renderPDF(
     const hasHeaderFooter = !!(options?.headerTemplate || options?.footerTemplate);
 
     const pdfData = await page.pdf({
-      format: "A4",
+      ...(options?.pageSize
+        ? { width: options.pageSize.width, height: options.pageSize.height }
+        : { format: "A4" as const }),
       printBackground: true,
       margin: {
         top: options?.margin?.top ?? 0,

@@ -24,7 +24,7 @@ const HoursBreakdownPage = dynamic(
   () => import("./hours-breakdown/HoursBreakdownPage"),
   { loading: () => <ReportLoading />, ssr: false },
 );
-const ProposalPage = dynamic(() => import("./proposal/ProposalPage"), {
+const ProposalBuilder = dynamic(() => import("./proposal/builder/ProposalBuilder"), {
   loading: () => <ReportLoading />,
   ssr: false,
 });
@@ -128,9 +128,9 @@ const REPORT_TYPES: ReportType[] = [
   },
   {
     id: "proposal",
-    label: "Proposal",
+    label: "Painting Proposal",
     description:
-      "Rich sales proposal with findings, scope, access plan and pricing.",
+      "Build a painting proposal from a SimPRO quote: findings, scope, access plan and pricing.",
     available: true,
     category: "proposal",
     icon: (
@@ -220,7 +220,7 @@ export default function ReportSelector() {
   }
 
   if (active === "proposal") {
-    return <ProposalPage onBack={() => setActive(null)} />;
+    return <ProposalBuilder onBack={() => setActive(null)} />;
   }
 
   return (

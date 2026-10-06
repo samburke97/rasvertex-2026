@@ -1,0 +1,256 @@
+/* ProposalBuilder.module.css — builder shell: header + step area.
+   Sits inside MainLayout's content card, same as the other report editors. */
+
+@font-face {
+  font-family: "Bebas Neue";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/bebas-neue.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "La Belle Aurore";
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/la-belle-aurore.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+  src: url("/fonts/inter.woff2") format("woff2");
+}
+
+.root {
+  margin: -1.5rem;
+  height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: #fff;
+  color: #17171a;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.root input,
+.root textarea,
+.root select,
+.root button {
+  font-family: inherit;
+}
+
+/* globals.css styles every bare h1/p/span (fixed sizes, grey, own fonts).
+   Inside the builder they inherit instead, so the editors match the design
+   and the preview matches the PDF (which has no global styles). Specificity
+   (0,0,2) beats the bare element rule but loses to any class. */
+html :where(.root) :is(h1, p, span) {
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+.root a {
+  color: #2f6a94;
+  text-decoration: none;
+}
+
+.root a:hover {
+  color: #26567c;
+}
+
+/* ── Header ── */
+.header {
+  height: 64px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px 0 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.09);
+}
+
+.back {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #17171a;
+  flex-shrink: 0;
+}
+
+.back:hover {
+  background: #fbfbfa;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: rgba(23, 23, 26, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stepsWrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.045);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.stepPill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 14px 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: default;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(23, 23, 26, 0.55);
+}
+
+.stepPillEnabled {
+  cursor: pointer;
+}
+
+.stepPillActive {
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  color: #17171a;
+}
+
+.stepDot {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(23, 23, 26, 0.5);
+}
+
+.stepPillActive .stepDot {
+  background: #17171a;
+  color: #fff;
+}
+
+.stepDotDone {
+  background: #e9f5ef;
+  color: #3f8f68;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.saveState {
+  font-size: 12.5px;
+  color: rgba(23, 23, 26, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.saveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #3f8f68;
+}
+
+.saveDotPending {
+  background: rgba(23, 23, 26, 0.3);
+}
+
+.saveDotError {
+  background: #c0492b;
+}
+
+/* Shared dark pill button (Review & export, Create proposal) */
+.darkPill {
+  height: 36px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: #17171a;
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.darkPill:hover {
+  background: #2a2a2a;
+}
+
+.darkPill:disabled {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(23, 23, 26, 0.4);
+  cursor: not-allowed;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .stepPill span:last-child {
+    display: none;
+  }
+  .stepPill {
+    padding: 0 6px;
+  }
+}

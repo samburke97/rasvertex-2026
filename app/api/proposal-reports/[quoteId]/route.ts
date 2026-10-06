@@ -8,7 +8,7 @@ import {
   saveReport,
   deleteReport,
 } from "@/lib/reports/proposal/store";
-import type { ProposalData } from "@/lib/reports/proposal.types";
+import { isProposalData } from "@/lib/reports/proposal.types";
 
 type Params = { params: Promise<{ quoteId: string }> };
 
@@ -22,7 +22,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   const { quoteId } = await params;
-  const report = (await request.json()) as ProposalData;
+  const report: unknown = await request.json().catch(() => null);
+  if (!isProposalData(report))
+    return NextResponse.json({ error: "Invalid proposal" }, { status: 400 });
   await saveReport(quoteId, report);
   return NextResponse.json({ success: true });
 }

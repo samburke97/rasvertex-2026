@@ -1,0 +1,245 @@
+/* ReviewStep.module.css — Screen 3: Review */
+
+.scroll {
+  flex: 1;
+  overflow: auto;
+  background: #fbfbfa;
+}
+
+.grid {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.sub {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: rgba(23, 23, 26, 0.6);
+}
+
+.card {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(23, 23, 26, 0.05);
+}
+
+.check:last-child {
+  border-bottom: 0;
+}
+
+.mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.markOk {
+  background: #e9f5ef;
+  color: #3f8f68;
+}
+
+.markIssue {
+  background: #fbf4e5;
+  color: #96731f;
+}
+
+.markInfo {
+  background: rgba(0, 0, 0, 0.045);
+  color: rgba(23, 23, 26, 0.55);
+}
+
+.checkText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkTitle {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.checkDetail {
+  font-size: 12.5px;
+  color: rgba(23, 23, 26, 0.55);
+}
+
+.fix,
+.secondary {
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  background: #fff;
+  color: #17171a;
+  cursor: pointer;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.fix {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  flex-shrink: 0;
+}
+
+.fix:hover,
+.secondary:hover {
+  background: #f6f6f4;
+}
+
+.side {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.coverImg {
+  aspect-ratio: 16 / 9;
+  background: #f6f6f4 center 68% / cover no-repeat;
+}
+
+.summary {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sumTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sumName {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sumFor {
+  font-size: 12.5px;
+  color: rgba(23, 23, 26, 0.55);
+}
+
+.sumRows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.sumRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sumRow span:first-child {
+  color: rgba(23, 23, 26, 0.55);
+}
+
+.sumRow span:last-child {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.export {
+  height: 46px;
+  border: 0;
+  border-radius: 999px;
+  background: #17171a;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.export:hover {
+  background: #2a2a2a;
+}
+
+.export:disabled,
+.export:disabled:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(23, 23, 26, 0.4);
+  cursor: not-allowed;
+}
+
+.done {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #e9f5ef;
+  color: #3f8f68;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.warn {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fbf4e5;
+  color: #96731f;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.secondary {
+  height: 40px;
+  font-size: 13.5px;
+}
+
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .side {
+    position: static;
+  }
+}
