@@ -83,31 +83,31 @@ export const SERVICES: ServiceDef[] = [
     id: "painting",
     name: "Painting",
     img: "/reports/proposal/assets/project-1.jpeg",
-    desc: "Professional interior and exterior painting for commercial, strata and residential properties on the Sunshine Coast. Quality finishes that actually last.",
+    desc: "Interior and exterior repaints for strata, commercial and residential buildings, with thorough surface prep and premium coatings so the finish lasts.",
   },
   {
     id: "cleaning",
     name: "Cleaning",
     img: "/reports/proposal/assets/nav-cleaning.png",
-    desc: "Pressure washing, façade cleaning and IRATA-certified high-rise window cleaning for strata and commercial properties across the Sunshine Coast.",
+    desc: "Pressure washing, façade and roof cleaning, and IRATA-certified high-rise window cleaning, scheduled around residents and tenants.",
   },
   {
     id: "waterproofing",
     name: "Waterproofing",
     img: "/reports/proposal/assets/nav-waterproofing.png",
-    desc: "Expert waterproofing for balconies, roofs and wet areas on the Sunshine Coast, backed by long-term warranties and proven protection.",
+    desc: "Membrane repairs and replacement for balconies, roofs and wet areas, stopping leaks at the source before they damage the structure.",
   },
   {
     id: "maintenance",
     name: "Building Maintenance",
     img: "/reports/proposal/assets/nav-maintenance.png",
-    desc: "Ongoing building maintenance and repair services that keep your Sunshine Coast property in top condition year round.",
+    desc: "Scheduled upkeep and reactive repairs, from sealants to minor carpentry, handled by the same team that already knows your building.",
   },
   {
     id: "height",
     name: "Height Safety",
     img: "/reports/proposal/assets/nav-height.png",
-    desc: "Complete height safety systems, certification and compliance for Sunshine Coast buildings, delivered by IRATA-certified technicians.",
+    desc: "Installation and annual certification of anchor points, static lines and roof access, keeping your building compliant and safe to work on.",
   },
   {
     id: "inspections",
@@ -118,7 +118,7 @@ export const SERVICES: ServiceDef[] = [
 ];
 
 export const SERVICES_INTRO =
-  "Since 2012 we have looked after Sunshine Coast homes and high-rises with our own employed team. Painting is one part of what we do for buildings like yours.";
+  "Painting is one part of what we do. As your complete property maintenance partner, we can bundle painting, cleaning, waterproofing, height safety and inspections into a single maintenance plan: one team, one schedule, one point of contact for the whole building.";
 
 export const STD_WORDING = {
   warranty:
@@ -142,24 +142,23 @@ export const DEFAULT_CLIENTS = [
 ].join("\n");
 
 // Logo library for "Our Clients", keyed by lower-case client name. Files live
-// in public/reports/proposal/clients/. A client whose logo file is missing
+// in public/reports/partners/. A client whose logo file is missing
 // (or who isn't listed here) shows their name in text instead — the preview
 // and the PDF route both check the file actually exists before using it.
 export const CLIENT_LOGOS: Record<string, { file: string; height: number }> = {
-  novotel: { file: "novotel.png", height: 56 },
-  accor: { file: "accor-clean.svg", height: 64 },
+  novotel: { file: "novotel.svg.png", height: 56 },
+  accor: { file: "accor.svg", height: 64 },
   racv: { file: "racv.png", height: 60 },
   "ray white": { file: "raywhite.png", height: 40 },
-  mosaic: { file: "mosaic-clean.svg", height: 40 },
+  mosaic: { file: "mosaic.svg", height: 40 },
   archers: { file: "archers.png", height: 56 },
   "pica group": { file: "pica.png", height: 52 },
   "coolum football club": { file: "coolum.png", height: 84 },
   "maroochy rsl": { file: "maroochy.png", height: 64 },
-  sskb: { file: "sskb-clean.svg", height: 64 },
-  trafalgar: { file: "trafalgar-clean.svg", height: 56 },
+  sskb: { file: "sskb.svg", height: 64 },
 };
 
-export const CLIENT_LOGO_DIR = "/reports/proposal/clients/";
+export const CLIENT_LOGO_DIR = "/reports/partners/";
 
 // ── State ────────────────────────────────────────────────────────────────────
 

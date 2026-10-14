@@ -70,6 +70,7 @@ const introP: CSSProperties = {
   color: "rgba(1,25,85,0.65)",
   maxWidth: 760,
   margin: "0 0 48px",
+  overflowWrap: "anywhere",
 };
 const h3: CSSProperties = {
   fontSize: 22,
@@ -136,10 +137,10 @@ function CrossIcon() {
 function GoogleMark() {
   return (
     <svg width="48" height="48" viewBox="0 0 48 48" style={{ flexShrink: 0 }} aria-label="Google">
-      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z" />
-      <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z" />
-      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z" />
-      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z" />
+      <path
+        fill={INK}
+        d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+      />
     </svg>
   );
 }
@@ -179,7 +180,7 @@ function Section({ p, id, selected, onPick, padding = "96px 48px", keep, childre
 
 function Label({ p, id }: { p: ProposalData; id: SectionId }) {
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 40, breakAfter: "avoid" }}>
+    <div data-kwn style={{ display: "flex", alignItems: "baseline", gap: 16, marginBottom: 40, breakAfter: "avoid" }}>
       <span
         style={{
           fontFamily: BEBAS,
@@ -364,6 +365,17 @@ export default function ProposalDocument({
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <span style={{ fontSize: 17, fontWeight: 500 }}>{x.name}</span>
+                {/* Filled with the section's page number when the PDF is paginated. */}
+                <span
+                  data-toc={x.id}
+                  style={{
+                    marginLeft: "auto",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "rgba(1,25,85,0.4)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                />
               </div>
             ))}
           </div>
@@ -408,7 +420,7 @@ export default function ProposalDocument({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3,1fr)",
+            gridTemplateColumns: "repeat(3,minmax(0,1fr))",
             borderTop: "1px solid rgba(1,25,85,0.15)",
             marginTop: 28,
             ...avoid,
@@ -417,7 +429,9 @@ export default function ProposalDocument({
           {projectFacts.map(([k, v], i) => (
             <div key={k} style={{ padding: "24px 24px 0", borderRight: i < 2 ? "1px solid rgba(1,25,85,0.15)" : "0" }}>
               <div style={factKey}>{k}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, marginTop: 6, color: v ? INK : "#b8860b" }}>
+              <div
+                style={{ fontSize: 18, fontWeight: 700, marginTop: 6, color: v ? INK : "#b8860b", overflowWrap: "anywhere" }}
+              >
                 {v || "To be confirmed"}
               </div>
             </div>
@@ -779,7 +793,7 @@ export default function ProposalDocument({
           style={{
             display: "flex",
             flexWrap: "wrap",
-            justifyContent: "center",
+            justifyContent: "flex-start",
             alignItems: "center",
             gap: "48px 72px",
             marginTop: 80,
@@ -790,13 +804,13 @@ export default function ProposalDocument({
             const key = name.toLowerCase();
             const logo = clientLogos[key];
             return (
-              <div key={i} style={{ width: 170, height: 84, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div key={i} style={{ width: 170, height: 84, display: "flex", alignItems: "center", justifyContent: "flex-start" }}>
                 {logo ? (
                   <div
                     style={{
                       width: "100%",
                       height: CLIENT_LOGOS[key]?.height ?? 56,
-                      background: "center/contain no-repeat",
+                      background: "left center/contain no-repeat",
                       backgroundImage: bg(logo),
                     }}
                   />

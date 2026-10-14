@@ -235,6 +235,9 @@ export interface RenderPDFOptions {
   // Custom page size (CSS units) instead of A4 — the Painting proposal is a
   // 1440px-wide document, printed onto 1440px pages of A4 proportion.
   pageSize?: { width: string; height: string };
+  // Script evaluated in the page after fonts load, before printing — e.g.
+  // to lay the document out onto fixed pages. A promise it returns is awaited.
+  prepareScript?: string;
 }
 
 export async function renderPDF(
@@ -257,6 +260,7 @@ export async function renderPDF(
 
     await page.setContent(htmlContent, { waitUntil: "load", timeout: 30000 });
     await page.evaluate(() => document.fonts.ready);
+    if (options?.prepareScript) await page.evaluate(options.prepareScript);
 
     const hasHeaderFooter = !!(options?.headerTemplate || options?.footerTemplate);
 

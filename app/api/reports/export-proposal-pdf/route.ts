@@ -2,8 +2,9 @@
 //
 // Renders the Painting proposal to PDF from the very same component the
 // builder previews (ProposalDocument), so what the rep sees is what the
-// client gets. The document is a fixed 1440px wide; it prints onto 1440px
-// pages of A4 proportion, with cards and rows kept whole across page breaks.
+// client gets. The document is a fixed 1440px wide; before printing it is
+// laid onto 1440px pages of A4 proportion (lib/reports/proposal/paginate.ts),
+// with whole sections moved rather than split, footers and page numbers.
 //
 // With saveToQuote, the finished PDF is also attached to the SimPRO quote
 // (replacing an earlier export of the same name). The download is returned
@@ -26,6 +27,7 @@ import {
   todayLong,
   type ProposalData,
 } from "@/lib/reports/proposal.types";
+import { paginateScript } from "@/lib/reports/proposal/paginate";
 import { pdfDownloadResponse, readPublicAsBase64, renderPDF } from "@/lib/server/pdf-utils";
 import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveReportImages";
 import { getSimproConfig, saveQuoteAttachment } from "@/lib/server/simpro";
@@ -33,7 +35,9 @@ import { getSimproConfig, saveQuoteAttachment } from "@/lib/server/simpro";
 export const maxDuration = 60;
 
 // 1440 × (1440 × √2): A4 proportions at the document's own width.
-const PAGE = { width: "1440px", height: "2036px" };
+const PAGE_W = 1440;
+const PAGE_H = 2036;
+const PAGE = { width: `${PAGE_W}px`, height: `${PAGE_H}px` };
 
 interface StaticAssets {
   doc: ProposalDocAssets;
@@ -123,7 +127,7 @@ async function buildHTML(report: ProposalData): Promise<string> {
 @font-face{font-family:'Inter';font-weight:300 700;font-style:normal;src:url("${inter}") format('woff2');}
 @font-face{font-family:'Bebas Neue';font-weight:400;font-style:normal;src:url("${bebas}") format('woff2');}
 @font-face{font-family:'La Belle Aurore';font-weight:400;font-style:normal;src:url("${script}") format('woff2');}
-@page{size:${PAGE.width} ${PAGE.height};margin:40px 0;}
+@page{size:${PAGE.width} ${PAGE.height};margin:0;}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 </style></head><body>${body}</body></html>`;
@@ -154,7 +158,11 @@ export async function POST(request: NextRequest) {
     const html = await buildHTML(report);
     buffer = await renderPDF(html, {
       pageSize: PAGE,
-      margin: { top: "40px", right: "0", bottom: "40px", left: "0" },
+      prepareScript: paginateScript({
+        width: PAGE_W,
+        height: PAGE_H,
+        footerLeft: `RAS-VERTEX · Proposal Q ${report.quote}`,
+      }),
     });
   } catch (err) {
     console.error("[ExportProposalPDF]", err);

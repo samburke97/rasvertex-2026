@@ -7,7 +7,7 @@ import { RECURRING_CATEGORIES, isRecurringCategory } from "@/lib/recertification
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
 
-const ARCHER_DUTCH_ID = 20;
+const CAROLINE_PARK_ID = 22;
 
 async function simproPost<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${SIMPRO_BASE_URL}${path}`, {
@@ -86,8 +86,8 @@ export async function POST(request: NextRequest) {
         Site: siteId,
         Type: "Service",
         DueDate: dueDateStr,
-        Salesperson: ARCHER_DUTCH_ID,
-        ProjectManager: ARCHER_DUTCH_ID,
+        Salesperson: CAROLINE_PARK_ID,
+        ProjectManager: CAROLINE_PARK_ID,
       },
     );
 

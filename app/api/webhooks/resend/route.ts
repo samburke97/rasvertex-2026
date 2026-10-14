@@ -2,7 +2,8 @@
 // Resend delivery/open/click/bounce events → crm_lead_activity tracking
 // columns (see lib/crm/store.ts's markDelivered/markOpened/markClicked/
 // markBounced — those already existed as unused scaffolding; this is their
-// first and only caller).
+// first and only caller). Outreach emails (lib/outreach) are tracked here too:
+// an event that matches no CRM activity is tried against outreach_messages.
 //
 // Resend signs webhook payloads the same way Svix does: headers
 // svix-id / svix-timestamp / svix-signature, secret shaped "whsec_<base64>",
@@ -24,6 +25,14 @@ import {
   markClicked,
   markBounced,
 } from "@/lib/crm/store";
+import { markMessageEvent } from "@/lib/outreach/store";
+
+const OUTREACH_EVENTS = {
+  "email.delivered": "delivered",
+  "email.opened": "opened",
+  "email.clicked": "clicked",
+  "email.bounced": "bounced",
+} as const;
 
 const MAX_TIMESTAMP_SKEW_SECONDS = 5 * 60;
 
@@ -98,6 +107,10 @@ export async function POST(request: NextRequest) {
 
   const activity = await findActivityByResendEmailId(emailId);
   if (!activity) {
+    const outreachEvent = OUTREACH_EVENTS[event.type as keyof typeof OUTREACH_EVENTS];
+    if (outreachEvent && (await markMessageEvent(emailId, outreachEvent))) {
+      return NextResponse.json({ received: true, type: event.type, outreach: true });
+    }
     return NextResponse.json({ received: true, skipped: "no matching activity" });
   }
 
