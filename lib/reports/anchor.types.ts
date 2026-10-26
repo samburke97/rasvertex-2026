@@ -94,6 +94,8 @@ export interface AnchorReportJob {
   nextInspectionDate: string;
   authorisedBy: string;
   certComments: string;
+  /** Shown under the asset register. Optional (absent on older drafts). */
+  technicianNotes?: string;
   /** SimPRO Site ID, used only for the Save-to-Site export path — not rendered. */
   siteId: string;
 }
@@ -110,11 +112,24 @@ export interface AnchorPhotoSettings {
   dateTo: string | null; // "YYYY-MM-DD"
 }
 
+/** Cover photo framing: focal point (%) and zoom. */
+export interface CoverPos {
+  x: number;
+  y: number;
+  zoom: number;
+}
+export const DEFAULT_COVER_POS: CoverPos = { x: 50, y: 50, zoom: 1 };
+/** Used on the cover until a photo is uploaded. */
+export const DEFAULT_COVER_IMAGE = "images/height-safety.png";
+
 export interface AnchorReportData {
   job: AnchorReportJob;
   zones: Zone[];
   photos: ReportPhoto[];
   photoSettings: AnchorPhotoSettings;
+  /** Uploaded cover photo. Absent or null means DEFAULT_COVER_IMAGE. */
+  coverUrl?: string | null;
+  coverPos?: CoverPos;
 }
 
 export const ANCHOR_TYPE_COLOURS: Record<AnchorType, string> = {
@@ -127,6 +142,59 @@ export const ANCHOR_TYPE_COLOURS: Record<AnchorType, string> = {
   harness: "#14b8a6",
   "rope-access-anchor": "#8b5cf6",
 };
+
+// Pastel pill colours (pale background, darker same-hue text) used for
+// pins, tags and the type table. Assigned per legend group, cycling in this
+// order, so subtypes of one type still get told apart.
+export interface Pastel {
+  bg: string;
+  fg: string;
+}
+export const PASTEL_CYCLE: Pastel[] = [
+  { bg: "#e3f5ea", fg: "#3f9a68" }, // green
+  { bg: "#eeeafb", fg: "#7a66c7" }, // violet
+  { bg: "#e5f0fd", fg: "#4a82c9" }, // blue
+  { bg: "#fbe8f1", fg: "#c2557f" }, // pink
+  { bg: "#fdeee2", fg: "#c46f2e" }, // orange
+  { bg: "#e9ebfb", fg: "#5b63c4" }, // indigo
+  { bg: "#fbf4d9", fg: "#9a7a12" }, // yellow
+  { bg: "#e0f4f2", fg: "#2f8f86" }, // teal
+];
+
+/** buildLegendGroups key for one anchor. */
+export function anchorGroupKey(a: Pick<AnchorPoint, "type" | "subtype">): string {
+  if (a.subtype) return `${a.type}:${a.subtype}`;
+  return ANCHOR_TYPE_SUBTYPES[a.type] ? `${a.type}:none` : a.type;
+}
+
+/** Legend group keys across every zone, in the order anchors were placed. */
+export function anchorGroupOrder(zones: { anchors: AnchorPoint[] }[]): string[] {
+  const order: string[] = [];
+  for (const z of zones) {
+    for (const a of z.anchors) {
+      const k = anchorGroupKey(a);
+      if (!order.includes(k)) order.push(k);
+    }
+  }
+  return order;
+}
+
+export function pastelFor(order: string[], key: string): Pastel {
+  const i = order.indexOf(key);
+  return PASTEL_CYCLE[(i < 0 ? order.length : i) % PASTEL_CYCLE.length];
+}
+
+/** Icon file (public/reports/anchor/icons) for an anchor: subtype first. */
+export function anchorIconName(a: Pick<AnchorPoint, "type" | "subtype">): string {
+  return a.subtype ?? a.type;
+}
+
+/** "Rope access anchor, eye bolt" */
+export function anchorTypeSentence(a: Pick<AnchorPoint, "type" | "subtype">): string {
+  const base = ANCHOR_TYPE_LABELS[a.type];
+  const t = base.charAt(0) + base.slice(1).toLowerCase();
+  return a.subtype ? `${t}, ${ANCHOR_SUBTYPE_LABELS[a.subtype].toLowerCase()}` : t;
+}
 
 export const ANCHOR_TYPE_LABELS: Record<AnchorType, string> = {
   "fall-arrest-anchor": "Fall Arrest Anchor",
@@ -332,14 +400,15 @@ export const DEFAULT_ANCHOR_REPORT: AnchorReportData = {
     address: "",
     reportType: "Roof Access & Fall Prevention Systems Inspection Report",
     date: new Date().toLocaleDateString("en-AU"),
-    description:
-      "This report relates to existing Height Safety and Roof Access Systems. All systems were visually inspected in accordance with AS/NZS 1891.4:2009, AS/NZS 1891.2 and AS 1657:2018.",
+    // Empty means the cover generates its own blurb from the address.
+    description: "",
     certNumber: "",
     buildingName: "",
     inspectionDate: "",
     nextInspectionDate: "",
     authorisedBy: "",
     certComments: "",
+    technicianNotes: "",
     siteId: "",
   },
   zones: [],

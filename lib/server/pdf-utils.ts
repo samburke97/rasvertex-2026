@@ -286,6 +286,26 @@ export async function renderPDF(
   }
 }
 
+// Loads html in the same cached browser and returns what `script` (an
+// expression, evaluated after fonts load) evaluates to — e.g. measuring
+// rendered block heights so a report can be paginated before it's printed.
+export async function evaluateHTML<T>(
+  htmlContent: string,
+  script: string,
+  viewport?: { width: number; height: number },
+): Promise<T> {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    if (viewport) await page.setViewport(viewport);
+    await page.setContent(htmlContent, { waitUntil: "load", timeout: 30000 });
+    await page.evaluate(() => document.fonts.ready);
+    return (await page.evaluate(script)) as T;
+  } finally {
+    await page.close();
+  }
+}
+
 // ── PDF download response ─────────────────────────────────────────────────────
 
 // Vercel Functions cap both request AND response bodies at 4.5MB for a

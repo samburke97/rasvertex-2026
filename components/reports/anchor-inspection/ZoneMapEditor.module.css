@@ -988,3 +988,21 @@
 .hiddenInput {
   display: none;
 }
+
+/* Mount options sit inline after the type chips. */
+.stampDivider {
+  width: 1px;
+  height: 24px;
+  background: var(--out-medium, #d9dbdb);
+  flex-shrink: 0;
+  margin: 0 0.25rem;
+}
+
+.stampMountLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--for-medium, #7e807f);
+  flex-shrink: 0;
+}

@@ -2,13 +2,6 @@
 /* Modal chrome (overlay/header/close/body padding) now lives in
    ui/Modal.tsx — this file only styles the form content inside it. */
 
-.typeIndicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
 .fieldGroup {
   display: flex;
   flex-direction: column;
@@ -30,43 +23,32 @@
   gap: 0.75rem;
 }
 
-/* ── Type grid ───────────────────────────────────────────────────────────── */
-.typeGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
+/* ── Type select ─────────────────────────────────────────────────────── */
+.select {
+  height: 40px;
+  border: 1px solid var(--out-medium, #d9dbdb);
+  border-radius: 7px;
+  padding: 0 0.625rem;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--for-darkest, #141414);
+  background: #fff;
 }
 
-.typeBtn {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.5rem;
-  border: 1.5px solid var(--out-light, #edf0f0);
-  border-radius: 7px;
+.datesLink {
+  border: 0;
   background: none;
-  font-size: 0.75rem;
-  font-weight: 500;
+  padding: 0;
+  margin-bottom: 1rem;
+  font: inherit;
+  font-size: 0.78rem;
   color: var(--for-medium, #7e807f);
   cursor: pointer;
-  transition: all 0.12s;
   text-align: left;
 }
 
-.typeBtn:hover {
-  border-color: var(--out-medium, #d9dbdb);
+.datesLink:hover {
   color: var(--for-darkest, #141414);
-}
-
-.typeBtnActive {
-  font-weight: 600;
-}
-
-.typeDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
 }
 
 /* ── Result toggle ───────────────────────────────────────────────────────── */

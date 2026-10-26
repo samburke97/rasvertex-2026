@@ -7,17 +7,16 @@ import Card from "@/components/ui/Card";
 import CountBadge from "@/components/ui/CountBadge";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
-// Each report builder is a large, self-contained editor (Condition Report
-// alone pulls in a full Tiptap rich-text engine) — loading all three
+// Each report builder is a large, self-contained editor — loading them all
 // unconditionally nearly tripled this page's bundle for no reason, since a
 // visit only ever uses one. Loading whichever one is picked, on demand,
 // keeps the initial /reports visit light.
-const ConditionReportPage = dynamic(
-  () => import("./condition/ConditionReportPage"),
-  { loading: () => <ReportLoading />, ssr: false },
-);
 const AnchorInspectionPage = dynamic(
   () => import("./anchor-inspection/AnchorInspectionPage"),
+  { loading: () => <ReportLoading />, ssr: false },
+);
+const InspectionReportPage = dynamic(
+  () => import("./inspection/InspectionReportPage"),
   { loading: () => <ReportLoading />, ssr: false },
 );
 const HoursBreakdownPage = dynamic(
@@ -38,7 +37,7 @@ function ReportLoading() {
 }
 
 type ReportTypeId =
-  | "condition"
+  | "inspection"
   | "anchor-inspection"
   | "hours-breakdown"
   | "proposal";
@@ -55,10 +54,10 @@ interface ReportType {
 // ── Report type definitions ────────────────────────────────────────────────
 const REPORT_TYPES: ReportType[] = [
   {
-    id: "condition",
-    label: "Condition Report",
+    id: "inspection",
+    label: "Inspection Report",
     description:
-      "Photo-based building condition report with cover page and summary.",
+      "Building or roof inspection report generated from the job's coded photo labels (e.g. D10 L2 SH).",
     available: true,
     category: "inspection",
     icon: (
@@ -72,11 +71,10 @@ const REPORT_TYPES: ReportType[] = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-        <polyline points="10 9 9 9 8 9" />
+        <circle cx="11" cy="11" r="7" />
+        <line x1="21" y1="21" x2="16" y2="16" />
+        <line x1="11" y1="8" x2="11" y2="11" />
+        <line x1="11" y1="14" x2="11.01" y2="14" />
       </svg>
     ),
   },
@@ -207,8 +205,8 @@ function CategorySection({
 export default function ReportSelector() {
   const [active, setActive] = useState<ReportTypeId | null>(null);
 
-  if (active === "condition") {
-    return <ConditionReportPage onBack={() => setActive(null)} />;
+  if (active === "inspection") {
+    return <InspectionReportPage onBack={() => setActive(null)} />;
   }
 
   if (active === "anchor-inspection") {

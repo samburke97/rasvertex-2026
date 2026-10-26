@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildAnchorPrintHTML } from "@/lib/reports/anchor.print";
-import {
-  loadReportAssets,
-  renderPDF,
-  pdfDownloadResponse,
-} from "@/lib/server/pdf-utils";
-import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveReportImages";
+import { pdfDownloadResponse } from "@/lib/server/pdf-utils";
+import { buildAnchorPDF } from "@/lib/server/anchorPdf";
 import type { AnchorReportData } from "@/lib/reports/anchor.types";
+
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   let body: { filename?: string; report?: AnchorReportData };
@@ -27,25 +24,7 @@ export async function POST(request: NextRequest) {
     );
 
   try {
-    const resolve = createImageResolver();
-    const [photos, zones] = await Promise.all([
-      Promise.all(
-        report.photos.map(async (p) => ({
-          ...p,
-          url: await resolve(p.url, GRID_PHOTO_RESIZE),
-        })),
-      ),
-      Promise.all(
-        report.zones.map(async (z) => ({
-          ...z,
-          mapImageUrl: z.mapImageUrl ? await resolve(z.mapImageUrl) : z.mapImageUrl,
-        })),
-      ),
-    ]);
-    const pdfReport: AnchorReportData = { ...report, photos, zones };
-
-    const html = buildAnchorPrintHTML(pdfReport, loadReportAssets());
-    const buffer = await renderPDF(html);
+    const buffer = await buildAnchorPDF(report);
     return pdfDownloadResponse(buffer, filename);
   } catch (err) {
     console.error("[ExportAnchorPDF]", err);

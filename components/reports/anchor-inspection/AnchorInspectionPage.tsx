@@ -1,7 +1,15 @@
 "use client";
 // components/reports/anchor-inspection/AnchorInspectionPage.tsx
 
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import styles from "../shared/ReportPage.module.css";
 import Button from "@/components/ui/Button";
 import IconButton from "@/components/ui/IconButton";
@@ -15,14 +23,22 @@ import { uploadReportPhoto, deleteReportPhoto } from "@/lib/reports/uploadPhoto"
 import SavedBadge from "../shared/SavedBadge";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
-import AnchorCoverSection from "./sections/AnchorCoverSection";
-import ZoneSummarySection from "./sections/ZoneSummarySection";
-import CertificationSection from "./sections/CertificationSection";
-import SummarySignoffSection from "./sections/SummarySignoffSection";
-import PhotoSection from "../shared/PhotoSection";
+import AnchorDocument, { AnchorStyles, type AnchorAssets } from "./AnchorDocument";
+import {
+  ANCHOR_ICON_NAMES,
+  ANCHOR_IMAGES,
+  PAGE_W,
+  anchorIconPath,
+  buildAnchorModel,
+  type AnchorImageKey,
+} from "@/lib/reports/anchor.layout";
 import {
   DEFAULT_ANCHOR_REPORT,
+  DEFAULT_COVER_IMAGE,
+  DEFAULT_COVER_POS,
+  anchorGroupOrder,
   generateId,
+  type CoverPos,
   type AnchorReportData,
   type AnchorReportJob,
   type PhotoFolder,
@@ -55,6 +71,24 @@ type PhotoLoadStatus =
   | { phase: "fetching-photos"; loaded: number; total: number }
   | { phase: "done" }
   | { phase: "error"; message: string };
+
+const pub = (rel: string) => "/" + rel;
+const ASSETS: AnchorAssets = {
+  images: Object.fromEntries(
+    Object.entries(ANCHOR_IMAGES).map(([k, rel]) => [k, pub(rel)]),
+  ) as Record<AnchorImageKey, string>,
+  icons: Object.fromEntries(ANCHOR_ICON_NAMES.map((n) => [n, pub(anchorIconPath(n))])),
+};
+const DEFAULT_COVER_URL = pub(DEFAULT_COVER_IMAGE);
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
 
 const AUTOSAVE_DEBOUNCE_MS = 1500;
 const AUTOSAVE_RETRY_MS = 5000;
@@ -108,6 +142,9 @@ export default function AnchorInspectionPage({
             : zone.mapImageUrl,
         })),
       ),
+      coverUrl: r.coverUrl?.startsWith("data:")
+        ? await compressMapImageDataUrl(r.coverUrl)
+        : r.coverUrl,
       photos: await Promise.all(
         r.photos.map(async (photo) => ({
           ...photo,
@@ -573,6 +610,84 @@ export default function AnchorInspectionPage({
       )
     : report.photos;
 
+  const groupOrder = useMemo(() => anchorGroupOrder(report.zones), [report.zones]);
+  const model = useMemo(
+    () => buildAnchorModel({ ...report, photos: filteredPhotos }, DEFAULT_COVER_URL),
+    [report, filteredPhotos],
+  );
+
+  // ── Cover photo: upload, zoom, drag to reposition ──────────────────────
+  const [coverBusy, setCoverBusy] = useState(false);
+  const handleUploadCover = useCallback(
+    async (file: File) => {
+      setCoverBusy(true);
+      try {
+        const dataUrl = await compressMapImageDataUrl(await readFileAsDataUrl(file));
+        const blobUrl = await uploadReportPhoto(
+          dataUrl,
+          `anchor-reports/${loadedJobId || "manual"}/cover-${Date.now()}.jpg`,
+        );
+        if (report.coverUrl) deleteReportPhoto(report.coverUrl);
+        setReport((prev) => ({ ...prev, coverUrl: blobUrl, coverPos: { ...DEFAULT_COVER_POS } }));
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Cover upload failed.");
+      } finally {
+        setCoverBusy(false);
+      }
+    },
+    [loadedJobId, report.coverUrl],
+  );
+  const handleResetCover = useCallback(() => {
+    if (report.coverUrl) deleteReportPhoto(report.coverUrl);
+    setReport((prev) => ({ ...prev, coverUrl: null, coverPos: { ...DEFAULT_COVER_POS } }));
+  }, [report.coverUrl]);
+  const setCoverPos = useCallback((patch: Partial<CoverPos>) => {
+    setReport((prev) => ({
+      ...prev,
+      coverPos: { ...(prev.coverPos ?? DEFAULT_COVER_POS), ...patch },
+    }));
+  }, []);
+  const onCoverPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLElement>) => {
+      e.preventDefault();
+      const box = e.currentTarget.getBoundingClientRect();
+      const start = { cx: e.clientX, cy: e.clientY, ...model.coverPos };
+      const clamp = (v: number) => Math.min(100, Math.max(0, v));
+      const move = (ev: PointerEvent) => {
+        // Dragging right moves the photo right, i.e. the focal point left.
+        const dx = ((ev.clientX - start.cx) / box.width) * 100 * 1.5;
+        const dy = ((ev.clientY - start.cy) / box.height) * 100 * 1.5;
+        setCoverPos({
+          x: Math.round(clamp(start.x - dx / start.zoom) * 10) / 10,
+          y: Math.round(clamp(start.y - dy / start.zoom) * 10) / 10,
+        });
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    },
+    [model.coverPos, setCoverPos],
+  );
+
+  // ── Preview zoom (fixed 1280px pages, scaled to the column) ────────────
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(0.5);
+  useLayoutEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const fit = () => {
+      const z = Math.max(0.15, Math.min(0.75, (el.clientWidth - 64) / PAGE_W));
+      setZoom((prev) => (Math.abs(prev - z) > 0.003 ? z : prev));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [view]);
+
   // ── Zone map view ──────────────────────────────────────────────────────
   if (view === "zone-map" && editingZoneId) {
     const zone = report.zones.find((z) => z.id === editingZoneId);
@@ -583,6 +698,7 @@ export default function AnchorInspectionPage({
           jobAddress={report.job.address}
           defaultInspectionDate={report.job.inspectionDate}
           defaultNextInspection={report.job.nextInspectionDate}
+          groupOrder={groupOrder}
           onUpdate={handleZoneUpdate}
           onBack={() => {
             setView("editor");
@@ -680,57 +796,32 @@ export default function AnchorInspectionPage({
           onSelectPhotoFolder={handleSelectPhotoFolder}
           onLoadPhotosFromJob={handleLoadPhotosFromJob}
           onUploadPhotos={handleUploadPhotos}
+          coverUrl={model.coverUrl ?? DEFAULT_COVER_URL}
+          hasCustomCover={!!report.coverUrl}
+          coverBusy={coverBusy}
+          coverZoom={model.coverPos.zoom}
+          onUploadCover={handleUploadCover}
+          onResetCover={handleResetCover}
+          onCoverZoom={(z) => setCoverPos({ zoom: z })}
+          comments={report.job.certComments}
+          onComments={(v) => updateJob("certComments", v)}
+          technicianNotes={report.job.technicianNotes ?? ""}
+          onTechnicianNotes={(v) => updateJob("technicianNotes", v)}
         />
 
-        {/* ── Canvas ── */}
-        <div className={styles.canvas}>
-          <div className={styles.pageLabel}>Cover Page</div>
-          <AnchorCoverSection job={report.job} onUpdate={updateJob} />
-
-          {report.zones.length > 0 && (
-            <>
-              <div className={styles.pageLabel}>
-                Zones &middot; {report.zones.length} zone
-                {report.zones.length !== 1 ? "s" : ""}
-              </div>
-              {report.zones.map((zone) => (
-                <ZoneSummarySection
-                  key={zone.id}
-                  zone={zone}
-                  onEditZone={() => openZoneMap(zone.id)}
-                />
-              ))}
-            </>
-          )}
-
-          <div className={styles.pageLabel}>Certification</div>
-          <CertificationSection
-            job={report.job}
-            zones={report.zones}
-            onUpdate={updateJob}
-          />
-
-          {report.photoSettings.enabled && (
-            <>
-              <div className={styles.pageLabel}>
-                Supporting Photos
-                {filteredPhotos.length > 0 &&
-                  ` · ${filteredPhotos.length} photo${filteredPhotos.length !== 1 ? "s" : ""}`}
-              </div>
-              <PhotoSection
-                photos={filteredPhotos}
-                importStatus={photoImportStatus}
-                showDates={report.photoSettings.showDates}
-                layout={report.photoSettings.photoLayout}
-                onPhotoRemove={removePhoto}
-                onPhotoRename={renamePhoto}
-                emptyMessage="No photos yet — upload some or pull them from the job."
-              />
-            </>
-          )}
-
-          <div className={styles.pageLabel}>Summary &amp; Sign-off</div>
-          <SummarySignoffSection />
+        {/* ── Preview: the report itself, scaled to the column ── */}
+        <div ref={previewRef} className={styles.canvas}>
+          <AnchorStyles />
+          <div style={{ zoom }}>
+            <AnchorDocument
+              model={model}
+              assets={ASSETS}
+              screen
+              onCoverPointerDown={onCoverPointerDown}
+              onPhotoRename={renamePhoto}
+              onPhotoRemove={removePhoto}
+            />
+          </div>
         </div>
       </div>
 

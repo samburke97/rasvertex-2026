@@ -18,27 +18,14 @@
   gap: 0.5rem;
 }
 
-/* Fixed-width icon slot — dot/line/shape icons are different intrinsic
-   sizes, so without this their labels don't line up to a common column
-   and row spacing reads as uneven. */
-.iconSlot {
-  display: flex;
+.pill {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 14px;
-  flex-shrink: 0;
-}
-
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.lineIcon,
-.shapeIcon {
-  flex-shrink: 0;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 0.65rem;
+  font-weight: 700;
 }
 
 .label {

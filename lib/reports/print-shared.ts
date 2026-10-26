@@ -1,7 +1,7 @@
 // lib/reports/print-shared.ts
 //
 // Common building blocks shared by every *.print.ts HTML/PDF builder
-// (condition.print.ts, anchor.print.ts, hours.print.ts). All three render
+// (hours.print.ts). All three render
 // via the same Puppeteer pipeline (lib/server/pdf-utils.ts) and share a lot
 // of the same visual language — this is the single source of truth for the
 // parts that are genuinely identical across them (brand colour, fonts, the

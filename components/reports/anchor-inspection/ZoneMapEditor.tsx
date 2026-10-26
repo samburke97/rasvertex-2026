@@ -13,10 +13,12 @@ import { compressMapImageDataUrl } from "@/lib/reports/compressImage";
 import { zoomToFitBounds } from "@/lib/reports/staticMapZoom";
 import {
   ANCHOR_SUBTYPE_LABELS,
-  ANCHOR_TYPE_COLOURS,
   ANCHOR_TYPE_LABELS,
   ANCHOR_TYPE_OPTIONS,
   ANCHOR_TYPE_SUBTYPES,
+  anchorGroupKey,
+  anchorTypeSentence,
+  pastelFor,
   computeLineEdges,
   generateId,
   DEFAULT_MAP_RATIO,
@@ -31,6 +33,8 @@ interface ZoneMapEditorProps {
   jobAddress: string;
   defaultInspectionDate: string;
   defaultNextInspection: string;
+  /** Report-wide legend group order — pin colours match the report. */
+  groupOrder: string[];
   onUpdate: (zone: Zone) => void;
   onBack: () => void;
   onDelete: () => void;
@@ -251,6 +255,7 @@ export default function ZoneMapEditor({
   jobAddress,
   defaultInspectionDate,
   defaultNextInspection,
+  groupOrder,
   onUpdate,
   onBack,
   onDelete,
@@ -856,6 +861,8 @@ export default function ZoneMapEditor({
     ...new Set(localZone.anchors.map((a) => a.type)),
   ] as AnchorType[];
 
+  const pastel = (a: Pick<AnchorPoint, "type" | "subtype">) =>
+    pastelFor(groupOrder, anchorGroupKey(a));
   const lineEdges = computeLineEdges(localZone.anchors);
   const lastAnchor = localZone.anchors[localZone.anchors.length - 1];
   const canCloseLoop =
@@ -1035,33 +1042,57 @@ export default function ZoneMapEditor({
         </>
       )}
 
-      {/* Type stamp toolbar — pick a type, then tap the map to place it */}
+      {/* Stamp toolbar — pick what you're placing, then tap the map. Types
+          with mounting options show them inline at the end of the same bar. */}
       {captured && (
         <div className={styles.stampBar}>
-          {ANCHOR_TYPE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              className={`${styles.stampChip} ${
-                selectedType === opt.value ? styles.stampChipActive : ""
-              }`}
-              style={
-                selectedType === opt.value
-                  ? {
-                      borderColor: ANCHOR_TYPE_COLOURS[opt.value],
-                      background: ANCHOR_TYPE_COLOURS[opt.value] + "18",
-                      color: ANCHOR_TYPE_COLOURS[opt.value],
-                    }
-                  : {}
-              }
-              onClick={() => selectType(opt.value)}
-            >
-              <span
-                className={styles.stampDot}
-                style={{ background: ANCHOR_TYPE_COLOURS[opt.value] }}
-              />
-              {opt.label}
-            </button>
-          ))}
+          {ANCHOR_TYPE_OPTIONS.map((opt) => {
+            const on = selectedType === opt.value;
+            const p = pastel({
+              type: opt.value,
+              subtype: on ? selectedSubtype : ANCHOR_TYPE_SUBTYPES[opt.value]?.[0],
+            });
+            return (
+              <button
+                key={opt.value}
+                className={`${styles.stampChip} ${on ? styles.stampChipActive : ""}`}
+                style={on ? { borderColor: p.fg, background: p.bg, color: p.fg } : {}}
+                onClick={() => selectType(opt.value)}
+                title={opt.label}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/reports/anchor/icons/${opt.value}.svg`}
+                  alt=""
+                  width={18}
+                  height={18}
+                />
+                {opt.label}
+              </button>
+            );
+          })}
+
+          {subtypeOptions && (
+            <>
+              <span className={styles.stampDivider} />
+              <span className={styles.stampMountLabel}>Mount</span>
+              {subtypeOptions.map((st) => {
+                const on = selectedSubtype === st;
+                const p = pastel({ type: selectedType, subtype: st });
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    className={`${styles.stampSubChip} ${on ? styles.stampSubChipActive : ""}`}
+                    style={on ? { borderColor: p.fg, background: p.bg, color: p.fg } : {}}
+                    onClick={() => setSelectedSubtype(st)}
+                  >
+                    {ANCHOR_SUBTYPE_LABELS[st]}
+                  </button>
+                );
+              })}
+            </>
+          )}
 
           {canCloseLoop && (
             <button
@@ -1077,32 +1108,6 @@ export default function ZoneMapEditor({
                 : "⤾ Close Loop"}
             </button>
           )}
-        </div>
-      )}
-
-      {/* Mount-type sub-picker — only for types with sub-options */}
-      {captured && subtypeOptions && (
-        <div className={styles.stampSubBar}>
-          {subtypeOptions.map((st) => (
-            <button
-              key={st}
-              type="button"
-              className={`${styles.stampSubChip} ${
-                selectedSubtype === st ? styles.stampSubChipActive : ""
-              }`}
-              style={
-                selectedSubtype === st
-                  ? {
-                      borderColor: ANCHOR_TYPE_COLOURS[selectedType],
-                      color: ANCHOR_TYPE_COLOURS[selectedType],
-                    }
-                  : {}
-              }
-              onClick={() => setSelectedSubtype(st)}
-            >
-              {ANCHOR_SUBTYPE_LABELS[st]}
-            </button>
-          ))}
         </div>
       )}
 
@@ -1259,8 +1264,8 @@ export default function ZoneMapEditor({
                         y1={edge.from.y}
                         x2={edge.to.x}
                         y2={edge.to.y}
-                        stroke={ANCHOR_TYPE_COLOURS[edge.from.type]}
-                        strokeWidth={0.5}
+                        stroke={pastel(edge.from).fg}
+                        strokeWidth={3}
                         vectorEffect="non-scaling-stroke"
                         strokeLinecap="round"
                       />
@@ -1293,7 +1298,7 @@ export default function ZoneMapEditor({
                   >
                     <span
                       className={styles.pinLabel}
-                      style={{ background: ANCHOR_TYPE_COLOURS[anchor.type] }}
+                      style={{ background: pastel(anchor).bg, color: pastel(anchor).fg }}
                     >
                       {anchor.label}
                     </span>
@@ -1302,7 +1307,11 @@ export default function ZoneMapEditor({
 
                 {activeTypes.length > 0 && (
                   <div className={styles.legendOverlay}>
-                    <MapLegend types={activeTypes} anchors={localZone.anchors} />
+                    <MapLegend
+                      types={activeTypes}
+                      anchors={localZone.anchors}
+                      groupOrder={groupOrder}
+                    />
                   </div>
                 )}
               </div>
@@ -1335,14 +1344,14 @@ export default function ZoneMapEditor({
                 >
                   <span
                     className={styles.anchorDot}
-                    style={{ background: ANCHOR_TYPE_COLOURS[anchor.type] }}
+                    style={{ background: pastel(anchor).fg }}
                   />
                   <div className={styles.anchorRowInfo}>
                     <span className={styles.anchorRowLabel}>
                       {anchor.label}
                     </span>
                     <span className={styles.anchorRowType}>
-                      {ANCHOR_TYPE_LABELS[anchor.type]}
+                      {anchorTypeSentence(anchor)}
                     </span>
                   </div>
                   <span

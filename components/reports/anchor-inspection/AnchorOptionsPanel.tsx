@@ -7,6 +7,7 @@ import JobImportInput from "../shared/JobImportInput";
 import ToggleRow from "../shared/ToggleRow";
 import Button from "@/components/ui/Button";
 import DatePicker from "@/components/ui/DatePicker";
+import DocEditor from "@/components/workspace/DocEditor";
 import type {
   AnchorPhotoSettings,
   PhotoFolder,
@@ -37,6 +38,20 @@ interface AnchorOptionsPanelProps {
   onSelectPhotoFolder: (folderId: number | null) => void;
   onLoadPhotosFromJob: () => void;
   onUploadPhotos: (files: FileList) => void;
+
+  // Cover photo — the default height-safety photo until one is uploaded.
+  coverUrl: string;
+  hasCustomCover: boolean;
+  coverBusy: boolean;
+  coverZoom: number;
+  onUploadCover: (file: File) => void;
+  onResetCover: () => void;
+  onCoverZoom: (zoom: number) => void;
+
+  comments: string;
+  onComments: (v: string) => void;
+  technicianNotes: string;
+  onTechnicianNotes: (v: string) => void;
 }
 
 // ── Date preset helpers ───────────────────────────────────────────────────────
@@ -72,12 +87,6 @@ const PRESETS = [
 
 type PresetKey = (typeof PRESETS)[number]["key"];
 
-const PHOTO_LAYOUT_OPTIONS = [
-  { key: "large", label: "Large", sub: "4 per page" },
-  { key: "medium", label: "Medium", sub: "6 per page" },
-  { key: "small", label: "Small", sub: "9 per page" },
-] as const;
-
 function detectPreset(
   from: string | null,
   to: string | null,
@@ -110,8 +119,20 @@ export default function AnchorOptionsPanel({
   onSelectPhotoFolder,
   onLoadPhotosFromJob,
   onUploadPhotos,
+  coverUrl,
+  hasCustomCover,
+  coverBusy,
+  coverZoom,
+  onUploadCover,
+  onResetCover,
+  onCoverZoom,
+  comments,
+  onComments,
+  technicianNotes,
+  onTechnicianNotes,
 }: AnchorOptionsPanelProps) {
   const uploadRef = useRef<HTMLInputElement>(null);
+  const coverRef = useRef<HTMLInputElement>(null);
 
   const hasPhotos = photos.length > 0;
   const isLoadingPhotos = photoImportStatus.phase === "fetching-photos";
@@ -244,6 +265,93 @@ export default function AnchorOptionsPanel({
         )}
       </div>
 
+      {/* ── Cover photo ──────────────────────────────────────────────────── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabel}>Cover Photo</div>
+        <input
+          ref={coverRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className={styles.hiddenInput}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) onUploadCover(f);
+          }}
+        />
+        <div className={styles.coverPhotoPreview}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={coverUrl} alt="Cover" className={styles.coverPhotoThumb} />
+          <div className={styles.coverPhotoActions}>
+            <button
+              className={styles.coverPhotoChange}
+              onClick={() => coverRef.current?.click()}
+              disabled={coverBusy}
+            >
+              {coverBusy ? "Uploading…" : "Upload photo"}
+            </button>
+            {hasCustomCover && (
+              <button className={styles.coverPhotoRemove} onClick={onResetCover}>
+                Use default
+              </button>
+            )}
+          </div>
+        </div>
+        <div className={styles.subLabel}>Zoom · {Math.round(coverZoom * 100)}%</div>
+        <input
+          type="range"
+          min={1}
+          max={3}
+          step={0.05}
+          value={coverZoom}
+          onChange={(e) => onCoverZoom(Number(e.target.value))}
+          style={{ width: "100%", accentColor: "#011955" }}
+        />
+        <div className={styles.subLabel} style={{ textTransform: "none", letterSpacing: 0 }}>
+          Drag the photo on the cover preview to reposition it.
+        </div>
+      </div>
+
+      {/* ── Technician notes (under the asset register) ─────────────────── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabel}>Technician Notes</div>
+        <div
+          style={{
+            border: "1px solid #d9dbdb",
+            borderRadius: 8,
+            padding: "8px 12px",
+            minHeight: 120,
+            fontSize: "0.85rem",
+            background: "#fff",
+          }}
+        >
+          <DocEditor value={technicianNotes} onChange={onTechnicianNotes} />
+        </div>
+        <div className={styles.subLabel} style={{ textTransform: "none", letterSpacing: 0 }}>
+          Type / for headings, lists and checklists. Shown under the asset register.
+        </div>
+      </div>
+
+      {/* ── Certification comments ───────────────────────────────────────── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabel}>Certification Comments</div>
+        <textarea
+          value={comments}
+          onChange={(e) => onComments(e.target.value)}
+          rows={3}
+          placeholder="Optional — shown under Please note"
+          style={{
+            width: "100%",
+            border: "1px solid #d9dbdb",
+            borderRadius: 8,
+            padding: "8px 10px",
+            font: "inherit",
+            fontSize: "0.8rem",
+            resize: "vertical",
+          }}
+        />
+      </div>
+
       {/* ── Supporting Photos — optional, off by default ────────────────── */}
       <div className={styles.group}>
         <div className={styles.groupLabelRow}>
@@ -316,33 +424,6 @@ export default function AnchorOptionsPanel({
                 </div>
               </>
             )}
-
-            <ToggleRow
-              label="Show dates"
-              sub={
-                hasPhotos
-                  ? "Print capture date under each photo"
-                  : "Add photos first"
-              }
-              checked={photoSettings.showDates}
-              onChange={(v) => set({ showDates: v })}
-              disabled={!hasPhotos}
-            />
-
-            <div className={styles.subLabel}>Grid size</div>
-            <div className={styles.presetRow}>
-              {PHOTO_LAYOUT_OPTIONS.map((l) => (
-                <button
-                  key={l.key}
-                  className={`${styles.presetBtn} ${photoSettings.photoLayout === l.key ? styles.presetBtnActive : ""}`}
-                  onClick={() => set({ photoLayout: l.key })}
-                  disabled={!hasPhotos}
-                  title={l.sub}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
 
             <ToggleRow
               label="Filter by date"
