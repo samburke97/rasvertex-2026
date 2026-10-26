@@ -10,7 +10,7 @@
 .rail {
   width: 240px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(0, 0, 0, 0.09);
+  border-right: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -24,11 +24,11 @@
 }
 
 .railTitle {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(23, 23, 26, 0.5);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6);
 }
 
 .railMeta {
@@ -36,7 +36,7 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: rgba(23, 23, 26, 0.5);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
 }
 
 .railToggle {
@@ -45,7 +45,7 @@
   border: 0;
   border-radius: 8px;
   background: none;
-  color: rgba(23, 23, 26, 0.5);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -54,8 +54,8 @@
 }
 
 .railToggle:hover {
-  background: rgba(0, 0, 0, 0.045);
-  color: #17171a;
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.045);
+  color: var(--rv-ink, #17171a);
 }
 
 .railList {
@@ -80,19 +80,19 @@
 }
 
 .railItem:hover {
-  background: rgba(0, 0, 0, 0.035);
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.035);
 }
 
 .railItemSel,
 .railItemSel:hover {
-  background: #edf4fa;
+  background: var(--rv-accent-nav, #edf4fa);
 }
 
 .railNum {
   width: 20px;
   font-size: 11.5px;
   font-weight: 600;
-  color: rgba(23, 23, 26, 0.4);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.4);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
@@ -112,7 +112,7 @@
   font-size: 13.5px;
   font-weight: 500;
   line-height: 1.3;
-  color: #17171a;
+  color: var(--rv-ink, #17171a);
   margin-bottom: 2px;
 }
 
@@ -132,42 +132,43 @@
 }
 
 .toggle {
-  width: 30px;
-  height: 18px;
+  width: 34px;
+  height: 20px;
   border-radius: 999px;
   border: 0;
   padding: 0;
   position: relative;
-  background: rgba(23, 23, 26, 0.18);
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.14);
   cursor: pointer;
   flex-shrink: 0;
+  transition: background 140ms ease-out;
 }
 
 .toggleOn {
-  background: #3e7fb0;
+  background: var(--rv-accent, #3e7fb0);
 }
 
 .knob {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--rv-surface, #fff);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  transition: left 120ms ease-out;
+  transition: left 140ms ease-out;
 }
 
 .toggleOn .knob {
-  left: 14px;
+  left: 16px;
 }
 
 /* Collapsed rail */
 .railMini {
   width: 56px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(0, 0, 0, 0.09);
+  border-right: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -198,7 +199,7 @@
   cursor: pointer;
   font-size: 11.5px;
   font-weight: 600;
-  color: rgba(23, 23, 26, 0.55);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
   font-variant-numeric: tabular-nums;
   display: flex;
   align-items: center;
@@ -206,13 +207,13 @@
 }
 
 .miniBtn:hover {
-  background: rgba(0, 0, 0, 0.045);
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.045);
 }
 
 .miniBtnSel,
 .miniBtnSel:hover {
-  background: #edf4fa;
-  color: #17171a;
+  background: var(--rv-accent-nav, #edf4fa);
+  color: var(--rv-ink, #17171a);
 }
 
 .miniDot {
@@ -229,7 +230,7 @@
   flex: 1;
   min-width: 0;
   overflow: auto;
-  background: #f6f6f4;
+  background: var(--rv-page, #f6f6f4);
   position: relative;
   padding: 24px;
 }
@@ -237,17 +238,18 @@
 .page {
   width: 1440px;
   margin: 0 auto;
+  /* The proposal page itself — always white, like the PDF. */
   background: #fff;
   box-shadow:
-    0 1px 2px rgba(23, 23, 26, 0.06),
-    0 16px 48px -16px rgba(23, 23, 26, 0.18);
+    0 1px 2px rgba(var(--rv-ink-rgb, 23, 23, 26), 0.06),
+    0 16px 48px -16px rgba(var(--rv-ink-rgb, 23, 23, 26), 0.18);
 }
 
 /* ── Editor panel ── */
 .panel {
   width: 340px;
   flex-shrink: 0;
-  border-left: 1px solid rgba(0, 0, 0, 0.09);
+  border-left: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -255,7 +257,7 @@
 
 .panelHead {
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(23, 23, 26, 0.05);
+  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.05);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -271,7 +273,7 @@
 
 .panelNum {
   font-size: 12px;
-  color: rgba(23, 23, 26, 0.5);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
 }
 
 .panelName {

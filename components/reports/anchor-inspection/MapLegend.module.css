@@ -7,7 +7,7 @@
   gap: 0.625rem 1.125rem;
   padding: 0.875rem 1.125rem;
   background: rgba(255, 255, 255, 0.94);
-  border: 1px solid var(--out-light, #edf0f0);
+  border: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
   border-radius: 10px;
   backdrop-filter: blur(4px);
 }
@@ -31,7 +31,7 @@
 .label {
   font-size: 0.775rem;
   font-weight: 500;
-  color: var(--for-dark, #374151);
+  color: var(--rv-ink-70, rgba(23, 23, 26, 0.7));
   white-space: nowrap;
 }
 
@@ -42,8 +42,8 @@
   min-width: 1.25rem;
   font-size: 0.7rem;
   font-weight: 600;
-  color: var(--for-medium, #7e807f);
-  background: var(--con-light, #fafafa);
+  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
+  background: var(--rv-surface-soft, #fbfbfa);
   border-radius: 20px;
   padding: 0.15rem 0.4rem;
 }

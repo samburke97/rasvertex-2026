@@ -11,19 +11,23 @@ import React, {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import styles from "../shared/ReportPage.module.css";
-import Button from "@/components/ui/Button";
-import IconButton from "@/components/ui/IconButton";
 import SaveReportModal from "../shared/SaveReportModal";
 import {
   compressImageDataUrl,
   compressMapImageDataUrl,
 } from "@/lib/reports/compressImage";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
-import { uploadReportPhoto, deleteReportPhoto } from "@/lib/reports/uploadPhoto";
+import {
+  uploadReportPhoto,
+  deleteReportPhoto,
+} from "@/lib/reports/uploadPhoto";
 import SavedBadge from "../shared/SavedBadge";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
-import AnchorDocument, { AnchorStyles, type AnchorAssets } from "./AnchorDocument";
+import AnchorDocument, {
+  AnchorStyles,
+  type AnchorAssets,
+} from "./AnchorDocument";
 import {
   ANCHOR_ICON_NAMES,
   ANCHOR_IMAGES,
@@ -77,7 +81,9 @@ const ASSETS: AnchorAssets = {
   images: Object.fromEntries(
     Object.entries(ANCHOR_IMAGES).map(([k, rel]) => [k, pub(rel)]),
   ) as Record<AnchorImageKey, string>,
-  icons: Object.fromEntries(ANCHOR_ICON_NAMES.map((n) => [n, pub(anchorIconPath(n))])),
+  icons: Object.fromEntries(
+    ANCHOR_ICON_NAMES.map((n) => [n, pub(anchorIconPath(n))]),
+  ),
 };
 const DEFAULT_COVER_URL = pub(DEFAULT_COVER_IMAGE);
 
@@ -238,9 +244,7 @@ export default function AnchorInspectionPage({
         ...fallback,
         preparedFor: jobData.preparedFor || "",
         address: jobData.siteAddress || "",
-        date: jobData.date
-          ? formatReportDateText(jobData.date)
-          : fallback.date,
+        date: jobData.date ? formatReportDateText(jobData.date) : fallback.date,
         certNumber: jobData.jobNo?.replace(/^#/, "") || "",
         buildingName: jobData.siteName || "",
         inspectionDate,
@@ -337,7 +341,8 @@ export default function AnchorInspectionPage({
     if (photoImportStatus.phase === "fetching-photos") return;
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
 
-    const delay = saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
+    const delay =
+      saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
     autosaveTimer.current = setTimeout(async () => {
       setSaveStatus("saving");
       try {
@@ -400,12 +405,15 @@ export default function AnchorInspectionPage({
   // upload finishes — don't clobber newer state with a stale result.
   const handleZoneUpdate = useCallback(
     (updatedZone: Zone) => {
-      const prevMapUrl = report.zones.find((z) => z.id === updatedZone.id)
-        ?.mapImageUrl;
+      const prevMapUrl = report.zones.find(
+        (z) => z.id === updatedZone.id,
+      )?.mapImageUrl;
 
       setReport((prev) => ({
         ...prev,
-        zones: prev.zones.map((z) => (z.id === updatedZone.id ? updatedZone : z)),
+        zones: prev.zones.map((z) =>
+          z.id === updatedZone.id ? updatedZone : z,
+        ),
       }));
 
       if (updatedZone.mapImageUrl?.startsWith("data:")) {
@@ -610,9 +618,16 @@ export default function AnchorInspectionPage({
       )
     : report.photos;
 
-  const groupOrder = useMemo(() => anchorGroupOrder(report.zones), [report.zones]);
+  const groupOrder = useMemo(
+    () => anchorGroupOrder(report.zones),
+    [report.zones],
+  );
   const model = useMemo(
-    () => buildAnchorModel({ ...report, photos: filteredPhotos }, DEFAULT_COVER_URL),
+    () =>
+      buildAnchorModel(
+        { ...report, photos: filteredPhotos },
+        DEFAULT_COVER_URL,
+      ),
     [report, filteredPhotos],
   );
 
@@ -622,13 +637,19 @@ export default function AnchorInspectionPage({
     async (file: File) => {
       setCoverBusy(true);
       try {
-        const dataUrl = await compressMapImageDataUrl(await readFileAsDataUrl(file));
+        const dataUrl = await compressMapImageDataUrl(
+          await readFileAsDataUrl(file),
+        );
         const blobUrl = await uploadReportPhoto(
           dataUrl,
           `anchor-reports/${loadedJobId || "manual"}/cover-${Date.now()}.jpg`,
         );
         if (report.coverUrl) deleteReportPhoto(report.coverUrl);
-        setReport((prev) => ({ ...prev, coverUrl: blobUrl, coverPos: { ...DEFAULT_COVER_POS } }));
+        setReport((prev) => ({
+          ...prev,
+          coverUrl: blobUrl,
+          coverPos: { ...DEFAULT_COVER_POS },
+        }));
       } catch (err) {
         alert(err instanceof Error ? err.message : "Cover upload failed.");
       } finally {
@@ -639,7 +660,11 @@ export default function AnchorInspectionPage({
   );
   const handleResetCover = useCallback(() => {
     if (report.coverUrl) deleteReportPhoto(report.coverUrl);
-    setReport((prev) => ({ ...prev, coverUrl: null, coverPos: { ...DEFAULT_COVER_POS } }));
+    setReport((prev) => ({
+      ...prev,
+      coverUrl: null,
+      coverPos: { ...DEFAULT_COVER_POS },
+    }));
   }, [report.coverUrl]);
   const setCoverPos = useCallback((patch: Partial<CoverPos>) => {
     setReport((prev) => ({
@@ -714,16 +739,24 @@ export default function AnchorInspectionPage({
     <div className={styles.page}>
       {/* ── Top bar ── */}
       <div className={styles.topBar}>
-        <IconButton
-          variant="secondary"
-          size="sm"
+        <button
+          className={styles.back}
           onClick={onBack}
           aria-label="Back to report types"
-          icon={
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src="/icons/utility-outline/back.svg" alt="" width={18} height={18} />
-          }
-        />
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
         <div className={styles.topBarRight}>
           <span className={styles.topBarTitle}>Anchor Inspection</span>
           <span className={styles.badge}>
@@ -748,30 +781,27 @@ export default function AnchorInspectionPage({
                   : "Draft saved"}
             </span>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
+          <button
+            className={styles.topBtn}
             onClick={handleResetDraft}
             disabled={!loadedJobId}
           >
             Reload from SimPRO
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
+          </button>
+          <button
+            className={styles.topBtn}
             onClick={() => setShowSaveModal(true)}
             disabled={!loadedJobId}
           >
             Save
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
+          </button>
+          <button
+            className={styles.topBtnPrimary}
             onClick={handleExport}
             disabled={isExporting}
           >
             {isExporting ? "Exporting…" : "Export PDF"}
-          </Button>
+          </button>
         </div>
       </div>
 

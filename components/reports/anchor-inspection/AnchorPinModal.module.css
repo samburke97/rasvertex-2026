@@ -14,7 +14,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--for-medium, #7e807f);
+  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
 }
 
 .grid2 {
@@ -26,12 +26,12 @@
 /* ── Type select ─────────────────────────────────────────────────────── */
 .select {
   height: 40px;
-  border: 1px solid var(--out-medium, #d9dbdb);
+  border: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
   border-radius: 7px;
   padding: 0 0.625rem;
   font: inherit;
   font-size: 0.85rem;
-  color: var(--for-darkest, #141414);
+  color: var(--rv-ink, #17171a);
   background: #fff;
 }
 
@@ -42,19 +42,19 @@
   margin-bottom: 1rem;
   font: inherit;
   font-size: 0.78rem;
-  color: var(--for-medium, #7e807f);
+  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
   cursor: pointer;
   text-align: left;
 }
 
 .datesLink:hover {
-  color: var(--for-darkest, #141414);
+  color: var(--rv-ink, #17171a);
 }
 
 /* ── Result toggle ───────────────────────────────────────────────────────── */
 .resultToggle {
   display: flex;
-  border: 1px solid var(--out-medium, #d9dbdb);
+  border: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
   border-radius: 7px;
   overflow: hidden;
 }
@@ -67,7 +67,7 @@
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.05em;
-  color: var(--for-medium, #7e807f);
+  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
   cursor: pointer;
   transition:
     background 0.12s,
@@ -75,17 +75,17 @@
 }
 
 .resultBtn + .resultBtn {
-  border-left: 1px solid var(--out-medium, #d9dbdb);
+  border-left: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
 }
 
 .resultBtnPass {
-  background: var(--success-100, #e6fffa);
-  color: var(--success-600, #047857);
+  background: var(--rv-good-tint, #e9f5ef);
+  color: var(--rv-good, #3f8f68);
 }
 
 .resultBtnFail {
-  background: #fdf2f8;
-  color: var(--red-wine-300, #900c40);
+  background: var(--rv-red-tint, #fbeeea);
+  color: var(--rv-red, #b8492b);
 }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
@@ -95,7 +95,7 @@
   justify-content: space-between;
   padding-top: 1rem;
   margin-top: 0.5rem;
-  border-top: 1px solid var(--out-light, #edf0f0);
+  border-top: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
 }
 
 .footerRight {
@@ -107,7 +107,7 @@
 .deleteBtn {
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--red-wine-300, #900c40);
+  color: var(--rv-red, #b8492b);
   background: none;
   border: none;
   cursor: pointer;
@@ -117,5 +117,5 @@
 }
 
 .deleteBtn:hover {
-  background: #fdf2f8;
+  background: var(--rv-red-tint, #fbeeea);
 }

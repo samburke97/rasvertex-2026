@@ -6,8 +6,6 @@ import styles from "../shared/ReportPage.module.css";
 import ScheduleSection from "../condition/sections/ScheduleSection";
 import HoursBreakdownOptionsPanel from "./HoursBreakdownOptionsPanel";
 import HoursSaveToJobModal from "./HoursSaveToJobModal";
-import Button from "@/components/ui/Button";
-import IconButton from "@/components/ui/IconButton";
 import SavedBadge from "../shared/SavedBadge";
 import {
   filterScheduleByDateRange,
@@ -212,16 +210,24 @@ export default function HoursBreakdownPage({ onBack }: Props) {
     <div className={styles.page}>
       {/* ── Top bar — identical structure to ConditionReportPage ── */}
       <div className={styles.topBar}>
-        <IconButton
-          variant="secondary"
-          size="sm"
+        <button
+          className={styles.back}
           onClick={onBack}
           aria-label="Back to report types"
-          icon={
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src="/icons/utility-outline/back.svg" alt="" width={18} height={18} />
-          }
-        />
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
         <div className={styles.topBarRight}>
           <span className={styles.topBarTitle}>Hours Breakdown</span>
           <span className={styles.badge}>
@@ -229,22 +235,20 @@ export default function HoursBreakdownPage({ onBack }: Props) {
             {filteredSchedule.length !== 1 ? "s" : ""}
           </span>
           {savedFilename && <SavedBadge />}
-          <Button
-            variant="secondary"
-            size="sm"
+          <button
+            className={styles.topBtn}
             onClick={() => setShowSaveModal(true)}
             disabled={!hasReport || !loadedJobId}
           >
             Save to Job
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
+          </button>
+          <button
+            className={styles.topBtnPrimary}
             onClick={handleExportPDF}
             disabled={!hasReport || isExporting}
           >
             {isExporting ? "Exporting…" : "Export PDF"}
-          </Button>
+          </button>
         </div>
       </div>
 

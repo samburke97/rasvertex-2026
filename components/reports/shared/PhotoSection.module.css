@@ -4,7 +4,7 @@
 .progressOuter {
   width: 794px;
   height: 4px;
-  background: var(--out-light, #f5f5f5);
+  background: var(--rv-line-strong, rgba(0, 0, 0, 0.09));
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 0.5rem;
@@ -13,14 +13,14 @@
 
 .progressBar {
   height: 100%;
-  background: var(--brand-primary, #900c40);
+  background: var(--rv-accent, #3e7fb0);
   border-radius: 999px;
   transition: width 0.3s ease;
 }
 
 .progressLabel {
   font-size: 0.7rem;
-  color: var(--for-light, #9ca3af);
+  color: var(--rv-ink-40, rgba(23, 23, 26, 0.4));
   margin-top: 6px;
 }
 
@@ -41,13 +41,13 @@
 
 .empty {
   width: 100%;
-  background: var(--con-light, #fafafa);
-  border: 1px dashed var(--out-medium, #d9dbdb);
+  background: var(--rv-surface-soft, #fbfbfa);
+  border: 1px dashed var(--rv-line-strong, rgba(0, 0, 0, 0.09));
   border-radius: 8px;
   padding: 3rem 2rem;
   text-align: center;
   font-size: 0.85rem;
-  color: var(--for-light, #9ca3af);
+  color: var(--rv-ink-40, rgba(23, 23, 26, 0.4));
 }
 
 /* ── A4 page block — fixed height, matches PDF exactly ──────────────────── */

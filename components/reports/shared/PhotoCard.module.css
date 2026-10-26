@@ -10,7 +10,7 @@
 .thumb {
   position: relative;
   aspect-ratio: 1;
-  background: var(--con-light, #fafafa);
+  background: var(--rv-surface-soft, #fbfbfa);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -42,7 +42,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--red-wine-300, #900c40);
+  background: var(--rv-red, #b8492b);
   border: none;
   cursor: pointer;
   color: white;
@@ -63,7 +63,7 @@
 .name {
   margin-top: 0.3rem;
   font-size: 0.68rem;
-  color: var(--for-dark, #374151);
+  color: var(--rv-ink-70, rgba(23, 23, 26, 0.7));
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -82,12 +82,12 @@
   width: 100%;
   font-size: 0.68rem;
   text-align: center;
-  border: 1px solid var(--brand-primary, #900c40);
+  border: 1px solid var(--rv-accent, #3e7fb0);
   border-radius: 3px;
   padding: 2px 4px;
   outline: none;
   background: rgba(116, 219, 137, 0.06);
-  color: var(--for-darkest, #374151);
+  color: var(--rv-ink, #17171a);
 }
 
 /* Date sub-caption — shown when showDates is on, matches print .photo-date */

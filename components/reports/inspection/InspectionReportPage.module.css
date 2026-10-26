@@ -25,8 +25,8 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  background: #fff;
-  color: #17171a;
+  background: var(--rv-surface, #fff);
+  color: var(--rv-ink, #17171a);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -49,31 +49,31 @@ html :where(.root) :is(h1, h2, p, span) {
 
 /* ── Header ── */
 .header {
-  height: 64px;
+  height: 56px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 20px 0 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.09);
+  gap: 12px;
+  padding: 0 16px 0 12px;
+  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
 }
 
 .back {
   width: 36px;
   height: 36px;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.09);
-  background: #fff;
+  border-radius: var(--rv-r-md, 9px);
+  border: 0;
+  background: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #17171a;
+  color: var(--rv-ink, #17171a);
   flex-shrink: 0;
 }
 
 .back:hover {
-  background: #fbfbfa;
+  background: var(--rv-fill, rgba(0, 0, 0, 0.045));
 }
 
 .titleBlock {
@@ -83,7 +83,7 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -93,7 +93,7 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .subtitle {
   font-size: 12px;
-  color: rgba(23, 23, 26, 0.5);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -112,7 +112,7 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .saveState {
   font-size: 12.5px;
-  color: rgba(23, 23, 26, 0.5);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -123,15 +123,15 @@ html :where(.root) :is(h1, h2, p, span) {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: #3f8f68;
+  background: var(--rv-good, #3f8f68);
 }
 
 .saveDotPending {
-  background: rgba(23, 23, 26, 0.3);
+  background: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.3);
 }
 
 .saveDotError {
-  background: #c0492b;
+  background: var(--rv-red, #b8492b);
 }
 
 .checkLabel {
@@ -139,34 +139,36 @@ html :where(.root) :is(h1, h2, p, span) {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: rgba(23, 23, 26, 0.7);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.7);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .darkPill {
   height: 36px;
-  padding: 0 18px;
+  padding: 0 16px;
   border: 0;
-  border-radius: 999px;
-  background: #17171a;
+  border-radius: var(--rv-r-md, 9px);
+  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%));
   color: #fff;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
+  transition: box-shadow 0.14s ease-out;
 }
 
 .darkPill:hover {
-  background: #2a2a2a;
+  box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
 }
 
 .darkPill:disabled {
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(23, 23, 26, 0.4);
+  opacity: 0.45;
+  box-shadow: none;
   cursor: not-allowed;
 }
 
@@ -191,7 +193,7 @@ html :where(.root) :is(h1, h2, p, span) {
 .sub {
   font-size: 14.5px;
   line-height: 1.55;
-  color: rgba(23, 23, 26, 0.6);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6);
 }
 
 .sub code {
@@ -222,7 +224,8 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .kindOn {
-  box-shadow: 0 0 0 2px #17171a;
+  box-shadow: 0 0 0 2px var(--rv-accent, #3e7fb0);
+  background: var(--rv-accent-soft, #f2f8fc);
 }
 
 .kindRadio {
@@ -235,7 +238,7 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .kindOn .kindRadio {
-  box-shadow: inset 0 0 0 5px #17171a;
+  box-shadow: inset 0 0 0 5px var(--rv-accent, #3e7fb0);
 }
 
 .kindText {
@@ -247,13 +250,13 @@ html :where(.root) :is(h1, h2, p, span) {
 .kindLabel {
   font-size: 14px;
   font-weight: 600;
-  color: #17171a;
+  color: var(--rv-ink, #17171a);
 }
 
 .kindHint {
   font-size: 12.5px;
   line-height: 1.4;
-  color: rgba(23, 23, 26, 0.55);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
 }
 
 .jobRow {
@@ -274,12 +277,13 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .jobBox:focus-within {
-  border-color: #17171a;
+  border-color: var(--rv-accent, #3e7fb0);
+  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
 }
 
 .jobPrefix {
   font-size: 14px;
-  color: rgba(23, 23, 26, 0.45);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.45);
 }
 
 .jobInput {
@@ -299,8 +303,8 @@ html :where(.root) :is(h1, h2, p, span) {
 .error {
   font-size: 13px;
   line-height: 1.45;
-  color: #a83a3a;
-  background: #fbe7e7;
+  color: var(--rv-red, #b8492b);
+  background: var(--rv-red-tint, #fbeeea);
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -308,8 +312,8 @@ html :where(.root) :is(h1, h2, p, span) {
 .notice {
   font-size: 13px;
   line-height: 1.45;
-  color: #2c6b4c;
-  background: #e9f5ef;
+  color: var(--rv-good, #3f8f68);
+  background: var(--rv-good-tint, #e9f5ef);
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -322,22 +326,21 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .panel {
-  width: 360px;
+  width: 340px;
   flex-shrink: 0;
   overflow-y: auto;
-  border-right: 1px solid rgba(0, 0, 0, 0.09);
-  padding: 16px;
+  border-right: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 .group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
 }
 
 .group:last-child {
@@ -351,11 +354,11 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .groupTitle {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(23, 23, 26, 0.5);
+  color: var(--rv-ink-60, rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6));
 }
 
 .linkBtn {
@@ -364,12 +367,12 @@ html :where(.root) :is(h1, h2, p, span) {
   padding: 0;
   font-size: 12.5px;
   font-weight: 500;
-  color: #2f6a94;
+  color: var(--rv-accent-ink, #2f6a94);
   cursor: pointer;
 }
 
 .linkBtn:disabled {
-  color: rgba(23, 23, 26, 0.3);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.3);
   cursor: default;
 }
 
@@ -381,34 +384,36 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .fieldLabel {
   font-size: 12px;
-  color: rgba(23, 23, 26, 0.55);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
 }
 
 .input {
   width: 100%;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 8px;
-  padding: 7px 10px;
+  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.12);
+  border-radius: 10px;
+  padding: 9px 12px;
   font-size: 13.5px;
-  line-height: 1.4;
-  color: #17171a;
-  background: #fff;
+  line-height: 1.45;
+  color: var(--rv-ink, #17171a);
+  background: var(--rv-surface, #fff);
   resize: vertical;
+  transition: border-color 0.14s, box-shadow 0.14s;
 }
 
 .input:focus {
   outline: none;
-  border-color: #17171a;
+  border-color: var(--rv-accent, #3e7fb0);
+  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
 }
 
 .inputBad {
-  border-color: #d9a3a3;
+  border-color: var(--rv-red, #b8492b);
 }
 
 .hint {
   font-size: 12.5px;
   line-height: 1.45;
-  color: rgba(23, 23, 26, 0.5);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
 }
 
 .stats {
@@ -416,16 +421,16 @@ html :where(.root) :is(h1, h2, p, span) {
   flex-wrap: wrap;
   gap: 6px 14px;
   font-size: 12.5px;
-  color: rgba(23, 23, 26, 0.6);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6);
 }
 
 .stats b {
-  color: #17171a;
+  color: var(--rv-ink, #17171a);
   font-weight: 600;
 }
 
 .statBad b {
-  color: #a83a3a;
+  color: var(--rv-red, #b8492b);
 }
 
 .progress {
@@ -438,7 +443,7 @@ html :where(.root) :is(h1, h2, p, span) {
   align-items: center;
   padding: 0 10px;
   font-size: 12px;
-  color: rgba(23, 23, 26, 0.65);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.65);
 }
 
 .progressBar {
@@ -446,7 +451,7 @@ html :where(.root) :is(h1, h2, p, span) {
   left: 0;
   top: 0;
   bottom: 0;
-  background: #deeeff;
+  background: var(--rv-accent-tint, #e9f2f9);
   transition: width 0.2s ease;
 }
 
@@ -504,15 +509,15 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .labelBad {
-  color: #a83a3a;
+  color: var(--rv-red, #b8492b);
 }
 
 .labelWarn {
-  color: #86561a;
+  color: var(--rv-gold, #96731f);
 }
 
 .labelOk {
-  color: #3f8f68;
+  color: var(--rv-good, #3f8f68);
 }
 
 /* Site map */
@@ -530,36 +535,38 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .smallBtn {
-  height: 30px;
+  height: 32px;
   padding: 0 12px;
-  border: 0;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.16),
-    0 1px 2px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
+  border-radius: var(--rv-r-md, 9px);
+  background: var(--rv-surface, #fff);
   font-size: 12.5px;
   font-weight: 500;
-  color: #17171a;
+  color: var(--rv-ink, #17171a);
   cursor: pointer;
+  transition: background 0.14s, box-shadow 0.14s;
 }
 
 .smallBtnPrimary {
-  background: #17171a;
+  border-color: transparent;
+  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%));
   color: #fff;
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
 }
 
 .smallBtnPrimary:hover {
-  background: #2a2a2a !important;
+  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%)) !important;
+  box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
 }
 
 .smallBtnOn {
-  box-shadow: 0 0 0 1.5px #17171a;
+  background: var(--rv-accent-nav, #edf4fa);
+  border-color: rgba(62, 127, 176, 0.35);
+  color: var(--rv-accent-ink, #2f6a94);
 }
 
 .smallBtn:hover {
-  background: #fbfbfa;
+  background: var(--rv-fill-hover, rgba(0, 0, 0, 0.035));
 }
 
 .smallBtn:disabled {
@@ -569,13 +576,13 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .fieldValue {
   float: right;
-  color: rgba(23, 23, 26, 0.45);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.45);
   font-variant-numeric: tabular-nums;
 }
 
 .range {
   width: 100%;
-  accent-color: #17171a;
+  accent-color: var(--rv-accent, #3e7fb0);
 }
 
 /* Job photo picker */
@@ -599,7 +606,7 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .thumbOn {
-  outline-color: #17171a;
+  outline-color: var(--rv-accent, #3e7fb0);
 }
 
 /* Preview */
@@ -608,7 +615,7 @@ html :where(.root) :is(h1, h2, p, span) {
   min-width: 0;
   overflow: auto;
   position: relative;
-  background: #f6f6f4;
+  background: var(--rv-page, #f6f6f4);
   padding: 32px;
   display: flex;
   justify-content: center;

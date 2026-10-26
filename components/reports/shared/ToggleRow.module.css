@@ -1,38 +1,38 @@
-/* components/reports/shared/ToggleRow.module.css */
+/* components/reports/shared/ToggleRow.module.css — CRM-style toggle row. */
 
 .row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 12px;
 }
 
 .rowDisabled {
-  opacity: 0.4;
+  opacity: 0.45;
   pointer-events: none;
 }
 
 .text {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 2px;
   flex: 1;
   min-width: 0;
 }
 
 .label {
-  font-size: 0.8rem;
+  font-size: 13.5px;
   font-weight: 500;
-  color: var(--for-darkest, #111827);
+  color: var(--rv-ink, #17171a);
 }
 
 .sub {
-  font-size: 0.72rem;
-  color: var(--for-light, #9ca3af);
-  line-height: 1.3;
+  font-size: 12px;
+  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
+  line-height: 1.4;
 }
 
-/* Toggle switch */
+/* Toggle switch: 34 × 20, blue when on. */
 .toggle {
   position: relative;
   display: inline-flex;
@@ -59,15 +59,19 @@
 
 .track {
   display: block;
-  width: 36px;
+  width: 34px;
   height: 20px;
   border-radius: 999px;
-  background: var(--out-dark, #d1d5db);
-  transition: background 0.18s;
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.14);
+  transition: background 0.14s ease-out;
 }
 
 .input:checked ~ .track {
-  background: var(--brand-primary, #900c40);
+  background: var(--rv-accent, #3e7fb0);
+}
+
+.input:focus-visible ~ .track {
+  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
 }
 
 .thumb {
@@ -77,12 +81,12 @@
   height: 16px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  transition: transform 0.18s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.14s ease-out;
   pointer-events: none;
 }
 
 .input:checked ~ .track ~ .thumb,
 .input:checked + .track + .thumb {
-  transform: translateX(16px);
+  transform: translateX(14px);
 }

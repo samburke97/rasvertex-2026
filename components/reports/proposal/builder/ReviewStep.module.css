@@ -3,7 +3,7 @@
 .scroll {
   flex: 1;
   overflow: auto;
-  background: #fbfbfa;
+  background: var(--rv-surface-soft, #fbfbfa);
 }
 
 .grid {
@@ -40,12 +40,12 @@
   margin: 0;
   font-size: 15px;
   line-height: 1.55;
-  color: rgba(23, 23, 26, 0.6);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6);
 }
 
 .card {
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.09);
+  background: var(--rv-surface, #fff);
+  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.09);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -55,7 +55,7 @@
   align-items: center;
   gap: 14px;
   padding: 14px 18px;
-  border-bottom: 1px solid rgba(23, 23, 26, 0.05);
+  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.05);
 }
 
 .check:last-child {
@@ -75,8 +75,8 @@
 }
 
 .markOk {
-  background: #e9f5ef;
-  color: #3f8f68;
+  background: var(--rv-good-tint, #e9f5ef);
+  color: var(--rv-good, #3f8f68);
 }
 
 .markIssue {
@@ -85,8 +85,8 @@
 }
 
 .markInfo {
-  background: rgba(0, 0, 0, 0.045);
-  color: rgba(23, 23, 26, 0.55);
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.045);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
 }
 
 .checkText {
@@ -104,14 +104,14 @@
 
 .checkDetail {
   font-size: 12.5px;
-  color: rgba(23, 23, 26, 0.55);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
 }
 
 .fix,
 .secondary {
-  border: 1px solid rgba(0, 0, 0, 0.09);
-  background: #fff;
-  color: #17171a;
+  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.09);
+  background: var(--rv-surface, #fff);
+  color: var(--rv-ink, #17171a);
   cursor: pointer;
   border-radius: 999px;
   font-weight: 500;
@@ -126,7 +126,7 @@
 
 .fix:hover,
 .secondary:hover {
-  background: #f6f6f4;
+  background: var(--rv-page, #f6f6f4);
 }
 
 .side {
@@ -139,7 +139,7 @@
 
 .coverImg {
   aspect-ratio: 16 / 9;
-  background: #f6f6f4 center 68% / cover no-repeat;
+  background: var(--rv-page, #f6f6f4) center 68% / cover no-repeat;
 }
 
 .summary {
@@ -163,7 +163,7 @@
 
 .sumFor {
   font-size: 12.5px;
-  color: rgba(23, 23, 26, 0.55);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
 }
 
 .sumRows {
@@ -180,7 +180,7 @@
 }
 
 .sumRow span:first-child {
-  color: rgba(23, 23, 26, 0.55);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
 }
 
 .sumRow span:last-child {
@@ -192,7 +192,7 @@
   height: 46px;
   border: 0;
   border-radius: 999px;
-  background: #17171a;
+  background: var(--rv-ink, #17171a);
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -205,16 +205,16 @@
 
 .export:disabled,
 .export:disabled:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(23, 23, 26, 0.4);
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.06);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.4);
   cursor: not-allowed;
 }
 
 .done {
   padding: 12px 14px;
   border-radius: 12px;
-  background: #e9f5ef;
-  color: #3f8f68;
+  background: var(--rv-good-tint, #e9f5ef);
+  color: var(--rv-good, #3f8f68);
   font-size: 13px;
   line-height: 1.5;
   font-weight: 500;

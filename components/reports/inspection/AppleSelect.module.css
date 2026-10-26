@@ -1,4 +1,4 @@
-/* AppleSelect.module.css — macOS pop-up button + menu */
+/* AppleSelect.module.css — pop-up select in the CRM style */
 
 .wrap {
   position: relative;
@@ -6,19 +6,18 @@
 
 .button {
   width: 100%;
-  height: 34px;
+  height: 36px;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 10px 0 12px;
-  border: 0;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.16),
-    0 1px 2px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.12);
+  border-radius: 10px;
+  background: var(--rv-surface, #fff);
+  font-family: inherit;
   font-size: 13.5px;
-  color: #17171a;
+  color: var(--rv-ink, #17171a);
+  transition: border-color 0.14s, box-shadow 0.14s;
   text-align: left;
   cursor: pointer;
 }
@@ -26,9 +25,8 @@
 .button:focus-visible,
 .buttonOpen {
   outline: none;
-  box-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.16),
-    0 0 0 3.5px rgba(10, 132, 255, 0.35);
+  border-color: var(--rv-accent, #3e7fb0);
+  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
 }
 
 .button:disabled {
@@ -46,12 +44,12 @@
 
 .detail {
   margin-left: 6px;
-  color: rgba(23, 23, 26, 0.45);
+  color: var(--rv-ink-42, rgba(23, 23, 26, 0.42));
 }
 
 .chevron {
   flex-shrink: 0;
-  color: rgba(23, 23, 26, 0.55);
+  color: var(--rv-ink-50, rgba(23, 23, 26, 0.5));
 }
 
 .menu {
@@ -61,14 +59,10 @@
   left: 0;
   right: 0;
   padding: 5px;
-  border-radius: 10px;
-  background: rgba(246, 246, 246, 0.86);
-  backdrop-filter: blur(24px) saturate(1.8);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  box-shadow:
-    0 0 0 0.5px rgba(0, 0, 0, 0.18),
-    0 10px 30px rgba(0, 0, 0, 0.16),
-    0 2px 6px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: var(--rv-surface, #fff);
+  border: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
+  box-shadow: var(--rv-shadow-pop, 0 14px 36px rgba(0, 0, 0, 0.15));
   animation: pop 0.12s ease-out;
 }
 
@@ -83,18 +77,18 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
+  height: 32px;
   padding: 0 10px 0 6px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 13.5px;
-  color: #17171a;
+  color: var(--rv-ink, #17171a);
   cursor: default;
   user-select: none;
 }
 
 .itemHi {
-  background: #0a84ff;
-  color: #fff;
+  background: var(--rv-accent-tint, #e9f2f9);
+  color: var(--rv-accent-ink, #2f6a94);
 }
 
 .check {
@@ -113,9 +107,9 @@
 
 .itemDetail {
   font-size: 12.5px;
-  color: rgba(23, 23, 26, 0.45);
+  color: var(--rv-ink-42, rgba(23, 23, 26, 0.42));
 }
 
 .itemHi .itemDetail {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--rv-accent-ink, #2f6a94);
 }

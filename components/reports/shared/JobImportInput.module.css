@@ -1,4 +1,5 @@
-/* components/reports/shared/JobImportInput.module.css */
+/* components/reports/shared/JobImportInput.module.css
+   Filled search-style pill with an attached Load button (CRM style). */
 
 .wrap {
   display: flex;
@@ -7,75 +8,79 @@
 
 .row {
   display: flex;
-  gap: 0.5rem;
+  gap: 6px;
 }
 
 .input {
   flex: 1;
-  height: 32px;
-  padding: 0 0.625rem;
-  border: 1px solid var(--out-darkest, #c9cbcb);
-  border-radius: 8px;
-  font-size: 0.875rem;
-  color: var(--for-darkest, #111827);
-  background: var(--white, #fff);
-  outline: none;
-  transition: border-color 0.2s;
-  min-width: 0;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--rv-r-md, 9px);
   font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--rv-ink, #17171a);
+  background: var(--rv-fill, rgba(0, 0, 0, 0.045));
+  outline: none;
+  transition:
+    border-color 0.14s,
+    background 0.14s,
+    box-shadow 0.14s;
+  min-width: 0;
 }
 
 .input::placeholder {
-  color: var(--for-light, #9ca3af);
+  color: var(--rv-ink-42, rgba(23, 23, 26, 0.42));
+  font-weight: 400;
 }
 
 .input:focus {
-  border-color: var(--brand-primary, #900c40);
+  background: var(--rv-surface, #fff);
+  border-color: var(--rv-accent, #3e7fb0);
+  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
 }
 
 .input:disabled {
-  background: var(--con-light, #fafafa);
-  color: var(--for-light, #9ca3af);
+  color: var(--rv-ink-40, rgba(23, 23, 26, 0.4));
 }
 
 .inputDone {
-  border-color: #6ee7b7;
-  background: #f0fdf8;
+  background: var(--rv-good-tint, #e9f5ef);
 }
 
 .inputError {
-  border-color: #fca5a5;
-  background: #fff8f8;
+  background: var(--rv-red-tint, #fbeeea);
 }
 
 /* ── Button ──────────────────────────────────────────────────────────────── */
 .btn {
-  height: 32px;
-  min-width: 52px;
-  padding: 0 0.875rem;
-  border-radius: 8px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid var(--out-darkest, #c9cbcb);
-  background: var(--white, #fff);
-  color: var(--for-darkest, #111827);
-  transition:
-    border-color 0.15s,
-    background 0.15s;
-  white-space: nowrap;
+  height: 36px;
+  min-width: 60px;
+  padding: 0 14px;
+  border-radius: var(--rv-r-md, 9px);
   font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 0;
+  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%));
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
+  transition: box-shadow 0.14s;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--brand-primary, #900c40);
+  box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -84,8 +89,8 @@
   display: block;
   width: 14px;
   height: 14px;
-  border: 2px solid var(--out-medium, #e5e7eb);
-  border-top-color: var(--for-dark, #4c4d4c);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }

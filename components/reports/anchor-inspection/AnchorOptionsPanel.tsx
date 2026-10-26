@@ -5,7 +5,6 @@ import React, { useRef } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import JobImportInput from "../shared/JobImportInput";
 import ToggleRow from "../shared/ToggleRow";
-import Button from "@/components/ui/Button";
 import DatePicker from "@/components/ui/DatePicker";
 import DocEditor from "@/components/workspace/DocEditor";
 import type {
@@ -169,7 +168,7 @@ export default function AnchorOptionsPanel({
     <aside className={styles.panel}>
       {/* ── Job Number ───────────────────────────────────────────────────── */}
       <div className={styles.group}>
-        <div className={styles.groupLabel}>Job Number</div>
+        <div className={styles.groupLabel}>Job number</div>
         <JobImportInput
           onImport={onImport}
           importStatus={importStatus}
@@ -189,7 +188,7 @@ export default function AnchorOptionsPanel({
         </div>
 
         <button className={styles.addZoneBtn} onClick={onAddZone}>
-          + Add Zone
+          + Add zone
         </button>
 
         {zones.length > 0 && (
@@ -267,7 +266,7 @@ export default function AnchorOptionsPanel({
 
       {/* ── Cover photo ──────────────────────────────────────────────────── */}
       <div className={styles.group}>
-        <div className={styles.groupLabel}>Cover Photo</div>
+        <div className={styles.groupLabel}>Cover photo</div>
         <input
           ref={coverRef}
           type="file"
@@ -305,61 +304,44 @@ export default function AnchorOptionsPanel({
           step={0.05}
           value={coverZoom}
           onChange={(e) => onCoverZoom(Number(e.target.value))}
-          style={{ width: "100%", accentColor: "#011955" }}
+          className={styles.range}
         />
-        <div className={styles.subLabel} style={{ textTransform: "none", letterSpacing: 0 }}>
+        <div className={styles.subLabel}>
           Drag the photo on the cover preview to reposition it.
         </div>
       </div>
 
       {/* ── Technician notes (under the asset register) ─────────────────── */}
       <div className={styles.group}>
-        <div className={styles.groupLabel}>Technician Notes</div>
-        <div
-          style={{
-            border: "1px solid #d9dbdb",
-            borderRadius: 8,
-            padding: "8px 12px",
-            minHeight: 120,
-            fontSize: "0.85rem",
-            background: "#fff",
-          }}
-        >
+        <div className={styles.groupLabel}>Technician notes</div>
+        <div className={styles.editorBox}>
           <DocEditor value={technicianNotes} onChange={onTechnicianNotes} />
         </div>
-        <div className={styles.subLabel} style={{ textTransform: "none", letterSpacing: 0 }}>
+        <div className={styles.subLabel}>
           Type / for headings, lists and checklists. Shown under the asset register.
         </div>
       </div>
 
       {/* ── Certification comments ───────────────────────────────────────── */}
       <div className={styles.group}>
-        <div className={styles.groupLabel}>Certification Comments</div>
+        <div className={styles.groupLabel}>Certification comments</div>
         <textarea
           value={comments}
           onChange={(e) => onComments(e.target.value)}
           rows={3}
           placeholder="Optional — shown under Please note"
-          style={{
-            width: "100%",
-            border: "1px solid #d9dbdb",
-            borderRadius: 8,
-            padding: "8px 10px",
-            font: "inherit",
-            fontSize: "0.8rem",
-            resize: "vertical",
-          }}
+          className={styles.textarea}
         />
       </div>
 
       {/* ── Supporting Photos — optional, off by default ────────────────── */}
       <div className={styles.group}>
         <div className={styles.groupLabelRow}>
-          <span className={styles.groupLabel}>Supporting Photos</span>
+          <span className={styles.groupLabel}>Supporting photos</span>
         </div>
 
         <ToggleRow
-          label="Add Photos"
+          label="Add photos"
           sub={
             photoSettings.enabled
               ? "Photos page will appear in the report"
@@ -379,25 +361,14 @@ export default function AnchorOptionsPanel({
               className={styles.hiddenInput}
               onChange={handleUploadChange}
             />
-            <Button
-              variant="secondary"
-              size="sm"
-              fullWidth
-              onClick={() => uploadRef.current?.click()}
-            >
-              Upload Photos
-            </Button>
+            <button className={styles.btn} onClick={() => uploadRef.current?.click()}>
+              Upload photos
+            </button>
 
             {hasLoadedJob && (
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                onClick={onLoadPhotosFromJob}
-                disabled={isLoadingPhotos}
-              >
-                {isLoadingPhotos ? "Loading…" : "Pull From Job"}
-              </Button>
+              <button className={styles.btn} onClick={onLoadPhotosFromJob} disabled={isLoadingPhotos}>
+                {isLoadingPhotos ? "Loading…" : "Pull from job"}
+              </button>
             )}
 
             {photoFolders.length > 0 && (

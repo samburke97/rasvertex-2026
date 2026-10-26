@@ -32,8 +32,8 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  background: #fff;
-  color: #17171a;
+  background: var(--rv-surface, #fff);
+  color: var(--rv-ink, #17171a);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -58,41 +58,41 @@ html :where(.root) :is(h1, p, span) {
 }
 
 .root a {
-  color: #2f6a94;
+  color: var(--rv-accent-ink, #2f6a94);
   text-decoration: none;
 }
 
 .root a:hover {
-  color: #26567c;
+  color: var(--rv-accent-hover, #26567c);
 }
 
 /* ── Header ── */
 .header {
-  height: 64px;
+  height: 56px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 0 20px 0 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.09);
+  gap: 12px;
+  padding: 0 16px 0 12px;
+  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
 }
 
 .back {
   width: 36px;
   height: 36px;
-  border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.09);
-  background: #fff;
+  border-radius: 9px;
+  border: 0;
+  background: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #17171a;
+  color: var(--rv-ink, #17171a);
   flex-shrink: 0;
 }
 
 .back:hover {
-  background: #fbfbfa;
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.045);
 }
 
 .titleBlock {
@@ -102,7 +102,7 @@ html :where(.root) :is(h1, p, span) {
 }
 
 .title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
   white-space: nowrap;
@@ -112,7 +112,7 @@ html :where(.root) :is(h1, p, span) {
 
 .subtitle {
   font-size: 12px;
-  color: rgba(23, 23, 26, 0.5);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -128,7 +128,7 @@ html :where(.root) :is(h1, p, span) {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(0, 0, 0, 0.045);
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.045);
   border-radius: 999px;
   padding: 4px;
 }
@@ -145,7 +145,7 @@ html :where(.root) :is(h1, p, span) {
   cursor: default;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(23, 23, 26, 0.55);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
 }
 
 .stepPillEnabled {
@@ -153,9 +153,9 @@ html :where(.root) :is(h1, p, span) {
 }
 
 .stepPillActive {
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  color: #17171a;
+  background: var(--rv-surface, #fff);
+  box-shadow: 0 1px 2px rgba(var(--rv-mix-rgb, 0, 0, 0), 0.08);
+  color: var(--rv-ink, #17171a);
 }
 
 .stepDot {
@@ -167,18 +167,18 @@ html :where(.root) :is(h1, p, span) {
   justify-content: center;
   font-size: 11px;
   font-weight: 600;
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(23, 23, 26, 0.5);
+  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.06);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
 }
 
 .stepPillActive .stepDot {
-  background: #17171a;
+  background: var(--rv-accent, #3e7fb0);
   color: #fff;
 }
 
 .stepDotDone {
-  background: #e9f5ef;
-  color: #3f8f68;
+  background: var(--rv-good-tint, #e9f5ef);
+  color: var(--rv-good, #3f8f68);
 }
 
 .headerRight {
@@ -190,7 +190,7 @@ html :where(.root) :is(h1, p, span) {
 
 .saveState {
   font-size: 12.5px;
-  color: rgba(23, 23, 26, 0.5);
+  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -201,41 +201,43 @@ html :where(.root) :is(h1, p, span) {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: #3f8f68;
+  background: var(--rv-good, #3f8f68);
 }
 
 .saveDotPending {
-  background: rgba(23, 23, 26, 0.3);
+  background: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.3);
 }
 
 .saveDotError {
-  background: #c0492b;
+  background: var(--rv-red, #b8492b);
 }
 
-/* Shared dark pill button (Review & export, Create proposal) */
+/* Shared primary button (Review & export, Create proposal) — the one blue action per view */
 .darkPill {
   height: 36px;
-  padding: 0 18px;
+  padding: 0 16px;
   border: 0;
-  border-radius: 999px;
-  background: #17171a;
+  border-radius: 9px;
+  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%));
   color: #fff;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
   white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
+  transition: box-shadow 0.14s ease-out;
 }
 
 .darkPill:hover {
-  background: #2a2a2a;
+  box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
 }
 
 .darkPill:disabled {
-  background: rgba(0, 0, 0, 0.06);
-  color: rgba(23, 23, 26, 0.4);
+  opacity: 0.45;
+  box-shadow: none;
   cursor: not-allowed;
 }
 

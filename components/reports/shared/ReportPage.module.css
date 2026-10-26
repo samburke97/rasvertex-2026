@@ -1,5 +1,6 @@
-/* components/reports/shared/ReportPage.module.css */
-/* Single source of truth for all report page shell layouts. */
+/* components/reports/shared/ReportPage.module.css
+   Report builder shell in the CRM style: white top bar with a hairline,
+   warm grey canvas behind the pages, one blue primary action. */
 
 .page {
   margin: -1.5rem;
@@ -7,7 +8,10 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg-page, #f5f3ef);
+  background: var(--rv-surface, #fff);
+  color: var(--rv-ink, #17171a);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ── Top bar ─────────────────────────────────────────────────────────────── */
@@ -16,54 +20,123 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.75rem;
-  height: 64px;
-  background: var(--white, #fff);
-  border-bottom: 1px solid var(--out-light, #f0f0f0);
-  gap: 1.25rem;
+  padding: 0 16px 0 12px;
+  height: 56px;
+  background: var(--rv-surface, #fff);
+  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
+  gap: 16px;
 }
 
 .topBarRight {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 8px;
+  min-width: 0;
 }
 
 .topBarTitle {
-  font-size: 0.8rem;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--for-medium, #6b7280);
-  letter-spacing: 0.04em;
+  letter-spacing: -0.01em;
+  color: var(--rv-ink, #17171a);
+  margin-right: 4px;
+  white-space: nowrap;
 }
 
 .badge {
-  font-size: 0.8rem;
-  color: var(--for-medium, #6b7280);
-  background: var(--con-light, #f5f5f5);
-  padding: 0.25rem 0.625rem;
-  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
+  background: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.05);
+  padding: 3px 9px;
+  border-radius: 7px;
+  white-space: nowrap;
 }
 
 .savedBadge {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--success-600, #059669);
-  background: var(--success-100, #e6fffa);
-  padding: 0.2rem 0.625rem;
-  border-radius: 20px;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--rv-good, #3f8f68);
+  background: var(--rv-good-tint, #e9f5ef);
+  padding: 3px 9px;
+  border-radius: 7px;
 }
 
 .draftStatus {
-  font-size: 0.75rem;
-  color: var(--for-medium, #7e807f);
+  font-size: 12.5px;
+  color: var(--rv-ink-50, rgba(23, 23, 26, 0.5));
   white-space: nowrap;
+  margin: 0 4px;
 }
 
 .draftStatusError {
-  color: var(--red-wine-300, #900c40);
+  color: var(--rv-red, #b8492b);
+}
+
+/* Buttons in the top bar: neutral by default, one blue primary. */
+.back,
+.topBtn,
+.topBtnPrimary {
+  height: 36px;
+  border-radius: var(--rv-r-md, 9px);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition:
+    background 0.14s ease-out,
+    box-shadow 0.14s ease-out;
+}
+
+.back {
+  width: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--rv-ink, #17171a);
+  flex-shrink: 0;
+}
+
+.back:hover {
+  background: var(--rv-fill, rgba(0, 0, 0, 0.045));
+}
+
+.topBtn {
+  padding: 0 14px;
+  border: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
+  background: var(--rv-surface, #fff);
+  color: var(--rv-ink, #17171a);
+}
+
+.topBtn:hover:not(:disabled) {
+  background: var(--rv-fill-hover, rgba(0, 0, 0, 0.035));
+}
+
+.topBtnPrimary {
+  padding: 0 16px;
+  border: 0;
+  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%));
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
+}
+
+.topBtnPrimary:hover:not(:disabled) {
+  box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
+}
+
+.topBtn:disabled,
+.topBtnPrimary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ── Body ────────────────────────────────────────────────────────────────── */
@@ -78,7 +151,7 @@
   .topBar {
     flex-wrap: wrap;
     height: auto;
-    padding: 0.5rem 1rem;
+    padding: 8px 12px;
   }
 
   .topBarRight {
@@ -94,12 +167,12 @@
 /* ── Canvas ──────────────────────────────────────────────────────────────── */
 .canvas {
   flex: 1;
-  background: #e8e8e8;
-  padding: 2.5rem 2rem 5rem;
+  background: var(--rv-page, #f6f6f4);
+  padding: 32px 32px 80px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2rem;
+  gap: 32px;
   overflow-y: auto;
   min-height: 0;
 }
@@ -107,10 +180,10 @@
 .pageLabel {
   align-self: flex-start;
   margin-left: max(0px, calc(50% - 397px));
-  font-size: 0.63rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #aaa;
-  margin-bottom: -1.5rem;
+  color: var(--rv-ink-50, rgba(23, 23, 26, 0.5));
+  margin-bottom: -20px;
 }
