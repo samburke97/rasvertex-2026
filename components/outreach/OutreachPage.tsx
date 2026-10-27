@@ -491,7 +491,7 @@ export default function OutreachPage() {
 
       <div className={styles.header}>
         <div>
-          <h1 className={styles.title}>Customer Outreach</h1>
+          <h1 className={styles.title}>Customer outreach</h1>
           <p className={styles.subtitle}>
             {rule === "all"
               ? "Maintenance reminders and quote follow-ups from SimPRO history. Nothing sends until you review it."

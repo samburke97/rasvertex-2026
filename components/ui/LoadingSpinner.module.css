@@ -1,33 +1,35 @@
+/* LoadingSpinner.module.css — quiet loading state. */
+
 .loading {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  gap: 12px;
   min-height: 400px;
-  font-size: 16px;
+  font-size: 13px;
+  color: var(--ink-55);
 }
 
 .spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid var(--out-light, #f5f5f5);
-  border-top-color: var(--for-dark, #4c4d4c);
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--line);
+  border-top-color: var(--ink-55);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
+  animation: spin 0.8s linear infinite;
 }
 
 .emptyState {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 48px 24px;
+  padding: 48px 20px;
   text-align: center;
-  color: var(--for-medium, #7e807f);
-  font-size: 14px;
+  color: var(--ink-62);
+  font-size: 12.5px;
 }
 
-/* Loading dots animation */
 .loadingDots {
   display: flex;
   align-items: center;
@@ -39,7 +41,7 @@
 .loadingDots span {
   width: 4px;
   height: 4px;
-  background-color: var(--for-medium, #7e807f);
+  background: var(--ink-45);
   border-radius: 50%;
   display: inline-block;
   animation: dotFade 1.4s infinite ease-in-out both;

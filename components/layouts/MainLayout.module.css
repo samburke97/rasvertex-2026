@@ -3,7 +3,7 @@
 .app {
   display: flex;
   height: 100vh;
-  background: var(--rv-page, #f6f6f4);
+  background: var(--canvas);
 }
 
 .mainWrap {
@@ -19,10 +19,10 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--rv-surface, #fff);
-  border-radius: var(--rv-r-2xl, 18px);
+  background: var(--surface);
+  border-radius: var(--r-page);
   overflow: hidden;
-  box-shadow: var(--rv-shadow-card);
+  box-shadow: var(--shadow-card);
 }
 
 .main {

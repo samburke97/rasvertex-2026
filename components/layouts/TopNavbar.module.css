@@ -1,71 +1,115 @@
-/* TopNavbar.module.css — slim utility bar inside the floating card */
+/* TopNavbar.module.css — 56px top bar inside the page card. */
 
 .topNav {
-  height: 56px;
+  height: var(--topbar-h);
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px 0 24px;
+  border-bottom: 1px solid var(--divider);
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.crumbWrap {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  padding: 0 28px;
-  border-bottom: 1px solid var(--rv-line-strong, rgba(var(--rv-mix-rgb), 0.06));
+  min-width: 0;
+}
+
+.crumbWrap + .crumbWrap {
+  margin-left: 8px;
+}
+
+.crumb {
+  color: var(--ink-55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crumbWrap:last-child .crumb {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.crumbSep {
+  width: 11px;
+  height: 11px;
+  color: var(--ink-30);
+  flex-shrink: 0;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.searchTrigger {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--r-md);
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--fill-hover);
+  color: var(--ink-55);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.searchTrigger:hover {
+  background: var(--fill-press);
+  color: var(--ink);
+}
+
+.kbd {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-45);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-xs);
+  padding: 0 5px;
+  line-height: 16px;
 }
 
 .iconButton {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-pill);
   border: none;
   background: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--rv-ink-60, rgba(var(--rv-ink-rgb), 0.62));
-  transition: background 120ms ease-out;
+  color: var(--ink-55);
+  transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
 
 .iconButton:hover {
-  background: var(--rv-fill, rgba(var(--rv-mix-rgb), 0.04));
+  background: var(--fill);
+  color: var(--ink);
 }
 
-/* The search/notification icons are static SVG assets with a hardcoded
-   dark-grey stroke baked in (not currentColor-aware since they're rendered
-   as <img>, not inline) — invert them in dark mode so they stay legible. */
-:root[data-theme="dark"] .iconButton img {
-  filter: invert(1) brightness(1.5);
-}
+@media (max-width: 720px) {
+  .topNav {
+    padding: 0 14px 0 16px;
+  }
 
-.profileBadge {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: none;
-  border-radius: 999px;
-  background: var(--rv-accent, #3e7fb0);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  overflow: hidden;
-  flex-shrink: 0;
-  transition: background 120ms ease-out;
-}
-
-.profileBadge:hover {
-  background: var(--rv-accent-hover, #26567c);
-}
-
-.profileImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.profileInitials {
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  user-select: none;
+  .searchTrigger span {
+    display: none;
+  }
 }

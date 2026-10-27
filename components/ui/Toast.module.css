@@ -1,40 +1,42 @@
+/* Toast.module.css — dark toast, bottom centre. */
+
 .toast {
   display: flex;
-  padding: 16px;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   position: fixed;
   left: 50%;
-  top: 16px;
+  bottom: 24px;
   transform: translateX(-50%);
-  border-radius: 12px;
-  border: 1px solid var(--grey-300, #f5f5f5);
-  background: var(--grey-900, #141414);
-  box-shadow: 0px 0px 16px 0px rgba(0, 0, 0, 0.1);
+  padding: 10px 16px;
+  border-radius: var(--r-lg);
+  background: #17171a;
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(var(--mix-rgb), 0.18);
   z-index: 1000;
-  animation: slideIn 0.3s ease-out;
-  color: white;
+  animation: toastIn 0.18s var(--ease) both;
 }
 
-.success {
-  background: var(--grey-900, #141414);
-}
-
+.success,
 .error {
-  background: var(--grey-900, #141414);
-  border-color: rgba(239, 68, 68, 0.3);
+  background: #17171a;
 }
 
 .icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--blue-300);
+}
+
+.error .icon {
+  color: var(--red);
 }
 
 .message {
   flex-grow: 1;
-  font-size: var(--font-size-md, 1rem);
-  color: white;
+  font-size: 13px;
+  color: #fff;
 }
 
 .closeButton {
@@ -45,12 +47,17 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  color: white;
+  margin-left: 4px;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-@keyframes slideIn {
+.closeButton:hover {
+  color: #fff;
+}
+
+@keyframes toastIn {
   from {
-    transform: translate(-50%, -100%);
+    transform: translate(-50%, 10px);
     opacity: 0;
   }
   to {

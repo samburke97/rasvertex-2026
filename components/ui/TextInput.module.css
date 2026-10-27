@@ -1,96 +1,86 @@
+/* TextInput.module.css — style guide form field: 12.5/500 label above,
+   hairline border, blue focus ring. */
+
 .container {
   position: relative;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 6px;
 }
 
 .label {
-  font-size: var(--font-size-sm, 0.875rem);
-  font-weight: 500;
-  color: var(--for-dark);
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  font-family: Inter;
-  font-size: 16px;
-  font-style: normal;
+  gap: 4px;
+  font-size: 12.5px;
   font-weight: 500;
-  line-height: 20px;
+  line-height: 1.4;
+  color: var(--ink-62);
 }
 
 .required {
-  color: #ef4444;
-  margin-left: 0.25rem;
+  color: var(--red);
 }
 
 .inputWrapper {
   display: flex;
-  padding: 12px 20px;
   align-items: center;
-  gap: 12px;
-  flex: 1 0 0;
-  border-radius: 8px;
-  border: 1px solid var(--out-medium, #d9dbdb);
-  background: var(--con-lightest, #fff);
+  gap: 10px;
   width: 100%;
-  box-sizing: border-box; /* Add this line */
+  height: 40px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-field);
+  background: var(--surface);
   position: relative;
-  transition: all var(--transition-fast, 0.15s ease);
+  transition:
+    border-color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease);
 }
 
 .inputWrapper:hover:not(:focus-within) {
-  border-color: var(--grey-500, #7e807f);
+  border-color: rgba(var(--mix-rgb), 0.2);
 }
 
 .inputWrapper:focus-within {
-  outline: none;
-  border-color: var(--grey-500, #7e807f);
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px var(--blue-100);
 }
 
 .input {
   border: none;
-  outline: none; /* Remove browser default focus outline */
+  outline: none;
   background: transparent;
-  font-family: Inter, var(--font-family);
-  font-size: 16px;
-  font-style: normal;
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 400;
-  line-height: 24px;
-  color: var(--for-darkest, #171717);
+  color: var(--ink);
   width: 100%;
   flex: 1;
+  min-width: 0;
 }
 
-/* Additional explicit focus styles to ensure no blue highlight */
 .input:focus {
   outline: none !important;
   box-shadow: none !important;
   border: none !important;
 }
 
-/* Remove autofill background */
 .input:-webkit-autofill,
 .input:-webkit-autofill:hover,
 .input:-webkit-autofill:focus,
 .input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 30px var(--con-lightest, #fff) inset !important;
-  -webkit-text-fill-color: var(--for-darkest, #171717) !important;
-  background-color: var(--con-lightest, #fff) !important;
-}
-
-/* Firefox autofill */
-.input:-moz-autofill {
-  background-color: var(--con-lightest, #fff) !important;
+  -webkit-box-shadow: 0 0 0 30px var(--surface) inset !important;
+  -webkit-text-fill-color: var(--ink) !important;
 }
 
 .input::placeholder {
-  color: var(--for-medium, #7e807f);
+  color: var(--ink-45);
 }
 
 .inputWrapper.hasError {
-  border: 1px solid var(--red-wine-300, #900c40);
+  border-color: var(--red);
 }
 
 .input:disabled {
@@ -98,7 +88,7 @@
 }
 
 .inputWrapper:has(.input:disabled) {
-  background-color: var(--con-light, #fafafa);
+  background: var(--surface-soft);
   opacity: 0.7;
 }
 
@@ -108,63 +98,53 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
+  color: var(--ink-45);
 }
 
 .charCount {
-  width: 72px;
-  color: var(--for-medium, #7e807f);
+  color: var(--ink-45);
   text-align: right;
-  font-family: Inter, var(--font-family);
-  font-size: 14px;
-  font-style: normal;
-  font-weight: 400;
-  line-height: 16px;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
   flex-shrink: 0;
 }
 
 .errorText {
-  font-size: 0.875rem;
-  color: var(--red-wine-300, #900c40);
-  margin-top: 0.25rem;
+  font-size: 12.5px;
+  color: var(--red);
 }
 
-/* Hide number input spinners */
 .noSpinner::-webkit-outer-spin-button,
 .noSpinner::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 
-/* Firefox */
 .noSpinner[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* Loading indicator styles */
 .loadingIndicator {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 .spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--grey-300);
-  border-top: 2px solid var(--grey-600);
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--ink-55);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
 @keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
+  to {
     transform: rotate(360deg);
   }
 }

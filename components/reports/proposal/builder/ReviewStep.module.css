@@ -3,7 +3,7 @@
 .scroll {
   flex: 1;
   overflow: auto;
-  background: var(--rv-surface-soft, #fbfbfa);
+  background: var(--surface-soft);
 }
 
 .grid {
@@ -40,12 +40,12 @@
   margin: 0;
   font-size: 15px;
   line-height: 1.55;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6);
+  color: rgba(var(--ink-rgb), 0.6);
 }
 
 .card {
-  background: var(--rv-surface, #fff);
-  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.09);
+  background: var(--surface);
+  border: 1px solid rgba(var(--mix-rgb), 0.09);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -55,7 +55,7 @@
   align-items: center;
   gap: 14px;
   padding: 14px 18px;
-  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.05);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.05);
 }
 
 .check:last-child {
@@ -71,22 +71,22 @@
   justify-content: center;
   flex-shrink: 0;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .markOk {
-  background: var(--rv-good-tint, #e9f5ef);
-  color: var(--rv-good, #3f8f68);
+  background: var(--green-tint);
+  color: var(--green);
 }
 
 .markIssue {
-  background: #fbf4e5;
-  color: #96731f;
+  background: var(--amber-tint);
+  color: var(--amber);
 }
 
 .markInfo {
-  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.045);
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
+  background: rgba(var(--mix-rgb), 0.045);
+  color: rgba(var(--ink-rgb), 0.55);
 }
 
 .checkText {
@@ -104,14 +104,14 @@
 
 .checkDetail {
   font-size: 12.5px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
+  color: rgba(var(--ink-rgb), 0.55);
 }
 
 .fix,
 .secondary {
-  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.09);
-  background: var(--rv-surface, #fff);
-  color: var(--rv-ink, #17171a);
+  border: 1px solid rgba(var(--mix-rgb), 0.09);
+  background: var(--surface);
+  color: var(--ink);
   cursor: pointer;
   border-radius: 999px;
   font-weight: 500;
@@ -126,7 +126,7 @@
 
 .fix:hover,
 .secondary:hover {
-  background: var(--rv-page, #f6f6f4);
+  background: var(--canvas);
 }
 
 .side {
@@ -139,7 +139,7 @@
 
 .coverImg {
   aspect-ratio: 16 / 9;
-  background: var(--rv-page, #f6f6f4) center 68% / cover no-repeat;
+  background: var(--canvas) center 68% / cover no-repeat;
 }
 
 .summary {
@@ -163,7 +163,7 @@
 
 .sumFor {
   font-size: 12.5px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
+  color: rgba(var(--ink-rgb), 0.55);
 }
 
 .sumRows {
@@ -180,7 +180,7 @@
 }
 
 .sumRow span:first-child {
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
+  color: rgba(var(--ink-rgb), 0.55);
 }
 
 .sumRow span:last-child {
@@ -191,30 +191,31 @@
 .export {
   height: 46px;
   border: 0;
-  border-radius: 999px;
-  background: var(--rv-ink, #17171a);
+  border-radius: var(--r-md);
+  background: var(--blue-grad);
+  box-shadow: var(--shadow-primary);
   color: #fff;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .export:hover {
-  background: #2a2a2a;
+  box-shadow: var(--shadow-primary-hover);
 }
 
 .export:disabled,
 .export:disabled:hover {
-  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.06);
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.4);
+  background: rgba(var(--mix-rgb), 0.06);
+  color: rgba(var(--ink-rgb), 0.4);
   cursor: not-allowed;
 }
 
 .done {
   padding: 12px 14px;
   border-radius: 12px;
-  background: var(--rv-good-tint, #e9f5ef);
-  color: var(--rv-good, #3f8f68);
+  background: var(--green-tint);
+  color: var(--green);
   font-size: 13px;
   line-height: 1.5;
   font-weight: 500;
@@ -223,8 +224,8 @@
 .warn {
   padding: 12px 14px;
   border-radius: 12px;
-  background: #fbf4e5;
-  color: #96731f;
+  background: var(--amber-tint);
+  color: var(--amber);
   font-size: 13px;
   line-height: 1.5;
   font-weight: 500;

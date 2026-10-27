@@ -1,92 +1,74 @@
+/* Modal.module.css — style guide modal: blurred scrim, 16px card. */
+
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(20, 20, 20, 0.5);
-  z-index: 50;
+  z-index: 110;
+  background: rgba(var(--ink-rgb), 0.3);
+  backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 32px;
+}
+
+:root[data-theme="dark"] .overlay {
+  background: rgba(0, 0, 0, 0.55);
 }
 
 .modal {
-  background: var(--bg-card, #fff);
-  border-radius: var(--border-radius-lg, 12px);
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.15),
-    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  background: var(--surface);
+  border-radius: var(--r-2xl);
+  box-shadow: var(--shadow-modal);
   max-width: 640px;
   width: 100%;
   max-height: 90vh;
   overflow: auto;
+  animation: fadeInUp 0.18s var(--ease) both;
 }
 
 .header {
   position: sticky;
   top: 0;
-  background: var(--bg-card, #fff);
-  border-bottom: 1px solid var(--out-light, #edf0f0);
-  padding: 1.25rem 1.5rem;
+  z-index: 1;
+  background: var(--surface);
+  padding: 20px 20px 4px 24px;
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 10px;
 }
 
 .title {
   flex: 1;
-  font-family: var(--font-family-heading);
-  font-size: 1.15rem;
+  font-size: 16.5px;
   font-weight: 600;
-  color: var(--for-darkest, #141414);
+  letter-spacing: -0.022em;
+  color: var(--ink);
 }
 
 .closeBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--border-radius-full, 9999px);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-pill);
   border: none;
   background: transparent;
-  color: var(--for-dark, #374151);
+  color: var(--ink-55);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--t-fast) var(--ease);
 }
 
 .closeBtn:hover {
-  background: var(--con-light, #fafafa);
+  background: rgba(var(--mix-rgb), 0.05);
+  color: var(--ink);
+}
+
+:root[data-theme="dark"] .closeBtn img {
+  filter: invert(1) brightness(1.5);
 }
 
 .body {
-  padding: 1.5rem;
-}
-
-/* Dark-mode overrides, scoped to this component's own classes only — Modal
-   is also used by the older (non-rv) Reports/Recurring Jobs screens, which
-   don't otherwise participate in dark mode, so this intentionally doesn't
-/* ... touch the shared --bg-card, --for-*, or --out-* tokens themselves. */
-:root[data-theme="dark"] .overlay {
-  background: rgba(0, 0, 0, 0.6);
-}
-
-:root[data-theme="dark"] .modal {
-  background: var(--rv-surface);
-}
-
-:root[data-theme="dark"] .header {
-  background: var(--rv-surface);
-  border-bottom-color: var(--rv-line);
-}
-
-:root[data-theme="dark"] .title {
-  color: var(--rv-ink);
-}
-
-:root[data-theme="dark"] .closeBtn {
-  color: var(--rv-ink-60);
-}
-
-:root[data-theme="dark"] .closeBtn:hover {
-  background: var(--rv-fill);
+  padding: 16px 24px 24px;
 }

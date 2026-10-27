@@ -758,7 +758,7 @@ export default function AnchorInspectionPage({
           </svg>
         </button>
         <div className={styles.topBarRight}>
-          <span className={styles.topBarTitle}>Anchor Inspection</span>
+          <span className={styles.topBarTitle}>Anchor inspection</span>
           <span className={styles.badge}>
             {report.zones.length} zone{report.zones.length !== 1 ? "s" : ""}
           </span>

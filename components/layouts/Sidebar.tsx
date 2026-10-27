@@ -3,74 +3,68 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
 import styles from "./Sidebar.module.css";
 
 interface SidebarItem {
-  icon?: string;
   href: string;
   label: string;
-  svgIcon?: React.ReactNode;
+  svgIcon: React.ReactNode;
 }
 
-const sidebarItems: SidebarItem[] = [
-  { icon: "/icons/menu/home.svg", href: "/dashboard", label: "Dashboard" },
-  { icon: "/icons/menu/reports.svg", href: "/reports", label: "Reports" },
+// Icons are inline 24px strokes in currentColor, so they follow hover,
+// active and dark mode (style guide rail).
+export const NAV_ITEMS: SidebarItem[] = [
   {
-    icon: "/icons/menu/calendar.svg",
+    href: "/dashboard",
+    label: "Today",
+    svgIcon: (
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+        <path d="M3 10.5L12 3L21 10.5M5.5 9V19.5C5.5 20.05 5.95 20.5 6.5 20.5H9.5C10.05 20.5 10.5 20.05 10.5 19.5V15.5C10.5 14.95 10.95 14.5 11.5 14.5H12.5C13.05 14.5 13.5 14.95 13.5 15.5V19.5C13.5 20.05 13.95 20.5 14.5 20.5H17.5C18.05 20.5 18.5 20.05 18.5 19.5V9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    href: "/reports",
+    label: "Reports",
+    svgIcon: (
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+        <path d="M7 3h10a1 1 0 011 1v17l-3-2-3 2-3-2-3 2V4a1 1 0 011-1zM9 8h6M9 12h6M9 16h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/recurring-jobs",
-    label: "Recurring Jobs",
+    label: "Recurring jobs",
+    svgIcon: (
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+        <path d="M20 12A8 8 0 1 1 17.66 6.34M20 3.5V8H15.5M12 8V12L14.5 13.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
   },
   {
     href: "/outreach",
     label: "Outreach",
     svgIcon: (
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M20.5 3.5 10.75 13.25M20.5 3.5l-6.25 17-3.5-7.25L3.5 9.75l17-6.25Z"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <path d="M20.5 3.5 10.75 13.25M20.5 3.5l-6.25 17-3.5-7.25L3.5 9.75l17-6.25Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
   {
     href: "/checkin",
-    label: "Client Check-in",
+    label: "Client check-in",
     svgIcon: (
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M8 4.5H6A1.5 1.5 0 0 0 4.5 6v13A1.5 1.5 0 0 0 6 20.5h12a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 18 4.5h-2M8 4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5 1.5 1.5 0 0 1 14.5 6h-5A1.5 1.5 0 0 1 8 4.5ZM8.5 13l2.25 2.25L15.5 10.5"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <path d="M8 4.5H6A1.5 1.5 0 0 0 4.5 6v13A1.5 1.5 0 0 0 6 20.5h12a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 18 4.5h-2M8 4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5 1.5 1.5 0 0 1 14.5 6h-5A1.5 1.5 0 0 1 8 4.5ZM8.5 13l2.25 2.25L15.5 10.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
   {
     href: "/crm",
     label: "CRM",
-    // Inline — no /icons/menu/crm.svg asset exists yet, and svgIcon avoids
-    // needing one (or a -filled variant) just for this one nav entry.
     svgIcon: (
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
-        <circle cx="9" cy="8" r="3.25" stroke="currentColor" strokeWidth="1.6" />
-        <path
-          d="M3.5 19c0-3.038 2.462-5.5 5.5-5.5s5.5 2.462 5.5 5.5"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        />
-        <path
-          d="M15.5 4.14a3.25 3.25 0 0 1 0 6.22M17.5 19c0-2.485-1.53-4.61-3.7-5.31"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-        />
+        <path d="M9 11a3.5 3.5 0 100-7 3.5 3.5 0 000 7zM2.5 20c0-3.3 2.9-5.5 6.5-5.5s6.5 2.2 6.5 5.5M16 4.6a3.5 3.5 0 010 6.8M18 14.8c2.1.7 3.5 2.6 3.5 5.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -125,7 +119,7 @@ export default function Sidebar({
       </div>
 
       <nav className={styles.navItems}>
-        {sidebarItems.map((item) => {
+        {NAV_ITEMS.map((item) => {
           const itemIsActive = isActive(item.href);
           const isHovered = hoveredItem === item.href;
 
@@ -134,21 +128,13 @@ export default function Sidebar({
               <Link
                 href={item.href}
                 className={`${styles.navItem} ${itemIsActive ? styles.active : ""} ${isHovered ? styles.hovered : ""}`}
+                aria-label={item.label}
+                aria-current={itemIsActive ? "page" : undefined}
                 onMouseEnter={() => setHoveredItem(item.href)}
                 onMouseLeave={() => setHoveredItem(null)}
               >
                 <div className={styles.iconContainer}>
-                  {item.svgIcon ? (
-                    item.svgIcon
-                  ) : item.icon ? (
-                    <Image
-                      src={item.icon}
-                      alt={item.label}
-                      width={21}
-                      height={21}
-                      className={styles.icon}
-                    />
-                  ) : null}
+                  {item.svgIcon}
                 </div>
               </Link>
 

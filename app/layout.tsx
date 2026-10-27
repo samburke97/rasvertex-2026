@@ -1,13 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Plus_Jakarta_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./styles/globals.css";
 import { Analytics } from "@vercel/analytics/react";
 
 const inter = Inter({ subsets: ["latin"] });
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  variable: "--font-plus-jakarta-sans",
-});
 
 export const metadata: Metadata = {
   title: "RAS-VERTEX CRM",
@@ -27,7 +23,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} ${plusJakartaSans.variable}`}>
+      <body className={inter.className}>
         {/* Sets data-theme before first paint so a stored "dark" preference
             never flashes light on load. Static string, no user input. */}
         <script

@@ -98,18 +98,20 @@ const STAGE_PILL_STYLE: Record<LeadStage, { background: string; color: string }>
   lost: { background: "var(--rv-red-tint)", color: "var(--rv-red)" },
 };
 
+// Option colours people can pick for a custom status column — the style
+// guide's stage + status colours and the blue cost-centre family only.
 const STATUS_PALETTE = [
-  "#6b7280",
+  "#9aa0b4",
   "#b8492b",
-  "#c2703a",
-  "#96731f",
-  "#7a8a1f",
-  "#1f6d4c",
-  "#0f8a8a",
-  "#2563eb",
-  "#4f46e5",
-  "#7c3aed",
-  "#c0348e",
+  "#d9a441",
+  "#8a6a17",
+  "#6e8ca0",
+  "#4b6b7e",
+  "#3f8f68",
+  "#6ea1c7",
+  "#3e7fb0",
+  "#2f6a94",
+  "#95bdd9",
   "#17171a",
 ];
 

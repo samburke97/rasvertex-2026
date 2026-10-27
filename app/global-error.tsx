@@ -26,6 +26,7 @@ export default function GlobalError({
         <div
           style={{
             minHeight: "100vh",
+            background: "#f6f6f4",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -37,10 +38,10 @@ export default function GlobalError({
             textAlign: "center",
           }}
         >
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 600, margin: 0 }}>
+          <h1 style={{ fontSize: 17, fontWeight: 600, letterSpacing: "-0.02em", color: "#17171a", margin: 0 }}>
             Something went wrong
           </h1>
-          <p style={{ color: "#7e807f", margin: 0, maxWidth: 420 }}>
+          <p style={{ color: "rgba(23, 23, 26, 0.62)", fontSize: 14, lineHeight: 1.55, margin: 0, maxWidth: 420 }}>
             The app hit an unexpected error and couldn&apos;t recover. Try
             reloading — if it keeps happening, let us know what you were
             doing.
@@ -48,13 +49,15 @@ export default function GlobalError({
           <button
             onClick={reset}
             style={{
-              marginTop: "0.5rem",
-              padding: "0.625rem 1.25rem",
-              borderRadius: "8px",
+              marginTop: 8,
+              height: 38,
+              padding: "0 16px",
+              borderRadius: 9,
               border: "none",
-              background: "#141414",
+              background: "linear-gradient(180deg, #3a78a6 0%, #2f6a94 100%)",
+              boxShadow: "0 1px 2px rgba(62, 127, 176, 0.15)",
               color: "#fff",
-              fontSize: "0.875rem",
+              fontSize: 13,
               fontWeight: 500,
               cursor: "pointer",
             }}

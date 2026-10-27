@@ -8,36 +8,37 @@
   align-items: center;
   gap: 0.5rem;
   width: 100%;
-  height: 34px;
-  padding: 0 0.625rem;
-  border: 1px solid var(--out-medium, #d9dbdb);
-  border-radius: 7px;
-  background: var(--bg-card, #fff);
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border-field);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
   cursor: pointer;
   font-family: inherit;
-  transition: border-color 0.15s;
+  transition: border-color var(--t-fast) var(--ease);
 }
 
 .trigger:hover {
-  border-color: var(--out-darkest, #c9cbcb);
+  border-color: rgba(var(--mix-rgb), 0.2);
 }
 
 .triggerIcon {
-  color: var(--for-medium, #7e807f);
+  color: var(--ink-45);
   flex-shrink: 0;
 }
 
 .triggerValue {
-  font-size: 0.8rem;
-  color: var(--for-darkest, #141414);
+  font-size: 13px;
+  color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .triggerPlaceholder {
-  font-size: 0.8rem;
-  color: var(--for-light, #9ca3af);
+  font-size: 13px;
+  color: var(--ink-45);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -48,12 +49,13 @@
   top: calc(100% + 6px);
   left: 0;
   z-index: 50;
-  width: 240px;
-  background: var(--bg-card, #fff);
-  border: 1px solid var(--out-medium, #d9dbdb);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
-  padding: 0.75rem;
+  width: 252px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  box-shadow: var(--shadow-pop);
+  padding: 12px;
+  animation: fadeInUp 0.14s var(--ease) both;
 }
 
 .header {
@@ -73,20 +75,20 @@
   background: transparent;
   border-radius: 6px;
   cursor: pointer;
-  color: var(--for-dark, #374151);
-  font-size: 1rem;
+  color: var(--ink-62);
+  font-size: 14px;
   line-height: 1;
   transition: background 0.15s;
 }
 
 .navBtn:hover {
-  background: var(--con-light, #fafafa);
+  background: var(--fill-hover);
 }
 
 .monthLabel {
-  font-size: 0.8rem;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--for-darkest, #141414);
+  color: var(--ink);
 }
 
 .weekdays {
@@ -97,9 +99,9 @@
 
 .weekday {
   text-align: center;
-  font-size: 0.63rem;
-  font-weight: 600;
-  color: var(--for-light, #9ca3af);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-45);
   padding: 0.25rem 0;
 }
 
@@ -120,9 +122,10 @@
   aspect-ratio: 1;
   border: none;
   background: transparent;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  color: var(--for-darkest, #141414);
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
   cursor: pointer;
   font-family: inherit;
   transition:
@@ -131,16 +134,16 @@
 }
 
 .day:hover {
-  background: var(--con-light, #fafafa);
+  background: var(--fill-hover);
 }
 
 .dayToday {
-  font-weight: 700;
-  color: var(--brand-primary, #900c40);
+  font-weight: 600;
+  color: var(--blue-600);
 }
 
 .daySelected {
-  background: var(--brand-primary, #900c40) !important;
+  background: var(--blue-500) !important;
   color: #fff !important;
   font-weight: 600;
 }
@@ -150,15 +153,15 @@
   margin-top: 0.625rem;
   padding-top: 0.625rem;
   border: none;
-  border-top: 1px solid var(--out-light, #edf0f0);
+  border-top: 1px solid var(--line);
   background: transparent;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--for-medium, #7e807f);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-55);
   cursor: pointer;
   font-family: inherit;
 }
 
 .clearBtn:hover {
-  color: var(--brand-primary, #900c40);
+  color: var(--blue-600);
 }

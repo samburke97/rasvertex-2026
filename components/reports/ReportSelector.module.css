@@ -9,8 +9,8 @@
 .spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
-  border-top-color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--ink-62);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -39,15 +39,18 @@
 }
 
 .title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--rv-ink, #17171a);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+  color: var(--ink);
   margin: 0;
 }
 
 .subtitle {
-  font-size: 0.875rem;
-  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-62);
   margin: 0;
 }
 
@@ -59,13 +62,11 @@
 }
 
 .categoryLabel {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-62);
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
+  border-bottom: 1px solid var(--border-strong);
 }
 
 /* ── Cards Grid ──────────────────────────────────────────────────────────── */
@@ -109,20 +110,20 @@
   width: 48px;
   height: 48px;
   border-radius: 11px;
-  background: var(--rv-surface-soft, #fbfbfa);
-  border: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
+  background: var(--surface-soft);
+  border: 1px solid var(--border-strong);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--rv-ink-40, rgba(23, 23, 26, 0.4));
+  color: var(--ink-45);
   flex-shrink: 0;
   margin-bottom: 0.75rem;
 }
 
 .iconWrapActive {
-  background: var(--rv-accent-tint, #e9f2f9);
-  border-color: var(--red-wine-200, #e5cad5);
-  color: var(--rv-accent, #3e7fb0);
+  background: var(--blue-100);
+  border-color: var(--blue-150);
+  color: var(--blue-500);
 }
 
 .cardBody {
@@ -134,11 +135,11 @@
 .cardLabel {
   font-size: 0.95rem;
   font-weight: 600;
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
 }
 
 .cardDesc {
   font-size: 0.825rem;
-  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
+  color: var(--ink-62);
   line-height: 1.6;
 }

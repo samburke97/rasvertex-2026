@@ -16,13 +16,13 @@
   height: 36px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: var(--rv-r-md, 9px);
+  border-radius: var(--r-md);
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
-  color: var(--rv-ink, #17171a);
-  background: var(--rv-fill, rgba(0, 0, 0, 0.045));
+  color: var(--ink);
+  background: var(--fill);
   outline: none;
   transition:
     border-color 0.14s,
@@ -32,26 +32,26 @@
 }
 
 .input::placeholder {
-  color: var(--rv-ink-42, rgba(23, 23, 26, 0.42));
+  color: var(--ink-42);
   font-weight: 400;
 }
 
 .input:focus {
-  background: var(--rv-surface, #fff);
-  border-color: var(--rv-accent, #3e7fb0);
-  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
+  background: var(--surface);
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px var(--blue-100);
 }
 
 .input:disabled {
-  color: var(--rv-ink-40, rgba(23, 23, 26, 0.4));
+  color: var(--ink-45);
 }
 
 .inputDone {
-  background: var(--rv-good-tint, #e9f5ef);
+  background: var(--green-tint);
 }
 
 .inputError {
-  background: var(--rv-red-tint, #fbeeea);
+  background: var(--red-tint);
 }
 
 /* ── Button ──────────────────────────────────────────────────────────────── */
@@ -59,13 +59,13 @@
   height: 36px;
   min-width: 60px;
   padding: 0 14px;
-  border-radius: var(--rv-r-md, 9px);
+  border-radius: var(--r-md);
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   border: 0;
-  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%));
+  background: var(--blue-grad);
   color: #fff;
   box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
   transition: box-shadow 0.14s;

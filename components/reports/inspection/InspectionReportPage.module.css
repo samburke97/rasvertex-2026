@@ -25,8 +25,8 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  background: var(--rv-surface, #fff);
-  color: var(--rv-ink, #17171a);
+  background: var(--surface);
+  color: var(--ink);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -55,25 +55,25 @@ html :where(.root) :is(h1, h2, p, span) {
   align-items: center;
   gap: 12px;
   padding: 0 16px 0 12px;
-  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
 }
 
 .back {
   width: 36px;
   height: 36px;
-  border-radius: var(--rv-r-md, 9px);
+  border-radius: var(--r-md);
   border: 0;
   background: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
   flex-shrink: 0;
 }
 
 .back:hover {
-  background: var(--rv-fill, rgba(0, 0, 0, 0.045));
+  background: var(--fill);
 }
 
 .titleBlock {
@@ -93,7 +93,7 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .subtitle {
   font-size: 12px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -112,7 +112,7 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .saveState {
   font-size: 12.5px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -123,15 +123,15 @@ html :where(.root) :is(h1, h2, p, span) {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--rv-good, #3f8f68);
+  background: var(--green);
 }
 
 .saveDotPending {
-  background: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.3);
+  background: rgba(var(--ink-rgb), 0.3);
 }
 
 .saveDotError {
-  background: var(--rv-red, #b8492b);
+  background: var(--red);
 }
 
 .checkLabel {
@@ -139,7 +139,7 @@ html :where(.root) :is(h1, h2, p, span) {
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.7);
+  color: rgba(var(--ink-rgb), 0.7);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -148,8 +148,8 @@ html :where(.root) :is(h1, h2, p, span) {
   height: 36px;
   padding: 0 16px;
   border: 0;
-  border-radius: var(--rv-r-md, 9px);
-  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%));
+  border-radius: var(--r-md);
+  background: var(--blue-grad);
   color: #fff;
   font-size: 13px;
   font-weight: 500;
@@ -185,7 +185,7 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .h1 {
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.2;
 }
@@ -193,12 +193,12 @@ html :where(.root) :is(h1, h2, p, span) {
 .sub {
   font-size: 14.5px;
   line-height: 1.55;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6);
+  color: rgba(var(--ink-rgb), 0.6);
 }
 
 .sub code {
   font-size: 13px;
-  background: rgba(0, 0, 0, 0.045);
+  background: rgba(var(--mix-rgb), 0.045);
   padding: 1px 6px;
   border-radius: 6px;
 }
@@ -217,15 +217,15 @@ html :where(.root) :is(h1, h2, p, span) {
   padding: 14px;
   border: 0;
   border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px rgba(var(--mix-rgb), 0.12);
   text-align: left;
   cursor: pointer;
 }
 
 .kindOn {
-  box-shadow: 0 0 0 2px var(--rv-accent, #3e7fb0);
-  background: var(--rv-accent-soft, #f2f8fc);
+  box-shadow: 0 0 0 2px var(--blue-500);
+  background: var(--blue-wash);
 }
 
 .kindRadio {
@@ -238,7 +238,7 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .kindOn .kindRadio {
-  box-shadow: inset 0 0 0 5px var(--rv-accent, #3e7fb0);
+  box-shadow: inset 0 0 0 5px var(--blue-500);
 }
 
 .kindText {
@@ -250,13 +250,13 @@ html :where(.root) :is(h1, h2, p, span) {
 .kindLabel {
   font-size: 14px;
   font-weight: 600;
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
 }
 
 .kindHint {
   font-size: 12.5px;
   line-height: 1.4;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
+  color: rgba(var(--ink-rgb), 0.55);
 }
 
 .jobRow {
@@ -270,20 +270,20 @@ html :where(.root) :is(h1, h2, p, span) {
   display: flex;
   align-items: center;
   height: 44px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(var(--mix-rgb), 0.12);
   border-radius: 12px;
   padding: 0 14px;
   gap: 8px;
 }
 
 .jobBox:focus-within {
-  border-color: var(--rv-accent, #3e7fb0);
-  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px var(--blue-100);
 }
 
 .jobPrefix {
   font-size: 14px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.45);
+  color: rgba(var(--ink-rgb), 0.45);
 }
 
 .jobInput {
@@ -303,8 +303,8 @@ html :where(.root) :is(h1, h2, p, span) {
 .error {
   font-size: 13px;
   line-height: 1.45;
-  color: var(--rv-red, #b8492b);
-  background: var(--rv-red-tint, #fbeeea);
+  color: var(--red);
+  background: var(--red-tint);
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -312,8 +312,8 @@ html :where(.root) :is(h1, h2, p, span) {
 .notice {
   font-size: 13px;
   line-height: 1.45;
-  color: var(--rv-good, #3f8f68);
-  background: var(--rv-good-tint, #e9f5ef);
+  color: var(--green);
+  background: var(--green-tint);
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -329,7 +329,7 @@ html :where(.root) :is(h1, h2, p, span) {
   width: 340px;
   flex-shrink: 0;
   overflow-y: auto;
-  border-right: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
+  border-right: 1px solid rgba(var(--ink-rgb), 0.07);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -340,7 +340,7 @@ html :where(.root) :is(h1, h2, p, span) {
   flex-direction: column;
   gap: 12px;
   padding: 20px;
-  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
 }
 
 .group:last-child {
@@ -354,11 +354,9 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .groupTitle {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--rv-ink-60, rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6));
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--rv-ink-60, rgba(var(--ink-rgb), 0.6));
 }
 
 .linkBtn {
@@ -367,12 +365,12 @@ html :where(.root) :is(h1, h2, p, span) {
   padding: 0;
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--rv-accent-ink, #2f6a94);
+  color: var(--blue-600);
   cursor: pointer;
 }
 
 .linkBtn:disabled {
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.3);
+  color: rgba(var(--ink-rgb), 0.3);
   cursor: default;
 }
 
@@ -384,36 +382,36 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .fieldLabel {
   font-size: 12px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
+  color: rgba(var(--ink-rgb), 0.55);
 }
 
 .input {
   width: 100%;
-  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.12);
+  border: 1px solid rgba(var(--mix-rgb), 0.12);
   border-radius: 10px;
   padding: 9px 12px;
   font-size: 13.5px;
   line-height: 1.45;
-  color: var(--rv-ink, #17171a);
-  background: var(--rv-surface, #fff);
+  color: var(--ink);
+  background: var(--surface);
   resize: vertical;
   transition: border-color 0.14s, box-shadow 0.14s;
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--rv-accent, #3e7fb0);
-  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px var(--blue-100);
 }
 
 .inputBad {
-  border-color: var(--rv-red, #b8492b);
+  border-color: var(--red);
 }
 
 .hint {
   font-size: 12.5px;
   line-height: 1.45;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
 }
 
 .stats {
@@ -421,29 +419,29 @@ html :where(.root) :is(h1, h2, p, span) {
   flex-wrap: wrap;
   gap: 6px 14px;
   font-size: 12.5px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6);
+  color: rgba(var(--ink-rgb), 0.6);
 }
 
 .stats b {
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
   font-weight: 600;
 }
 
 .statBad b {
-  color: var(--rv-red, #b8492b);
+  color: var(--red);
 }
 
 .progress {
   position: relative;
   height: 28px;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.045);
+  background: rgba(var(--mix-rgb), 0.045);
   overflow: hidden;
   display: flex;
   align-items: center;
   padding: 0 10px;
   font-size: 12px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.65);
+  color: rgba(var(--ink-rgb), 0.65);
 }
 
 .progressBar {
@@ -451,7 +449,7 @@ html :where(.root) :is(h1, h2, p, span) {
   left: 0;
   top: 0;
   bottom: 0;
-  background: var(--rv-accent-tint, #e9f2f9);
+  background: var(--blue-100);
   transition: width 0.2s ease;
 }
 
@@ -477,7 +475,7 @@ html :where(.root) :is(h1, h2, p, span) {
   height: 44px;
   flex-shrink: 0;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.06) center/cover no-repeat;
+  background: rgba(var(--mix-rgb), 0.06) center/cover no-repeat;
 }
 
 .labelBody {
@@ -509,15 +507,15 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .labelBad {
-  color: var(--rv-red, #b8492b);
+  color: var(--red);
 }
 
 .labelWarn {
-  color: var(--rv-gold, #96731f);
+  color: var(--amber);
 }
 
 .labelOk {
-  color: var(--rv-good, #3f8f68);
+  color: var(--green);
 }
 
 /* Site map */
@@ -525,7 +523,7 @@ html :where(.root) :is(h1, h2, p, span) {
   width: 100%;
   aspect-ratio: 3 / 2;
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.06) center/cover no-repeat;
+  background: rgba(var(--mix-rgb), 0.06) center/cover no-repeat;
 }
 
 .btnRow {
@@ -537,36 +535,36 @@ html :where(.root) :is(h1, h2, p, span) {
 .smallBtn {
   height: 32px;
   padding: 0 12px;
-  border: 1px solid var(--rv-line-strong, rgba(0, 0, 0, 0.09));
-  border-radius: var(--rv-r-md, 9px);
-  background: var(--rv-surface, #fff);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
   cursor: pointer;
   transition: background 0.14s, box-shadow 0.14s;
 }
 
 .smallBtnPrimary {
   border-color: transparent;
-  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%));
+  background: var(--blue-grad);
   color: #fff;
   box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
 }
 
 .smallBtnPrimary:hover {
-  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%)) !important;
+  background: var(--blue-grad) !important;
   box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
 }
 
 .smallBtnOn {
-  background: var(--rv-accent-nav, #edf4fa);
+  background: var(--blue-50);
   border-color: rgba(62, 127, 176, 0.35);
-  color: var(--rv-accent-ink, #2f6a94);
+  color: var(--blue-600);
 }
 
 .smallBtn:hover {
-  background: var(--rv-fill-hover, rgba(0, 0, 0, 0.035));
+  background: var(--fill-hover);
 }
 
 .smallBtn:disabled {
@@ -576,13 +574,13 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .fieldValue {
   float: right;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.45);
+  color: rgba(var(--ink-rgb), 0.45);
   font-variant-numeric: tabular-nums;
 }
 
 .range {
   width: 100%;
-  accent-color: var(--rv-accent, #3e7fb0);
+  accent-color: var(--blue-500);
 }
 
 /* Job photo picker */
@@ -599,14 +597,14 @@ html :where(.root) :is(h1, h2, p, span) {
   aspect-ratio: 1;
   border: 0;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.06) center/cover no-repeat;
+  background: rgba(var(--mix-rgb), 0.06) center/cover no-repeat;
   cursor: pointer;
   outline: 2px solid transparent;
   outline-offset: 1px;
 }
 
 .thumbOn {
-  outline-color: var(--rv-accent, #3e7fb0);
+  outline-color: var(--blue-500);
 }
 
 /* Preview */
@@ -615,7 +613,7 @@ html :where(.root) :is(h1, h2, p, span) {
   min-width: 0;
   overflow: auto;
   position: relative;
-  background: var(--rv-page, #f6f6f4);
+  background: var(--canvas);
   padding: 32px;
   display: flex;
   justify-content: center;

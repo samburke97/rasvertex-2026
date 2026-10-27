@@ -1,97 +1,104 @@
+/* IconButton.module.css — quiet icon buttons (style guide .icon-btn). */
+
 .iconButton {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--border-radius-full, 9999px);
-  background-color: var(--bg-card, #fff);
-  border: 1px solid var(--out-medium, #d9dbdb);
-  transition:
-    background 0.15s,
-    border-color 0.15s;
+  border-radius: var(--r-md);
+  border: none;
+  background: none;
+  color: var(--ink-55);
   cursor: pointer;
   padding: 0;
   overflow: hidden;
+  transition:
+    background var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
 }
 
-/* Size variants */
+.iconButton:hover {
+  background: rgba(var(--mix-rgb), 0.05);
+  color: var(--ink);
+}
+
+/* Sizes */
 .sm {
   width: 32px;
   height: 32px;
 }
 
 .md {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
 }
 
 .lg {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-lg);
 }
 
 .xl {
   width: 96px;
   height: 96px;
+  border-radius: var(--r-xl);
 }
 
-/* Style variants */
+/* Variants */
 .primary {
-  background-color: var(--bg-card, #fff);
-  border: 1px solid var(--out-medium, #d9dbdb);
-  color: var(--for-darkest, #141414);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .primary:hover {
-  background-color: var(--con-light, #fafafa);
+  background: var(--fill-hover);
 }
 
 .secondary {
-  background-color: var(--con-light, #fafafa);
-  border: 1px solid var(--out-medium, #d9dbdb);
-  color: var(--for-darkest, #141414);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .secondary:hover {
-  background-color: var(--con-medium, #edf0f0);
+  background: var(--fill-hover);
 }
 
 .ghost {
-  background-color: transparent;
-  border: none;
-  color: var(--for-dark, #374151);
+  background: none;
 }
 
-.ghost:hover {
-  background-color: var(--con-light, #fafafa);
-}
-
-/* Dotted border variant */
 .dashed {
-  border: 1px dashed var(--out-medium, #d9dbdb);
+  border: 1px dashed rgba(var(--ink-rgb), 0.16);
 }
 
-/* Default icon sizing */
 .iconButton svg,
 .iconButton img {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
 }
 
 .lg svg,
 .lg img {
-  width: 30px;
-  height: 30px;
+  width: 22px;
+  height: 22px;
 }
 
 .xl svg,
 .xl img {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
 }
 
-/* Image container that fills the button */
+/* Image assets with a fixed dark stroke: invert in dark mode. */
+:root[data-theme="dark"] .iconButton img {
+  filter: invert(1) brightness(1.5);
+}
+
 .imageContainer img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  filter: none;
 }

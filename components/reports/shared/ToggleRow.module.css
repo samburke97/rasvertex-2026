@@ -23,12 +23,12 @@
 .label {
   font-size: 13.5px;
   font-weight: 500;
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
 }
 
 .sub {
   font-size: 12px;
-  color: var(--rv-ink-60, rgba(23, 23, 26, 0.6));
+  color: var(--ink-62);
   line-height: 1.4;
 }
 
@@ -62,16 +62,16 @@
   width: 34px;
   height: 20px;
   border-radius: 999px;
-  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.14);
+  background: rgba(var(--mix-rgb), 0.14);
   transition: background 0.14s ease-out;
 }
 
 .input:checked ~ .track {
-  background: var(--rv-accent, #3e7fb0);
+  background: var(--blue-500);
 }
 
 .input:focus-visible ~ .track {
-  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
+  box-shadow: 0 0 0 3px var(--blue-100);
 }
 
 .thumb {
@@ -80,7 +80,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
   transition: transform 0.14s ease-out;
   pointer-events: none;

@@ -1,7 +1,7 @@
 "use client";
 // components/reports/shared/SaveReportModal.tsx
 //
-// Generic "Save Report" modal used by all report types. Lets the user save
+// Generic "Save report" modal used by all report types. Lets the user save
 // the report as a PDF to the SimPRO Job, the SimPRO Site (visible in the
 // Customer Portal), or both at once.
 //
@@ -206,7 +206,7 @@ export default function SaveReportModal({
                   cx="10"
                   cy="10"
                   r="10"
-                  fill="var(--success-400, #10b981)"
+                  fill="var(--green)"
                 />
                 <path
                   d="M6 10l3 3 5-5"
@@ -238,7 +238,7 @@ export default function SaveReportModal({
           </div>
           <div>
             <h2 className={styles.title} id="modal-title">
-              {isSuccess ? "Saved" : "Save Report"}
+              {isSuccess ? "Saved" : "Save report"}
             </h2>
             <p className={styles.subtitle}>
               {isSuccess
@@ -273,12 +273,12 @@ export default function SaveReportModal({
                   cx="24"
                   cy="24"
                   r="22"
-                  stroke="var(--success-400, #10b981)"
+                  stroke="var(--green)"
                   strokeWidth="2"
                 />
                 <path
                   d="M15 24l7 7 11-11"
-                  stroke="var(--success-400, #10b981)"
+                  stroke="var(--green)"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"

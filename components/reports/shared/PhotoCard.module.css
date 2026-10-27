@@ -10,7 +10,7 @@
 .thumb {
   position: relative;
   aspect-ratio: 1;
-  background: var(--rv-surface-soft, #fbfbfa);
+  background: var(--surface-soft);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -29,7 +29,7 @@
   background: rgba(0, 0, 0, 0.5);
   color: white;
   font-size: 0.62rem;
-  font-weight: 700;
+  font-weight: 600;
   border-radius: 3px;
   padding: 1px 5px;
   pointer-events: none;
@@ -42,12 +42,12 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--rv-red, #b8492b);
+  background: var(--red);
   border: none;
   cursor: pointer;
   color: white;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -63,7 +63,7 @@
 .name {
   margin-top: 0.3rem;
   font-size: 0.68rem;
-  color: var(--rv-ink-70, rgba(23, 23, 26, 0.7));
+  color: var(--ink-72);
   text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -82,19 +82,19 @@
   width: 100%;
   font-size: 0.68rem;
   text-align: center;
-  border: 1px solid var(--rv-accent, #3e7fb0);
+  border: 1px solid var(--blue-500);
   border-radius: 3px;
   padding: 2px 4px;
   outline: none;
   background: rgba(116, 219, 137, 0.06);
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
 }
 
 /* Date sub-caption — shown when showDates is on, matches print .photo-date */
 .date {
   font-size: 0.62rem;
   font-weight: 300;
-  color: #9ca3af;
+  color: var(--ink-45);
   text-align: center;
   margin-top: 2px;
   line-height: 1.3;

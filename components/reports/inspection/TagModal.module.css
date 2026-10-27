@@ -4,7 +4,7 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(23, 23, 26, 0.35);
+  background: rgba(var(--ink-rgb), 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -14,19 +14,19 @@
 .dialog {
   width: min(1040px, 100%);
   height: min(680px, 100%);
-  background: #fff;
+  background: var(--surface);
   border-radius: 16px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
   display: flex;
   overflow: hidden;
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #17171a;
+  color: var(--ink);
 }
 
 .photoCol {
   width: 44%;
   flex-shrink: 0;
-  background: #f6f6f4;
+  background: var(--canvas);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -36,12 +36,12 @@
 .photo {
   flex: 1;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.06) center/contain no-repeat;
+  background: rgba(var(--mix-rgb), 0.06) center/contain no-repeat;
 }
 
 .fileName {
   font-size: 12px;
-  color: rgba(23, 23, 26, 0.5);
+  color: var(--ink-55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -70,7 +70,7 @@
 .count {
   flex: 1;
   font-size: 13px;
-  color: rgba(23, 23, 26, 0.5);
+  color: var(--ink-55);
 }
 
 .close {
@@ -79,8 +79,8 @@
   height: 30px;
   border: 0;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.05);
-  color: #17171a;
+  background: rgba(var(--mix-rgb), 0.05);
+  color: var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -103,11 +103,9 @@
 }
 
 .label {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(23, 23, 26, 0.5);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-55);
 }
 
 .labelNote {
@@ -126,7 +124,7 @@
 
 .seg {
   display: flex;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(var(--mix-rgb), 0.05);
   border-radius: 9px;
   padding: 3px;
   gap: 2px;
@@ -140,14 +138,14 @@
   background: transparent;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(23, 23, 26, 0.6);
+  color: var(--ink-62);
   cursor: pointer;
 }
 
 .segOn {
-  background: #fff;
-  color: #17171a;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(var(--mix-rgb), 0.08);
 }
 
 .numInput,
@@ -155,11 +153,11 @@
   height: 34px;
   border: 0;
   border-radius: 8px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 0 0 1px rgba(var(--mix-rgb), 0.14);
   padding: 0 10px;
   font-size: 14px;
-  color: #17171a;
-  background: #fff;
+  color: var(--ink);
+  background: var(--surface);
   outline: none;
 }
 
@@ -173,7 +171,7 @@
 
 .numInput:focus,
 .textInput:focus {
-  box-shadow: 0 0 0 1.5px #17171a;
+  box-shadow: 0 0 0 1.5px var(--ink);
 }
 
 .chip {
@@ -182,17 +180,17 @@
   padding: 0 10px;
   border: 0;
   border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px rgba(var(--mix-rgb), 0.12);
   font-size: 13px;
   font-weight: 500;
-  color: #17171a;
+  color: var(--ink);
   cursor: pointer;
 }
 
 .chipOn {
-  background: #17171a;
-  color: #fff;
+  background: var(--blue-100);
+  color: var(--blue-600);
   box-shadow: none;
 }
 
@@ -201,19 +199,19 @@
   padding: 0 10px;
   border: 0;
   border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px rgba(var(--mix-rgb), 0.12);
   font-size: 12.5px;
-  color: rgba(23, 23, 26, 0.75);
+  color: var(--ink-72);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .code b {
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.04em;
   margin-right: 2px;
-  color: #17171a;
+  color: var(--ink);
 }
 
 .codeOn b {
@@ -221,7 +219,7 @@
 }
 
 .codeOnPlain {
-  background: #eef1f6;
+  background: var(--blue-50);
   box-shadow: 0 0 0 1.5px rgba(1, 25, 85, 0.72);
 }
 
@@ -230,7 +228,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px 16px 16px 20px;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-top: 1px solid rgba(var(--mix-rgb), 0.08);
 }
 
 .preview {
@@ -238,14 +236,14 @@
   min-width: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 12.5px;
-  color: #2c6b4c;
+  color: var(--green);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .previewBad {
-  color: #a83a3a;
+  color: var(--red);
 }
 
 .secondary,
@@ -253,27 +251,27 @@
   height: 34px;
   padding: 0 16px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
 }
 
 .secondary {
-  background: #fff;
-  color: #17171a;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px rgba(var(--mix-rgb), 0.12);
   font-weight: 500;
 }
 
 .primary {
-  background: #17171a;
+  background: var(--ink);
   color: #fff;
 }
 
 .primary:disabled {
-  background: rgba(0, 0, 0, 0.08);
-  color: rgba(23, 23, 26, 0.4);
+  background: rgba(var(--mix-rgb), 0.08);
+  color: var(--ink-45);
   cursor: default;
 }

@@ -4,7 +4,7 @@
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: rgba(var(--rv-ink-rgb), 0.32);
+  background: rgba(var(--ink-rgb), 0.32);
   backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
@@ -17,9 +17,9 @@
   max-width: 94vw;
   height: 640px;
   max-height: 88vh;
-  background: var(--rv-surface);
-  border-radius: var(--rv-r-2xl);
-  box-shadow: 0 24px 64px rgba(var(--rv-mix-rgb), 0.24);
+  background: var(--surface);
+  border-radius: var(--r-page);
+  box-shadow: 0 24px 64px rgba(var(--mix-rgb), 0.24);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -27,7 +27,7 @@
 
 .loading {
   font-size: 13px;
-  color: var(--rv-ink-50);
+  color: var(--ink-55);
   padding: 24px;
   margin: 0;
 }
@@ -39,16 +39,16 @@
   gap: 12px;
   flex-shrink: 0;
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(var(--rv-mix-rgb), 0.07);
+  border-bottom: 1px solid rgba(var(--mix-rgb), 0.07);
 }
 
 .headAvatar {
   width: 34px;
   height: 34px;
-  border-radius: var(--rv-r-md);
+  border-radius: var(--r-md);
   flex-shrink: 0;
-  background: var(--rv-accent-nav);
-  color: var(--rv-accent-ink);
+  background: var(--blue-50);
+  color: var(--blue-600);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -66,9 +66,9 @@
 
 .headWho b {
   font-size: 14.5px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.015em;
-  color: var(--rv-ink);
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -76,7 +76,7 @@
 
 .headWho span {
   font-size: 12px;
-  color: var(--rv-ink-50);
+  color: var(--ink-55);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -92,7 +92,7 @@
 
 .headMetaDot {
   font-size: 11px;
-  color: var(--rv-ink-30);
+  color: var(--ink-30);
   flex-shrink: 0;
 }
 
@@ -104,7 +104,7 @@
   border-radius: 5px;
   font: inherit;
   font-size: 11px;
-  color: var(--rv-ink-50);
+  color: var(--ink-55);
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
@@ -113,26 +113,26 @@
 }
 
 .headMetaBtn:hover {
-  background: var(--rv-fill);
-  color: var(--rv-ink);
+  background: var(--fill);
+  color: var(--ink);
 }
 
 .headMetaPlaceholder {
-  color: var(--rv-ink-30);
+  color: var(--ink-30);
 }
 
 .headMetaInput {
   width: 90px;
   border: 0;
   outline: none;
-  box-shadow: 0 0 0 1.5px var(--rv-accent);
+  box-shadow: 0 0 0 1.5px var(--blue-500);
   border-radius: 5px;
   padding: 2px 4px;
   margin: -2px -4px;
   font: inherit;
   font-size: 11px;
-  color: var(--rv-ink);
-  background: var(--rv-surface);
+  color: var(--ink);
+  background: var(--surface);
 }
 
 .headCall {
@@ -140,19 +140,19 @@
   height: 34px;
   flex-shrink: 0;
   border-radius: 999px;
-  border: 1px solid var(--rv-line-strong);
+  border: 1px solid var(--border-strong);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--rv-ink-60);
+  color: var(--ink-62);
   transition: background 120ms ease-out;
 }
 
 .headCall:hover {
-  background: var(--rv-accent-tint);
+  background: var(--blue-100);
   border-color: rgba(62, 127, 176, 0.25);
-  color: var(--rv-accent-ink);
+  color: var(--blue-600);
 }
 
 .headClose {
@@ -167,17 +167,17 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: rgba(var(--rv-ink-rgb), 0.45);
+  color: rgba(var(--ink-rgb), 0.45);
 }
 
 .headClose:hover {
-  background: rgba(var(--rv-mix-rgb), 0.06);
-  color: var(--rv-ink);
+  background: rgba(var(--mix-rgb), 0.06);
+  color: var(--ink);
 }
 
 .error {
   font-size: 12px;
-  color: var(--rv-red);
+  color: var(--red);
   margin: 8px 0 0;
 }
 
@@ -188,7 +188,7 @@
   gap: 2px;
   flex-shrink: 0;
   padding: 0 20px;
-  border-bottom: 1px solid rgba(var(--rv-ink-rgb), 0.07);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
 }
 
 .tab {
@@ -201,7 +201,7 @@
   background: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
-  color: var(--rv-ink-50);
+  color: var(--ink-55);
   font-size: 13px;
   font-weight: 500;
   font-family: inherit;
@@ -213,19 +213,19 @@
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 999px;
-  color: var(--rv-ink-40);
-  background: var(--rv-fill);
+  color: var(--ink-45);
+  background: var(--fill);
 }
 
 .tabOn {
-  border-bottom-color: var(--rv-accent);
-  color: var(--rv-ink);
+  border-bottom-color: var(--blue-500);
+  color: var(--ink);
   font-weight: 600;
 }
 
 .tabOn b {
-  color: var(--rv-accent-ink);
-  background: var(--rv-accent-tint);
+  color: var(--blue-600);
+  background: var(--blue-100);
 }
 
 /* ── Panes ───────────────────────────────────────────────────────────────── */
@@ -237,12 +237,12 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: var(--rv-surface-soft);
+  background: var(--surface-soft);
 }
 
 .paneEmpty {
   font-size: 12.5px;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
   margin: 0;
 }
 
@@ -262,34 +262,34 @@
 .msgAuthor {
   font-size: 12px;
   font-weight: 600;
-  color: var(--rv-ink);
+  color: var(--ink);
 }
 
 .msgTime {
   font-size: 11px;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
 }
 
 .msgBubble {
-  border-radius: var(--rv-r-lg);
+  border-radius: var(--r-lg);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: var(--rv-surface);
-  border: 1px solid rgba(var(--rv-ink-rgb), 0.07);
+  background: var(--surface);
+  border: 1px solid rgba(var(--ink-rgb), 0.07);
 }
 
 .msgSubject {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--rv-ink);
+  color: var(--ink);
 }
 
 .msgBody {
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--rv-ink-70);
+  color: var(--ink-72);
   white-space: pre-line;
 }
 
@@ -300,7 +300,7 @@
   flex-wrap: wrap;
   padding-top: 4px;
   margin-top: 2px;
-  border-top: 1px solid rgba(var(--rv-mix-rgb), 0.05);
+  border-top: 1px solid rgba(var(--mix-rgb), 0.05);
 }
 
 .tag {
@@ -311,35 +311,35 @@
   font-weight: 500;
   padding: 3px 8px;
   border-radius: 999px;
-  background: var(--rv-fill);
-  color: var(--rv-ink-50);
+  background: var(--fill);
+  color: var(--ink-55);
 }
 
 .tagSent {
-  color: var(--rv-accent-ink);
-  background: var(--rv-accent-tint);
+  color: var(--blue-600);
+  background: var(--blue-100);
 }
 
 .tagOpen {
-  color: var(--rv-slate);
-  background: var(--rv-slate-tint);
+  color: var(--slate);
+  background: var(--slate-tint);
 }
 
 .tagClick {
-  color: var(--rv-gold);
-  background: var(--rv-gold-tint);
+  color: var(--amber);
+  background: var(--amber-tint);
 }
 
 .tagFailed {
-  color: var(--rv-red);
-  background: var(--rv-red-tint);
+  color: var(--red);
+  background: var(--red-tint);
 }
 
 /* ── Composer ────────────────────────────────────────────────────────────── */
 .composer {
   flex-shrink: 0;
-  background: var(--rv-surface);
-  border-top: 1px solid rgba(var(--rv-mix-rgb), 0.07);
+  background: var(--surface);
+  border-top: 1px solid rgba(var(--mix-rgb), 0.07);
   padding: 14px 20px;
   display: flex;
   flex-direction: column;
@@ -348,7 +348,7 @@
 
 .composerBlocked {
   font-size: 12.5px;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
   margin: 0;
 }
 
@@ -361,7 +361,7 @@
 .composerSubject label {
   font-size: 11px;
   font-weight: 500;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
   flex-shrink: 0;
 }
 
@@ -372,25 +372,25 @@
   outline: none;
   font-size: 13px;
   font-weight: 500;
-  color: var(--rv-ink);
+  color: var(--ink);
   font-family: inherit;
 }
 
 .composerBody {
-  border: 1px solid var(--rv-line-strong);
-  border-radius: var(--rv-r-sm);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
   padding: 8px 10px;
   outline: none;
   resize: none;
   font-family: inherit;
   font-size: 12.5px;
   line-height: 1.55;
-  color: var(--rv-ink);
+  color: var(--ink);
   transition: border-color 120ms ease-out;
 }
 
 .composerBody:focus {
-  border-color: var(--rv-accent);
+  border-color: var(--blue-500);
 }
 
 .composerFoot {
@@ -402,17 +402,17 @@
 
 .composerFrom {
   font-size: 11px;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
 }
 
 .sendBtn {
   border: 0;
-  background: linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%);
+  background: linear-gradient(180deg, var(--blue-500) 0%, var(--blue-600) 100%);
   color: #fff;
   font-weight: 500;
   font-size: 12.5px;
   padding: 8px 18px;
-  border-radius: var(--rv-r-sm);
+  border-radius: var(--r-sm);
   cursor: pointer;
   font-family: inherit;
 }
@@ -428,25 +428,25 @@
   flex-direction: column;
   gap: 8px;
   padding-bottom: 14px;
-  border-bottom: 1px solid rgba(var(--rv-ink-rgb), 0.06);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.06);
 }
 
 .notesNew textarea {
-  border: 1px solid var(--rv-line-strong);
-  border-radius: var(--rv-r-sm);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
   padding: 8px 10px;
   outline: none;
   resize: none;
   font-family: inherit;
   font-size: 12.5px;
   line-height: 1.55;
-  color: var(--rv-ink);
-  background: var(--rv-surface);
+  color: var(--ink);
+  background: var(--surface);
   transition: border-color 120ms ease-out;
 }
 
 .notesNew textarea:focus {
-  border-color: var(--rv-accent);
+  border-color: var(--blue-500);
 }
 
 .notesFoot {
@@ -456,21 +456,21 @@
 
 .addNoteBtn {
   border: 0;
-  background: var(--rv-accent-tint-2);
-  color: var(--rv-accent-ink);
+  background: var(--blue-100);
+  color: var(--blue-600);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
   font-family: inherit;
   padding: 7px 12px;
-  border-radius: var(--rv-r-sm);
+  border-radius: var(--r-sm);
   transition:
     background 130ms ease-out,
     color 130ms ease-out;
 }
 
 .addNoteBtn:hover {
-  background: var(--rv-accent);
+  background: var(--blue-500);
   color: #fff;
 }
 
@@ -480,9 +480,9 @@
 }
 
 .note {
-  background: var(--rv-surface);
-  border: 1px solid rgba(var(--rv-ink-rgb), 0.07);
-  border-radius: var(--rv-r-lg);
+  background: var(--surface);
+  border: 1px solid rgba(var(--ink-rgb), 0.07);
+  border-radius: var(--r-lg);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -492,13 +492,13 @@
 .noteBody {
   font-size: 12.5px;
   line-height: 1.6;
-  color: var(--rv-ink-70);
+  color: var(--ink-72);
   white-space: pre-line;
 }
 
 .noteTime {
   font-size: 11px;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
 }
 
 /* ── Timeline ────────────────────────────────────────────────────────────── */
@@ -516,25 +516,25 @@
   width: 26px;
   height: 26px;
   flex-shrink: 0;
-  border-radius: var(--rv-r-sm);
+  border-radius: var(--r-sm);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .tlIconEmail {
-  background: var(--rv-accent-tint);
-  color: var(--rv-accent-ink);
+  background: var(--blue-100);
+  color: var(--blue-600);
 }
 
 .tlIconNote {
-  background: var(--rv-slate-tint);
-  color: var(--rv-slate);
+  background: var(--slate-tint);
+  color: var(--slate);
 }
 
 .tlIconStage {
-  background: var(--rv-fill);
-  color: var(--rv-ink-50);
+  background: var(--fill);
+  color: var(--ink-55);
 }
 
 .tlBody {
@@ -556,17 +556,17 @@
 .tlLabel {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--rv-ink);
+  color: var(--ink);
 }
 
 .tlTime {
   font-size: 11px;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
   flex-shrink: 0;
   white-space: nowrap;
 }
 
 .tlDetail {
   font-size: 12px;
-  color: var(--rv-ink-60);
+  color: var(--ink-62);
 }

@@ -229,7 +229,7 @@ export default function HoursBreakdownPage({ onBack }: Props) {
           </svg>
         </button>
         <div className={styles.topBarRight}>
-          <span className={styles.topBarTitle}>Hours Breakdown</span>
+          <span className={styles.topBarTitle}>Hours breakdown</span>
           <span className={styles.badge}>
             {filteredSchedule.length} row
             {filteredSchedule.length !== 1 ? "s" : ""}

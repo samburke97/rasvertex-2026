@@ -1,11 +1,11 @@
-import ReportingDashboard from "@/components/dashboard/ReportingDashboard";
+import TodayPage from "@/components/dashboard/TodayPage";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dashboard | RAS-VERTEX",
-  description: "KPIs, revenue, and job status at a glance",
+  title: "Today | RAS-VERTEX",
+  description: "What needs you today, and what's riding on it",
 };
 
 export default function DashboardPage() {
-  return <ReportingDashboard />;
+  return <TodayPage />;
 }

@@ -55,7 +55,7 @@ interface ReportType {
 const REPORT_TYPES: ReportType[] = [
   {
     id: "inspection",
-    label: "Inspection Report",
+    label: "Inspection report",
     description:
       "Building or roof inspection report generated from the job's coded photo labels (e.g. D10 L2 SH).",
     available: true,
@@ -80,7 +80,7 @@ const REPORT_TYPES: ReportType[] = [
   },
   {
     id: "anchor-inspection",
-    label: "Anchor Inspection",
+    label: "Anchor inspection",
     description:
       "Roof access & fall prevention systems inspection with aerial map zones and asset register.",
     available: true,
@@ -103,7 +103,7 @@ const REPORT_TYPES: ReportType[] = [
   },
   {
     id: "hours-breakdown",
-    label: "Hours Breakdown",
+    label: "Hours breakdown",
     description:
       "Labour hours report by employee and date, filterable by date range.",
     available: true,
@@ -126,7 +126,7 @@ const REPORT_TYPES: ReportType[] = [
   },
   {
     id: "proposal",
-    label: "Painting Proposal",
+    label: "Painting proposal",
     description:
       "Build a painting proposal from a SimPRO quote: findings, scope, access plan and pricing.",
     available: true,
@@ -224,7 +224,7 @@ export default function ReportSelector() {
   return (
     <div className={styles.page}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Report Builder</h1>
+        <h1 className={styles.title}>Reports</h1>
         <p className={styles.subtitle}>Select a report type to get started</p>
       </div>
 

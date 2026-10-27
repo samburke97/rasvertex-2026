@@ -188,7 +188,7 @@ function getImageNaturalRatio(dataUrl: string): Promise<number> {
 // their normal place). A thin rotated guide overlay (pointer-events: none)
 // gives a straightedge to line up against while framing. The chosen angle
 // is only actually applied once — baked into the captured bitmap the
-// instant "Use This View" fires, at the image's full native resolution
+// instant "Use this view" fires, at the image's full native resolution
 // (not a fixed small size) so quality isn't lost.
 function coverScaleForRotation(angleDeg: number, w: number, h: number): number {
   const rad = (angleDeg * Math.PI) / 180;
@@ -279,7 +279,7 @@ export default function ZoneMapEditor({
 
   // Rotation, dialed in live while framing the shot in step 1 — applied to
   // the map's on-screen container as you set it, then baked into the
-  // captured bitmap the moment "Use This View" fires. No separate step.
+  // captured bitmap the moment "Use this view" fires. No separate step.
   const [mapRotation, setMapRotation] = useState(0);
 
   // ── Live map (Google Maps JS API) ────────────────────────────────────────
@@ -386,7 +386,7 @@ export default function ZoneMapEditor({
 
   // Step 1's address — starts from the job's SimPRO address, but is always
   // manually searchable/correctable so a bad geocode or missing job address
-  // is never a dead end (only escape hatch used to be Upload Aerial).
+  // is never a dead end (only escape hatch used to be Upload aerial).
   const [searchInput, setSearchInput] = useState(jobAddress);
   const [activeAddress, setActiveAddress] = useState(jobAddress);
   const handleLocate = useCallback(() => {
@@ -928,7 +928,7 @@ export default function ZoneMapEditor({
             size="sm"
             onClick={() => uploadRef.current?.click()}
           >
-            Upload Aerial
+            Upload aerial
           </Button>
 
           {!captured && hasAddress && (
@@ -942,13 +942,13 @@ export default function ZoneMapEditor({
                 (HAS_LIVE_MAPS && (!liveMapReady || !!liveMapError))
               }
             >
-              {capturing ? "Capturing…" : "Use This View"}
+              {capturing ? "Capturing…" : "Use this view"}
             </Button>
           )}
 
           {captured && (
             <Button variant="secondary" size="sm" onClick={handleRecapture}>
-              Re-capture Map
+              Re-capture map
             </Button>
           )}
 
@@ -961,7 +961,7 @@ export default function ZoneMapEditor({
                 onDelete();
             }}
           >
-            Delete Zone
+            Delete zone
           </button>
         </div>
       </div>
@@ -974,14 +974,14 @@ export default function ZoneMapEditor({
           className={`${styles.step} ${!captured ? styles.stepActive : styles.stepDone}`}
         >
           <span className={styles.stepCircle}>{captured ? "✓" : "1"}</span>
-          <span className={styles.stepLabel}>Set Aerial View</span>
+          <span className={styles.stepLabel}>Set aerial view</span>
         </div>
         <span className={styles.stepConnector} />
         <div
           className={`${styles.step} ${captured ? styles.stepActive : styles.stepPending}`}
         >
           <span className={styles.stepCircle}>2</span>
-          <span className={styles.stepLabel}>Place Anchors</span>
+          <span className={styles.stepLabel}>Place anchors</span>
         </div>
       </div>
 
@@ -1023,7 +1023,7 @@ export default function ZoneMapEditor({
               ) : (
                 <span className={styles.statusInfo}>
                   <strong>Drag and scroll to frame the roof</strong>, then
-                  click Use This View.
+                  click Use this view.
                 </span>
               )
             ) : previewError ? (
@@ -1035,7 +1035,7 @@ export default function ZoneMapEditor({
             ) : (
               <span className={styles.statusInfo}>
                 <strong>Scroll to zoom</strong> and frame the roof, then
-                click Use This View.
+                click Use this view.
               </span>
             )}
           </div>
@@ -1105,7 +1105,7 @@ export default function ZoneMapEditor({
             >
               {connectingFrom
                 ? "Tap an anchor to connect…"
-                : "⤾ Close Loop"}
+                : "⤾ Close loop"}
             </button>
           )}
         </div>
@@ -1363,7 +1363,11 @@ export default function ZoneMapEditor({
                           : styles.anchorBadgeNone
                     }`}
                   >
-                    {anchor.result ?? "—"}
+                    {anchor.result === "PASSED"
+                      ? "Passed"
+                      : anchor.result === "FAILED"
+                        ? "Failed"
+                        : "—"}
                   </span>
                 </button>
               ))}

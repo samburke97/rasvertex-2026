@@ -32,8 +32,8 @@
   flex-direction: column;
   min-width: 0;
   overflow: hidden;
-  background: var(--rv-surface, #fff);
-  color: var(--rv-ink, #17171a);
+  background: var(--surface);
+  color: var(--ink);
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -58,12 +58,12 @@ html :where(.root) :is(h1, p, span) {
 }
 
 .root a {
-  color: var(--rv-accent-ink, #2f6a94);
+  color: var(--blue-600);
   text-decoration: none;
 }
 
 .root a:hover {
-  color: var(--rv-accent-hover, #26567c);
+  color: var(--blue-700);
 }
 
 /* ── Header ── */
@@ -74,7 +74,7 @@ html :where(.root) :is(h1, p, span) {
   align-items: center;
   gap: 12px;
   padding: 0 16px 0 12px;
-  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.07);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
 }
 
 .back {
@@ -87,12 +87,12 @@ html :where(.root) :is(h1, p, span) {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
   flex-shrink: 0;
 }
 
 .back:hover {
-  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.045);
+  background: rgba(var(--mix-rgb), 0.045);
 }
 
 .titleBlock {
@@ -112,7 +112,7 @@ html :where(.root) :is(h1, p, span) {
 
 .subtitle {
   font-size: 12px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -128,7 +128,7 @@ html :where(.root) :is(h1, p, span) {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.045);
+  background: rgba(var(--mix-rgb), 0.045);
   border-radius: 999px;
   padding: 4px;
 }
@@ -145,7 +145,7 @@ html :where(.root) :is(h1, p, span) {
   cursor: default;
   font-size: 13px;
   font-weight: 500;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
+  color: rgba(var(--ink-rgb), 0.55);
 }
 
 .stepPillEnabled {
@@ -153,9 +153,9 @@ html :where(.root) :is(h1, p, span) {
 }
 
 .stepPillActive {
-  background: var(--rv-surface, #fff);
-  box-shadow: 0 1px 2px rgba(var(--rv-mix-rgb, 0, 0, 0), 0.08);
-  color: var(--rv-ink, #17171a);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(var(--mix-rgb), 0.08);
+  color: var(--ink);
 }
 
 .stepDot {
@@ -167,18 +167,18 @@ html :where(.root) :is(h1, p, span) {
   justify-content: center;
   font-size: 11px;
   font-weight: 600;
-  background: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.06);
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
+  background: rgba(var(--mix-rgb), 0.06);
+  color: rgba(var(--ink-rgb), 0.5);
 }
 
 .stepPillActive .stepDot {
-  background: var(--rv-accent, #3e7fb0);
+  background: var(--blue-500);
   color: #fff;
 }
 
 .stepDotDone {
-  background: var(--rv-good-tint, #e9f5ef);
-  color: var(--rv-good, #3f8f68);
+  background: var(--green-tint);
+  color: var(--green);
 }
 
 .headerRight {
@@ -190,7 +190,7 @@ html :where(.root) :is(h1, p, span) {
 
 .saveState {
   font-size: 12.5px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -201,15 +201,15 @@ html :where(.root) :is(h1, p, span) {
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--rv-good, #3f8f68);
+  background: var(--green);
 }
 
 .saveDotPending {
-  background: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.3);
+  background: rgba(var(--ink-rgb), 0.3);
 }
 
 .saveDotError {
-  background: var(--rv-red, #b8492b);
+  background: var(--red);
 }
 
 /* Shared primary button (Review & export, Create proposal) — the one blue action per view */
@@ -218,7 +218,7 @@ html :where(.root) :is(h1, p, span) {
   padding: 0 16px;
   border: 0;
   border-radius: 9px;
-  background: var(--rv-accent-grad, linear-gradient(180deg, #3e7fb0 0%, #2f6a94 100%));
+  background: var(--blue-grad);
   color: #fff;
   font-size: 13px;
   font-weight: 500;

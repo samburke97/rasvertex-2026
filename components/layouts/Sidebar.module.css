@@ -16,8 +16,8 @@
   width: 38px;
   height: 38px;
   border-radius: 11px;
-  background: var(--rv-surface, #fafaf9);
-  border: 1px solid var(--rv-line-strong, rgba(var(--rv-mix-rgb), 0.07));
+  background: var(--logo-tile);
+  border: 1px solid rgba(var(--mix-rgb), 0.07);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,9 +26,9 @@
 
 .logo span {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--rv-ink);
+  color: var(--ink);
 }
 
 .collapseBadge {
@@ -39,7 +39,7 @@
   height: 15px;
   border-radius: 999px;
   border: 0;
-  background: var(--rv-ink);
+  background: #17171a;
   color: #fff;
   display: flex;
   align-items: center;
@@ -75,25 +75,25 @@
   align-items: center;
   justify-content: center;
   text-decoration: none;
-  color: var(--rv-ink-42, rgba(var(--rv-ink-rgb), 0.42));
+  color: var(--rv-ink-42, rgba(var(--ink-rgb), 0.42));
   transition:
     background 120ms ease-out,
     color 120ms ease-out;
 }
 
 .navItem:focus-visible {
-  outline: 2px solid var(--rv-accent);
+  outline: 2px solid var(--blue-500);
   outline-offset: 2px;
 }
 
 .navItem.hovered {
-  background: var(--rv-fill, rgba(var(--rv-mix-rgb), 0.04));
-  color: var(--rv-ink);
+  background: var(--rv-fill, rgba(var(--mix-rgb), 0.04));
+  color: var(--ink);
 }
 
 .navItem.active {
-  background: var(--rv-accent-nav, #edf4fa);
-  color: var(--rv-ink);
+  background: var(--blue-50);
+  color: var(--ink);
 }
 
 .iconContainer {
@@ -102,17 +102,6 @@
   justify-content: center;
   width: 21px;
   height: 21px;
-}
-
-.icon {
-  width: 21px;
-  height: 21px;
-}
-
-/* Static SVG assets with a hardcoded dark-grey stroke (not currentColor-
-   aware, rendered as <img>) — invert them in dark mode so they stay legible. */
-:root[data-theme="dark"] .icon {
-  filter: invert(1) brightness(1.5);
 }
 
 /* Tooltip */
@@ -126,11 +115,22 @@
   font-size: 13px;
   font-weight: 500;
   padding: 7px 14px;
-  border-radius: var(--rv-r-md, 9px);
+  border-radius: var(--r-md);
   white-space: nowrap;
   z-index: 60;
   pointer-events: none;
-  box-shadow: var(--rv-shadow-pop);
+  box-shadow: var(--shadow-tip);
+}
+
+.tooltip::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  background: #18181b;
+  transform: translateY(-50%) rotate(45deg);
 }
 
 .spacer {
@@ -141,7 +141,7 @@
   width: 34px;
   height: 34px;
   border-radius: 999px;
-  background: var(--rv-accent-tint, #e9f2f9);
+  background: var(--blue-100);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,7 +160,7 @@
 .avatarInitials {
   font-size: 11.5px;
   font-weight: 600;
-  color: var(--rv-accent-ink, #2f6a94);
+  color: var(--blue-600);
 }
 
 /* Mobile: hide rail completely */

@@ -4,7 +4,7 @@
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(23, 23, 26, 0.35);
+  background: rgba(var(--ink-rgb), 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -13,7 +13,7 @@
 
 .dialog {
   width: min(960px, 100%);
-  background: #fff;
+  background: var(--surface);
   border-radius: 16px;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
   padding: 20px;
@@ -21,7 +21,7 @@
   flex-direction: column;
   gap: 14px;
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #17171a;
+  color: var(--ink);
 }
 
 .head {
@@ -39,7 +39,7 @@
 
 .sub {
   font-size: 13px;
-  color: rgba(23, 23, 26, 0.55);
+  color: var(--ink-55);
   margin-top: 2px;
 }
 
@@ -48,8 +48,8 @@
   height: 30px;
   border: 0;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.05);
-  color: #17171a;
+  background: rgba(var(--mix-rgb), 0.05);
+  color: var(--ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -63,7 +63,7 @@
   max-height: 64vh;
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(var(--mix-rgb), 0.06);
 }
 
 .map {
@@ -80,14 +80,14 @@
   align-items: center;
   justify-content: center;
   font-size: 13px;
-  color: rgba(23, 23, 26, 0.6);
+  color: var(--ink-62);
   background: rgba(246, 246, 244, 0.85);
 }
 
 .error {
   font-size: 13px;
-  color: #a83a3a;
-  background: #fbe7e7;
+  color: var(--red);
+  background: var(--red-tint);
   border-radius: 10px;
   padding: 10px 12px;
 }
@@ -102,7 +102,7 @@
   flex: 1;
   min-width: 0;
   font-size: 13px;
-  color: rgba(23, 23, 26, 0.55);
+  color: var(--ink-55);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -120,11 +120,11 @@
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
-  background: #fff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px rgba(var(--mix-rgb), 0.12);
   font-size: 13.5px;
   font-weight: 500;
-  color: #17171a;
+  color: var(--ink);
   cursor: pointer;
 }
 
@@ -137,16 +137,17 @@
   height: 34px;
   padding: 0 18px;
   border: 0;
-  border-radius: 999px;
-  background: #17171a;
+  border-radius: var(--r-md);
+  background: var(--blue-grad);
+  box-shadow: var(--shadow-primary);
   color: #fff;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .primary:disabled {
-  background: rgba(0, 0, 0, 0.08);
-  color: rgba(23, 23, 26, 0.4);
+  background: rgba(var(--mix-rgb), 0.08);
+  color: var(--ink-45);
   cursor: default;
 }

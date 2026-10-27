@@ -93,7 +93,7 @@ export default function HoursBreakdownOptionsPanel({
 
       {/* ── Date filter ── */}
       <div className={styles.group}>
-        <div className={styles.groupLabel}>Date Filter</div>
+        <div className={styles.groupLabel}>Date filter</div>
 
         <ToggleRow
           label="Filter by date"

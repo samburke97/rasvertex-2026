@@ -12,7 +12,7 @@
 .loading,
 .notFound {
   font-size: 13px;
-  color: var(--rv-ink-50);
+  color: var(--ink-55);
   margin: 24px 0;
 }
 
@@ -26,18 +26,18 @@
 .crumbIcon {
   width: 32px;
   height: 32px;
-  border-radius: var(--rv-r-md);
+  border-radius: var(--r-md);
   flex-shrink: 0;
-  background: var(--rv-fill);
+  background: var(--fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
 }
 
 .crumb span {
   font-size: 12px;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
 }
 
 .title {
@@ -46,21 +46,21 @@
   background: none;
   font-family: inherit;
   font-size: 38px;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.04em;
   line-height: 1.12;
-  color: var(--rv-ink);
+  color: var(--ink);
   margin: 0 0 6px;
   padding: 0;
   width: 100%;
 }
 
 .title::placeholder {
-  color: var(--rv-ink-30);
+  color: var(--ink-30);
 }
 
 .meta {
   font-size: 12px;
-  color: var(--rv-ink-40);
+  color: var(--ink-45);
   margin-bottom: 20px;
 }

@@ -3,7 +3,7 @@
 .scroll {
   flex: 1;
   overflow: auto;
-  background: var(--rv-surface-soft, #fbfbfa);
+  background: var(--surface-soft);
 }
 
 .column {
@@ -33,7 +33,7 @@
   margin: 0;
   font-size: 15px;
   line-height: 1.55;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.6);
+  color: rgba(var(--ink-rgb), 0.6);
 }
 
 .quoteRow {
@@ -48,20 +48,20 @@
   gap: 10px;
   height: 48px;
   padding: 0 14px;
-  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.09);
+  border: 1px solid rgba(var(--mix-rgb), 0.09);
   border-radius: 12px;
-  background: var(--rv-surface, #fff);
+  background: var(--surface);
 }
 
 .quoteBox:focus-within {
-  border-color: var(--rv-accent, #3e7fb0);
-  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px var(--blue-100);
 }
 
 .quotePrefix {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
 }
 
 .quoteInput {
@@ -71,7 +71,7 @@
   outline: none;
   font-size: 16px;
   font-weight: 500;
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
   background: transparent;
   font-variant-numeric: tabular-nums;
 }
@@ -81,16 +81,17 @@
   padding: 0 22px;
   border: 0;
   border-radius: 12px;
-  background: var(--rv-ink, #17171a);
+  background: var(--blue-grad);
+  box-shadow: var(--shadow-primary);
   color: #fff;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
   min-width: 96px;
 }
 
 .loadBtn:hover {
-  background: #2a2a2a;
+  box-shadow: var(--shadow-primary-hover);
 }
 
 .loadBtn:disabled {
@@ -101,15 +102,15 @@
 .error {
   padding: 12px 14px;
   border-radius: 12px;
-  background: #fbf4e5;
-  color: #96731f;
+  background: var(--amber-tint);
+  color: var(--amber);
   font-size: 13px;
   line-height: 1.5;
 }
 
 .card {
-  background: var(--rv-surface, #fff);
-  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.09);
+  background: var(--surface);
+  border: 1px solid rgba(var(--mix-rgb), 0.09);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -120,7 +121,7 @@
   align-items: center;
   gap: 16px;
   padding: 6px 20px;
-  border-bottom: 1px solid rgba(var(--rv-ink-rgb, 23, 23, 26), 0.05);
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.05);
   cursor: text;
 }
 
@@ -136,7 +137,7 @@
 
 .rowLabel {
   font-size: 13px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.55);
+  color: rgba(var(--ink-rgb), 0.55);
 }
 
 .rowTop .rowLabel {
@@ -152,20 +153,20 @@
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
-  color: var(--rv-ink, #17171a);
+  color: var(--ink);
   background: transparent;
   outline: none;
 }
 
 .rowInput:hover {
-  background: var(--rv-surface-soft, #fbfbfa);
-  border-color: rgba(var(--rv-mix-rgb, 0, 0, 0), 0.09);
+  background: var(--surface-soft);
+  border-color: rgba(var(--mix-rgb), 0.09);
 }
 
 .rowInput:focus {
-  background: var(--rv-surface, #fff);
-  border-color: var(--rv-accent, #3e7fb0);
-  box-shadow: 0 0 0 3px var(--rv-accent-tint, #e9f2f9);
+  background: var(--surface);
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px var(--blue-100);
 }
 
 .rowValue {
@@ -190,9 +191,9 @@
   height: 30px;
   padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(var(--rv-mix-rgb, 0, 0, 0), 0.09);
-  background: var(--rv-surface, #fff);
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.7);
+  border: 1px solid rgba(var(--mix-rgb), 0.09);
+  background: var(--surface);
+  color: rgba(var(--ink-rgb), 0.7);
   font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
@@ -202,9 +203,9 @@
 }
 
 .chipOn {
-  background: var(--rv-accent-tint, #e9f2f9);
-  border-color: var(--rv-accent, #3e7fb0);
-  color: var(--rv-accent-ink, #2f6a94);
+  background: var(--blue-100);
+  border-color: var(--blue-500);
+  color: var(--blue-600);
 }
 
 .chipCount {
@@ -221,7 +222,7 @@
   width: 40px;
   height: 40px;
   border-radius: 6px;
-  background: #edf0f0 center / cover no-repeat;
+  background: var(--line) center / cover no-repeat;
 }
 
 .thumbLoading {
@@ -236,7 +237,7 @@
 
 .poolSummary {
   font-size: 12px;
-  color: rgba(var(--rv-ink-rgb, 23, 23, 26), 0.5);
+  color: rgba(var(--ink-rgb), 0.5);
 }
 
 .actions {

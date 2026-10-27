@@ -443,14 +443,14 @@ export default function RecurringJobsPage() {
     { key: "site", header: "Site" },
     {
       key: "completedDate",
-      header: "Last Completed",
+      header: "Last completed",
       render: (job) => (
         <span className={styles.tdMuted}>{formatDate(job.completedDate)}</span>
       ),
     },
     {
       key: "nextDueDate",
-      header: "Next Due",
+      header: "Next due",
       render: (job) => (
         <span
           className={`${styles.tdMuted} ${job.status === "overdue" && !isHiddenView ? styles.tdOverdue : ""}`}
@@ -461,7 +461,7 @@ export default function RecurringJobsPage() {
     },
     {
       key: "totalExTax",
-      header: "Last Price",
+      header: "Last price",
       render: (job) => (
         <span className={styles.tdMuted}>
           {formatCurrency(job.totalExTax)} ex

@@ -4,7 +4,7 @@
 .progressOuter {
   width: 794px;
   height: 4px;
-  background: var(--rv-line-strong, rgba(0, 0, 0, 0.09));
+  background: var(--border-strong);
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 0.5rem;
@@ -13,14 +13,14 @@
 
 .progressBar {
   height: 100%;
-  background: var(--rv-accent, #3e7fb0);
+  background: var(--blue-500);
   border-radius: 999px;
   transition: width 0.3s ease;
 }
 
 .progressLabel {
   font-size: 0.7rem;
-  color: var(--rv-ink-40, rgba(23, 23, 26, 0.4));
+  color: var(--ink-45);
   margin-top: 6px;
 }
 
@@ -28,10 +28,10 @@
 .emptyPage {
   width: 794px;
   height: 1123px;
-  background: #fff;
+  background: var(--surface);
   box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.1),
-    0 1px 4px rgba(0, 0, 0, 0.06);
+    0 4px 24px rgba(var(--mix-rgb), 0.1),
+    0 1px 4px rgba(var(--mix-rgb), 0.06);
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -41,23 +41,23 @@
 
 .empty {
   width: 100%;
-  background: var(--rv-surface-soft, #fbfbfa);
-  border: 1px dashed var(--rv-line-strong, rgba(0, 0, 0, 0.09));
+  background: var(--surface-soft);
+  border: 1px dashed var(--border-strong);
   border-radius: 8px;
   padding: 3rem 2rem;
   text-align: center;
   font-size: 0.85rem;
-  color: var(--rv-ink-40, rgba(23, 23, 26, 0.4));
+  color: var(--ink-45);
 }
 
 /* ── A4 page block — fixed height, matches PDF exactly ──────────────────── */
 .page {
   width: 794px;
   height: 1123px;
-  background: #fff;
+  background: var(--surface);
   box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.1),
-    0 1px 4px rgba(0, 0, 0, 0.06);
+    0 4px 24px rgba(var(--mix-rgb), 0.1),
+    0 1px 4px rgba(var(--mix-rgb), 0.06);
   border-radius: 4px;
   overflow: hidden;
   flex-shrink: 0;
@@ -80,11 +80,9 @@
   bottom: 1.25rem;
   right: 2.75rem;
   font-family: "Inter", Arial, sans-serif;
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #9ca3af;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-45);
   line-height: 1;
   pointer-events: none;
 }
@@ -92,7 +90,7 @@
 .pageNumberTotal {
   font-size: 0.65rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--ink-45);
 }
 
 /* ── Date separator ─────────────────────────────────────────────────────── */
@@ -107,16 +105,14 @@
 .dateHeaderLine {
   flex: 1;
   height: 1px;
-  background: #e5e7eb;
+  background: var(--line);
 }
 
 .dateHeaderText {
   font-family: "Inter", Arial, sans-serif;
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #9ca3af;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-45);
   white-space: nowrap;
   padding: 0 0.25rem;
 }
