@@ -124,18 +124,21 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   }, []);
 
   // ── Load (or resume) a quote ─────────────────────────────────────────────
-  const loadQuote = useCallback(async () => {
-    const quote = quoteInput.trim();
+  // reset: ignore the saved draft and every change — a brand-new proposal
+  // straight from SimPRO, which then overwrites the draft.
+  const loadQuote = useCallback(async (opts?: { reset?: boolean }) => {
+    const reset = !!opts?.reset;
+    const quote = (reset && p ? p.quote : quoteInput).trim();
     if (!quote || loading) return;
     setLoading(true);
     setLoadError(null);
 
     const safe = (url: string) => fetch(url).catch(() => null);
-    const sameQuote = p?.quote === quote;
+    const sameQuote = !reset && p?.quote === quote;
     const [qRes, prRes, dRes, fRes] = await Promise.all([
       safe(`/api/simpro/quotes/${quote}`),
       sameQuote ? Promise.resolve(null) : safe(`/api/simpro/quotes/${quote}/pricing`),
-      sameQuote ? Promise.resolve(null) : safe(`/api/proposal-reports/${quote}`),
+      sameQuote || reset ? Promise.resolve(null) : safe(`/api/proposal-reports/${quote}`),
       safe(`/api/simpro/quotes/${quote}/attachments/folders`),
     ]);
 
@@ -160,7 +163,12 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
         const pricing: QuotePricingRow[] = prRes?.ok ? await prRes.json() : [];
         const draftJson = dRes?.ok ? await dRes.json().catch(() => null) : null;
         // A resumed draft keeps its own trade.
-        const fresh = createProposal(quote, header, pricing, isProposal(draftJson?.report) ? (draftJson.report.trade ?? "painting") : trade);
+        const fresh = createProposal(
+          quote,
+          header,
+          pricing,
+          reset ? (p?.trade ?? trade) : isProposal(draftJson?.report) ? (draftJson.report.trade ?? "painting") : trade,
+        );
         next = isProposal(draftJson?.report) ? mergeDraft(draftJson.report, fresh) : fresh;
         // A new proposal brings in every SimPRO folder; a resumed one keeps
         // the rep's choice, plus Unfiled.
@@ -174,6 +182,11 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
         setPickFolder("all");
         setSel("cover");
         setSaveStatus("idle");
+        setFocusFinding(null);
+        setPicker(null);
+        // A reset re-imports the SimPRO photos as new copies, so the old
+        // copies and the rep's uploads are deleted from storage.
+        if (reset && p) for (const u of [...p.uploads, ...p.simpro.photos.map((x) => x.url)]) void deleteReportPhoto(u);
       }
       if (folderList) {
         const ids = new Set(folderList.map((f) => f.id));
@@ -183,7 +196,8 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           folders: next.folders.filter((id) => !id.startsWith("sp:") || ids.has(id)),
         };
       }
-      dirty.current = sameQuote;
+      // A reset is saved straight away, replacing the old draft.
+      dirty.current = sameQuote || reset;
       setP(next);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load quote");
@@ -549,7 +563,15 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
             setQuoteInput={setQuoteInput}
             loading={loading}
             loadError={loadError}
-            onLoad={loadQuote}
+            onLoad={() => loadQuote()}
+            onReset={() => {
+              if (
+                confirm(
+                  `Start again from SimPRO?\n\nEverything you've changed on quote ${p?.quote} is wiped: wording, photos, findings, prices and uploads. The job details, prices and photos are loaded fresh from SimPRO. This can't be undone.`,
+                )
+              )
+                void loadQuote({ reset: true });
+            }}
             loadingFolders={loadingFolders}
             onOpen={() => goBuild("cover")}
             trade={p?.trade ?? trade}

@@ -15,13 +15,14 @@ interface Props {
   loading: boolean;
   loadError: string | null;
   onLoad: () => void;
+  onReset: () => void;
   loadingFolders: string[];
   onOpen: () => void;
   trade: Trade;
   onTrade: (t: Trade) => void;
 }
 
-export default function QuoteStep({ ctx, quoteInput, setQuoteInput, loading, loadError, onLoad, loadingFolders, onOpen, trade, onTrade }: Props) {
+export default function QuoteStep({ ctx, quoteInput, setQuoteInput, loading, loadError, onLoad, onReset, loadingFolders, onOpen, trade, onTrade }: Props) {
   const p = ctx?.p;
   const tagged = useMemo(() => (p ? taggedPhotos(p) : []), [p]);
 
@@ -160,7 +161,15 @@ export default function QuoteStep({ ctx, quoteInput, setQuoteInput, loading, loa
               </div>
             </div>
 
-            <div className={styles.right}>
+            <div className={styles.quoteFoot}>
+              <span className={styles.resetWrap}>
+                <button className={`${styles.linkBtn} ${styles.danger}`} disabled={loading} onClick={onReset}>
+                  Start again from SimPRO
+                </button>
+                <InfoTip>
+                  Wipes every change on this quote (wording, photos, findings, prices and uploads) and builds the proposal fresh from SimPRO. “Reload” above only refreshes the job details and keeps your work.
+                </InfoTip>
+              </span>
               <button className={`${styles.darkPill} ${styles.openBtn}`} onClick={onOpen}>
                 Open proposal
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
