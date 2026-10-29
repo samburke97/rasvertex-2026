@@ -1,5 +1,6 @@
-import CheckinPage from "@/components/checkin/CheckinPage";
+// Client check-in moved into Caro (Clients). Kept as a redirect for old links.
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <CheckinPage />;
+  redirect("/caro#clients");
 }

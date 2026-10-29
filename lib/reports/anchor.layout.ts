@@ -11,6 +11,7 @@
 
 import {
   ANCHOR_TYPE_IS_RATED,
+  ANCHOR_TYPE_LABELS,
   DEFAULT_COVER_POS,
   DEFAULT_MAP_RATIO,
   anchorGroupKey,
@@ -98,6 +99,16 @@ export interface TypeRow {
   pastel: Pastel;
 }
 
+/** Certification table line: every anchor of one type, across all zones. */
+export interface CertRow {
+  type: string;
+  name: string;
+  qty: number;
+  rating: string;
+  passed: number;
+  failed: number;
+}
+
 export interface ZoneBlock {
   id: string;
   name: string;
@@ -156,6 +167,7 @@ export interface AnchorModel {
   total: number;
   toc: { title: string; items: { name: string; page: string }[] }[];
   certFacts: { k: string; v: string }[];
+  certRows: CertRow[];
   certNumber: string;
   comments: string;
 }
@@ -273,6 +285,25 @@ export function buildAnchorModel(
         : "") +
     (next ? `The next inspection is due by ${next}.` : "");
 
+  const certRows: CertRow[] = [];
+  for (const a of all) {
+    let row = certRows.find((r) => r.type === a.type);
+    if (!row) {
+      row = {
+        type: a.type,
+        name: ANCHOR_TYPE_LABELS[a.type],
+        qty: 0,
+        rating: ANCHOR_TYPE_IS_RATED[a.type] ? "15 kN" : "–",
+        passed: 0,
+        failed: 0,
+      };
+      certRows.push(row);
+    }
+    row.qty += 1;
+    if (a.result === "PASSED") row.passed += 1;
+    else if (a.result === "FAILED") row.failed += 1;
+  }
+
   const toRow = (
     a: AnchorReportData["zones"][number]["anchors"][number],
   ): RegRow => ({
@@ -323,9 +354,10 @@ export function buildAnchorModel(
     cur = { kind: "summary", first: false, items: [], no: 0 };
     y = TOP + SEC_LABEL;
   };
+  // A zone that won't fit moves to the next page, including off the intro
+  // page; only a page with nothing on it yet keeps an oversized zone.
   for (const z of zones) {
-    if (y + zoneH(z, false) > BOTTOM && cur.items.length > (cur.first ? 1 : 0))
-      newPage();
+    if (y + zoneH(z, false) > BOTTOM && cur.items.length > 0) newPage();
     const first = !cur.first && cur.items.length === 0;
     cur.items.push({ kind: "zone", zone: z, first });
     y += zoneH(z, first);
@@ -464,6 +496,7 @@ export function buildAnchorModel(
       { k: "Inspection date", v: inspected },
       { k: "Next inspection date", v: next },
     ],
+    certRows,
     certNumber: job.certNumber,
     comments: job.certComments?.trim() ?? "",
   };

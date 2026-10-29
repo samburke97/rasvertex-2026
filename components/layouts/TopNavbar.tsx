@@ -2,8 +2,10 @@
 // TopNavbar.tsx — the page card's 56px top bar: breadcrumb left; search,
 // alerts, theme and the user right. Nothing else (style guide).
 
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "./Sidebar";
+import { LINE, isLineKey } from "@/lib/caro/data";
 import styles from "./TopNavbar.module.css";
 
 interface TopNavbarProps {
@@ -11,21 +13,47 @@ interface TopNavbarProps {
   onToggleTheme: () => void;
 }
 
-function crumbsFor(pathname: string | null): string[] {
+// Caro routes by hash (#sites/hs, #automations/new, …).
+const CARO_VIEWS: Record<string, string> = {
+  overview: "Overview",
+  sites: "All sites",
+  clients: "Clients",
+  automations: "Automations",
+  templates: "Email templates",
+  timing: "Reminder timing",
+};
+function caroCrumbs(hash: string): string[] {
+  const [view, sub] = (hash.slice(1) || "overview").split("/");
+  const c = ["Caro", CARO_VIEWS[view] ?? "Overview"];
+  if (view === "sites" && isLineKey(sub)) c[1] = LINE[sub].name;
+  if (view === "automations" && sub) c.push(sub === "library" ? "Library" : sub === "new" ? "New automation" : "Edit automation");
+  return c;
+}
+
+function crumbsFor(pathname: string | null, hash: string): string[] {
   if (!pathname || pathname === "/") return ["Today"];
+  if (pathname.startsWith("/caro")) return caroCrumbs(hash);
   const item = NAV_ITEMS.find((n) => pathname.startsWith(n.href));
   if (pathname.startsWith("/workspace")) return ["CRM", "Workspace"];
   return item ? [item.label] : [];
 }
 
 export default function TopNavbar({ theme, onToggleTheme }: TopNavbarProps) {
-  const crumbs = crumbsFor(usePathname());
+  const pathname = usePathname();
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    const read = () => setHash(window.location.hash);
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, [pathname]);
+  const crumbs = crumbsFor(pathname, hash);
 
   return (
     <header className={styles.topNav}>
       <nav className={styles.crumbs} aria-label="Breadcrumb">
         {crumbs.map((c, i) => (
-          <span key={c} className={styles.crumbWrap}>
+          <span key={`${i}-${c}`} className={styles.crumbWrap}>
             {i > 0 && (
               <svg className={styles.crumbSep} viewBox="0 0 24 24" fill="none">
                 <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

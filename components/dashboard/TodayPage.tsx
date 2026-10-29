@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import styles from "./TodayPage.module.css";
 import { RECURRING_CATEGORY_LIST } from "@/lib/recertifications/categories";
+import { LINE_OF_CATEGORY } from "@/lib/caro/data";
 import { OUTREACH_RULES } from "@/lib/outreach/rules";
 import type { RecertificationJob } from "@/lib/recertifications/types";
 import type { Opportunity } from "@/lib/outreach/store";
@@ -118,7 +119,7 @@ async function loadItems(): Promise<Item[]> {
           : `${cat.label} is due in ${plural(j.daysUntilDue, "day")}.`,
         value: j.totalExTax || null,
         action: "Book it",
-        href: `/recurring-jobs?category=${cat.id}`,
+        href: `/caro#sites/${LINE_OF_CATEGORY[cat.id]}`,
         rank: j.daysUntilDue,
       });
     }
@@ -138,7 +139,7 @@ async function loadItems(): Promise<Item[]> {
           : `${plural(c.jobCount, "job")}, ${money(c.ltv)} all up.`,
       value: c.ltv || null,
       action: "Check in",
-      href: "/checkin",
+      href: "/caro#clients",
       rank: -c.score,
     });
   }

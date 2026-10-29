@@ -520,3 +520,47 @@ export async function fetchQuotePricingItems(
 
   return items;
 }
+
+// ── Job scope — the quote a job came from: its description and line items ────
+// Used by the Job Overview report. A job converted from a quote keeps the
+// quote's number in SimPRO; ConvertedFromQuote is used when the job carries
+// it. With no quote to read, the job's own description stands in.
+
+export interface JobScope {
+  /** The quote read, or null when the job's description was used. */
+  quoteId: string | null;
+  /** HTML from SimPRO — sanitised where it's rendered. */
+  description: string;
+  /** Line item names, grouped by cost centre (no prices). */
+  items: { group: string; label: string }[];
+}
+
+export async function fetchJobScope(jobId: number, companyId = 0): Promise<JobScope> {
+  const job = await fetchRawJob(jobId, companyId);
+  const linked = (job.ConvertedFromQuote as { ID?: number } | null | undefined)?.ID;
+  const jobDescription = typeof job.Description === "string" ? job.Description.trim() : "";
+
+  for (const quoteId of [...new Set([linked, jobId].filter((n): n is number => !!n && n > 0))]) {
+    let quote: SimproRawQuote;
+    try {
+      quote = await fetchRawQuote(quoteId, companyId);
+    } catch {
+      continue; // no quote with this number
+    }
+    // Only a quote for the same customer and site is this job's quote.
+    if (quote.Site?.ID && job.Site?.ID && quote.Site.ID !== job.Site.ID) continue;
+    const pricing = await fetchQuotePricingItems(quoteId, companyId).catch(() => [] as QuotePricingItem[]);
+    const seen = new Set<string>();
+    const items = pricing
+      .map((p) => ({ group: p.groupLabel, label: p.label }))
+      .filter((i) => {
+        const k = `${i.group}|${i.label}`;
+        if (seen.has(k) || !i.label) return false;
+        seen.add(k);
+        return true;
+      });
+    const description = typeof quote.Description === "string" ? quote.Description.trim() : "";
+    return { quoteId: String(quoteId), description: description || jobDescription, items };
+  }
+  return { quoteId: null, description: jobDescription, items: [] };
+}

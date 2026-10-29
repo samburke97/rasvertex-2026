@@ -20,12 +20,13 @@ interface ScheduleSectionProps {
   sectioned?: boolean;
 }
 
-// Pagination — must match condition.print.ts
+// Pagination of the on-screen table (the report itself paginates in
+// lib/reports/overview.layout.ts)
 const ROWS_PER_FIRST_PAGE = 25;
 const ROWS_PER_CONTINUATION = 28;
 
 // Rows are taller when the Notes column is active (room to write on the
-// printed page), so fewer of them fit per page — must match condition.print.ts
+// printed page), so fewer of them fit per page
 const ROWS_PER_FIRST_PAGE_NOTES = 18;
 const ROWS_PER_CONTINUATION_NOTES = 20;
 

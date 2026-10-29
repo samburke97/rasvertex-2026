@@ -112,7 +112,7 @@ function buildDeepLink(job: JobSummary, config: CategoryConfig): string {
     nextDueDate: job.nextDueDate,
     lastExTax: String(job.totalExTax),
   });
-  return `${APP_URL}/recurring-jobs?${params.toString()}`;
+  return `${APP_URL}/caro?${params.toString()}`;
 }
 
 function buildJobEmail(job: JobSummary, config: CategoryConfig): string {

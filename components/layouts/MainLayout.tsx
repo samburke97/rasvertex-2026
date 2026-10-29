@@ -1,7 +1,8 @@
 // MainLayout.tsx — icon rail + floating card shell.
 // Hosts the one global dark-mode toggle (surfaced in TopNavbar, so it's on
-// every page) and the workspace tree, which stays scoped to the CRM/Leads
-// section — it's a "Leads workspace" concept, not an app-wide one.
+// every page), the workspace tree, which stays scoped to the CRM/Leads
+// section — it's a "Leads workspace" concept, not an app-wide one — and the
+// slot Caro's section menu renders into.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -28,6 +29,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
   const pathname = usePathname();
   const isWorkspaceSection =
     pathname?.startsWith("/crm") || pathname?.startsWith("/workspace");
+  // Caro renders its own section menu into this slot (a portal), so the menu
+  // can show live counts from the page's state.
+  const isCaro = pathname?.startsWith("/caro");
 
   useEffect(() => {
     const stored = localStorage.getItem(THEME_KEY);
@@ -46,11 +50,12 @@ export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className={styles.app}>
       <Sidebar
-        showWorkspaceToggle={!!isWorkspaceSection}
+        showWorkspaceToggle={!!isWorkspaceSection || !!isCaro}
         workspaceCollapsed={workspaceCollapsed}
         onToggleWorkspace={() => setWorkspaceCollapsed((c) => !c)}
       />
       {isWorkspaceSection && <WorkspacePanel collapsed={workspaceCollapsed} />}
+      {isCaro && <div id="caro-section-menu" className={styles.sectionMenu} hidden={workspaceCollapsed} />}
       <div className={styles.mainWrap}>
         <div className={styles.panel}>
           <TopNavbar

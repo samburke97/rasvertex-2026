@@ -11,6 +11,10 @@ import LoadingSpinner from "@/components/ui/LoadingSpinner";
 // unconditionally nearly tripled this page's bundle for no reason, since a
 // visit only ever uses one. Loading whichever one is picked, on demand,
 // keeps the initial /reports visit light.
+const JobOverviewPage = dynamic(
+  () => import("./condition/ConditionReportPage"),
+  { loading: () => <ReportLoading />, ssr: false },
+);
 const AnchorInspectionPage = dynamic(
   () => import("./anchor-inspection/AnchorInspectionPage"),
   { loading: () => <ReportLoading />, ssr: false },
@@ -37,6 +41,7 @@ function ReportLoading() {
 }
 
 type ReportTypeId =
+  | "job-overview"
   | "inspection"
   | "anchor-inspection"
   | "hours-breakdown"
@@ -53,6 +58,32 @@ interface ReportType {
 
 // ── Report type definitions ────────────────────────────────────────────────
 const REPORT_TYPES: ReportType[] = [
+  {
+    id: "job-overview",
+    label: "Job overview",
+    description:
+      "The job's photos, hours schedule and summary in one report, with a cover page.",
+    available: true,
+    category: "inspection",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10 9 9 9 8 9" />
+      </svg>
+    ),
+  },
   {
     id: "inspection",
     label: "Inspection report",
@@ -204,6 +235,10 @@ function CategorySection({
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function ReportSelector() {
   const [active, setActive] = useState<ReportTypeId | null>(null);
+
+  if (active === "job-overview") {
+    return <JobOverviewPage onBack={() => setActive(null)} />;
+  }
 
   if (active === "inspection") {
     return <InspectionReportPage onBack={() => setActive(null)} />;

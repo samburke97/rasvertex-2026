@@ -3,7 +3,8 @@
 // columns (see lib/crm/store.ts's markDelivered/markOpened/markClicked/
 // markBounced — those already existed as unused scaffolding; this is their
 // first and only caller). Outreach emails (lib/outreach) are tracked here too:
-// an event that matches no CRM activity is tried against outreach_messages.
+// an event that matches no CRM activity is tried against outreach_messages,
+// then Caro's reminders (caro_messages).
 //
 // Resend signs webhook payloads the same way Svix does: headers
 // svix-id / svix-timestamp / svix-signature, secret shaped "whsec_<base64>",
@@ -26,6 +27,7 @@ import {
   markBounced,
 } from "@/lib/crm/store";
 import { markMessageEvent } from "@/lib/outreach/store";
+import { markCaroMessageEvent } from "@/lib/caro/store";
 
 const OUTREACH_EVENTS = {
   "email.delivered": "delivered",
@@ -110,6 +112,9 @@ export async function POST(request: NextRequest) {
     const outreachEvent = OUTREACH_EVENTS[event.type as keyof typeof OUTREACH_EVENTS];
     if (outreachEvent && (await markMessageEvent(emailId, outreachEvent))) {
       return NextResponse.json({ received: true, type: event.type, outreach: true });
+    }
+    if ((outreachEvent === "opened" || outreachEvent === "bounced") && (await markCaroMessageEvent(emailId, outreachEvent))) {
+      return NextResponse.json({ received: true, type: event.type, caro: true });
     }
     return NextResponse.json({ received: true, skipped: "no matching activity" });
   }

@@ -17,7 +17,7 @@ import type { WorkspaceItem, WorkspaceItemType } from "@/lib/workspace/store";
 
 const TABLE_ROUTES: Record<string, string> = {
   leads: "/crm",
-  "recurring-jobs": "/recurring-jobs",
+  "recurring-jobs": "/caro",
 };
 
 interface WorkspacePanelProps {

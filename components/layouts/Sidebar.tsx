@@ -33,8 +33,8 @@ export const NAV_ITEMS: SidebarItem[] = [
     ),
   },
   {
-    href: "/recurring-jobs",
-    label: "Recurring jobs",
+    href: "/caro",
+    label: "Caro",
     svgIcon: (
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
         <path d="M20 12A8 8 0 1 1 17.66 6.34M20 3.5V8H15.5M12 8V12L14.5 13.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -47,15 +47,6 @@ export const NAV_ITEMS: SidebarItem[] = [
     svgIcon: (
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
         <path d="M20.5 3.5 10.75 13.25M20.5 3.5l-6.25 17-3.5-7.25L3.5 9.75l17-6.25Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "/checkin",
-    label: "Client check-in",
-    svgIcon: (
-      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
-        <path d="M8 4.5H6A1.5 1.5 0 0 0 4.5 6v13A1.5 1.5 0 0 0 6 20.5h12a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 18 4.5h-2M8 4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5 1.5 1.5 0 0 1 14.5 6h-5A1.5 1.5 0 0 1 8 4.5ZM8.5 13l2.25 2.25L15.5 10.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },

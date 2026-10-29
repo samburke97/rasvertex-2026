@@ -37,6 +37,11 @@ export type ScheduleImportStatus =
 // ── Job details ───────────────────────────────────────────────────────────────
 
 export interface ReportJobDetails {
+  /** SimPRO site name — the cover headline. Older drafts have none and fall
+   *  back to the street address. */
+  site?: string;
+  /** SimPRO job number, e.g. "#10970". Refreshed on every load. */
+  jobNo?: string;
   preparedFor: string;
   preparedBy: string;
   address: string;
@@ -68,16 +73,41 @@ export interface ReportSettings {
   scheduleSections: boolean;
   /** Comments/Recommendations summary page — on by default, optional per report. */
   showSummary: boolean;
+  /** In the summary: the quote's description, and its line items. Older
+   *  drafts have neither and show both. */
+  showScope?: boolean;
+  showScopeItems?: boolean;
+}
+
+/** The job's scope of works, from the quote it came from in SimPRO. */
+export interface ReportScope {
+  /** The quote read, or null when the job's own description was used. */
+  quoteId: string | null;
+  /** HTML from SimPRO. */
+  description: string;
+  items: { group: string; label: string }[];
 }
 
 // ── Root data ─────────────────────────────────────────────────────────────────
 
+/** Cover photo focal point (0–100 %) and zoom (1 = fills the frame). */
+export interface CoverPos {
+  x: number;
+  y: number;
+  zoom: number;
+}
+export const DEFAULT_COVER_POS: CoverPos = { x: 50, y: 50, zoom: 1 };
+
 export interface ConditionReportData {
   job: ReportJobDetails;
+  /** How the cover photo sits in its frame (dragged in the preview). */
+  coverPos?: CoverPos;
   photos: ReportPhoto[];
   schedule: ScheduleRow[];
   comments: string;
   recommendations: string;
+  /** Loaded from SimPRO on every import; null until then. */
+  scope?: ReportScope | null;
   settings: ReportSettings;
 }
 
@@ -95,13 +125,16 @@ export type ImportStatus =
 
 export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
   return {
+    site: job.siteName || job.name,
+    jobNo: job.jobNo,
     preparedFor: job.preparedFor,
     preparedBy: "Phil Clark",
     address: job.siteAddress,
-    reportType: "Building Condition Report",
+    reportType: "Job Overview",
     intro:
       "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
-    project: job.name,
+    // The job number is what the client and the office refer to.
+    project: `Job ${job.jobNo}`,
     date: job.date,
     coverPhoto: null,
     siteId: job.siteId,

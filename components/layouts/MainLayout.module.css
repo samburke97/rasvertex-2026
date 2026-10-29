@@ -32,6 +32,16 @@
   overflow-x: hidden;
 }
 
+.sectionMenu {
+  display: flex;
+  flex-shrink: 0;
+  height: 100vh;
+}
+
+.sectionMenu[hidden] {
+  display: none;
+}
+
 /* Responsive: Hide rail on mobile */
 @media (max-width: 768px) {
   .mainWrap {

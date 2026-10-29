@@ -624,6 +624,10 @@ const NOTES = [
   "RAS-VERTEX attaches coloured test tags to all anchor points, identifying the type and intended use of each anchor.",
 ];
 
+const CERT_COLS = {
+  gridTemplateColumns: "minmax(0,1fr) 90px 110px 100px 100px",
+};
+
 function CertPage({
   ctx,
   page,
@@ -673,6 +677,33 @@ function CertPage({
           </div>
         ))}
       </div>
+      {model.certRows.length > 0 && (
+        <div className="ar-table" style={{ marginTop: 40 }}>
+          <div className="ar-thead" style={CERT_COLS}>
+            <span>Anchor type</span>
+            <span className="ar-r">Qty</span>
+            <span className="ar-r">Rating</span>
+            <span className="ar-r">Passed</span>
+            <span className="ar-r">Failed</span>
+          </div>
+          {model.certRows.map((r) => (
+            <div
+              key={r.type}
+              className="ar-tr"
+              style={{ ...CERT_COLS, padding: "12px 0" }}
+            >
+              <div className="ar-cell" style={{ gap: 14 }}>
+                <Icon ctx={ctx} name={r.type} size={28} />
+                <span style={{ fontWeight: 600 }}>{r.name}</span>
+              </div>
+              <span className="ar-r">{r.qty}</span>
+              <span className="ar-r">{r.rating}</span>
+              <span className="ar-r">{r.passed}</span>
+              <span className="ar-r">{r.failed}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div
         style={{
           display: "flex",
@@ -777,12 +808,14 @@ const CLIENTS: [AnchorImageKey, string, number][] = [
   ["racv", "RACV", 64],
 ];
 
-function Partner({ ctx }: { ctx: Ctx }) {
-  const img = ctx.assets.images;
+/** The closing RAS-VERTEX page. Shared with the Job Overview report, which
+ *  renders it inside its own .ar scope. */
+export function Partner({ images, label }: { images: Record<AnchorImageKey, string>; label: string }) {
+  const img = images;
   return (
     <div className="ar-sheet">
       <section className="ar-page ar-page--end">
-        <SecLabel text={secText(4)} />
+        <SecLabel text={label} />
         <h2 className="ar-h2" style={{ whiteSpace: "nowrap" }}>
           We maintain the buildings where
           <br />
@@ -969,7 +1002,7 @@ export default function AnchorDocument({
           )}
         </div>
       ))}
-      <Partner ctx={ctx} />
+      <Partner images={assets.images} label={secText(4)} />
     </div>
   );
 }

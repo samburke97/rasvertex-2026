@@ -25,7 +25,7 @@ import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveRepo
 
 // Raster images in public/ are often multi-MB website photos; print-size
 // them once per server instance. SVGs go through as they are.
-async function shrink(rel: string, maxWidth: number): Promise<string> {
+export async function shrink(rel: string, maxWidth: number): Promise<string> {
   if (rel.endsWith(".svg")) return readPublicAsBase64(rel);
   try {
     const input = fs.readFileSync(path.join(process.cwd(), "public", rel));
@@ -42,7 +42,8 @@ const WIDTHS: Partial<Record<AnchorImageKey, number>> = { logo: 800, signature: 
 
 let _assets: Promise<{ doc: AnchorAssets; cover: string; fontCSS: string }> | null = null;
 
-function loadAssets() {
+/** Logo, closing-page images, icons and fonts — also used by the Job Overview PDF. */
+export function loadAssets() {
   _assets ??= (async () => {
     const entries = await Promise.all(
       Object.entries(ANCHOR_IMAGES).map(
