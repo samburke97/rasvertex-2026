@@ -67,7 +67,7 @@ interface Registry {
   flaggedGroups: Record<Band, [string, string]>;
   prestartGroups: Record<Band, [string, string]>;
   stageColours: { bg: string; fg: string }[];
-  paintBrands: Record<Brand, { name: string; logo: string }>;
+  paintBrands: Record<string, { name: string; logo: string }>;
 }
 
 const registry = registryJson as unknown as Registry;
@@ -92,11 +92,8 @@ export const TERMS = termsJson as { k: string; v: string }[];
 export const ASSET_DIR = "/reports/proposal/v3/";
 export const asset = (file: string) => ASSET_DIR + file;
 
-export type Brand = "dulux" | "haymes";
-export const BRANDS: Record<Brand, { name: string; logo: string }> = {
-  dulux: { name: "Dulux", logo: asset("dulux.svg") },
-  haymes: { name: "Haymes", logo: asset("haymes.svg") },
-};
+export { BRANDS, TRADES, tradeOf, type Brand, type Trade } from "./trades";
+import { TRADES, type Brand, type Trade } from "./trades";
 
 /** Standard photo folders, available on every proposal alongside the
  *  quote's own SimPRO folders. */
@@ -116,7 +113,18 @@ export const LIBRARY_FOLDERS: { id: string; name: string; photos: string[] }[] =
   {
     id: "team",
     name: "Team",
-    photos: ["team-abseil.webp", "team-gutter.webp", "team-painting.webp", "team-tower.jpg"].map(asset),
+    photos: ["team-abseil.jpg", "team-gutter.jpg", "team-painting.jpg", "team-tower.jpg"].map(asset),
+  },
+  {
+    id: "waterproofing",
+    name: "Waterproofing",
+    photos: [
+      "membrane-rooftop.jpg",
+      "waterproofing-services.jpg",
+      "prep-done-right.jpg",
+      "leading-systems.jpg",
+      "documented-waterproofing.jpg",
+    ].map((f) => asset("wp/" + f)),
   },
 ];
 
@@ -181,7 +189,8 @@ export interface ProposalSections {
     brand: Brand;
     specIntro: string;
     note: string;
-    rows: Record<Brand, SpecRow[]>;
+    /** Each product keeps its own rows. */
+    rows: Partial<Record<Brand, SpecRow[]>>;
   };
   scope: { intro: string; inc: string; exc: string };
   findings: { intro: string; style: FindingsStyle; items: Finding[] };
@@ -200,6 +209,8 @@ export interface ProposalSections {
 
 export interface Proposal {
   version: 3;
+  /** Painting or waterproofing — wording, photos, warranty (trades.ts). */
+  trade: Trade;
   quote: string;
   job: Job;
   order: PageId[];
@@ -285,6 +296,7 @@ export function mergeDraft(saved: Proposal, fresh: Proposal): Proposal {
     job: { ...fresh.job, ...saved.job },
     order,
     hidden: saved.hidden ?? {},
+    trade: saved.trade ?? "painting",
     simpro: saved.simpro ?? fresh.simpro,
     d,
   };
@@ -332,7 +344,7 @@ export function jobFromQuote(quote: string, h: QuoteHeader): Partial<Job> {
   };
 }
 
-export function createProposal(quote: string, h: QuoteHeader, pricing: QuotePricingRow[]): Proposal {
+export function createProposal(quote: string, h: QuoteHeader, pricing: QuotePricingRow[], trade: Trade = "painting"): Proposal {
   const job: Job = {
     building: "",
     client: "",
@@ -349,125 +361,215 @@ export function createProposal(quote: string, h: QuoteHeader, pricing: QuotePric
     signerTitle: "Director",
     ...jobFromQuote(quote, h),
   };
-  const b = job.building || "your building";
-  const street = job.site.split(",")[0]?.trim() || b;
-  const stages = stagesFromPricing(pricing);
-
   return {
     version: 3,
+    trade,
     quote,
     job,
     order: PAGES.map((p) => p.id),
     // Findings start in standard style. Flagged issues and Pre-start come on
     // with report style (tagged inspection photos, see survey.ts).
     hidden: { flagged: true, prestart: true },
-    folders: ["building", "team"],
+    folders: [...TRADES[trade].folders],
     uploads: [],
     simpro: { folders: [], photos: [] },
-    d: {
-      cover: {
-        blurb: `Proposal for the full external repaint and remedial works at ${street}. Every defect repaired, two full coats applied by rope access, and an 8-year written warranty, with residents in the building throughout.`,
-        photo: asset("web-the-work.jpg"),
-      },
-      intro: {
-        open: `Thank you for the opportunity to quote on ${b}. We inspected the building face by face before pricing, so this proposal is built on what we found, not a generic scope. Here’s what the committee gets:`,
-        bullets: [
-          { t: "Every defect repaired, already priced", d: "Every defect from our survey is fixed before any paint goes on." },
-          { t: "Two full coats, photographed", d: "A coastal-grade Dulux system applied to spec, with photo evidence at every stage." },
-          { t: "Rope access, building stays open", d: "No scaffold blocking the site. Residents keep full use of the building throughout." },
-          { t: "One project manager, start to finish", d: "I run your job personally, from first site visit to warranty handover." },
-          { t: "8-year written warranty", d: "As standard, and never tied to a maintenance plan." },
-        ],
-        close: `Your price is fixed for this scope. If anything new turns up, we stop, show you the evidence and price it in writing before any work goes ahead. Any questions, call or text me directly on ${COMPANY_PHONE}.`,
-      },
-      project: {
-        p1: "",
-        p2: "Rope access does most of the work from the roof down. Only the lower levels need a knuckle boom or mobile scaffold, and residents keep full use of the building throughout.",
-        type: "Residential high-rise",
-        access: "Rope access",
-        program: "",
-        photo: asset("project-2.jpeg"),
-        brand: "dulux",
-        specIntro:
-          "After 25+ years painting coastal buildings, we know which systems last here. Each one below was specified with the manufacturer’s representative, who also inspects our work on site, so your warranty is backed by both of us.",
-        note: "Coastal grade system, checked on site by the manufacturer’s representative.",
-        rows: {
-          dulux: [
-            { surface: "Rendered walls", system: "Dulux AcraTex sealer + Dulux Weathershield Low Sheen", coats: "Sealer + 2 full coats" },
-            { surface: "Trims and fascias", system: "Dulux Weathershield Gloss", coats: "2 full coats" },
-            { surface: "Metal balustrades", system: "Dulux Metalshield", coats: "Primer + 2 full coats" },
-          ],
-          haymes: [
-            { surface: "Rendered walls", system: "Haymes masonry sealer + Haymes Solarscreen Low Sheen", coats: "Sealer + 2 full coats" },
-            { surface: "Trims and fascias", system: "Haymes Ultratrim Gloss", coats: "2 full coats" },
-            { surface: "Metal balustrades", system: "Haymes metal primer + Haymes Ultratrim", coats: "Primer + 2 full coats" },
-          ],
-        },
-      },
-      scope: {
-        intro:
-          "Exactly what your price covers. If we find something during the job that isn’t listed here, we stop, show you the evidence and price it in writing before any work goes ahead.",
-        inc: [
-          "Full pressure clean of all painted and rendered surfaces",
-          "Crack injection and substrate repair",
-          "Repair of every defect flagged in the site survey, by our own remedial team",
-          "Two-coat premium coating system, coastal grade",
-          "All access as set out in the access plan",
-          "Full site clean-up and waste removal on completion",
-        ].join("\n"),
-        exc: [
-          "Internal painting or works of any kind",
-          "Structural or engineering-certified remedial work",
-          "Permit and council fees, if required for this site",
-          "Defects hidden at survey, priced and approved in writing before work proceeds",
-        ].join("\n"),
-      },
-      findings: {
-        intro: `We inspected ${b} before writing a single line of this quote. What we found decides which defects need repair, which products will last, and which specialist teams go on site. Every defect shown is already priced, so there are no surprises.`,
-        style: "standard",
-        items: [],
-      },
-      flagged: {
-        intro:
-          "Every defect from the survey, sorted by urgency. Priority items are made safe first, before rope access begins, so the building is safe for residents and our crew.",
-        rows: [],
-      },
-      prestart: {
-        intro:
-          "Repairs come before paint, never after. This is the order we work in, so every repair is sound before the coating goes over it and nothing comes back through the new finish.",
-        rows: [],
-        note: "Before painting starts, our dedicated maintenance team works through every item above and reports back to the committee with photos. Only then does the coating go on. It’s how we hold ourselves to a higher standard, and why we’ve been the Sunshine Coast’s trusted painting partner for over 25 years.",
-      },
-      access: {
-        intro:
-          "Planned face by face so residents always know where we’ll be. Rope access works the building from the roof down, and residents get 48 hours’ notice before we reach their floor.",
-        aerial: "",
-        stages: [
-          { when: "Weeks 1 to 2", what: "Wash & prep", where: "" },
-          { when: "Weeks 3 to 5", what: "Remedial repairs", where: "" },
-          { when: "Weeks 6 to 9", what: "Coating & sign-off", where: "" },
-        ],
-        drops: [],
-      },
-      pricing: {
-        intro:
-          "One fixed price, broken down by stage. Repair allowances are included, and anything beyond them is priced in writing first.",
-        stages: stages.length ? stages : [{ label: "Works", note: "", amt: "0" }],
-        terms: [
-          "Deposit: 10% on acceptance of this proposal.",
-          "Progress claims: tied to the percentage of the job completed.",
-          "Final payment: on completion and sign-off.",
-          "Workmanship warranty: 8 years, written, as standard. The industry norm is 5.",
-        ].join("\n"),
-      },
-      maintenance: {
-        intro:
-          "After handover, the plan keeps your building looking as it did on day one, catching wear early so it never becomes a full repaint. It’s optional, with nothing to sign until you’re happy with the finished job.",
-        price: "",
-      },
-      accept: {
-        intro: `Sign below or confirm in writing to secure your start date. ${job.pm.split(" ")[0] || "We"} will then confirm the programme with the committee and notify residents before works begin.`,
-      },
+    d: defaultSections(trade, job, stagesFromPricing(pricing)),
+  };
+}
+
+/** The standard wording for a trade. Also used to switch a proposal's
+ *  trade: sections still on the old trade's wording take the new one's. */
+export function defaultSections(trade: Trade, job: Job, stages: ProposalSections["pricing"]["stages"]): ProposalSections {
+  const T = TRADES[trade];
+  const W = trade === "waterproofing";
+  const b = job.building || "your building";
+  const street = job.site.split(",")[0]?.trim() || b;
+  const y = T.warrantyYears;
+  return {
+    cover: {
+      blurb: W
+        ? `Proposal for the waterproofing and remedial works at ${street}. Every defect repaired, a manufacturer-approved membrane system applied by our own team, and a ${y}-year written warranty, with residents in the building throughout.`
+        : `Proposal for the full external repaint and remedial works at ${street}. Every defect repaired, two full coats applied by rope access, and an ${y}-year written warranty, with residents in the building throughout.`,
+      photo: T.coverPhoto,
     },
+    intro: {
+      open: `Thank you for the opportunity to quote on ${b}. We inspected the building face by face before pricing, so this proposal is built on what we found, not a generic scope. Here’s what the committee gets:`,
+      bullets: [
+        {
+          t: "Every defect repaired, already priced",
+          d: W ? "Every defect from our survey is fixed before any membrane goes down." : "Every defect from our survey is fixed before any paint goes on.",
+        },
+        W
+          ? { t: "Manufacturer-approved membrane, photographed", d: "A coastal-grade Sika system applied to spec, with photo evidence at every stage." }
+          : { t: "Two full coats, photographed", d: "A coastal-grade Dulux system applied to spec, with photo evidence at every stage." },
+        { t: "Rope access, building stays open", d: "No scaffold blocking the site. Residents keep full use of the building throughout." },
+        { t: "One project manager, start to finish", d: "I run your job personally, from first site visit to warranty handover." },
+        { t: `${y}-year written warranty`, d: "As standard, and never tied to a maintenance plan." },
+      ],
+      close: `Your price is fixed for this scope. If anything new turns up, we stop, show you the evidence and price it in writing before any work goes ahead. Any questions, call or text me directly on ${COMPANY_PHONE}.`,
+    },
+    project: {
+      p1: "",
+      p2: "Rope access does most of the work from the roof down. Only the lower levels need a knuckle boom or mobile scaffold, and residents keep full use of the building throughout.",
+      type: "Residential high-rise",
+      access: "Rope access",
+      program: "",
+      photo: T.projectPhoto,
+      brand: T.brands[0],
+      specIntro: `After 25+ years ${W ? "waterproofing" : "painting"} coastal buildings, we know which systems last here. Each one below was specified with the manufacturer’s representative, who also inspects our work on site, so your warranty is backed by both of us.`,
+      note: W
+        ? "Coastal grade membrane system, checked on site by the manufacturer’s representative."
+        : "Coastal grade system, checked on site by the manufacturer’s representative.",
+      rows: W
+        ? {
+            sika: [
+              { surface: "Roof decks", system: "Sika primer + Sika liquid-applied polyurethane membrane", coats: "Primer + 2 coats" },
+              { surface: "Balconies", system: "Sika liquid-applied membrane under tile", coats: "Primer + 2 coats" },
+              { surface: "Joints and penetrations", system: "Sikaflex polyurethane sealant", coats: "Cut out and reseal" },
+            ],
+            adheseal: [
+              { surface: "Roof decks", system: "Liquid-applied membrane system", coats: "Primer + 2 coats" },
+              { surface: "Balconies", system: "Liquid-applied membrane under tile", coats: "Primer + 2 coats" },
+              { surface: "Joints and penetrations", system: "Adheseal hybrid sealant", coats: "Cut out and reseal" },
+            ],
+          }
+        : {
+            dulux: [
+              { surface: "Rendered walls", system: "Dulux AcraTex sealer + Dulux Weathershield Low Sheen", coats: "Sealer + 2 full coats" },
+              { surface: "Trims and fascias", system: "Dulux Weathershield Gloss", coats: "2 full coats" },
+              { surface: "Metal balustrades", system: "Dulux Metalshield", coats: "Primer + 2 full coats" },
+            ],
+            haymes: [
+              { surface: "Rendered walls", system: "Haymes masonry sealer + Haymes Solarscreen Low Sheen", coats: "Sealer + 2 full coats" },
+              { surface: "Trims and fascias", system: "Haymes Ultratrim Gloss", coats: "2 full coats" },
+              { surface: "Metal balustrades", system: "Haymes metal primer + Haymes Ultratrim", coats: "Primer + 2 full coats" },
+            ],
+          },
+    },
+    scope: {
+      intro:
+        "Exactly what your price covers. If we find something during the job that isn’t listed here, we stop, show you the evidence and price it in writing before any work goes ahead.",
+      inc: (W
+        ? [
+            "Full clean and preparation of all membrane areas",
+            "Crack repair and substrate preparation",
+            "Repair of every defect flagged in the site survey, by our own remedial team",
+            "Manufacturer-approved membrane system, coastal grade",
+            "Joint, penetration and upstand sealing",
+            "All access as set out in the access plan",
+            "Full site clean-up and waste removal on completion",
+          ]
+        : [
+            "Full pressure clean of all painted and rendered surfaces",
+            "Crack injection and substrate repair",
+            "Repair of every defect flagged in the site survey, by our own remedial team",
+            "Two-coat premium coating system, coastal grade",
+            "All access as set out in the access plan",
+            "Full site clean-up and waste removal on completion",
+          ]
+      ).join("\n"),
+      exc: (W
+        ? [
+            "Internal works of any kind",
+            "Structural or engineering-certified remedial work",
+            "Tiling, screeds or finishes over the membrane, unless listed",
+            "Permit and council fees, if required for this site",
+            "Defects hidden at survey, priced and approved in writing before work proceeds",
+          ]
+        : [
+            "Internal painting or works of any kind",
+            "Structural or engineering-certified remedial work",
+            "Permit and council fees, if required for this site",
+            "Defects hidden at survey, priced and approved in writing before work proceeds",
+          ]
+      ).join("\n"),
+    },
+    findings: {
+      intro: `We inspected ${b} before writing a single line of this quote. What we found decides which defects need repair, which products will last, and which specialist teams go on site. Every defect shown is already priced, so there are no surprises.`,
+      style: "standard",
+      items: [],
+    },
+    flagged: {
+      intro:
+        "Every defect from the survey, sorted by urgency. Priority items are made safe first, before rope access begins, so the building is safe for residents and our crew.",
+      rows: [],
+    },
+    prestart: {
+      intro: W
+        ? "Repairs come before the membrane, never after. This is the order we work in, so every repair is sound before the membrane goes over it and nothing comes back through the new system."
+        : "Repairs come before paint, never after. This is the order we work in, so every repair is sound before the coating goes over it and nothing comes back through the new finish.",
+      rows: [],
+      note: W
+        ? "Before the membrane goes down, our dedicated maintenance team works through every item above and reports back to the committee with photos. It’s how we hold ourselves to a higher standard, and why we’ve been the Sunshine Coast’s trusted waterproofing partner for over 25 years."
+        : "Before painting starts, our dedicated maintenance team works through every item above and reports back to the committee with photos. Only then does the coating go on. It’s how we hold ourselves to a higher standard, and why we’ve been the Sunshine Coast’s trusted painting partner for over 25 years.",
+    },
+    access: {
+      intro:
+        "Planned face by face so residents always know where we’ll be. Rope access works the building from the roof down, and residents get 48 hours’ notice before we reach their floor.",
+      aerial: "",
+      stages: W
+        ? [
+            { when: "Weeks 1 to 2", what: "Clean & prep", where: "" },
+            { when: "Weeks 3 to 4", what: "Repairs & detailing", where: "" },
+            { when: "Weeks 5 to 6", what: "Membrane & sign-off", where: "" },
+          ]
+        : [
+            { when: "Weeks 1 to 2", what: "Wash & prep", where: "" },
+            { when: "Weeks 3 to 5", what: "Remedial repairs", where: "" },
+            { when: "Weeks 6 to 9", what: "Coating & sign-off", where: "" },
+          ],
+      drops: [],
+    },
+    pricing: {
+      intro:
+        "One fixed price, broken down by stage. Repair allowances are included, and anything beyond them is priced in writing first.",
+      stages: stages.length ? stages : [{ label: "Works", note: "", amt: "0" }],
+      terms: [
+        "Deposit: 10% on acceptance of this proposal.",
+        "Progress claims: tied to the percentage of the job completed.",
+        "Final payment: on completion and sign-off.",
+        `Workmanship warranty: ${y} years, written, as standard.${W ? "" : " The industry norm is 5."}`,
+      ].join("\n"),
+    },
+    maintenance: {
+      intro: `After handover, the plan keeps your building looking as it did on day one, catching wear early so it never becomes a full ${W ? "membrane replacement" : "repaint"}. It’s optional, with nothing to sign until you’re happy with the finished job.`,
+      price: "",
+    },
+    accept: {
+      intro: `Sign below or confirm in writing to secure your start date. ${job.pm.split(" ")[0] || "We"} will then confirm the programme with the committee and notify residents before works begin.`,
+    },
+  };
+}
+
+/** Switches a proposal's trade. Wording still on the old trade's standard
+ *  takes the new trade's; anything the rep has edited is kept. */
+export function switchTrade(p: Proposal, trade: Trade): Proposal {
+  if (p.trade === trade) return p;
+  const from = defaultSections(p.trade ?? "painting", p.job, p.d.pricing.stages);
+  const to = defaultSections(trade, p.job, p.d.pricing.stages);
+  const d = { ...p.d } as unknown as Record<string, Record<string, unknown>>;
+  const F = from as unknown as Record<string, Record<string, unknown>>;
+  const N = to as unknown as Record<string, Record<string, unknown>>;
+  for (const sec of Object.keys(d)) {
+    const next = { ...d[sec] };
+    for (const k of Object.keys(next)) {
+      if (k === "rows" && sec === "project") continue;
+      if (JSON.stringify(next[k]) === JSON.stringify(F[sec]?.[k])) next[k] = N[sec]?.[k];
+    }
+    d[sec] = next;
+  }
+  const proj = d.project as unknown as ProposalSections["project"];
+  const T = TRADES[trade];
+  d.project = {
+    ...proj,
+    brand: T.brands.includes(proj.brand) ? proj.brand : T.brands[0],
+    rows: { ...to.project.rows, ...proj.rows },
+  } as unknown as Record<string, unknown>;
+  const lib = (id: string) => LIBRARY_FOLDERS.some((f) => f.id === id);
+  return {
+    ...p,
+    trade,
+    folders: [...p.folders.filter((id) => !lib(id)), ...T.folders],
+    d: d as unknown as ProposalSections,
   };
 }

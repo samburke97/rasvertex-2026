@@ -16,6 +16,7 @@ import {
   LIMITS,
   LOCK_NOTES,
   PAGE,
+  TRADES,
   type Brand,
   type FindingsStyle,
   type PageId,
@@ -316,11 +317,11 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
           <Text ctx={ctx} label="Access method" path={["project", "access"]} />
           <Text ctx={ctx} label="Program" path={["project", "program"]} ph="e.g. 9 weeks" />
           <Photo ctx={ctx} label="Project photo" path={["project", "photo"]} />
-          <GroupHead title="Paint specification" sub="Choose the product. The table, logo and wording switch with it." />
+          <GroupHead title={TRADES[ctx.p.trade].specTitle} sub="Choose the product. The table, logo and wording switch with it." />
           <Segmented
             label="Product"
             value={b}
-            options={(Object.keys(BRANDS) as Brand[]).map((k) => ({ v: k, label: BRANDS[k].name }))}
+            options={TRADES[ctx.p.trade].brands.map((k) => ({ v: k, label: BRANDS[k].name }))}
             onPick={(v) => ctx.update((prev) => setBrand(prev, v as Brand))}
             info="Each product keeps its own table. Switching also swaps the brand name in the wording and the introduction."
           />
@@ -336,7 +337,7 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
               <>
                 <Text ctx={ctx} label="Surface" path={["project", "rows", b, i, "surface"]} />
                 <Text ctx={ctx} label="System" path={["project", "rows", b, i, "system"]} />
-                <Text ctx={ctx} label="Coats" path={["project", "rows", b, i, "coats"]} />
+                <Text ctx={ctx} label={TRADES[ctx.p.trade].coatsLabel} path={["project", "rows", b, i, "coats"]} />
               </>
             )}
           />

@@ -84,6 +84,8 @@ html :where(.root) strong { font-weight: 700; }
 .h1 { margin: 0; font-size: 30px !important; font-weight: 600 !important; letter-spacing: -0.03em !important; line-height: 1.15 !important; }
 .lead { margin: 8px 0 0; font-size: 15px !important; line-height: 1.55 !important; color: var(--app-ink-2) !important; }
 .quoteRow { display: flex; gap: 8px; }
+.tradeRow { display: flex; align-items: center; gap: 10px; }
+.tradeRow .seg { width: 300px; }
 .quoteBox { flex: 1; display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border: 1px solid var(--app-line); border-radius: 12px; background: #fff; }
 .quoteBox span { font-size: 13px !important; font-weight: 500 !important; color: var(--app-ink-3) !important; }
 .quoteBox input { flex: 1; min-width: 0; border: 0; outline: none; font-size: 16px; font-weight: 500; color: var(--app-ink); background: transparent; font-variant-numeric: tabular-nums; }
@@ -179,7 +181,7 @@ html :where(.root) strong { font-weight: 700; }
 .filter { height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--app-line); background: #fff; color: rgba(23, 23, 26, 0.7); font-size: 12px; font-weight: 500; cursor: pointer; }
 .filterOn { border-color: var(--app-accent); background: var(--app-accent-tint); color: var(--app-accent-ink); }
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; max-height: 320px; overflow: auto; }
-.cell { aspect-ratio: 4/3; border-radius: 8px; background: #edf0f0 center/cover no-repeat; cursor: pointer; }
+.cell { position: relative; aspect-ratio: 4/3; border-radius: 8px; background: #edf0f0 center/cover no-repeat; cursor: pointer; }
 .cellOn { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--app-accent); }
 .fgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .fcell { position: relative; aspect-ratio: 4/3; border: 0; padding: 0; border-radius: 8px; background: #edf0f0 center/cover no-repeat; cursor: pointer; }
@@ -276,3 +278,8 @@ html :where(.root) strong { font-weight: 700; }
 .richList :global(.tiptap p + p) { margin-top: 4px; }
 .richList :global(.tiptap p)::before { content: ""; position: absolute; left: 2px; top: 0.62em; width: 5px; height: 5px; border-radius: 50%; background: rgba(23, 23, 26, 0.55); }
 .richList :global(.tiptap p.is-empty)::before, .richList :global(.tiptap p:has(> br.ProseMirror-trailingBreak:only-child))::before { opacity: 0.35; }
+
+/* Delete an upload: shown on hover over the photo. */
+.cellRemove { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border: 0; border-radius: 999px; background: rgba(23, 23, 26, 0.72); color: #fff; font-size: 14px; line-height: 20px; padding: 0; cursor: pointer; opacity: 0; transition: opacity 120ms; }
+.cell:hover .cellRemove, .cellRemove:focus-visible { opacity: 1; }
+.cellRemove:hover { background: #a83a3a; }

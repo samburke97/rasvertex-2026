@@ -364,9 +364,9 @@
       "id": "team",
       "name": "Team",
       "photos": [
-        "./assets/team-abseil.webp",
-        "./assets/team-gutter.webp",
-        "./assets/team-painting.webp",
+        "./assets/team-abseil.jpg",
+        "./assets/team-gutter.jpg",
+        "./assets/team-painting.jpg",
         "./assets/team-tower.png"
       ]
     }

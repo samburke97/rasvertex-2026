@@ -375,7 +375,20 @@ export function Photo({ ctx, label, path, extra, info, large }: { ctx: BuilderCt
                     ctx.set(path, x);
                     ctx.setPicker(null);
                   }}
-                />
+                >
+                  {ctx.p.uploads.includes(x) && (
+                    <button
+                      className={styles.cellRemove}
+                      title="Delete this upload"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        ctx.removeUpload(x);
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           ) : (

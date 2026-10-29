@@ -38,6 +38,8 @@ export interface BuilderCtx {
   pickFolder: string;
   setPickFolder: (id: string) => void;
   upload: (file: File) => Promise<string>;
+  /** Deletes an upload, and takes it off any page that uses it. */
+  removeUpload: (url: string) => void;
   captureAerial: () => Promise<void>;
   sel: PageId;
   select: (id: PageId, scroll: boolean) => void;

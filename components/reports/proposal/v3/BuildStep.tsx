@@ -64,12 +64,14 @@ export default function BuildStep({ ctx, review, scrollReq, children }: Props) {
         </aside>
       )}
       <Preview ctx={ctx} review={review} scrollReq={scrollReq} />
-      <div
-        className={styles.resizer}
-        onPointerDown={panel.start}
-        onDoubleClick={panel.reset}
-        title="Drag to resize the panel. Double-click to reset."
-      />
+      {!review && (
+        <div
+          className={styles.resizer}
+          onPointerDown={panel.start}
+          onDoubleClick={panel.reset}
+          title="Drag to resize the panel. Double-click to reset."
+        />
+      )}
       {review ? children : <SectionPanel ctx={ctx} width={panel.w} />}
     </>
   );

@@ -23,6 +23,7 @@ import {
   STAGE_COLOURS,
   TERMS,
   asset,
+  tradeOf,
   type PageId,
   type Proposal,
 } from "@/lib/reports/proposal/v3/types";
@@ -383,21 +384,22 @@ function Company({ r, s }: PageProps) {
     gap: 24,
     minHeight: 0,
   };
-  const pic = (area: string, file: string, pos: string): CSSProperties => ({
+  const T = tradeOf(r.p.trade);
+  const pic = (area: "a" | "g" | "c" | "d"): CSSProperties => ({
     gridArea: area,
     borderRadius: 20,
     minHeight: 0,
-    background: `${CARD} ${pos}/cover no-repeat`,
-    backgroundImage: bg(r.img(asset(file))),
+    background: `${CARD} ${T.company.photos[area][1]}/cover no-repeat`,
+    backgroundImage: bg(r.img(T.company.photos[area][0])),
   });
   return (
     <Sheet r={r} s={s}>
       <SecLabel text={r.D.sectionLabel.company} />
       <h2 style={{ ...h2, maxWidth: 1000, textWrap: "balance" }}>
-        The Sunshine Coast’s leading commercial and body corporate painting team.
+        {T.company.h2}
       </h2>
       <p style={lede()}>
-        For over 25 years, we’ve completed painting projects with one dedicated team, right here on the Sunshine Coast. No subcontractors, no handovers, just the same experienced faces on site from start to finish.
+        {T.company.lede}
       </p>
       <div
         style={{
@@ -411,7 +413,7 @@ function Company({ r, s }: PageProps) {
           gap: 16,
         }}
       >
-        <div style={pic("a", "team-abseil.webp", "center 40%")} />
+        <div style={pic("a")} />
         <div style={{ ...tile, gridArea: "t" }}>
           <IconTile>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -426,7 +428,7 @@ function Company({ r, s }: PageProps) {
             <span style={tileText}>The same faces, start to finish.</span>
           </div>
         </div>
-        <div style={pic("g", "team-gutter.webp", "30% center")} />
+        <div style={pic("g")} />
         <div style={{ ...tile, gridArea: "k" }}>
           <IconTile>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={NAVY} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -440,7 +442,7 @@ function Company({ r, s }: PageProps) {
             <span style={tileText}>Photos, milestones and updates, start to finish.</span>
           </div>
         </div>
-        <div style={pic("c", "team-painting.webp", "35% center")} />
+        <div style={pic("c")} />
         <div
           style={{
             gridArea: "w",
@@ -456,7 +458,7 @@ function Company({ r, s }: PageProps) {
           }}
         >
           <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
-            <span style={{ fontFamily: BEBAS, fontSize: 112, lineHeight: 0.74, letterSpacing: "-0.04em" }}>8</span>
+            <span style={{ fontFamily: BEBAS, fontSize: 112, lineHeight: 0.74, letterSpacing: "-0.04em" }}>{T.warrantyYears}</span>
             <span style={{ fontSize: "1.0625rem", fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.35, paddingBottom: 2 }}>
               Year
               <br />
@@ -466,11 +468,11 @@ function Company({ r, s }: PageProps) {
           <div style={{ display: "flex", flexDirection: "column", gap: 10, minWidth: 0, maxWidth: 640 }}>
             <span style={tileTitle}>Standing by our team, and our products.</span>
             <span style={{ ...tileText, color: INK(0.7) }}>
-              Every exterior repaint is backed by an 8-year written warranty covering workmanship and the paint system.
+              {T.company.warrantyLine}
             </span>
           </div>
         </div>
-        <div style={pic("d", "team-tower.jpg", "center 30%")} />
+        <div style={pic("d")} />
       </div>
       <Footer r={r} s={s} />
     </Sheet>
@@ -521,7 +523,7 @@ function Recent({ r, s }: PageProps) {
     <Sheet r={r} s={s}>
       <SecLabel text={r.D.sectionLabel.recent} />
       <div style={{ flex: "1 1 0", minHeight: 0, display: "grid", gridTemplateColumns: "minmax(0,1.55fr) minmax(0,1fr)", gap: 16 }}>
-        <div style={photo(r.img(asset("trafalgar.jpg")), { position: "relative", borderRadius: 20, overflow: "hidden", minHeight: 0, backgroundPosition: "center 30%" })} />
+        <div style={photo(r.img(tradeOf(r.p.trade).recent.photo), { position: "relative", borderRadius: 20, overflow: "hidden", minHeight: 0, backgroundPosition: "center 30%" })} />
         <a
           href="https://www.rasvertex.com.au/projects"
           target="_blank"
@@ -559,10 +561,14 @@ function Recent({ r, s }: PageProps) {
       </div>
       <Quote
         gap={120}
-        text="“The RAS-VERTEX team are pros. Top quality workmanship and always in a professional manner. We've used RAS-VERTEX on a number of commercial painting projects and they always deliver. Especially if there's something we need when access is difficult, this is the team we always turn to.”"
-        who="Tim Lee"
-        role="Quality First Constructions"
-        logo={<img src={r.img(asset("clients/quality-first-navy.png"))} alt="Quality First Constructions" style={{ height: 56, width: "auto" }} />}
+        text={tradeOf(r.p.trade).recent.quote}
+        who={tradeOf(r.p.trade).recent.who}
+        role={tradeOf(r.p.trade).recent.role}
+        logo={
+          tradeOf(r.p.trade).recent.logo ? (
+            <img src={r.img(tradeOf(r.p.trade).recent.logo!)} alt={tradeOf(r.p.trade).recent.role} style={{ height: 56, width: "auto" }} />
+          ) : undefined
+        }
       />
       <Footer r={r} s={s} />
     </Sheet>
@@ -662,7 +668,7 @@ function Project({ r, s }: PageProps) {
         <div style={{ ...tableHead(cols, 48), gap: 40, lineHeight: 1.3 }}>
           <span>Surface</span>
           <span>System</span>
-          <span>Coats</span>
+          <span>{tradeOf(r.p.trade).coatsLabel}</span>
         </div>
         {rows.map((sr, i) => (
           <div key={i} data-edit={`project.rows.${d.brand}.${i}.surface`} style={{ display: "grid", gridTemplateColumns: cols, gap: 40, padding: "18px 0", borderBottom: rule(i, rows.length), fontSize: "1.25rem", lineHeight: 1.5 }}>
@@ -672,7 +678,7 @@ function Project({ r, s }: PageProps) {
           </div>
         ))}
         <div style={{ display: "flex", alignItems: "flex-end", gap: 24, marginTop: 32 }}>
-          <img src={r.img(brand.logo)} alt={brand.name} style={{ height: 52, width: "auto", display: "block" }} />
+          <img src={r.img(brand.logo)} alt={brand.name} style={{ height: brand.height, width: "auto", display: "block" }} />
           <span data-edit="project.note" style={{ fontSize: "1.0625rem", lineHeight: 1, color: INK(0.6), paddingBottom: 2 }}>{d.note}</span>
         </div>
       </div>
@@ -1148,6 +1154,10 @@ function Maintenance({ r, s }: PageProps) {
   const mp = parseAmt(d.price);
   const mg = Math.round(mp * 10) / 100;
   const greyChip = chip(BANDS.grey);
+  const T = tradeOf(r.p.trade);
+  const PLAN = PLAN_ROWS.map((x): (typeof PLAN_ROWS)[number] =>
+    x[0] === "03" ? [x[0], T.hoursLabel, x[2], x[3]] : x[0] === "07" ? [x[0], `${T.warrantyYears}-year warranty`, x[2], x[3]] : x,
+  );
   const row = ([n, a, b2, c]: (typeof PLAN_ROWS)[number], last: boolean) => (
     <div key={n} style={{ display: "grid", gridTemplateColumns: cols, gap: 24, alignItems: "center", padding: "12px 0", borderBottom: last ? 0 : `1px solid ${RULE}`, lineHeight: 1.3 }}>
       <span style={greyChip}>{n}</span>
@@ -1173,9 +1183,9 @@ function Maintenance({ r, s }: PageProps) {
         <span>Typical plan</span>
       </div>
       <GroupBar name="Every visit" desc="Wash, inspect and repair, by the same team each year." bg="#eef1f6" pt={16} />
-      {PLAN_ROWS.slice(0, 4).map((x, i) => row(x, i === 3))}
+      {PLAN.slice(0, 4).map((x, i) => row(x, i === 3))}
       <GroupBar name="Plan terms" desc="Billed quarterly. Labour fixed for two years, then CPI." bg={BLUE_CARD} pt={28} />
-      {PLAN_ROWS.slice(4).map((x, i) => row(x, i === 2))}
+      {PLAN.slice(4).map((x, i) => row(x, i === 2))}
       <div data-edit="maintenance.price" style={{ display: "flex", flexDirection: "column", marginTop: 72 }}>
         <MoneyRows ex={money(mp)} gst={money(mg)} inc={money(mp + mg)} exLabel="Maintenance plan, per year (ex GST)" incLabel="Per year incl. GST" />
       </div>
@@ -1281,7 +1291,7 @@ function Terms({ r, s }: PageProps) {
       <SecLabel text={r.D.sectionLabel.terms} />
       <h2 style={h2}>Terms &amp; conditions</h2>
       <div style={{ columnCount: 3, columnGap: 48, marginTop: 56, fontSize: "1rem", lineHeight: 1.6 }}>
-        {TERMS.map((tc) => (
+        {TERMS.map((t) => tradeOf(r.p.trade).terms[t.k] ?? t).map((tc) => (
           <div key={tc.k} style={{ breakInside: "avoid", marginBottom: 22 }}>
             <div style={{ fontWeight: 700 }}>{tc.k}</div>
             <div style={{ color: INK(0.65), marginTop: 2, textWrap: "pretty" }}>{tc.v}</div>

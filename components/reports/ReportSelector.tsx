@@ -157,9 +157,9 @@ const REPORT_TYPES: ReportType[] = [
   },
   {
     id: "proposal",
-    label: "Painting proposal",
+    label: "Master proposal",
     description:
-      "Build a painting proposal from a SimPRO quote: findings, scope, access plan and pricing.",
+      "Painting or waterproofing proposal from a SimPRO quote: findings, scope, access plan and pricing.",
     available: true,
     category: "proposal",
     icon: (

@@ -19,7 +19,7 @@ import type { BuilderCtx, Path, PhotoFolderOption } from "./ctx";
 import { getIn, setIn } from "./ctx";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import { compressMapImageDataUrl } from "@/lib/reports/compressImage";
-import { uploadReportPhoto } from "@/lib/reports/uploadPhoto";
+import { deleteReportPhoto, uploadReportPhoto } from "@/lib/reports/uploadPhoto";
 import { derive } from "@/lib/reports/proposal/v3/derive";
 import { enabledPhotos, standardFromPhotos } from "@/lib/reports/proposal/v3/survey";
 import {
@@ -36,6 +36,9 @@ import {
   type QuoteHeader,
   type QuotePricingRow,
   type SimproFolder,
+  TRADES,
+  switchTrade,
+  type Trade,
 } from "@/lib/reports/proposal/v3/types";
 
 type Step = "start" | "build" | "review";
@@ -89,6 +92,8 @@ async function downsize(file: File): Promise<string> {
 
 export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   const [p, setP] = useState<Proposal | null>(null);
+  // Chosen in the Quote step; a resumed draft brings its own.
+  const [trade, setTrade] = useState<Trade>("painting");
   const [step, setStep] = useState<Step>("start");
   const [quoteInput, setQuoteInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -152,7 +157,8 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
       } else {
         const pricing: QuotePricingRow[] = prRes?.ok ? await prRes.json() : [];
         const draftJson = dRes?.ok ? await dRes.json().catch(() => null) : null;
-        const fresh = createProposal(quote, header, pricing);
+        // A resumed draft keeps its own trade.
+        const fresh = createProposal(quote, header, pricing, isProposal(draftJson?.report) ? (draftJson.report.trade ?? "painting") : trade);
         next = isProposal(draftJson?.report) ? mergeDraft(draftJson.report, fresh) : fresh;
         // A new proposal brings in every SimPRO folder; a resumed one keeps
         // the rep's choice, plus Unfiled.
@@ -182,7 +188,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [quoteInput, loading, p]);
+  }, [quoteInput, loading, p, trade]);
 
   // ── Stream photos for each enabled SimPRO folder not yet loaded ───────────
   useEffect(() => {
@@ -391,6 +397,30 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
     [p, update],
   );
 
+  const removeUpload = useCallback(
+    (url: string) => {
+      if (!p) return;
+      const used = JSON.stringify(p.d).includes(JSON.stringify(url).slice(1, -1));
+      if (used && !confirm("This photo is used in the proposal. Remove it from the page too?")) return;
+      // Clears every photo field that points at it; findings using it go.
+      const clear = (v: unknown): unknown =>
+        v === url
+          ? ""
+          : Array.isArray(v)
+            ? v.filter((x) => !(x && typeof x === "object" && (x as { photo?: string }).photo === url)).map(clear)
+            : v && typeof v === "object"
+              ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, clear(x)]))
+              : v;
+      update((prev) => ({
+        ...prev,
+        uploads: prev.uploads.filter((u) => u !== url),
+        d: clear(prev.d) as Proposal["d"],
+      }));
+      void deleteReportPhoto(url);
+    },
+    [p, update],
+  );
+
   const captureAerial = useCallback(async () => {
     if (!p) return;
     const params = new URLSearchParams({ address: p.job.site, zoom: "19", size: "640x320" });
@@ -423,6 +453,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           pickFolder,
           setPickFolder,
           upload,
+          removeUpload,
           captureAerial,
           sel,
           select,
@@ -463,7 +494,9 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           </svg>
         </button>
         <div className={styles.titleBlock}>
-          <span className={styles.title}>{p ? `${p.job.building} · Painting proposal` : "New painting proposal"}</span>
+          <span className={styles.title}>
+            {p ? `${p.job.building} · ${TRADES[p.trade].label} proposal` : "New proposal"}
+          </span>
           <span className={styles.subtitle}>{p ? `Quote ${p.job.quote} · ${p.job.client}` : "Not started"}</span>
         </div>
         <div className={styles.stepsWrap}>
@@ -510,6 +543,11 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
             onLoad={loadQuote}
             loadingFolders={loadingFolders}
             onOpen={() => goBuild("cover")}
+            trade={p?.trade ?? trade}
+            onTrade={(t) => {
+              setTrade(t);
+              if (p) update((prev) => switchTrade(prev, t));
+            }}
           />
         )}
         {showDoc && ctx && (

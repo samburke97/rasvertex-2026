@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import styles from "./Builder.module.css";
 import type { BuilderCtx } from "./ctx";
 import { InfoTip } from "./fields";
-import { JOB_FIELDS, LIBRARY_FOLDERS } from "@/lib/reports/proposal/v3/types";
+import { JOB_FIELDS, LIBRARY_FOLDERS, TRADES, type Trade } from "@/lib/reports/proposal/v3/types";
 import { applySurvey, enabledPhotos, taggedPhotos, untaggedExamples } from "@/lib/reports/proposal/v3/survey";
 
 interface Props {
@@ -17,9 +17,11 @@ interface Props {
   onLoad: () => void;
   loadingFolders: string[];
   onOpen: () => void;
+  trade: Trade;
+  onTrade: (t: Trade) => void;
 }
 
-export default function QuoteStep({ ctx, quoteInput, setQuoteInput, loading, loadError, onLoad, loadingFolders, onOpen }: Props) {
+export default function QuoteStep({ ctx, quoteInput, setQuoteInput, loading, loadError, onLoad, loadingFolders, onOpen, trade, onTrade }: Props) {
   const p = ctx?.p;
   const tagged = useMemo(() => (p ? taggedPhotos(p) : []), [p]);
 
@@ -47,8 +49,21 @@ export default function QuoteStep({ ctx, quoteInput, setQuoteInput, loading, loa
     <div className={styles.quote}>
       <div className={styles.quoteCol}>
         <div>
-          <h1 className={styles.h1}>New painting proposal</h1>
-          <p className={styles.lead}>Enter the quote number to fill in the job details.</p>
+          <h1 className={styles.h1}>New proposal</h1>
+          <p className={styles.lead}>Choose the proposal type, then enter the quote number to fill in the job details.</p>
+        </div>
+
+        <div className={styles.tradeRow}>
+          <div className={styles.seg}>
+            {(["painting", "waterproofing"] as Trade[]).map((t) => (
+              <button key={t} className={trade === t ? styles.segOn : ""} onClick={() => onTrade(t)}>
+                {TRADES[t].label}
+              </button>
+            ))}
+          </div>
+          <InfoTip>
+            Sets the wording, photos, products and warranty: painting 8 years, waterproofing 7. You can switch later; anything you’ve already edited is kept.
+          </InfoTip>
         </div>
 
         <form

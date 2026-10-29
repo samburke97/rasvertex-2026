@@ -9,42 +9,29 @@
 // (replacing an earlier export of the same name). The download is returned
 // either way; X-Saved-To-Quote says whether the attachment succeeded.
 
-import fs from "fs";
-import path from "path";
 import { createElement } from "react";
-import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
 import ProposalPages from "@/components/reports/proposal/v3/doc/ProposalPages";
 import { derive } from "@/lib/reports/proposal/v3/derive";
 import { ASSET_DIR, isProposal, resolvePhoto, type Proposal } from "@/lib/reports/proposal/v3/types";
 import { pdfDownloadResponse, readPublicAsBase64, renderPDF } from "@/lib/server/pdf-utils";
-import { createImageResolver } from "@/lib/server/resolveReportImages";
+import { createImageResolver, type ResizeTo } from "@/lib/server/resolveReportImages";
 import { getSimproConfig, saveQuoteAttachment } from "@/lib/server/simpro";
 
 export const maxDuration = 60;
 
-// Static assets are print-sized once per server instance.
-const assetCache = new Map<string, Promise<string>>();
-
-function staticAsset(rel: string): Promise<string> {
+// Static assets in public/reports/proposal/v3 are already compressed to
+// print size, so they're inlined as-is (cached per server instance).
+const assetCache = new Map<string, string>();
+const staticAsset = (rel: string) => {
   let hit = assetCache.get(rel);
-  if (!hit) {
-    hit = (async () => {
-      const file = path.join(process.cwd(), "public", rel);
-      if (/\.svg$/i.test(rel) || !fs.existsSync(file)) return readPublicAsBase64(rel);
-      try {
-        const img = sharp(fs.readFileSync(file)).resize({ width: 1800, withoutEnlargement: true });
-        const png = /\.png$/i.test(rel);
-        const out = png ? await img.png().toBuffer() : await img.jpeg({ quality: 82 }).toBuffer();
-        return `data:image/${png ? "png" : "jpeg"};base64,${out.toString("base64")}`;
-      } catch {
-        return readPublicAsBase64(rel);
-      }
-    })();
-    assetCache.set(rel, hit);
-  }
+  if (hit == null) assetCache.set(rel, (hit = readPublicAsBase64(rel)));
   return hit;
-}
+};
+
+// Photos under findings print about 4.5in wide: 1000px is ample. Full-width
+// photos (cover, project, aerial) keep their size.
+const FINDING_PHOTO: ResizeTo = { maxDimension: 1000, quality: 80 };
 
 let _fonts: { inter: string; bebas: string; script: string } | null = null;
 const fonts = () =>
@@ -69,13 +56,15 @@ async function buildHTML(p: Proposal): Promise<string> {
   });
   const resolve = createImageResolver();
   const resolved = new Map<string, string>();
+  const findingPhotos = new Set(p.d.findings.items.map((f) => f.photo));
+  const fullWidth = new Set([p.d.cover.photo, p.d.project.photo, p.d.access.aerial]);
   await Promise.all(
     [...refs].map(async (ref) => {
       const url = resolvePhoto(p, ref);
       if (!url) return;
       if (url.startsWith("data:")) resolved.set(ref, url);
-      else if (url.startsWith(ASSET_DIR)) resolved.set(ref, await staticAsset(url.replace(/^\//, "")));
-      else resolved.set(ref, await resolve(url));
+      else if (url.startsWith(ASSET_DIR)) resolved.set(ref, staticAsset(url.replace(/^\//, "")));
+      else resolved.set(ref, await resolve(url, findingPhotos.has(ref) && !fullWidth.has(ref) ? FINDING_PHOTO : undefined));
     }),
   );
   const body = render((ref) => resolved.get(ref) ?? "");
