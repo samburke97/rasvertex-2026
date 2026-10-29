@@ -305,7 +305,7 @@ function Cover({ r, s }: PageProps) {
   ];
   return (
     <Sheet r={r} s={s} cover>
-      <img src={r.img(asset("logo-full.png"))} alt="RAS-VERTEX Maintenance Solutions" style={{ height: 68, width: "auto", alignSelf: "flex-start" }} />
+      <img src={r.img(asset("logo-full.png")) || undefined} alt="RAS-VERTEX Maintenance Solutions" style={{ height: 68, width: "auto", alignSelf: "flex-start" }} />
       <h1 style={{ fontSize: 84, fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.06em", margin: "48px 0 0" }}>
         <Bind build={b}>{v.building}</Bind>.
       </h1>
@@ -555,7 +555,7 @@ function Recent({ r, s }: PageProps) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(11,minmax(0,1fr))", gap: 16, alignItems: "center", marginTop: 72 }}>
         {CLIENT_LOGOS.map(([file, alt, h]) => (
           <div key={file} style={{ height: 72, display: "flex", alignItems: "center", justifyContent: "center", minWidth: 0 }}>
-            <img src={r.img(asset("clients/" + file))} alt={alt} style={{ maxHeight: h, maxWidth: "100%", width: "auto", objectFit: "contain" }} />
+            <img src={r.img(asset("clients/" + file)) || undefined} alt={alt} style={{ maxHeight: h, maxWidth: "100%", width: "auto", objectFit: "contain" }} />
           </div>
         ))}
       </div>
@@ -566,7 +566,7 @@ function Recent({ r, s }: PageProps) {
         role={tradeOf(r.p.trade).recent.role}
         logo={
           tradeOf(r.p.trade).recent.logo ? (
-            <img src={r.img(tradeOf(r.p.trade).recent.logo!)} alt={tradeOf(r.p.trade).recent.role} style={{ height: 56, width: "auto" }} />
+            <img src={r.img(tradeOf(r.p.trade).recent.logo!) || undefined} alt={tradeOf(r.p.trade).recent.role} style={{ height: 56, width: "auto" }} />
           ) : undefined
         }
       />
@@ -678,7 +678,7 @@ function Project({ r, s }: PageProps) {
           </div>
         ))}
         <div style={{ display: "flex", alignItems: "flex-end", gap: 24, marginTop: 32 }}>
-          <img src={r.img(brand.logo)} alt={brand.name} style={{ height: brand.height, width: "auto", display: "block" }} />
+          <img src={r.img(brand.logo) || undefined} alt={brand.name} style={{ height: brand.height, width: "auto", display: "block" }} />
           <span data-edit="project.note" style={{ fontSize: "1.0625rem", lineHeight: 1, color: INK(0.6), paddingBottom: 2 }}>{d.note}</span>
         </div>
       </div>
@@ -797,9 +797,9 @@ function Findings({ r, s }: PageProps) {
             <div data-edit={`findings.items.${i}.photo`} style={photo(r.img(f.photo), { width: "100%", height: FINDING_PHOTO_H, flexShrink: 0, borderRadius: 20 })} />
             {textH > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start", height: textH, flexShrink: 0, overflow: "hidden" }}>
-                {report && <span style={codeChip(f.code)}>{f.code}</span>}
+                {report && f.code && <span style={codeChip(f.code)}>{f.code}</span>}
                 {f.title.trim() && (
-                  <h3 data-edit={`findings.items.${i}.title`} style={{ ...sub, margin: report ? "4px 0 0" : 0 }}>
+                  <h3 data-edit={`findings.items.${i}.title`} style={{ ...sub, margin: report && f.code ? "4px 0 0" : 0 }}>
                     {f.title}
                   </h3>
                 )}
@@ -1021,10 +1021,10 @@ function Safety({ r, s }: PageProps) {
       <div style={{ marginTop: 72, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 40 }}>
         <h3 style={h3card}>Certified and accredited.</h3>
         <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
-          <img src={r.img(asset("irata.png"))} alt="IRATA International" style={{ height: 72, width: "auto", mixBlendMode: "multiply" }} />
-          <img src={r.img(asset("qbcc.png"))} alt="QBCC" style={{ height: 52, width: "auto" }} />
-          <img src={r.img(asset("workcover.png"))} alt="WorkCover Queensland" style={{ height: 36, width: "auto" }} />
-          <img src={r.img(asset("smartstrata.png"))} alt="Smart Strata" style={{ height: 52, width: "auto" }} />
+          <img src={r.img(asset("irata.png")) || undefined} alt="IRATA International" style={{ height: 72, width: "auto", mixBlendMode: "multiply" }} />
+          <img src={r.img(asset("qbcc.png")) || undefined} alt="QBCC" style={{ height: 52, width: "auto" }} />
+          <img src={r.img(asset("workcover.png")) || undefined} alt="WorkCover Queensland" style={{ height: 36, width: "auto" }} />
+          <img src={r.img(asset("smartstrata.png")) || undefined} alt="Smart Strata" style={{ height: 52, width: "auto" }} />
         </div>
       </div>
       <Quote
@@ -1127,9 +1127,9 @@ function Pricing({ r, s }: PageProps) {
         >
           <h3 style={h3card}>Fully qualified.</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 36, height: 64 }}>
-            <img src={r.img(asset("qbcc.png"))} alt="QBCC" style={{ height: 60, width: "auto" }} />
-            <img src={r.img(asset("smartstrata.png"))} alt="Smart Strata" style={{ height: 60, width: "auto" }} />
-            <img src={r.img(asset("workcover.png"))} alt="WorkCover Queensland" style={{ height: 42, width: "auto" }} />
+            <img src={r.img(asset("qbcc.png")) || undefined} alt="QBCC" style={{ height: 60, width: "auto" }} />
+            <img src={r.img(asset("smartstrata.png")) || undefined} alt="Smart Strata" style={{ height: 60, width: "auto" }} />
+            <img src={r.img(asset("workcover.png")) || undefined} alt="WorkCover Queensland" style={{ height: 42, width: "auto" }} />
           </div>
         </div>
       )}
@@ -1191,7 +1191,7 @@ function Maintenance({ r, s }: PageProps) {
       </div>
       <div style={{ marginTop: "auto", alignSelf: "flex-start", display: "inline-flex", flexDirection: "column", alignItems: "stretch", gap: 24 }}>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 20 }}>
-          <img src={r.img(asset("people-caro.jpg"))} alt="Caroline Park" style={{ width: 96, height: 120, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} />
+          <img src={r.img(asset("people-caro.jpg")) || undefined} alt="Caroline Park" style={{ width: 96, height: 120, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <span style={sub}>Caroline Park</span>
             <span style={{ fontSize: "1.25rem", lineHeight: 1.3, color: INK(0.6) }}>Client Services Manager</span>

@@ -40,8 +40,9 @@ const CARD_W = (1088 - 40) / 2;
 export function findingTextH(f: Finding, report: boolean): number {
   const title = f.title.trim();
   const items = richItems(f.desc).slice(0, report ? 99 : MAX_POINTS);
-  if (!title && !items.length) return report ? 36 : 0; // the code chip always shows
-  let h = report ? 28 + 8 + 4 : 0;
+  const chip = report && !!f.code;
+  if (!title && !items.length) return chip ? 36 : 0;
+  let h = chip ? 28 + 8 + 4 : 0;
   if (title) h += textLines(title, 22, CARD_W, 700) * 27.5;
   if (items.length) {
     h += 8;

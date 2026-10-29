@@ -154,7 +154,7 @@ export interface SpecRow {
 
 export interface Finding {
   photo: string;
-  code: string; // report style only
+  code: string; // report style only; "" = no code
   title: string;
   desc: string; // standard style: one point per line
 }
@@ -194,8 +194,10 @@ export interface ProposalSections {
   };
   scope: { intro: string; inc: string; exc: string };
   findings: { intro: string; style: FindingsStyle; items: Finding[] };
-  flagged: { intro: string; rows: { code: string; count: string }[] };
-  prestart: { intro: string; rows: { code: string; work: string; where: string }[]; note: string };
+  // auto: built from the findings' codes and kept in step with them
+  // (survey.ts syncSurvey); editing a row makes it the rep's own.
+  flagged: { intro: string; rows: { code: string; count: string; auto?: boolean }[] };
+  prestart: { intro: string; rows: { code: string; work: string; where: string; auto?: boolean }[]; note: string };
   access: {
     intro: string;
     aerial: string;

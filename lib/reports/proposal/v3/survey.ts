@@ -78,13 +78,13 @@ export function applySurvey(p: Proposal, tagged: TaggedPhoto[]): Proposal {
       findings: { ...p.d.findings, style: "report", items },
       flagged: {
         ...p.d.flagged,
-        rows: codes.slice(0, LIMITS.flagged).map((code) => ({ code, count: String(places(code).length) })),
+        rows: codes.slice(0, LIMITS.flagged).map((code) => ({ code, count: String(places(code).length), auto: true })),
       },
       prestart: {
         ...p.d.prestart,
         rows: codes
           .slice(0, LIMITS.prestart)
-          .map((code) => ({ code, work: CODES[code].defaultWork, where: places(code).join(", ") })),
+          .map((code) => ({ code, work: CODES[code].defaultWork, where: places(code).join(", "), auto: true })),
       },
     },
   };
@@ -115,7 +115,55 @@ export function standardFromPhotos(p: Proposal): Proposal {
       const label = labelOf(ph);
       const r = parseLabel(label, LIB);
       const title = r.kind === "photo" ? sentence(r.note) : CAMERA_NAME.test(label) ? "" : sentence(label);
-      return { photo: "ph:" + ph.id, code: r.kind === "photo" ? r.codes[0] ?? "RC" : "RC", title, desc: "" };
+      return { photo: "ph:" + ph.id, code: r.kind === "photo" ? (r.codes.find((c) => CODES[c]) ?? "") : "", title, desc: "" };
     });
   return { ...p, hidden: { ...p.hidden, findings: false }, d: { ...p.d, findings: { ...p.d.findings, style: "standard", items } } };
+}
+
+/** Codes for report style: a tagged photo takes its tag's code; anything
+ *  not tagged starts with no code. */
+export function recodeFromTags(p: Proposal): Proposal {
+  const tags = new Map(taggedPhotos(p).map((t) => [t.photo.id, t]));
+  const items = p.d.findings.items.map((f) => {
+    const t = f.photo.startsWith("ph:") ? tags.get(f.photo.slice(3)) : undefined;
+    return { ...f, code: t ? t.codes[0] : "" };
+  });
+  return { ...p, d: { ...p.d, findings: { ...p.d.findings, items } } };
+}
+
+/** Keeps Flagged issues and Pre-start in step with the findings' codes (report
+ *  style only). Automatic rows are rebuilt from the codes in use — counted by
+ *  location, where a tag gives one — and dropped when no finding uses the
+ *  code any more. Rows the rep added or edited are never touched. */
+export function syncSurvey(p: Proposal): Proposal {
+  if (p.d.findings.style !== "report") return p;
+  const tags = new Map(taggedPhotos(p).map((t) => [t.photo.id, t]));
+  const locs = new Map<string, string[]>(); // code → locations ("#i" if untagged)
+  p.d.findings.items.forEach((f, i) => {
+    if (!f.code || !CODES[f.code]) return;
+    const t = f.photo.startsWith("ph:") ? tags.get(f.photo.slice(3)) : undefined;
+    const at = t ? where(t) : `#${i}`;
+    const list = locs.get(f.code) ?? [];
+    if (!list.includes(at)) list.push(at);
+    locs.set(f.code, list);
+  });
+  const codes = [...locs.keys()].sort((a, b) => rank(a) - rank(b));
+  const named = (code: string) => locs.get(code)!.filter((x) => !x.startsWith("#"));
+
+  const fl = p.d.flagged.rows;
+  const flagged = [
+    ...fl.filter((r) => !r.auto),
+    ...codes
+      .filter((c) => !fl.some((r) => !r.auto && r.code === c))
+      .map((code) => ({ code, count: String(locs.get(code)!.length), auto: true })),
+  ];
+  const ps = p.d.prestart.rows;
+  const prestart = [
+    ...ps.filter((r) => !r.auto),
+    ...codes
+      .filter((c) => !ps.some((r) => !r.auto && r.code === c))
+      .map((code) => ({ code, work: CODES[code].defaultWork, where: named(code).join(", "), auto: true })),
+  ];
+  if (JSON.stringify(flagged) === JSON.stringify(fl) && JSON.stringify(prestart) === JSON.stringify(ps)) return p;
+  return { ...p, d: { ...p.d, flagged: { ...p.d.flagged, rows: flagged }, prestart: { ...p.d.prestart, rows: prestart } } };
 }

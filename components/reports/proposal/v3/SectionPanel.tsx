@@ -8,7 +8,7 @@ import styles from "./Builder.module.css";
 import type { BuilderCtx } from "./ctx";
 import { GroupHead, List, Money, Note, Photo, Rich, Segmented, Select, Text } from "./fields";
 import { isHidden, money, parseAmt } from "@/lib/reports/proposal/v3/derive";
-import { applySurvey, enabledPhotos, standardFromPhotos, taggedPhotos } from "@/lib/reports/proposal/v3/survey";
+import { applySurvey, enabledPhotos, recodeFromTags, standardFromPhotos, taggedPhotos } from "@/lib/reports/proposal/v3/survey";
 import {
   BRANDS,
   CODES,
@@ -24,7 +24,10 @@ import {
   type SpecRow,
 } from "@/lib/reports/proposal/v3/types";
 
-const CODE_OPTS = Object.keys(CODES).map((k) => ({ v: k, label: `${k} · ${CODES[k].name}` }));
+const CODE_LIST = Object.keys(CODES).map((k) => ({ v: k, label: `${k} · ${CODES[k].name}` }));
+// Findings can have no code; Flagged / Pre-start rows always have one.
+const FINDING_CODES = [{ v: "", label: "No code" }, ...CODE_LIST];
+const CODE_OPTS = CODE_LIST;
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Dulux ↔ Haymes: swap brand, and its name in the spec wording and intro. */
@@ -47,6 +50,7 @@ function setBrand(p: Proposal, b: Brand): Proposal {
  *  style leaves them out. */
 function setFindingsStyle(p: Proposal, style: FindingsStyle): Proposal {
   const report = style === "report";
+  if (report && p.d.findings.style !== "report") p = recodeFromTags(p);
   return {
     ...p,
     hidden: { ...p.hidden, flagged: !report, prestart: !report },
@@ -65,7 +69,7 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
   const report = d.findings.style === "report";
   const f = ctx.focusFinding != null && ctx.focusFinding < items.length ? ctx.focusFinding : null;
   const path = (k: string) => ["findings", "items", f!, k];
-  const blank = (photo = "") => ({ photo, code: "RC", title: "", desc: "" });
+  const blank = (photo = "") => ({ photo, code: "", title: "", desc: "" });
 
   if (f != null) {
     const it = items[f];
@@ -97,7 +101,13 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
         </div>
         <Photo ctx={ctx} label={`Finding ${pad(f + 1)}`} path={path("photo")} large />
         {report && (
-          <Select ctx={ctx} label="Code" path={path("code")} options={CODE_OPTS} info="Sets the colour of the chip and which severity group the defect is counted in." />
+          <Select
+            ctx={ctx}
+            label="Code"
+            path={path("code")}
+            options={FINDING_CODES}
+            info="Sets the chip and severity colour, and adds the defect to Flagged issues and Pre-start. “No code” leaves this photo out of both."
+          />
         )}
         <Text ctx={ctx} label="Title" path={path("title")} ph="e.g. Render crack, north face level 2" />
         {report ? (
@@ -359,7 +369,7 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
       return (
         <>
           <Rich ctx={ctx} label="Intro" path={["flagged", "intro"]} />
-          <Note>Totals and severity groups update from the codes.</Note>
+          <Note>Rows come from the codes on your survey photos and update by themselves. Edit a row and it stays as you set it.</Note>
           <List<{ code: string; count: string }>
             ctx={ctx}
             path={["flagged", "rows"]}
@@ -380,6 +390,7 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
       return (
         <>
           <Rich ctx={ctx} label="Intro" path={["prestart", "intro"]} />
+          <Note>Rows come from the codes on your survey photos and update by themselves. Edit a row and it stays as you set it.</Note>
           <List<{ code: string; work: string; where: string }>
             ctx={ctx}
             path={["prestart", "rows"]}

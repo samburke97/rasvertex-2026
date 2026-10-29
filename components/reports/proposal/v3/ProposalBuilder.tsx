@@ -21,7 +21,7 @@ import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import { compressMapImageDataUrl } from "@/lib/reports/compressImage";
 import { deleteReportPhoto, uploadReportPhoto } from "@/lib/reports/uploadPhoto";
 import { derive } from "@/lib/reports/proposal/v3/derive";
-import { enabledPhotos, standardFromPhotos } from "@/lib/reports/proposal/v3/survey";
+import { enabledPhotos, standardFromPhotos, syncSurvey } from "@/lib/reports/proposal/v3/survey";
 import {
   LIBRARY_FOLDERS,
   LIMITS,
@@ -116,9 +116,11 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   const dirty = useRef(false);
   const autoFilled = useRef(-1); // loadGen the findings were auto-filled for
 
+  // Every edit goes through here; in report style Flagged issues and
+  // Pre-start follow the findings' codes.
   const update = useCallback((fn: (prev: Proposal) => Proposal) => {
     dirty.current = true;
-    setP((prev) => (prev ? fn(prev) : prev));
+    setP((prev) => (prev ? syncSurvey(fn(prev)) : prev));
   }, []);
 
   // ── Load (or resume) a quote ─────────────────────────────────────────────
@@ -445,7 +447,14 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           D,
           update,
           get: (path: Path) => getIn(p.d, path),
-          set: (path: Path, v: unknown) => update((prev) => ({ ...prev, d: setIn(prev.d, path, v) })),
+          set: (path: Path, v: unknown) =>
+            update((prev) => {
+              let d = setIn(prev.d, path, v);
+              // Editing a Flagged / Pre-start row makes it the rep's own.
+              if ((path[0] === "flagged" || path[0] === "prestart") && path[1] === "rows" && path.length > 3)
+                d = setIn(d, [path[0], "rows", path[2], "auto"], false);
+              return { ...prev, d };
+            }),
           img,
           folders,
           picker,
