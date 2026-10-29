@@ -1,0 +1,473 @@
+// lib/reports/proposal/v3/types.ts
+//
+// Data model for the Painting proposal builder (Quote → Build → Review).
+// Shape follows data/default-proposal.json (the handoff spec), plus what the
+// SimPRO integration needs: the quote number, the quote's photo folders and
+// the photos imported from them.
+//
+// Photo references (cover.photo, findings[i].photo, …) are plain strings:
+//   "/reports/proposal/v3/…"  a standard library photo (public/)
+//   "ph:<id>"                 a photo imported from the SimPRO quote
+//   "https://…" / "data:…"    an upload
+// resolvePhoto() turns any of them into a URL.
+
+import registryJson from "./data/registry.json";
+import termsJson from "./data/terms.json";
+
+export const PAGE_IDS = [
+  "cover",
+  "contents",
+  "company",
+  "recent",
+  "intro",
+  "project",
+  "scope",
+  "findings",
+  "flagged",
+  "prestart",
+  "access",
+  "safety",
+  "pricing",
+  "maintenance",
+  "accept",
+  "terms",
+] as const;
+export type PageId = (typeof PAGE_IDS)[number];
+
+export interface PageDef {
+  id: PageId;
+  name: string;
+  cat?: string;
+  sec?: string;
+  fixed?: boolean;
+  locked?: boolean;
+  auto?: boolean;
+}
+
+export type Band = "red" | "amber" | "grey";
+
+export interface DefectCodeDef {
+  name: string;
+  band: Band;
+  defaultWork: string;
+}
+
+export interface JobField {
+  key: keyof Job;
+  label: string;
+  type: "text" | "date" | "number";
+}
+
+interface Registry {
+  pages: PageDef[];
+  lockedPageNotes: Partial<Record<PageId, string>>;
+  jobFields: JobField[];
+  defectCodes: Record<string, DefectCodeDef>;
+  bands: Record<Band, { bg: string; fg: string }>;
+  flaggedGroups: Record<Band, [string, string]>;
+  prestartGroups: Record<Band, [string, string]>;
+  stageColours: { bg: string; fg: string }[];
+  paintBrands: Record<Brand, { name: string; logo: string }>;
+}
+
+const registry = registryJson as unknown as Registry;
+
+export const PAGES = registry.pages;
+export const PAGE: Record<PageId, PageDef> = Object.fromEntries(PAGES.map((p) => [p.id, p])) as Record<
+  PageId,
+  PageDef
+>;
+export const LOCK_NOTES = registry.lockedPageNotes;
+export const JOB_FIELDS = registry.jobFields;
+export const CODES = registry.defectCodes;
+export const BANDS = registry.bands;
+export const FLAG_GROUPS = registry.flaggedGroups;
+export const PRESTART_GROUPS = registry.prestartGroups;
+export const STAGE_COLOURS = registry.stageColours;
+export const BAND_ORDER: Band[] = ["red", "amber", "grey"];
+export const TERMS = termsJson as { k: string; v: string }[];
+
+// ── Assets ───────────────────────────────────────────────────────────────────
+
+export const ASSET_DIR = "/reports/proposal/v3/";
+export const asset = (file: string) => ASSET_DIR + file;
+
+export type Brand = "dulux" | "haymes";
+export const BRANDS: Record<Brand, { name: string; logo: string }> = {
+  dulux: { name: "Dulux", logo: asset("dulux.svg") },
+  haymes: { name: "Haymes", logo: asset("haymes.svg") },
+};
+
+/** Standard photo folders, available on every proposal alongside the
+ *  quote's own SimPRO folders. */
+export const LIBRARY_FOLDERS: { id: string; name: string; photos: string[] }[] = [
+  {
+    id: "building",
+    name: "Building",
+    photos: [
+      "web-the-work.jpg",
+      "project-2.jpeg",
+      "project-1.jpeg",
+      "drilldown.jpeg",
+      "trafalgar.jpg",
+      "web-rope-access-works.jpg",
+    ].map(asset),
+  },
+  {
+    id: "team",
+    name: "Team",
+    photos: ["team-abseil.webp", "team-gutter.webp", "team-painting.webp", "team-tower.jpg"].map(asset),
+  },
+];
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+export interface Job {
+  building: string;
+  client: string;
+  contact: string;
+  site: string;
+  quote: string;
+  date: string; // YYYY-MM-DD
+  valid: string; // days
+  pm: string;
+  pmTitle: string;
+  phone: string;
+  email: string;
+  signer: string;
+  signerTitle: string;
+}
+
+export interface SpecRow {
+  surface: string;
+  system: string;
+  coats: string;
+}
+
+export interface Finding {
+  photo: string;
+  code: string; // report style only
+  title: string;
+  desc: string; // standard style: one point per line
+}
+
+/** Standard: photo, title and points. Report: inspection style, with defect
+ *  codes, plus the Flagged issues and Pre-start pages. */
+export type FindingsStyle = "standard" | "report";
+
+export interface SimproFolder {
+  id: string; // "sp:<SimPRO folder id>"
+  name: string;
+  count: number;
+}
+
+export interface SimproPhoto {
+  id: string;
+  name: string;
+  url: string; // data: URL until its Blob upload finishes, then the Blob URL
+  folderId: string;
+}
+
+export interface ProposalSections {
+  cover: { blurb: string; photo: string };
+  intro: { open: string; bullets: { t: string; d: string }[]; close: string };
+  project: {
+    p1: string;
+    p2: string;
+    type: string;
+    access: string;
+    program: string;
+    photo: string;
+    brand: Brand;
+    specIntro: string;
+    note: string;
+    rows: Record<Brand, SpecRow[]>;
+  };
+  scope: { intro: string; inc: string; exc: string };
+  findings: { intro: string; style: FindingsStyle; items: Finding[] };
+  flagged: { intro: string; rows: { code: string; count: string }[] };
+  prestart: { intro: string; rows: { code: string; work: string; where: string }[]; note: string };
+  access: {
+    intro: string;
+    aerial: string;
+    stages: { when: string; what: string; where: string }[];
+    drops: { d: string; where: string; access: string; levels: string; stage: string }[];
+  };
+  pricing: { intro: string; stages: { label: string; note: string; amt: string }[]; terms: string };
+  maintenance: { intro: string; price: string };
+  accept: { intro: string };
+}
+
+export interface Proposal {
+  version: 3;
+  quote: string;
+  job: Job;
+  order: PageId[];
+  hidden: Partial<Record<PageId, boolean>>;
+  folders: string[]; // enabled photo folders: library ids + SimPRO "sp:" ids
+  uploads: string[]; // newest first, max 20
+  simpro: { folders: SimproFolder[]; photos: SimproPhoto[] };
+  d: ProposalSections;
+}
+
+// Lists on pages that flow onto continuation sheets (findings, flagged,
+// pre-start, drops, price stages) are capped only to keep a PDF sane; the rest are capped
+// so their single page never overflows.
+export const LIMITS = {
+  bullets: 6,
+  specRows: 6,
+  findings: 120,
+  flagged: 40,
+  prestart: 40,
+  stages: 4,
+  drops: 40,
+  priceStages: 40,
+  uploads: 20,
+};
+
+export function isProposal(x: unknown): x is Proposal {
+  const p = x as Proposal | null;
+  return !!p && p.version === 3 && typeof p.quote === "string" && !!p.job && !!p.d && Array.isArray(p.order);
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+export const pad2 = (n: number) => String(n).padStart(2, "0");
+export const lines = (t: string) =>
+  String(t || "")
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+export const bandOf = (code: string): Band => CODES[code]?.band ?? "grey";
+
+export function todayISO(d = new Date()): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+// Company email convention: firstname@rasvertex.com.au.
+export function deriveEmail(name: string): string {
+  const first = (name.trim().split(/\s+/)[0] ?? "").toLowerCase().replace(/[^a-z]/g, "");
+  return first ? `${first}@rasvertex.com.au` : "";
+}
+
+export const COMPANY_PHONE = "07 5371 0201";
+
+export function resolvePhoto(p: Proposal, ref: string): string {
+  if (!ref) return "";
+  if (ref.startsWith("ph:")) return p.simpro.photos.find((x) => x.id === ref.slice(3))?.url ?? "";
+  return ref;
+}
+
+/** Every photo the visible document shows — the PDF export inlines these. */
+export function referencedPhotos(p: Proposal): string[] {
+  const d = p.d;
+  return [d.cover.photo, d.project.photo, d.access.aerial, ...d.findings.items.map((f) => f.photo)].filter(Boolean);
+}
+
+/** Merges a saved draft over fresh defaults, and puts any page the draft
+ *  doesn't know about back at its registry position. */
+export function mergeDraft(saved: Proposal, fresh: Proposal): Proposal {
+  const d = { ...fresh.d } as ProposalSections;
+  for (const k of Object.keys(d) as (keyof ProposalSections)[]) {
+    if (saved.d?.[k]) (d as unknown as Record<string, unknown>)[k] = { ...fresh.d[k], ...saved.d[k] };
+  }
+  // Drafts from before the style switch were all report style.
+  if (saved.d?.findings && !saved.d.findings.style)
+    d.findings = { ...d.findings, style: saved.d.findings.items?.length ? "report" : "standard" };
+  const order = (saved.order ?? []).filter((id) => PAGE[id]);
+  PAGES.forEach((pg, i) => {
+    if (!order.includes(pg.id)) order.splice(Math.min(i, order.length), 0, pg.id);
+  });
+  return {
+    ...fresh,
+    ...saved,
+    job: { ...fresh.job, ...saved.job },
+    order,
+    hidden: saved.hidden ?? {},
+    simpro: saved.simpro ?? fresh.simpro,
+    d,
+  };
+}
+
+// ── Construction from a SimPRO quote ─────────────────────────────────────────
+
+export interface QuoteHeader {
+  siteName: string;
+  siteAddress: string;
+  clientName: string;
+  contactName: string;
+  salespersonName: string;
+}
+
+export interface QuotePricingRow {
+  id: string;
+  groupLabel: string;
+  label: string;
+  amountExTax: number;
+}
+
+/** One price stage per SimPRO cost centre. */
+export function stagesFromPricing(rows: QuotePricingRow[]): ProposalSections["pricing"]["stages"] {
+  const order: string[] = [];
+  const sums = new Map<string, number>();
+  for (const r of rows) {
+    const key = r.groupLabel || "Works";
+    if (!sums.has(key)) order.push(key);
+    sums.set(key, (sums.get(key) ?? 0) + (r.amountExTax || 0));
+  }
+  return order.map((label) => ({ label, note: "", amt: String(Math.round((sums.get(label) ?? 0) * 100) / 100) }));
+}
+
+/** Job fields that come from the SimPRO quote (the rest are the rep's). */
+export function jobFromQuote(quote: string, h: QuoteHeader): Partial<Job> {
+  const pm = h.salespersonName.trim();
+  return {
+    building: h.siteName || h.clientName || "",
+    client: h.clientName,
+    contact: h.contactName.trim().split(/\s+/)[0] ?? "",
+    site: h.siteAddress,
+    quote,
+    ...(pm ? { pm, email: deriveEmail(pm) } : {}),
+  };
+}
+
+export function createProposal(quote: string, h: QuoteHeader, pricing: QuotePricingRow[]): Proposal {
+  const job: Job = {
+    building: "",
+    client: "",
+    contact: "",
+    site: "",
+    quote,
+    date: todayISO(),
+    valid: "30",
+    pm: "Hylton Denton",
+    pmTitle: "Project Manager",
+    phone: COMPANY_PHONE,
+    email: "hylton@rasvertex.com.au",
+    signer: "Phil Clark",
+    signerTitle: "Director",
+    ...jobFromQuote(quote, h),
+  };
+  const b = job.building || "your building";
+  const street = job.site.split(",")[0]?.trim() || b;
+  const stages = stagesFromPricing(pricing);
+
+  return {
+    version: 3,
+    quote,
+    job,
+    order: PAGES.map((p) => p.id),
+    // Findings start in standard style. Flagged issues and Pre-start come on
+    // with report style (tagged inspection photos, see survey.ts).
+    hidden: { flagged: true, prestart: true },
+    folders: ["building", "team"],
+    uploads: [],
+    simpro: { folders: [], photos: [] },
+    d: {
+      cover: {
+        blurb: `Proposal for the full external repaint and remedial works at ${street}. Every defect repaired, two full coats applied by rope access, and an 8-year written warranty, with residents in the building throughout.`,
+        photo: asset("web-the-work.jpg"),
+      },
+      intro: {
+        open: `Thank you for the opportunity to quote on ${b}. We inspected the building face by face before pricing, so this proposal is built on what we found, not a generic scope. Here’s what the committee gets:`,
+        bullets: [
+          { t: "Every defect repaired, already priced", d: "Every defect from our survey is fixed before any paint goes on." },
+          { t: "Two full coats, photographed", d: "A coastal-grade Dulux system applied to spec, with photo evidence at every stage." },
+          { t: "Rope access, building stays open", d: "No scaffold blocking the site. Residents keep full use of the building throughout." },
+          { t: "One project manager, start to finish", d: "I run your job personally, from first site visit to warranty handover." },
+          { t: "8-year written warranty", d: "As standard, and never tied to a maintenance plan." },
+        ],
+        close: `Your price is fixed for this scope. If anything new turns up, we stop, show you the evidence and price it in writing before any work goes ahead. Any questions, call or text me directly on ${COMPANY_PHONE}.`,
+      },
+      project: {
+        p1: "",
+        p2: "Rope access does most of the work from the roof down. Only the lower levels need a knuckle boom or mobile scaffold, and residents keep full use of the building throughout.",
+        type: "Residential high-rise",
+        access: "Rope access",
+        program: "",
+        photo: asset("project-2.jpeg"),
+        brand: "dulux",
+        specIntro:
+          "After 25+ years painting coastal buildings, we know which systems last here. Each one below was specified with the manufacturer’s representative, who also inspects our work on site, so your warranty is backed by both of us.",
+        note: "Coastal grade system, checked on site by the manufacturer’s representative.",
+        rows: {
+          dulux: [
+            { surface: "Rendered walls", system: "Dulux AcraTex sealer + Dulux Weathershield Low Sheen", coats: "Sealer + 2 full coats" },
+            { surface: "Trims and fascias", system: "Dulux Weathershield Gloss", coats: "2 full coats" },
+            { surface: "Metal balustrades", system: "Dulux Metalshield", coats: "Primer + 2 full coats" },
+          ],
+          haymes: [
+            { surface: "Rendered walls", system: "Haymes masonry sealer + Haymes Solarscreen Low Sheen", coats: "Sealer + 2 full coats" },
+            { surface: "Trims and fascias", system: "Haymes Ultratrim Gloss", coats: "2 full coats" },
+            { surface: "Metal balustrades", system: "Haymes metal primer + Haymes Ultratrim", coats: "Primer + 2 full coats" },
+          ],
+        },
+      },
+      scope: {
+        intro:
+          "Exactly what your price covers. If we find something during the job that isn’t listed here, we stop, show you the evidence and price it in writing before any work goes ahead.",
+        inc: [
+          "Full pressure clean of all painted and rendered surfaces",
+          "Crack injection and substrate repair",
+          "Repair of every defect flagged in the site survey, by our own remedial team",
+          "Two-coat premium coating system, coastal grade",
+          "All access as set out in the access plan",
+          "Full site clean-up and waste removal on completion",
+        ].join("\n"),
+        exc: [
+          "Internal painting or works of any kind",
+          "Structural or engineering-certified remedial work",
+          "Permit and council fees, if required for this site",
+          "Defects hidden at survey, priced and approved in writing before work proceeds",
+        ].join("\n"),
+      },
+      findings: {
+        intro: `We inspected ${b} before writing a single line of this quote. What we found decides which defects need repair, which products will last, and which specialist teams go on site. Every defect shown is already priced, so there are no surprises.`,
+        style: "standard",
+        items: [],
+      },
+      flagged: {
+        intro:
+          "Every defect from the survey, sorted by urgency. Priority items are made safe first, before rope access begins, so the building is safe for residents and our crew.",
+        rows: [],
+      },
+      prestart: {
+        intro:
+          "Repairs come before paint, never after. This is the order we work in, so every repair is sound before the coating goes over it and nothing comes back through the new finish.",
+        rows: [],
+        note: "Before painting starts, our dedicated maintenance team works through every item above and reports back to the committee with photos. Only then does the coating go on. It’s how we hold ourselves to a higher standard, and why we’ve been the Sunshine Coast’s trusted painting partner for over 25 years.",
+      },
+      access: {
+        intro:
+          "Planned face by face so residents always know where we’ll be. Rope access works the building from the roof down, and residents get 48 hours’ notice before we reach their floor.",
+        aerial: "",
+        stages: [
+          { when: "Weeks 1 to 2", what: "Wash & prep", where: "" },
+          { when: "Weeks 3 to 5", what: "Remedial repairs", where: "" },
+          { when: "Weeks 6 to 9", what: "Coating & sign-off", where: "" },
+        ],
+        drops: [],
+      },
+      pricing: {
+        intro:
+          "One fixed price, broken down by stage. Repair allowances are included, and anything beyond them is priced in writing first.",
+        stages: stages.length ? stages : [{ label: "Works", note: "", amt: "0" }],
+        terms: [
+          "Deposit: 10% on acceptance of this proposal.",
+          "Progress claims: tied to the percentage of the job completed.",
+          "Final payment: on completion and sign-off.",
+          "Workmanship warranty: 8 years, written, as standard. The industry norm is 5.",
+        ].join("\n"),
+      },
+      maintenance: {
+        intro:
+          "After handover, the plan keeps your building looking as it did on day one, catching wear early so it never becomes a full repaint. It’s optional, with nothing to sign until you’re happy with the finished job.",
+        price: "",
+      },
+      accept: {
+        intro: `Sign below or confirm in writing to secure your start date. ${job.pm.split(" ")[0] || "We"} will then confirm the programme with the committee and notify residents before works begin.`,
+      },
+    },
+  };
+}

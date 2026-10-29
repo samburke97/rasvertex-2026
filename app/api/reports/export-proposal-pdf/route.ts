@@ -1,10 +1,9 @@
 // app/api/reports/export-proposal-pdf/route.ts
 //
-// Renders the Painting proposal to PDF from the very same component the
-// builder previews (ProposalDocument), so what the rep sees is what the
-// client gets. The document is a fixed 1440px wide; before printing it is
-// laid onto 1440px pages of A4 proportion (lib/reports/proposal/paginate.ts),
-// with whole sections moved rather than split, footers and page numbers.
+// Renders the Painting proposal to an A4 PDF from the very same component
+// the builder previews (components/reports/proposal/v3/doc/ProposalPages),
+// so what the rep sees is what the client gets. Each visible page is one
+// 210×297mm sheet; hidden pages are left out.
 //
 // With saveToQuote, the finished PDF is also attached to the SimPRO quote
 // (replacing an earlier export of the same name). The download is returned
@@ -15,121 +14,82 @@ import path from "path";
 import { createElement } from "react";
 import sharp from "sharp";
 import { NextRequest, NextResponse } from "next/server";
-import ProposalDocument, {
-  type ProposalDocAssets,
-} from "@/components/reports/proposal/builder/ProposalDocument";
-import {
-  CLIENT_LOGOS,
-  CLIENT_LOGO_DIR,
-  SERVICES,
-  isProposalData,
-  referencedPhotoIds,
-  todayLong,
-  type ProposalData,
-} from "@/lib/reports/proposal.types";
-import { paginateScript } from "@/lib/reports/proposal/paginate";
+import ProposalPages from "@/components/reports/proposal/v3/doc/ProposalPages";
+import { derive } from "@/lib/reports/proposal/v3/derive";
+import { ASSET_DIR, isProposal, resolvePhoto, type Proposal } from "@/lib/reports/proposal/v3/types";
 import { pdfDownloadResponse, readPublicAsBase64, renderPDF } from "@/lib/server/pdf-utils";
-import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveReportImages";
+import { createImageResolver } from "@/lib/server/resolveReportImages";
 import { getSimproConfig, saveQuoteAttachment } from "@/lib/server/simpro";
 
 export const maxDuration = 60;
 
-// 1440 × (1440 × √2): A4 proportions at the document's own width.
-const PAGE_W = 1440;
-const PAGE_H = 2036;
-const PAGE = { width: `${PAGE_W}px`, height: `${PAGE_H}px` };
+// Static assets are print-sized once per server instance.
+const assetCache = new Map<string, Promise<string>>();
 
-interface StaticAssets {
-  doc: ProposalDocAssets;
-  clientLogos: Record<string, string>;
-  fonts: { inter: string; bebas: string; script: string };
-}
-
-// The static images are print-sized once per server instance: the service
-// photos in public/ are 3-5MB PNGs, far beyond the ~450px cards they fill.
-async function shrink(rel: string, maxWidth: number, format: "jpeg" | "png"): Promise<string> {
-  try {
-    const input = fs.readFileSync(path.join(process.cwd(), "public", rel));
-    const img = sharp(input).resize({ width: maxWidth, withoutEnlargement: true });
-    const out = format === "png" ? await img.png().toBuffer() : await img.jpeg({ quality: 80 }).toBuffer();
-    return `data:image/${format};base64,${out.toString("base64")}`;
-  } catch {
-    return readPublicAsBase64(rel);
-  }
-}
-
-let _assets: Promise<StaticAssets> | null = null;
-
-function loadAssets(): Promise<StaticAssets> {
-  _assets ??= (async () => {
-    const clientLogos: Record<string, string> = {};
-    for (const [name, { file }] of Object.entries(CLIENT_LOGOS)) {
-      const rel = CLIENT_LOGO_DIR.replace(/^\//, "") + file;
-      if (fs.existsSync(path.join(process.cwd(), "public", rel))) {
-        clientLogos[name] = readPublicAsBase64(rel);
+function staticAsset(rel: string): Promise<string> {
+  let hit = assetCache.get(rel);
+  if (!hit) {
+    hit = (async () => {
+      const file = path.join(process.cwd(), "public", rel);
+      if (/\.svg$/i.test(rel) || !fs.existsSync(file)) return readPublicAsBase64(rel);
+      try {
+        const img = sharp(fs.readFileSync(file)).resize({ width: 1800, withoutEnlargement: true });
+        const png = /\.png$/i.test(rel);
+        const out = png ? await img.png().toBuffer() : await img.jpeg({ quality: 82 }).toBuffer();
+        return `data:image/${png ? "png" : "jpeg"};base64,${out.toString("base64")}`;
+      } catch {
+        return readPublicAsBase64(rel);
       }
-    }
-    const services = await Promise.all(
-      SERVICES.map(async (s) => [s.id, await shrink(s.img.replace(/^\//, ""), 900, "jpeg")] as const),
-    );
-    return {
-      doc: {
-        logo: await shrink("reports/proposal/assets/logo-full.png", 800, "png"),
-        haymes: readPublicAsBase64("reports/proposal/assets/haymes.svg"),
-        dulux: readPublicAsBase64("reports/proposal/assets/dulux.svg"),
-        services: Object.fromEntries(services),
-      },
-      clientLogos,
-      fonts: {
-        inter: readPublicAsBase64("fonts/inter.woff2"),
-        bebas: readPublicAsBase64("fonts/bebas-neue.woff2"),
-        script: readPublicAsBase64("fonts/la-belle-aurore.woff2"),
-      },
-    };
-  })();
-  return _assets;
+    })();
+    assetCache.set(rel, hit);
+  }
+  return hit;
 }
 
-async function buildHTML(report: ProposalData): Promise<string> {
-  const assets = await loadAssets();
+let _fonts: { inter: string; bebas: string; script: string } | null = null;
+const fonts = () =>
+  (_fonts ??= {
+    inter: readPublicAsBase64("fonts/inter.woff2"),
+    bebas: readPublicAsBase64("fonts/bebas-neue.woff2"),
+    script: readPublicAsBase64("fonts/la-belle-aurore.woff2"),
+  });
 
-  // Only the photos the document actually shows get fetched and inlined.
-  // Cover and aerial render near full width, so they keep their size;
-  // finding photos are a third of the page and get the grid resize.
-  const ids = referencedPhotoIds(report);
+async function buildHTML(p: Proposal): Promise<string> {
+  const D = derive(p);
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const render = (img: (ref: string) => string) =>
+    renderToStaticMarkup(createElement(ProposalPages, { p, D, mode: "print", img }));
+
+  // Pass 1 collects every image the visible pages use; pass 2 renders with
+  // each one inlined as a data: URL.
+  const refs = new Set<string>();
+  render((ref) => {
+    if (ref) refs.add(ref);
+    return "";
+  });
   const resolve = createImageResolver();
   const resolved = new Map<string, string>();
   await Promise.all(
-    report.photos
-      .filter((ph) => ids.has(ph.id))
-      .map(async (ph) => {
-        const fullSize = ph.id === report.cover.photo || ph.id === report.access.aerial;
-        resolved.set(ph.id, await resolve(ph.url, fullSize ? undefined : GRID_PHOTO_RESIZE));
-      }),
-  );
-
-  // Dynamic import keeps react-dom/server out of the route's module graph
-  // until it's actually needed.
-  const { renderToStaticMarkup } = await import("react-dom/server");
-  const body = renderToStaticMarkup(
-    createElement(ProposalDocument, {
-      p: report,
-      photoUrl: (id) => (id ? (resolved.get(id) ?? null) : null),
-      assets: assets.doc,
-      clientLogos: assets.clientLogos,
-      today: todayLong(),
+    [...refs].map(async (ref) => {
+      const url = resolvePhoto(p, ref);
+      if (!url) return;
+      if (url.startsWith("data:")) resolved.set(ref, url);
+      else if (url.startsWith(ASSET_DIR)) resolved.set(ref, await staticAsset(url.replace(/^\//, "")));
+      else resolved.set(ref, await resolve(url));
     }),
   );
+  const body = render((ref) => resolved.get(ref) ?? "");
 
-  const { inter, bebas, script } = assets.fonts;
-  const title = `Proposal - ${report.job.building} - Q${report.quote}`.replace(/[<>&"]/g, "");
+  const { inter, bebas, script } = fonts();
+  const title = `Proposal - ${p.job.client} - Q${p.job.quote}`.replace(/[<>&"]/g, "");
   return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>
-@font-face{font-family:'Inter';font-weight:300 700;font-style:normal;src:url("${inter}") format('woff2');}
+@font-face{font-family:'Inter';font-weight:200 700;font-style:normal;src:url("${inter}") format('woff2');}
 @font-face{font-family:'Bebas Neue';font-weight:400;font-style:normal;src:url("${bebas}") format('woff2');}
 @font-face{font-family:'La Belle Aurore';font-weight:400;font-style:normal;src:url("${script}") format('woff2');}
-@page{size:${PAGE.width} ${PAGE.height};margin:0;}
+@page{size:A4;margin:0;}
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.pb3-sheet:last-child{break-after:auto!important;page-break-after:auto!important;}
 </style></head><body>${body}</body></html>`;
 }
 
@@ -146,24 +106,15 @@ export async function POST(request: NextRequest) {
   }
 
   const report = body.report;
-  if (!isProposalData(report)) {
+  if (!isProposal(report)) {
     return NextResponse.json({ error: "proposal data is required" }, { status: 400 });
   }
 
-  const filename =
-    safeName(`Proposal - ${report.job.building || "Painting"} - Q${report.quote}`) + ".pdf";
+  const filename = safeName(`Proposal - ${report.job.client || report.job.building || "Painting"} - Q${report.job.quote}`) + ".pdf";
 
   let buffer: Buffer;
   try {
-    const html = await buildHTML(report);
-    buffer = await renderPDF(html, {
-      pageSize: PAGE,
-      prepareScript: paginateScript({
-        width: PAGE_W,
-        height: PAGE_H,
-        footerLeft: `RAS-VERTEX · Proposal Q ${report.quote}`,
-      }),
-    });
+    buffer = await renderPDF(await buildHTML(report));
   } catch (err) {
     console.error("[ExportProposalPDF]", err);
     return NextResponse.json({ error: "PDF generation failed." }, { status: 500 });

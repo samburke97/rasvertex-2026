@@ -30,7 +30,14 @@ import styles from "./DocEditor.module.css";
 interface DocEditorProps {
   value: string;
   onChange: (html: string) => void;
+  /** "doc" (default): every block type. "prose": paragraphs, bullet and
+   *  numbered lists, bold, italic — no headings, quotes or other styles.
+   *  "list": one item per line, bold and italic only (no "/" menu). */
+  variant?: "doc" | "prose" | "list";
+  placeholder?: string;
 }
+
+const PROSE_COMMANDS = new Set(["Text", "Bullet list", "Numbered list"]);
 
 // ── Slash-command palette ─────────────────────────────────────────────────────
 
@@ -188,6 +195,7 @@ const SlashCommand = Extension.create({
   name: "slashCommand",
   addOptions() {
     return {
+      items: COMMAND_ITEMS,
       suggestion: {
         char: "/",
         startOfLine: false,
@@ -210,7 +218,7 @@ const SlashCommand = Extension.create({
       Suggestion({
         editor: this.editor,
         items: ({ query }: { query: string }) =>
-          COMMAND_ITEMS.filter((i) => i.title.toLowerCase().includes(query.toLowerCase())).slice(
+          (this.options.items as CommandItem[]).filter((i) => i.title.toLowerCase().includes(query.toLowerCase())).slice(
             0,
             8,
           ),
@@ -218,11 +226,16 @@ const SlashCommand = Extension.create({
           let component: ReactRenderer<SlashListHandle> | undefined;
           let popup: HTMLElement | undefined;
 
+          // Fixed to the viewport: opens upward when there's no room below
+          // the cursor, and never runs off either side.
           const position = (clientRect?: (() => DOMRect | null) | null) => {
             const rect = clientRect?.();
             if (!rect || !popup) return;
-            popup.style.left = `${rect.left}px`;
-            popup.style.top = `${rect.bottom + 6}px`;
+            const h = popup.offsetHeight || 280;
+            const w = popup.offsetWidth || 240;
+            const below = rect.bottom + 6 + h <= window.innerHeight - 8;
+            popup.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - w - 8))}px`;
+            popup.style.top = `${below ? rect.bottom + 6 : Math.max(8, rect.top - 6 - h)}px`;
           };
 
           return {
@@ -233,9 +246,11 @@ const SlashCommand = Extension.create({
               });
               popup = component.element as HTMLElement;
               popup.style.position = "fixed";
-              popup.style.zIndex = "80";
+              popup.style.zIndex = "2147483000";
               document.body.appendChild(popup);
               position(props.clientRect);
+              // Measure again once it has rendered, to flip if needed.
+              requestAnimationFrame(() => position(props.clientRect));
             },
             onUpdate: (props: SuggestionProps<CommandItem>) => {
               component?.updateProps({ items: props.items, command: props.command });
@@ -262,22 +277,30 @@ const SlashCommand = Extension.create({
 
 // ── Editor ────────────────────────────────────────────────────────────────────
 
-export default function DocEditor({ value, onChange }: DocEditorProps) {
+export default function DocEditor({ value, onChange, variant = "doc", placeholder }: DocEditorProps) {
   const focusedRef = useRef(false);
+  const doc = variant === "doc";
 
-  const extensions = useMemo(
-    () => [
-      StarterKit.configure({ heading: { levels: [2] } }),
-      Placeholder.configure({
-        placeholder: "Type '/' for commands",
-        emptyEditorClass: styles.isEmpty,
-      }),
-      TaskList,
-      TaskItem.configure({ nested: false }),
-      SlashCommand,
-    ],
-    [],
-  );
+  const extensions = useMemo(() => {
+    const ph = Placeholder.configure({
+      placeholder: placeholder ?? (variant === "list" ? "One per line" : "Type '/' for commands"),
+      emptyEditorClass: styles.isEmpty,
+    });
+    if (doc) {
+      return [StarterKit.configure({ heading: { levels: [2] } }), ph, TaskList, TaskItem.configure({ nested: false }), SlashCommand];
+    }
+    // Restricted: no headings, quotes, code, strike or rules — so the text
+    // can't step outside the document's type scale.
+    const plain = { heading: false, blockquote: false, codeBlock: false, code: false, horizontalRule: false, strike: false } as const;
+    if (variant === "list")
+      return [StarterKit.configure({ ...plain, bulletList: false, orderedList: false, listItem: false }), ph];
+    return [
+      StarterKit.configure(plain),
+      ph,
+      SlashCommand.configure({ items: COMMAND_ITEMS.filter((c) => PROSE_COMMANDS.has(c.title)) }),
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const editor = useEditor({
     extensions,
@@ -328,8 +351,8 @@ export default function DocEditor({ value, onChange }: DocEditorProps) {
           >
             <span style={{ fontStyle: "italic" }}>I</span>
           </button>
-          <div className={styles.bubbleDivider} />
-          <button
+          {doc && <div className={styles.bubbleDivider} />}
+          {doc && <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
@@ -338,15 +361,15 @@ export default function DocEditor({ value, onChange }: DocEditorProps) {
             }
           >
             H2
-          </button>
-          <button
+          </button>}
+          {doc && <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
             className={editor.isActive("blockquote") ? styles.bubbleBtnActive : styles.bubbleBtn}
           >
             <IconQuote />
-          </button>
+          </button>}
         </BubbleMenu>
       )}
       <EditorContent editor={editor} className={styles.editorWrap} />

@@ -18,7 +18,7 @@
 //   quoteNo    "Q10614" (quote rule)
 //   phone      company phone
 
-import { COMPANY_PHONE } from "@/lib/reports/proposal.types";
+import { COMPANY_PHONE } from "@/lib/reports/proposal/v3/types";
 import { OUTREACH_SIGNER } from "./email";
 import { OUTREACH_RULES, type OutreachRuleId } from "./rules";
 import type { Opportunity } from "./store";

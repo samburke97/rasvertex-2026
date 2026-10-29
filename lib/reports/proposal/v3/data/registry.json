@@ -1,0 +1,374 @@
+{
+  "pages": [
+    {
+      "id": "cover",
+      "name": "Cover",
+      "fixed": true
+    },
+    {
+      "id": "contents",
+      "name": "Contents",
+      "fixed": true,
+      "locked": true
+    },
+    {
+      "id": "company",
+      "name": "Our company",
+      "cat": "About us",
+      "locked": true
+    },
+    {
+      "id": "recent",
+      "name": "Recent project",
+      "cat": "About us",
+      "locked": true
+    },
+    {
+      "id": "intro",
+      "name": "Introduction",
+      "cat": "Your project"
+    },
+    {
+      "id": "project",
+      "name": "Your project",
+      "cat": "Your project"
+    },
+    {
+      "id": "scope",
+      "name": "Scope",
+      "cat": "Your project"
+    },
+    {
+      "id": "findings",
+      "name": "Site survey & findings",
+      "sec": "findings",
+      "cat": "Your project"
+    },
+    {
+      "id": "flagged",
+      "name": "Flagged issues",
+      "sec": "findings",
+      "cat": "Your project"
+    },
+    {
+      "id": "prestart",
+      "name": "Pre-start maintenance",
+      "sec": "findings",
+      "cat": "Your project"
+    },
+    {
+      "id": "access",
+      "name": "Access & disruption plan",
+      "cat": "Your project"
+    },
+    {
+      "id": "safety",
+      "name": "Safety",
+      "cat": "Your project",
+      "locked": true
+    },
+    {
+      "id": "pricing",
+      "name": "Pricing & terms",
+      "cat": "Pricing"
+    },
+    {
+      "id": "maintenance",
+      "name": "10-year maintenance plan",
+      "cat": "Pricing"
+    },
+    {
+      "id": "accept",
+      "name": "Acceptance",
+      "cat": "Pricing"
+    },
+    {
+      "id": "terms",
+      "name": "Terms & conditions",
+      "cat": "Pricing",
+      "locked": true
+    }
+  ],
+  "lockedPageNotes": {
+    "contents": "Contents builds itself from the pages you include. Hide or reorder pages and it updates.",
+    "company": "Standard company page. Same in every proposal.",
+    "recent": "Standard sales page. Same in every proposal.",
+    "safety": "Standard safety page. Same in every proposal.",
+    "terms": "Standard terms and conditions. Same in every proposal."
+  },
+  "jobFields": [
+    {
+      "key": "building",
+      "label": "Building",
+      "type": "text"
+    },
+    {
+      "key": "client",
+      "label": "Client",
+      "type": "text"
+    },
+    {
+      "key": "contact",
+      "label": "Contact first name",
+      "type": "text"
+    },
+    {
+      "key": "site",
+      "label": "Site address",
+      "type": "text"
+    },
+    {
+      "key": "quote",
+      "label": "Quote number",
+      "type": "text"
+    },
+    {
+      "key": "date",
+      "label": "Proposal date",
+      "type": "date"
+    },
+    {
+      "key": "valid",
+      "label": "Valid for (days)",
+      "type": "number"
+    },
+    {
+      "key": "pm",
+      "label": "Project manager",
+      "type": "text"
+    },
+    {
+      "key": "pmTitle",
+      "label": "Manager title",
+      "type": "text"
+    },
+    {
+      "key": "phone",
+      "label": "Phone",
+      "type": "text"
+    },
+    {
+      "key": "email",
+      "label": "Email",
+      "type": "text"
+    },
+    {
+      "key": "signer",
+      "label": "RAS-VERTEX signatory",
+      "type": "text"
+    },
+    {
+      "key": "signerTitle",
+      "label": "Signatory title",
+      "type": "text"
+    }
+  ],
+  "defectCodes": {
+    "SH": {
+      "name": "Safety hazard",
+      "band": "red",
+      "defaultWork": "Make safe and repair hazards"
+    },
+    "SP": {
+      "name": "Spalling",
+      "band": "red",
+      "defaultWork": "Concrete spalling repairs"
+    },
+    "CO": {
+      "name": "Corrosion",
+      "band": "red",
+      "defaultWork": "Corrosion treatment and fixing replacement"
+    },
+    "SC": {
+      "name": "Structural crack",
+      "band": "red",
+      "defaultWork": "Structural crack assessment and repair"
+    },
+    "WI": {
+      "name": "Water ingress",
+      "band": "red",
+      "defaultWork": "Leak investigation and repair"
+    },
+    "RC": {
+      "name": "Render crack",
+      "band": "amber",
+      "defaultWork": "Render crack repairs"
+    },
+    "DR": {
+      "name": "Drummy render",
+      "band": "amber",
+      "defaultWork": "Drummy render repairs"
+    },
+    "SF": {
+      "name": "Sealant failure",
+      "band": "amber",
+      "defaultWork": "Joint and sealant replacement"
+    },
+    "LF": {
+      "name": "Loose fixing",
+      "band": "amber",
+      "defaultWork": "Refix loose items"
+    },
+    "WS": {
+      "name": "Window seal failure",
+      "band": "amber",
+      "defaultWork": "Window seal replacement"
+    },
+    "FL": {
+      "name": "Flashing problem",
+      "band": "amber",
+      "defaultWork": "Flashing repairs"
+    },
+    "BL": {
+      "name": "Balustrade problem",
+      "band": "amber",
+      "defaultWork": "Balustrade repairs"
+    },
+    "RM": {
+      "name": "Roof membrane problem",
+      "band": "amber",
+      "defaultWork": "Roof membrane repair or recoat"
+    },
+    "PW": {
+      "name": "Ponding water",
+      "band": "amber",
+      "defaultWork": "Drainage and falls correction"
+    },
+    "BD": {
+      "name": "Blocked drain or gutter",
+      "band": "amber",
+      "defaultWork": "Gutter and drain clean"
+    },
+    "HC": {
+      "name": "Hairline crack",
+      "band": "grey",
+      "defaultWork": "Hairline crack filling and recoat"
+    },
+    "CD": {
+      "name": "Paint or coating delamination",
+      "band": "grey",
+      "defaultWork": "Recoat failed paint and coatings"
+    },
+    "RS": {
+      "name": "Rust spot",
+      "band": "grey",
+      "defaultWork": "Rust treatment and touch up"
+    }
+  },
+  "bands": {
+    "red": {
+      "bg": "#fbe7e7",
+      "fg": "#a83a3a"
+    },
+    "amber": {
+      "bg": "#fcf0dc",
+      "fg": "#86561a"
+    },
+    "grey": {
+      "bg": "#eef1f6",
+      "fg": "rgba(1,25,85,0.72)"
+    }
+  },
+  "flaggedGroups": {
+    "red": [
+      "Priority",
+      "Safety risks and active damage. Act now."
+    ],
+    "amber": [
+      "Repair",
+      "Defects that will get worse. Plan repairs."
+    ],
+    "grey": [
+      "Monitor",
+      "Minor items, handled during the repaint."
+    ]
+  },
+  "prestartGroups": {
+    "red": [
+      "Before works start",
+      "Made safe and repaired before rope access begins."
+    ],
+    "amber": [
+      "Before coating",
+      "Repaired during prep, ahead of any sealer or paint."
+    ],
+    "grey": [
+      "During the repaint",
+      "Handled as part of the full coating system."
+    ]
+  },
+  "stageColours": [
+    {
+      "bg": "#dff2e6",
+      "fg": "#2f7a55"
+    },
+    {
+      "bg": "#deeeff",
+      "fg": "#2563a8"
+    },
+    {
+      "bg": "#eef1f6",
+      "fg": "rgba(1,25,85,0.72)"
+    },
+    {
+      "bg": "#fcf0dc",
+      "fg": "#86561a"
+    }
+  ],
+  "paintBrands": {
+    "dulux": {
+      "name": "Dulux",
+      "logo": "./assets/dulux.svg"
+    },
+    "haymes": {
+      "name": "Haymes",
+      "logo": "./assets/haymes.svg"
+    }
+  },
+  "photoFolders": [
+    {
+      "id": "survey",
+      "name": "Site survey",
+      "photos": [
+        "./assets/inspection/p2-2.jpg",
+        "./assets/inspection/p6-1.jpg",
+        "./assets/inspection/p4-0.jpg",
+        "./assets/inspection/p7-2.jpg",
+        "./assets/inspection/p5-3.jpg",
+        "./assets/inspection/p19-1.jpg",
+        "./assets/inspection/p2-1.jpg",
+        "./assets/inspection/p20-2.jpg",
+        "./assets/inspection/p3-3.jpg",
+        "./assets/inspection/p8-3.jpg",
+        "./assets/inspection/p16-0.jpg",
+        "./assets/inspection/p18-1.jpg",
+        "./assets/inspection/p21-1.jpg",
+        "./assets/inspection/p17-0.jpg",
+        "./assets/inspection/p5-1.jpg",
+        "./assets/inspection/p6-0.jpg"
+      ]
+    },
+    {
+      "id": "building",
+      "name": "Building",
+      "photos": [
+        "./assets/web-the-work.jpg",
+        "./assets/project-2.jpeg",
+        "./assets/project-1.jpeg",
+        "./assets/drilldown.jpeg",
+        "./assets/trafalgar.png",
+        "./assets/web-rope-access-works.jpg"
+      ]
+    },
+    {
+      "id": "team",
+      "name": "Team",
+      "photos": [
+        "./assets/team-abseil.webp",
+        "./assets/team-gutter.webp",
+        "./assets/team-painting.webp",
+        "./assets/team-tower.png"
+      ]
+    }
+  ]
+}

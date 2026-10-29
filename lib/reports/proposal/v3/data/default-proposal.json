@@ -1,0 +1,367 @@
+{
+  "job": {
+    "building": "Space",
+    "client": "Space The Residence CTS 34806",
+    "contact": "Pat",
+    "site": "45 The Esplanade, Maroochydore QLD 4558",
+    "quote": "10262",
+    "date": "2026-10-29",
+    "valid": "30",
+    "pm": "Hylton Denton",
+    "pmTitle": "Project Manager",
+    "phone": "07 5371 0201",
+    "email": "hylton@rasvertex.com.au",
+    "signer": "Phil Clark",
+    "signerTitle": "Director"
+  },
+  "order": [
+    "cover",
+    "contents",
+    "company",
+    "recent",
+    "intro",
+    "project",
+    "scope",
+    "findings",
+    "findings2",
+    "flagged",
+    "prestart",
+    "access",
+    "safety",
+    "pricing",
+    "maintenance",
+    "accept",
+    "terms"
+  ],
+  "hidden": {},
+  "folders": [
+    "survey",
+    "building",
+    "team"
+  ],
+  "uploads": [],
+  "d": {
+    "cover": {
+      "blurb": "Proposal for the full external repaint and remedial works at 45 The Esplanade, Maroochydore. Every defect repaired, two full coats applied by rope access, and an 8-year written warranty, with residents in the building throughout.",
+      "photo": "./assets/web-the-work.jpg"
+    },
+    "intro": {
+      "open": "Thank you for the opportunity to quote on Space. We inspected the building face by face before pricing, so this proposal is built on what we found, not a generic scope. Here’s what the committee gets:",
+      "bullets": [
+        {
+          "t": "Every defect repaired, already priced",
+          "d": "All 30 defects from our survey are fixed before any paint goes on."
+        },
+        {
+          "t": "Two full coats, photographed",
+          "d": "A coastal-grade Dulux system applied to spec, with photo evidence at every stage."
+        },
+        {
+          "t": "Rope access, building stays open",
+          "d": "No scaffold on The Esplanade. Residents keep full use of the building throughout."
+        },
+        {
+          "t": "One project manager, start to finish",
+          "d": "I run your job personally, from first site visit to warranty handover."
+        },
+        {
+          "t": "8-year written warranty",
+          "d": "As standard, and never tied to a maintenance plan."
+        }
+      ],
+      "close": "Your price is fixed for this scope. If anything new turns up, we stop, show you the evidence and price it in writing before any work goes ahead. Any questions, call or text me directly on 07 5371 0201."
+    },
+    "project": {
+      "p1": "Space sits 50 metres from the water, so salt air and UV are the biggest threats to your coating. That shaped every decision in this proposal, from the products we specify to how we reach each face.",
+      "p2": "There’s no room on The Esplanade for scaffold, so rope access does most of the work from the roof down. Only the lower levels need a knuckle boom or mobile scaffold, and residents keep full use of the building throughout.",
+      "type": "Residential high-rise",
+      "access": "Rope access",
+      "program": "9 weeks",
+      "photo": "./assets/project-2.jpeg",
+      "brand": "dulux",
+      "specIntro": "After 25+ years painting coastal buildings, we know which systems last here. Each one below was specified with the manufacturer’s representative, who also inspects our work on site, so your warranty is backed by both of us.",
+      "note": "Coastal grade system, checked on site by the manufacturer’s representative.",
+      "rows": {
+        "dulux": [
+          {
+            "surface": "Rendered walls",
+            "system": "Dulux AcraTex sealer + Dulux Weathershield Low Sheen",
+            "coats": "Sealer + 2 full coats"
+          },
+          {
+            "surface": "Trims and fascias",
+            "system": "Dulux Weathershield Gloss",
+            "coats": "2 full coats"
+          },
+          {
+            "surface": "Metal balustrades",
+            "system": "Dulux Metalshield",
+            "coats": "Primer + 2 full coats"
+          }
+        ],
+        "haymes": [
+          {
+            "surface": "Rendered walls",
+            "system": "Haymes masonry sealer + Haymes Solarscreen Low Sheen",
+            "coats": "Sealer + 2 full coats"
+          },
+          {
+            "surface": "Trims and fascias",
+            "system": "Haymes Ultratrim Gloss",
+            "coats": "2 full coats"
+          },
+          {
+            "surface": "Metal balustrades",
+            "system": "Haymes metal primer + Haymes Ultratrim",
+            "coats": "Primer + 2 full coats"
+          }
+        ]
+      }
+    },
+    "scope": {
+      "intro": "Exactly what your price covers. If we find something during the job that isn’t listed here, we stop, show you the evidence and price it in writing before any work goes ahead.",
+      "inc": "Full pressure clean of all painted and rendered surfaces\nCrack injection and substrate repair\nRepair of every defect flagged in the site survey, by our own remedial team\nTwo-coat premium coating system, coastal grade\nAll access as set out in the access plan: rope access, knuckle boom and mobile scaffold\nFull site clean-up and waste removal on completion",
+      "exc": "Internal painting or works of any kind\nStructural or engineering-certified remedial work\nPermit and council fees, if required for this site\nDefects hidden at survey, priced and approved in writing before work proceeds"
+    },
+    "findings": {
+      "intro": "We inspected Space before writing a single line of this quote. What we found decides which defects need repair, which products will last, and which specialist teams go on site. Every defect shown is already priced, so there are no surprises.",
+      "items": [
+        {
+          "photo": "./assets/inspection/p2-2.jpg",
+          "code": "SH",
+          "title": "Fallen awning, D12 level 3",
+          "desc": "Damage at the fixing points. Make safe before works start."
+        },
+        {
+          "photo": "./assets/inspection/p6-1.jpg",
+          "code": "SP",
+          "title": "Render blowout, D13 level 1",
+          "desc": "Possible spalling behind the privacy screen. Treat steel and patch."
+        },
+        {
+          "photo": "./assets/inspection/p4-0.jpg",
+          "code": "CO",
+          "title": "Corroded frame screws, D16 level 2",
+          "desc": "Top cap screws corroded throughout. Replace fixings."
+        },
+        {
+          "photo": "./assets/inspection/p7-2.jpg",
+          "code": "RC",
+          "title": "Vertical render crack, D9 level 3",
+          "desc": "Rake out, fill with flexible filler and recoat."
+        },
+        {
+          "photo": "./assets/inspection/p5-3.jpg",
+          "code": "SF",
+          "title": "Joint failure, D15 level 2",
+          "desc": "Remove old sealant and reseal with a compatible product."
+        },
+        {
+          "photo": "./assets/inspection/p19-1.jpg",
+          "code": "CD",
+          "title": "Breezeway coating breaking down, S3 level 4",
+          "desc": "Prepare and recoat as part of the repaint."
+        },
+        {
+          "photo": "./assets/inspection/p2-1.jpg",
+          "code": "LF",
+          "title": "Awning screws backing out, D10 level 2",
+          "desc": "Refix into sound backing and replace damaged screws."
+        },
+        {
+          "photo": "./assets/inspection/p20-2.jpg",
+          "code": "HC",
+          "title": "Hairline crack, D16 level 1",
+          "desc": "Fill and seal ahead of the full wall system."
+        }
+      ]
+    },
+    "flagged": {
+      "intro": "Every defect from the survey, sorted by urgency. Priority items are made safe first, before rope access begins, so the building is safe for residents and our crew.",
+      "rows": [
+        {
+          "code": "SH",
+          "count": "3"
+        },
+        {
+          "code": "SP",
+          "count": "1"
+        },
+        {
+          "code": "CO",
+          "count": "5"
+        },
+        {
+          "code": "RC",
+          "count": "9"
+        },
+        {
+          "code": "DR",
+          "count": "1"
+        },
+        {
+          "code": "SF",
+          "count": "5"
+        },
+        {
+          "code": "LF",
+          "count": "2"
+        },
+        {
+          "code": "HC",
+          "count": "2"
+        },
+        {
+          "code": "CD",
+          "count": "1"
+        },
+        {
+          "code": "RS",
+          "count": "1"
+        }
+      ]
+    },
+    "prestart": {
+      "intro": "Repairs come before paint, never after. This is the order we work in, so every repair is sound before the coating goes over it and nothing comes back through the new finish.",
+      "rows": [
+        {
+          "code": "SH",
+          "work": "Make safe and repair hazards",
+          "where": "S1 LR, D10 L2, D12 L3"
+        },
+        {
+          "code": "SP",
+          "work": "Concrete spalling repairs",
+          "where": "D13 L1"
+        },
+        {
+          "code": "CO",
+          "work": "Corrosion treatment and fixing replacement",
+          "where": "D16 L1–L2, S3 LG, L1, L4"
+        },
+        {
+          "code": "RC",
+          "work": "Render crack repairs",
+          "where": "D9, D10, D12, D13, D14, D16, S2, S3"
+        },
+        {
+          "code": "DR",
+          "work": "Drummy render repairs",
+          "where": "D13 L1"
+        },
+        {
+          "code": "SF",
+          "work": "Joint and sealant replacement",
+          "where": "S1 LR, D15 L2, D16 L1, S2 L2, L4"
+        },
+        {
+          "code": "LF",
+          "work": "Refix loose items",
+          "where": "D10 L2"
+        },
+        {
+          "code": "HC",
+          "work": "Hairline crack filling and recoat",
+          "where": "D16 L1, S3 L2"
+        },
+        {
+          "code": "CD",
+          "work": "Recoat failed paint and coatings",
+          "where": "S3 L4"
+        },
+        {
+          "code": "RS",
+          "work": "Rust treatment and touch up",
+          "where": "S1 LR"
+        }
+      ],
+      "note": "Before painting starts, our dedicated maintenance team works through every item above and reports back to the committee with photos. Only then does the coating go on. It’s how we hold ourselves to a higher standard, and why we’ve been the Sunshine Coast’s trusted painting partner for over 25 years."
+    },
+    "access": {
+      "intro": "Nine weeks on site, planned face by face so residents always know where we’ll be. Rope access works the tower from the roof down. The lower east and south faces use a knuckle boom from the car park in weeks 3 to 5, and residents get 48 hours’ notice before we reach their floor.",
+      "aerial": "",
+      "stages": [
+        {
+          "when": "Weeks 1 to 2",
+          "what": "Wash & prep",
+          "where": "D1 north face, D2 north-east corner"
+        },
+        {
+          "when": "Weeks 3 to 5",
+          "what": "Remedial repairs",
+          "where": "D3 east face, D4 south face"
+        },
+        {
+          "when": "Weeks 6 to 9",
+          "what": "Coating & sign-off",
+          "where": "D5 west face, then handover"
+        }
+      ],
+      "drops": [
+        {
+          "d": "D1",
+          "where": "North face",
+          "access": "Rope access",
+          "levels": "1 to 9",
+          "stage": "0"
+        },
+        {
+          "d": "D2",
+          "where": "North-east corner",
+          "access": "Rope access",
+          "levels": "1 to 9",
+          "stage": "0"
+        },
+        {
+          "d": "D3",
+          "where": "East face",
+          "access": "Knuckle boom, from car park",
+          "levels": "1 to 4",
+          "stage": "1"
+        },
+        {
+          "d": "D4",
+          "where": "South face",
+          "access": "Knuckle boom, from car park",
+          "levels": "1 to 4",
+          "stage": "1"
+        },
+        {
+          "d": "D5",
+          "where": "West face and entry",
+          "access": "Ladders and mobile scaffold",
+          "levels": "Ground to 1",
+          "stage": "2"
+        }
+      ]
+    },
+    "pricing": {
+      "intro": "One fixed price, broken down by stage. Repair allowances are included, and anything beyond them is priced in writing first.",
+      "stages": [
+        {
+          "label": "Wash & prep",
+          "note": "Weeks 1 to 2",
+          "amt": "186420"
+        },
+        {
+          "label": "Remedial repairs",
+          "note": "Weeks 3 to 5",
+          "amt": "412815.40"
+        },
+        {
+          "label": "Coating & sign-off",
+          "note": "Weeks 6 to 9",
+          "amt": "670662.28"
+        }
+      ],
+      "terms": "Deposit: 10% on acceptance of this proposal.\nProgress claims: tied to the percentage of the job completed.\nFinal payment: on completion and sign-off.\nWorkmanship warranty: 8 years, written, as standard. The industry norm is 5."
+    },
+    "maintenance": {
+      "intro": "After handover, the plan keeps your building looking as it did on day one, catching wear early so it never becomes a full repaint. It’s optional, with nothing to sign until you’re happy with the finished job.",
+      "price": "18600"
+    },
+    "accept": {
+      "intro": "Sign below or confirm in writing to secure your start date. Hylton will then confirm the programme with the committee and notify residents before works begin."
+    }
+  }
+}

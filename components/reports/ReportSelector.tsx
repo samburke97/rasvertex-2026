@@ -27,7 +27,7 @@ const HoursBreakdownPage = dynamic(
   () => import("./hours-breakdown/HoursBreakdownPage"),
   { loading: () => <ReportLoading />, ssr: false },
 );
-const ProposalBuilder = dynamic(() => import("./proposal/builder/ProposalBuilder"), {
+const ProposalBuilder = dynamic(() => import("./proposal/v3/ProposalBuilder"), {
   loading: () => <ReportLoading />,
   ssr: false,
 });
