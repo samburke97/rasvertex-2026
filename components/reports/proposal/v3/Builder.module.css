@@ -254,7 +254,6 @@ html :where(.root) strong { font-weight: 700; }
 .itemActions { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* ── Photos ── */
-.photoLarge { width: 100%; aspect-ratio: 4/3; border-radius: 12px; background: #edf0f0 center/cover no-repeat; cursor: pointer; border: 1px solid rgba(0, 0, 0, 0.06); }
 .danger { color: #a83a3a; }
 .danger:hover { background: #fbe7e7; }
 .pickerHead { display: flex; align-items: center; gap: 8px; }
