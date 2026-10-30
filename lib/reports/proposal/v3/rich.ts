@@ -69,7 +69,5 @@ export const RICH_CSS = `
 .pb3-rt ul>li::before{content:"";position:absolute;left:-22px;top:0.72em;width:6px;height:6px;border-radius:50%;background:#011955}
 .pb3-rt li>p{margin:0}
 .pb3-rt li+li{margin-top:0.2em}
-.pb3-build [data-edit]{cursor:pointer;border-radius:12px;transition:background-color 120ms,box-shadow 120ms,filter 120ms}
-.pb3-build [data-edit]:hover{background-color:rgba(1,25,85,0.035);box-shadow:0 0 0 10px rgba(1,25,85,0.035)}
-.pb3-build [data-edit][style*="background-image"]:hover{filter:brightness(0.96);box-shadow:none}
+.pb3-build [data-edit]{cursor:pointer}
 `;

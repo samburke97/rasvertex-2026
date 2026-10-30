@@ -178,6 +178,9 @@ export function reviewChecks(p: Proposal, D: Derived): Check[] {
     missing.length
       ? { ok: false, title: "Job details incomplete", detail: missing.map((f) => f.label).join(", "), fix: "cover" }
       : { ok: true, title: "Job details", detail: `${p.job.client} · Q ${p.job.quote}` },
+    ...(!isHidden(p, "project") && !p.d.project.program.trim()
+      ? [{ ok: false, title: "Program missing", detail: "Your project · how long the works take", fix: "project" as PageId }]
+      : []),
     !isHidden(p, "access") && !p.d.access.aerial
       ? { ok: false, title: "Aerial photo missing", detail: "Access & disruption plan", fix: "access" }
       : { ok: true, title: "Photos", detail: "Every photo space is filled" },

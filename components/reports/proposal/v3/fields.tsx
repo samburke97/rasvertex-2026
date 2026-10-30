@@ -85,6 +85,7 @@ export function Rich({
   list,
   info,
   ph,
+  fallback,
 }: {
   ctx: BuilderCtx;
   label: string;
@@ -92,8 +93,10 @@ export function Rich({
   list?: boolean;
   info?: ReactNode;
   ph?: string;
+  /** Shown (and edited from) when the field is empty, e.g. standard steps. */
+  fallback?: string;
 }) {
-  const raw = str(ctx.get(path));
+  const raw = str(ctx.get(path)) || fallback || "";
   // Plain-text values from older drafts: one paragraph per line.
   const value = raw && !raw.trim().startsWith("<") ? richHtml(raw) : raw;
   return (
@@ -271,42 +274,26 @@ export function List<T>({
   );
 }
 
-/** Photo field: preview, Choose / Upload / Remove, and an inline picker.
+/** Photo field: a small thumbnail with Change / Upload / Remove. Change
+ *  opens the picker in a pop-up, so photos never push the text fields down.
  *  The picker always lists the quote's SimPRO folders (picking one that's
  *  off turns it on and loads it) next to the standard ones. */
-export function Photo({ ctx, label, path, extra, info, large }: { ctx: BuilderCtx; label: string; path: Path; extra?: ReactNode; info?: ReactNode; large?: boolean }) {
+export function Photo({ ctx, label, path, extra, info }: { ctx: BuilderCtx; label: string; path: Path; extra?: ReactNode; info?: ReactNode }) {
   const k = key(path);
   const open = ctx.picker === k;
   const ref = str(ctx.get(path));
   const src = ctx.img(ref);
   const [busy, setBusy] = useState(false);
 
-  const filters = [
-    { id: "all", name: "All" },
-    ...ctx.allFolders.map((f) => ({ id: f.id, name: f.name, off: !f.on, sp: f.sp })),
-    ...(ctx.p.uploads.length ? [{ id: "uploads", name: "Uploads" }] : []),
-  ];
-  const active = filters.some((f) => f.id === ctx.pickFolder) ? ctx.pickFolder : "all";
-  const pool =
-    active === "all"
-      ? [...ctx.p.uploads, ...ctx.folders.flatMap((f) => f.photos)]
-      : active === "uploads"
-        ? ctx.p.uploads
-        : (ctx.folders.find((f) => f.id === active)?.photos ?? []);
-  const loadingThis = ctx.loadingFolders.includes(active);
-
   return (
     <div className={styles.field} data-field={k}>
       <Label text={label} info={info} />
-      {large && ref ? (
-        <div className={styles.photoLarge} style={{ backgroundImage: src ? `url("${src}")` : "none" }} onClick={() => ctx.setPicker(open ? null : k)} />
-      ) : null}
       <div className={styles.photoRow}>
-        {!large && (
-          <div className={styles.thumb} style={{ backgroundImage: src ? `url("${src}")` : "none" }} onClick={() => ctx.setPicker(open ? null : k)} />
-        )}
-        <button className={styles.smallBtn} onClick={() => ctx.setPicker(open ? null : k)}>
-          {open ? "Close" : ref ? "Change" : "Choose"}
+        <button className={styles.thumb} style={{ backgroundImage: src ? `url("${src}")` : "none" }} onClick={() => ctx.setPicker(k)} title="Change photo">
+          {!ref && <span className={styles.thumbEmpty}>No photo</span>}
+        </button>
+        <button className={styles.smallBtn} onClick={() => ctx.setPicker(k)}>
+          {ref ? "Change" : "Choose"}
         </button>
         <label className={styles.smallBtn} style={{ cursor: busy ? "default" : "pointer" }}>
           {busy ? "Uploading…" : "Upload"}
@@ -323,7 +310,6 @@ export function Photo({ ctx, label, path, extra, info, large }: { ctx: BuilderCt
               try {
                 const url = await ctx.upload(f);
                 if (url) ctx.set(path, url);
-                ctx.setPicker(null);
               } finally {
                 setBusy(false);
               }
@@ -332,49 +318,90 @@ export function Photo({ ctx, label, path, extra, info, large }: { ctx: BuilderCt
         </label>
         {extra}
         {ref && (
-          <button className={`${styles.smallBtn} ${styles.danger}`} title="Remove this photo from the page" onClick={() => ctx.set(path, "")}>
+          <button className={`${styles.linkBtn} ${styles.danger}`} title="Take this photo off the page" onClick={() => ctx.set(path, "")}>
             Remove
           </button>
         )}
       </div>
       {open && (
-        <div className={styles.picker}>
-          <div className={styles.pickerHead}>
-            <span>Photos</span>
-            <button className={styles.linkBtn} disabled={ctx.reloading} onClick={() => ctx.reloadSimpro()} title="Fetch the quote's photo folders again">
-              {ctx.reloading ? "Reloading…" : "↻ Reload from SimPRO"}
+        <PhotoModal
+          ctx={ctx}
+          title={label}
+          current={ref}
+          onPick={(x) => {
+            ctx.set(path, x);
+            ctx.setPicker(null);
+          }}
+          onClose={() => ctx.setPicker(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** The photo picker, over the whole app. Folder chips, then a grid; click a
+ *  photo to use it. Esc or the backdrop closes it. */
+function PhotoModal({ ctx, title, current, onPick, onClose }: { ctx: BuilderCtx; title: string; current: string; onPick: (ref: string) => void; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const filters = [
+    { id: "all", name: "All" },
+    ...ctx.allFolders.map((f) => ({ id: f.id, name: f.name, off: !f.on, sp: f.sp })),
+    ...(ctx.p.uploads.length ? [{ id: "uploads", name: "Uploads" }] : []),
+  ];
+  const active = filters.some((f) => f.id === ctx.pickFolder) ? ctx.pickFolder : "all";
+  const pool =
+    active === "all"
+      ? [...ctx.p.uploads, ...ctx.folders.flatMap((f) => f.photos)]
+      : active === "uploads"
+        ? ctx.p.uploads
+        : (ctx.folders.find((f) => f.id === active)?.photos ?? []);
+  const loadingThis = ctx.loadingFolders.includes(active);
+
+  return createPortal(
+    <div className={`${styles.vars} ${styles.modalBack}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={styles.modal} role="dialog" aria-label={`Choose ${title.toLowerCase()}`}>
+        <div className={styles.modalHead}>
+          <div>
+            <b>Choose a photo</b>
+            <small>{title}</small>
+          </div>
+          <button className={styles.linkBtn} disabled={ctx.reloading} onClick={() => ctx.reloadSimpro()} title="Fetch the quote's photo folders again">
+            {ctx.reloading ? "Reloading…" : "↻ Reload from SimPRO"}
+          </button>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div className={styles.chips}>
+          {filters.map((f) => (
+            <button
+              key={f.id}
+              className={`${styles.filter} ${active === f.id ? styles.filterOn : ""} ${"off" in f && f.off ? styles.filterOff : ""}`}
+              title={"off" in f && f.off ? "Off for this proposal. Click to load its photos" : undefined}
+              onClick={() => {
+                if ("off" in f && f.off) ctx.enableFolder(f.id);
+                ctx.setPickFolder(f.id);
+              }}
+            >
+              {"sp" in f && f.sp && <span className={styles.spDot} />}
+              {f.name}
             </button>
-            <InfoTip>
-              Photos come from the quote’s folders in SimPRO. Added photos in SimPRO? Reload. A folder that’s greyed out is off. Click it to load its photos.
-            </InfoTip>
-          </div>
-          <div className={styles.chips}>
-            {filters.map((f) => (
-              <button
-                key={f.id}
-                className={`${styles.filter} ${active === f.id ? styles.filterOn : ""} ${"off" in f && f.off ? styles.filterOff : ""}`}
-                title={"off" in f && f.off ? "Off for this proposal. Click to load its photos" : undefined}
-                onClick={() => {
-                  if ("off" in f && f.off) ctx.enableFolder(f.id);
-                  ctx.setPickFolder(f.id);
-                }}
-              >
-                {"sp" in f && f.sp && <span className={styles.spDot} />}
-                {f.name}
-              </button>
-            ))}
-          </div>
+          ))}
+        </div>
+        <div className={styles.modalBody}>
           {pool.length ? (
-            <div className={styles.grid}>
+            <div className={styles.modalGrid}>
               {pool.map((x) => (
                 <div
                   key={x}
-                  className={`${styles.cell} ${x === ref ? styles.cellOn : ""}`}
+                  className={`${styles.cell} ${x === current ? styles.cellOn : ""}`}
                   style={{ backgroundImage: `url("${ctx.img(x)}")` }}
-                  onClick={() => {
-                    ctx.set(path, x);
-                    ctx.setPicker(null);
-                  }}
+                  onClick={() => onPick(x)}
                 >
                   {ctx.p.uploads.includes(x) && (
                     <button
@@ -395,7 +422,8 @@ export function Photo({ ctx, label, path, extra, info, large }: { ctx: BuilderCt
             <span className={styles.empty}>{loadingThis ? "Loading photos from SimPRO…" : "No photos here. Pick another folder, reload from SimPRO, or upload one."}</span>
           )}
         </div>
-      )}
-    </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

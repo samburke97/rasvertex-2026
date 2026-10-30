@@ -255,6 +255,23 @@ function Preview({ ctx, review, scrollReq }: { ctx: BuilderCtx; review: boolean;
           onPick={(id) => ctx.select(id, false)}
           onPickFinding={(i) => ctx.pickFinding(i, false)}
           onPickField={(id, path) => ctx.pickField(id, path)}
+          onPinPointerDown={(zone, e) => {
+            // Drag a site-map pin; stored as % of the map, so zoom doesn't matter.
+            e.preventDefault();
+            e.stopPropagation();
+            const box = e.currentTarget.parentElement!.getBoundingClientRect();
+            const move = (ev: PointerEvent) => {
+              const x = Math.min(97, Math.max(3, ((ev.clientX - box.left) / box.width) * 100));
+              const y = Math.min(95, Math.max(5, ((ev.clientY - box.top) / box.height) * 100));
+              ctx.set(["findings", "pins", zone], [Math.round(x * 10) / 10, Math.round(y * 10) / 10]);
+            };
+            const up = () => {
+              window.removeEventListener("pointermove", move);
+              window.removeEventListener("pointerup", up);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+          }}
           focusFinding={ctx.sel === "findings" ? ctx.focusFinding : null}
         />
       </div>

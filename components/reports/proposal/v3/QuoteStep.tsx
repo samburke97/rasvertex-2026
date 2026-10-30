@@ -153,7 +153,7 @@ export default function QuoteStep({ ctx, quoteInput, setQuoteInput, loading, loa
                     </span>
                   )}
                   {tagged.length > 0 && (
-                    <button className={styles.surveyBtn} disabled={!!loadingFolders.length} onClick={() => ctx.update((prev) => applySurvey(prev, tagged))}>
+                    <button className={styles.surveyBtn} disabled={!!loadingFolders.length} onClick={() => ctx.update((prev) => applySurvey(prev))}>
                       {reportOn ? "Refill in report style" : "Use report style"}
                     </button>
                   )}

@@ -3,10 +3,12 @@
 // Locked pages show their lock note instead. Clicking text or a photo on the
 // page brings its field here into view and puts the cursor in it.
 
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import MapCaptureModal from "@/components/reports/inspection/MapCaptureModal";
 import styles from "./Builder.module.css";
 import type { BuilderCtx } from "./ctx";
-import { GroupHead, List, Money, Note, Photo, Rich, Segmented, Select, Text } from "./fields";
+import { GroupHead, InfoTip, List, Money, Note, Photo, Rich, Segmented, Select, Text } from "./fields";
+import { methodHtml } from "@/lib/reports/proposal/v3/methods";
 import { isHidden, money, parseAmt } from "@/lib/reports/proposal/v3/derive";
 import { applySurvey, enabledPhotos, recodeFromTags, standardFromPhotos, taggedPhotos } from "@/lib/reports/proposal/v3/survey";
 import {
@@ -17,6 +19,10 @@ import {
   LOCK_NOTES,
   PAGE,
   TRADES,
+  BANDS,
+  codeRank,
+  codesOf,
+  withCodes,
   type Brand,
   type FindingsStyle,
   type PageId,
@@ -25,8 +31,6 @@ import {
 } from "@/lib/reports/proposal/v3/types";
 
 const CODE_LIST = Object.keys(CODES).map((k) => ({ v: k, label: `${k} · ${CODES[k].name}` }));
-// Findings can have no code; Flagged / Pre-start rows always have one.
-const FINDING_CODES = [{ v: "", label: "No code" }, ...CODE_LIST];
 const CODE_OPTS = CODE_LIST;
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -60,6 +64,130 @@ function setFindingsStyle(p: Proposal, style: FindingsStyle): Proposal {
 
 const bgOf = (url: string): CSSProperties => ({ backgroundImage: url ? `url("${url}")` : "none" });
 
+/** A finding's codes as toggle chips: tap to add or remove. The most
+ *  severe one decides which group the photo sits in. */
+function CodePicker({ ctx, index }: { ctx: BuilderCtx; index: number }) {
+  const f = ctx.p.d.findings.items[index];
+  const on = codesOf(f);
+  const toggle = (c: string) =>
+    ctx.set(["findings", "items", index], withCodes(f, on.includes(c) ? on.filter((x) => x !== c) : [...on, c]));
+  return (
+    <div className={styles.field} data-field={`findings.items.${index}.codes`}>
+      <span className={styles.fieldLabel}>
+        Codes
+        <InfoTip>
+          Tap every defect in this photo. It shows once, under its most severe code; the other codes’ groups point to it. Codes also fill Flagged issues and Pre-start. No code puts it in “Other site photos”.
+        </InfoTip>
+      </span>
+      <div className={styles.codeGrid}>
+        {CODE_LIST.map(({ v, label }) => {
+          const b = BANDS[CODES[v].band];
+          const sel = on.includes(v);
+          return (
+            <button
+              key={v}
+              className={`${styles.codeChip} ${sel ? styles.codeChipOn : ""}`}
+              style={sel ? { background: b.bg, color: b.fg, borderColor: "transparent" } : undefined}
+              title={label}
+              onClick={() => toggle(v)}
+            >
+              {v}
+            </button>
+          );
+        })}
+      </div>
+      <span className={styles.note}>{on.length ? on.map((c) => CODES[c].name).join(" · ") : "No code: shown under Other site photos"}</span>
+    </div>
+  );
+}
+
+/** Report style's site map: so the client can find D10 on the building. */
+function SiteMapField({ ctx }: { ctx: BuilderCtx }) {
+  const [mapOpen, setMapOpen] = useState(false);
+  const d = ctx.p.d;
+  const own = !!d.findings.map;
+  return (
+    <>
+      <Photo
+        ctx={ctx}
+        label="Site map"
+        path={["findings", "map"]}
+        info="Shown above the findings with a pin for every zone in the photos’ locations. Drag the pins on the page to place them. Until you choose one, it uses the access plan’s aerial."
+        extra={
+          ctx.p.job.site ? (
+            <button className={styles.smallBtn} onClick={() => setMapOpen(true)}>
+              Satellite
+            </button>
+          ) : null
+        }
+      />
+      {!own && <Note>{d.access.aerial ? "Using the access plan’s aerial photo." : "No map yet: choose a photo or capture one from satellite."}</Note>}
+      {mapOpen && (
+        <MapCaptureModal
+          address={ctx.p.job.site}
+          size={{ w: 640, h: 320 }}
+          initial={d.findings.mapView ?? d.access.aerialView}
+          onCancel={() => setMapOpen(false)}
+          onCapture={async (dataUrl, view) => {
+            const url = await ctx.uploadData(dataUrl, "site-map");
+            ctx.update((prev) => ({ ...prev, d: { ...prev.d, findings: { ...prev.d.findings, map: url, mapView: view } } }));
+            setMapOpen(false);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/** "How we fix it" for each code in use: collapsible rows with the steps as
+ *  a list. Starts from the standard steps; "Use standard" resets. */
+function MethodRows({ ctx }: { ctx: BuilderCtx }) {
+  const codes = [...new Set(ctx.p.d.findings.items.flatMap(codesOf))].sort((a, b) => codeRank(a) - codeRank(b));
+  const [open, setOpen] = useState<string | null>(null);
+  const focus = ctx.focusField?.path;
+  useEffect(() => {
+    const m = focus?.match(/^findings\.methods\.(\w+)/);
+    if (m) setOpen(m[1]);
+  }, [focus, ctx.focusField?.n]);
+  if (!codes.length) return null;
+  return (
+    <>
+      <GroupHead
+        title="How we fix it"
+        info="The steps printed once under each code’s group. They start from our standard method. Changes apply to this proposal only."
+      />
+      {codes.map((c) => {
+        const own = ctx.p.d.findings.methods?.[c];
+        return (
+          <div key={c} className={`${styles.item} ${open === c ? styles.itemOpen : ""}`}>
+            <div className={styles.itemHead}>
+              <button className={styles.itemToggle} onClick={() => setOpen(open === c ? null : c)} aria-expanded={open === c}>
+                <svg className={styles.chev} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                  <path d="m9 6 6 6-6 6" />
+                </svg>
+                <span className={styles.itemTitle}>
+                  {c} · {CODES[c].name}
+                </span>
+                <span className={styles.itemMeta}>{own ? "Edited" : "Standard"}</span>
+              </button>
+            </div>
+            {open === c && (
+              <div className={styles.itemBody}>
+                <Rich ctx={ctx} label="Steps" path={["findings", "methods", c]} list fallback={methodHtml(c)} />
+                {own && (
+                  <button className={styles.linkBtn} style={{ justifySelf: "start" }} onClick={() => ctx.set(["findings", "methods", c], undefined)}>
+                    Use standard steps
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 /** Findings run to dozens of photos. With none picked, the panel shows the
  *  grid and the quote's unused photos (to bring back). Picking one — here or
  *  by clicking it on the page — shows only that finding. */
@@ -85,7 +213,7 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
       <>
         <div className={styles.focusBar}>
           <button className={styles.linkBtn} onClick={() => ctx.pickFinding(null, false)}>
-            ‹ All photos
+            ‹ All photos{report ? " & site map" : ""}
           </button>
           <span className={styles.focusCount}>
             {f + 1} of {items.length}
@@ -99,14 +227,17 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
             </button>
           </span>
         </div>
-        <Photo ctx={ctx} label={`Finding ${pad(f + 1)}`} path={path("photo")} large />
+        <Photo ctx={ctx} label="Photo" path={path("photo")} />
         {report && (
-          <Select
+          <CodePicker ctx={ctx} index={f} />
+        )}
+        {report && (
+          <Text
             ctx={ctx}
-            label="Code"
-            path={path("code")}
-            options={FINDING_CODES}
-            info="Sets the chip and severity colour, and adds the defect to Flagged issues and Pre-start. “No code” leaves this photo out of both."
+            label="Location"
+            path={path("where")}
+            ph="e.g. D10 L2 U403"
+            info="Zone (D# drop or S# section), level (LG, L2, LR) and unit. Prints beside the photo; the zone is pinned on the site map and listed in Flagged issues."
           />
         )}
         <Text ctx={ctx} label="Title" path={path("title")} ph="e.g. Render crack, north face level 2" />
@@ -161,8 +292,10 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
           </>
         }
       />
+      {report && <SiteMapField ctx={ctx} />}
       <Rich ctx={ctx} label="Intro" path={["findings", "intro"]} />
 
+      {report && <MethodRows ctx={ctx} />}
       <GroupHead
         title={`On the page · ${items.length}`}
         sub="Click a photo to edit it. Four photos to a page; pages are added as needed."
@@ -245,7 +378,7 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
             </button>
             {report
               ? tagged.length > 0 && (
-                  <button className={styles.smallBtn} onClick={() => ctx.update((prev) => applySurvey(prev, tagged))}>
+                  <button className={styles.smallBtn} onClick={() => ctx.update((prev) => applySurvey(prev))}>
                     Rebuild from {tagged.length} tagged
                   </button>
                 )
@@ -269,6 +402,7 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
 
 function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
   const d = ctx.p.d;
+  const [mapOpen, setMapOpen] = useState(false);
   switch (id) {
     case "cover":
       return (
@@ -325,7 +459,13 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
           <Rich ctx={ctx} label="Access and site" path={["project", "p2"]} />
           <Text ctx={ctx} label="Building type" path={["project", "type"]} />
           <Text ctx={ctx} label="Access method" path={["project", "access"]} />
-          <Text ctx={ctx} label="Program" path={["project", "program"]} ph="e.g. 9 weeks" />
+          <Text
+            ctx={ctx}
+            label="Program · required"
+            path={["project", "program"]}
+            ph="e.g. 9 weeks"
+            info="How long the works take on site. Required: the proposal can’t be saved or downloaded until it’s filled in."
+          />
           <Photo ctx={ctx} label="Project photo" path={["project", "photo"]} />
           <GroupHead title={TRADES[ctx.p.trade].specTitle} sub="Choose the product. The table, logo and wording switch with it." />
           <Segmented
@@ -380,6 +520,7 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
             render={(i) => (
               <>
                 <Select ctx={ctx} label="Defect" path={["flagged", "rows", i, "code"]} options={CODE_OPTS} />
+                <Text ctx={ctx} label="Where" path={["flagged", "rows", i, "where"]} ph="e.g. D10, D12, S1" />
                 <Text ctx={ctx} label="Locations found" path={["flagged", "rows", i, "count"]} type="number" />
               </>
             )}
@@ -425,15 +566,27 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
             ctx={ctx}
             label="Aerial or elevation photo"
             path={["access", "aerial"]}
-            info="Required before export. “Satellite” captures the site address from Google Maps; Remove takes it off the page."
+            info="Required before export. “Satellite” opens Google Maps at the site address: pan and zoom until the building fills the frame, then use that view."
             extra={
               ctx.p.job.site ? (
-                <button className={styles.smallBtn} onClick={() => ctx.captureAerial()}>
+                <button className={styles.smallBtn} onClick={() => setMapOpen(true)}>
                   Satellite
                 </button>
               ) : null
             }
           />
+          {mapOpen && (
+            <MapCaptureModal
+              address={ctx.p.job.site}
+              size={{ w: 640, h: 320 }}
+              initial={d.access.aerialView}
+              onCancel={() => setMapOpen(false)}
+              onCapture={async (dataUrl, view) => {
+                await ctx.saveAerial(dataUrl, view);
+                setMapOpen(false);
+              }}
+            />
+          )}
           <GroupHead title="Programme" info="Up to four stages. Each drop below is coloured by the stage it belongs to." />
           <List
             ctx={ctx}
@@ -543,14 +696,17 @@ export default function SectionPanel({ ctx, width }: { ctx: BuilderCtx; width: n
     const t = requestAnimationFrame(() => {
       const root = body.current;
       if (!root) return;
+      // A finding's photo clicked on the page: the text is what gets edited
+      // most, so land in its title (Change is right above it).
+      const target = focus.path.replace(/^(findings\.items\.\d+)\.photo$/, "$1.title");
       let el: HTMLElement | null = null;
-      for (let p = focus.path; p && !el; p = p.includes(".") ? p.slice(0, p.lastIndexOf(".")) : "")
+      for (let p = target; p && !el; p = p.includes(".") ? p.slice(0, p.lastIndexOf(".")) : "")
         el = root.querySelector<HTMLElement>(`[data-field="${p}"]`);
       if (!el) return;
       el.scrollIntoView({ block: "center" });
       const input = el.querySelector<HTMLElement>("input:not([type=file]), select, .tiptap");
       if (input) input.focus({ preventScroll: true });
-      else if (/photo|aerial$/.test(focus.path)) ctx.setPicker(el.dataset.field ?? null);
+      else if (/photo|aerial$/.test(target)) ctx.setPicker(el.dataset.field ?? null);
     });
     return () => cancelAnimationFrame(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -40,7 +40,11 @@ export interface BuilderCtx {
   upload: (file: File) => Promise<string>;
   /** Deletes an upload, and takes it off any page that uses it. */
   removeUpload: (url: string) => void;
-  captureAerial: () => Promise<void>;
+  /** Compresses and stores an image (e.g. a satellite capture); adds it to
+   *  uploads and returns its URL. */
+  uploadData: (dataUrl: string, name: string) => Promise<string>;
+  /** Stores a satellite capture as the aerial photo. */
+  saveAerial: (dataUrl: string, view: { lat?: number; lng?: number; zoom: number }) => Promise<void>;
   sel: PageId;
   select: (id: PageId, scroll: boolean) => void;
   toggleHide: (id: PageId) => void;

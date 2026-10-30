@@ -154,7 +154,14 @@ export interface SpecRow {
 
 export interface Finding {
   photo: string;
-  code: string; // report style only; "" = no code
+  /** Report style: the most severe of `codes` ("" = none). Kept for older
+   *  drafts and simple reads; codesOf() is the full list. */
+  code: string;
+  /** Every code on the photo, e.g. a "D10 L2 SH LF" tag gives [SH, LF]. */
+  codes?: string[];
+  /** Report style: where it is — zone, level, unit ("D10 L2"). From the tag,
+   *  editable. Its zone is pinned on the site map. */
+  where?: string;
   title: string;
   desc: string; // standard style: one point per line
 }
@@ -193,14 +200,28 @@ export interface ProposalSections {
     rows: Partial<Record<Brand, SpecRow[]>>;
   };
   scope: { intro: string; inc: string; exc: string };
-  findings: { intro: string; style: FindingsStyle; items: Finding[] };
+  findings: {
+    intro: string;
+    style: FindingsStyle;
+    items: Finding[];
+    /** Per-proposal "How we fix it" steps by code (list HTML); unset =
+     *  the standard steps in methods.ts. */
+    methods?: Partial<Record<string, string>>;
+    /** Report style: the site map (photo ref) — falls back to the access
+     *  plan's aerial — and each zone's pin, as [x%, y%]. */
+    map?: string;
+    mapView?: { lat?: number; lng?: number; zoom: number };
+    pins?: Record<string, [number, number]>;
+  };
   // auto: built from the findings' codes and kept in step with them
   // (survey.ts syncSurvey); editing a row makes it the rep's own.
-  flagged: { intro: string; rows: { code: string; count: string; auto?: boolean }[] };
+  flagged: { intro: string; rows: { code: string; count: string; where?: string; auto?: boolean }[] };
   prestart: { intro: string; rows: { code: string; work: string; where: string; auto?: boolean }[]; note: string };
   access: {
     intro: string;
     aerial: string;
+    /** Where the satellite view was last framed, to reopen there. */
+    aerialView?: { lat?: number; lng?: number; zoom: number };
     stages: { when: string; what: string; where: string }[];
     drops: { d: string; where: string; access: string; levels: string; stage: string }[];
   };
@@ -211,6 +232,8 @@ export interface ProposalSections {
 
 export interface Proposal {
   version: 3;
+  /** SimPRO Site ID of the quote's site ("" if none), for saving the PDF. */
+  siteId?: string;
   /** Painting or waterproofing — wording, photos, warranty (trades.ts). */
   trade: Trade;
   quote: string;
@@ -253,6 +276,21 @@ export const lines = (t: string) =>
     .filter(Boolean);
 
 export const bandOf = (code: string): Band => CODES[code]?.band ?? "grey";
+
+/** Severity order: red before amber before grey, then registry order. */
+export const codeRank = (code: string) => BAND_ORDER.indexOf(bandOf(code)) * 100 + Object.keys(CODES).indexOf(code);
+
+/** A finding's codes, most severe first (older drafts carry just `code`). */
+export function codesOf(f: Finding): string[] {
+  const list = (f.codes?.length ? f.codes : f.code ? [f.code] : []).filter((c) => CODES[c]);
+  return [...new Set(list)].sort((a, b) => codeRank(a) - codeRank(b));
+}
+
+/** Sets a finding's codes, keeping `code` as the most severe. */
+export function withCodes(f: Finding, codes: string[]): Finding {
+  const sorted = [...new Set(codes.filter((c) => CODES[c]))].sort((a, b) => codeRank(a) - codeRank(b));
+  return { ...f, codes: sorted, code: sorted[0] ?? "" };
+}
 
 export function todayISO(d = new Date()): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -307,6 +345,7 @@ export function mergeDraft(saved: Proposal, fresh: Proposal): Proposal {
 // ── Construction from a SimPRO quote ─────────────────────────────────────────
 
 export interface QuoteHeader {
+  siteId?: string;
   siteName: string;
   siteAddress: string;
   clientName: string;
@@ -365,6 +404,7 @@ export function createProposal(quote: string, h: QuoteHeader, pricing: QuotePric
   };
   return {
     version: 3,
+    siteId: h.siteId ?? "",
     trade,
     quote,
     job,
@@ -575,3 +615,6 @@ export function switchTrade(p: Proposal, trade: Trade): Proposal {
     d: d as unknown as ProposalSections,
   };
 }
+
+/** The zone of a location ("D10 L2" → "D10"), or "". */
+export const zoneOf = (where: string | undefined) => (where ?? "").toUpperCase().match(/\b[DS]\d+\b/)?.[0] ?? "";

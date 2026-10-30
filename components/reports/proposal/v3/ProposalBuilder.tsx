@@ -158,7 +158,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
       let next: Proposal;
       if (sameQuote && p) {
         // Reload: refresh the job record from SimPRO, keep everything else.
-        next = { ...p, job: { ...p.job, ...jobFromQuote(quote, header) } };
+        next = { ...p, siteId: header.siteId ?? p.siteId, job: { ...p.job, ...jobFromQuote(quote, header) } };
       } else {
         const pricing: QuotePricingRow[] = prRes?.ok ? await prRes.json() : [];
         const draftJson = dRes?.ok ? await dRes.json().catch(() => null) : null;
@@ -169,7 +169,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           pricing,
           reset ? (p?.trade ?? trade) : isProposal(draftJson?.report) ? (draftJson.report.trade ?? "painting") : trade,
         );
-        next = isProposal(draftJson?.report) ? mergeDraft(draftJson.report, fresh) : fresh;
+        next = isProposal(draftJson?.report) ? { ...mergeDraft(draftJson.report, fresh), siteId: fresh.siteId } : fresh;
         // A new proposal brings in every SimPRO folder; a resumed one keeps
         // the rep's choice, plus Unfiled.
         if (folderList) {
@@ -332,8 +332,12 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   const pickField = useCallback((id: PageId, path: string) => {
     setSel(id);
     setFocusField((f) => ({ path, n: (f?.n ?? 0) + 1 }));
+    // A photo's own fields open that photo; anything else on the findings
+    // pages (site map, intro, "How we fix it") goes back to the overview,
+    // where those fields live.
     const m = path.match(/^findings\.items\.(\d+)/);
     if (m) setFocusFinding(Number(m[1]));
+    else if (path.startsWith("findings.")) setFocusFinding(null);
   }, []);
 
   const enableFolder = useCallback(
@@ -437,22 +441,30 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
     [p, update],
   );
 
-  const captureAerial = useCallback(async () => {
-    if (!p) return;
-    const params = new URLSearchParams({ address: p.job.site, zoom: "19", size: "640x320" });
-    const res = await fetch(`/api/maps/static-map?${params}`).catch(() => null);
-    if (!res?.ok) {
-      alert("Couldn't capture a satellite view for this address.");
-      return;
-    }
-    const data = await compressMapImageDataUrl(await readAsDataUrl(await res.blob()));
-    const url = await uploadReportPhoto(data, `proposal-reports/${p.quote}/aerial-${uid()}.jpg`);
-    update((prev) => ({
-      ...prev,
-      uploads: [url, ...prev.uploads].slice(0, LIMITS.uploads),
-      d: { ...prev.d, access: { ...prev.d.access, aerial: url } },
-    }));
-  }, [p, update]);
+  const uploadData = useCallback(
+    async (dataUrl: string, name: string) => {
+      if (!p) return "";
+      const data = await compressMapImageDataUrl(dataUrl);
+      const url = await uploadReportPhoto(data, `proposal-reports/${p.quote}/${name}-${uid()}.jpg`);
+      update((prev) => ({ ...prev, uploads: [url, ...prev.uploads].slice(0, LIMITS.uploads) }));
+      return url;
+    },
+    [p, update],
+  );
+
+  const saveAerial = useCallback(
+    async (dataUrl: string, view: { lat?: number; lng?: number; zoom: number }) => {
+      if (!p) return;
+      const data = await compressMapImageDataUrl(dataUrl);
+      const url = await uploadReportPhoto(data, `proposal-reports/${p.quote}/aerial-${uid()}.jpg`);
+      update((prev) => ({
+        ...prev,
+        uploads: [url, ...prev.uploads].slice(0, LIMITS.uploads),
+        d: { ...prev.d, access: { ...prev.d.access, aerial: url, aerialView: view } },
+      }));
+    },
+    [p, update],
+  );
 
   const ctx: BuilderCtx | null =
     p && D
@@ -477,7 +489,8 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           setPickFolder,
           upload,
           removeUpload,
-          captureAerial,
+          saveAerial,
+          uploadData,
           sel,
           select,
           toggleHide,

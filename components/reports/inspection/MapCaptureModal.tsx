@@ -28,11 +28,14 @@ export interface MapView {
 interface Props {
   address: string;
   initial?: MapView;
+  /** Capture size in px; the frame takes its shape. Default 640×427 (3:2,
+   *  the inspection site map). The proposal's aerial uses 2:1. */
+  size?: { w: number; h: number };
   onCancel: () => void;
   onCapture: (dataUrl: string, view: MapView) => Promise<void>;
 }
 
-function staticUrl(v: { address?: string; lat?: number; lng?: number; zoom: number }): string {
+function staticUrl(v: { address?: string; lat?: number; lng?: number; zoom: number }, w = CAPTURE_W, h = CAPTURE_H): string {
   const params = new URLSearchParams();
   if (v.lat != null && v.lng != null) {
     params.set("lat", String(v.lat));
@@ -41,7 +44,7 @@ function staticUrl(v: { address?: string; lat?: number; lng?: number; zoom: numb
     params.set("address", v.address);
   }
   params.set("zoom", String(v.zoom));
-  params.set("size", `${CAPTURE_W}x${CAPTURE_H}`);
+  params.set("size", `${w}x${h}`);
   return `/api/maps/static-map?${params}`;
 }
 
@@ -57,7 +60,9 @@ async function urlToDataUrl(url: string): Promise<string> {
   });
 }
 
-export default function MapCaptureModal({ address, initial, onCancel, onCapture }: Props) {
+export default function MapCaptureModal({ address, initial, size, onCancel, onCapture }: Props) {
+  const W = size?.w ?? CAPTURE_W;
+  const H = size?.h ?? CAPTURE_H;
   const mapEl = useRef<HTMLDivElement>(null);
   const liveMap = useRef<google.maps.Map | null>(null);
   const [ready, setReady] = useState(!HAS_LIVE_MAPS);
@@ -137,14 +142,14 @@ export default function MapCaptureModal({ address, initial, onCancel, onCapture 
           zoom: zoomToFitBounds(
             { lat: sw.lat(), lng: sw.lng() },
             { lat: ne.lat(), lng: ne.lng() },
-            CAPTURE_W,
-            CAPTURE_H,
+            W,
+            H,
           ),
         };
-        url = staticUrl(view);
+        url = staticUrl(view, W, H);
       } else {
         view = { zoom: staticZoom };
-        url = staticUrl({ address, zoom: staticZoom });
+        url = staticUrl({ address, zoom: staticZoom }, W, H);
       }
       await onCapture(await urlToDataUrl(url), view);
     } catch (err) {
@@ -172,12 +177,12 @@ export default function MapCaptureModal({ address, initial, onCancel, onCapture 
           </button>
         </div>
 
-        <div className={styles.frame}>
+        <div className={styles.frame} style={size ? { aspectRatio: `${W} / ${H}` } : undefined}>
           {HAS_LIVE_MAPS ? (
-            <div ref={mapEl} className={styles.map} />
+            <div ref={mapEl} className={styles.map} style={size ? { aspectRatio: `${W} / ${H}` } : undefined} />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img className={styles.map} src={staticUrl({ address, zoom: staticZoom })} alt="Satellite view" />
+            <img className={styles.map} style={size ? { aspectRatio: `${W} / ${H}` } : undefined} src={staticUrl({ address, zoom: staticZoom }, W, H)} alt="Satellite view" />
           )}
           {!ready && !error && <div className={styles.overlay}>Finding {address}…</div>}
         </div>

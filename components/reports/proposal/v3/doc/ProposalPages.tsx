@@ -12,8 +12,9 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { codeName, money, parseAmt, type Derived } from "@/lib/reports/proposal/v3/derive";
-import { FINDING_PHOTO_H, MAX_POINTS, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
+import { FINDING_PHOTO_H, MAX_POINTS, REPORT_PHOTO_H, SITE_MAP_H, refsText, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
 import { RICH_CSS, richHtml, richItems } from "@/lib/reports/proposal/v3/rich";
+import { placeLabel } from "@/lib/reports/proposal/v3/survey";
 import {
   BANDS,
   BRANDS,
@@ -24,6 +25,8 @@ import {
   TERMS,
   asset,
   tradeOf,
+  bandOf,
+  codesOf,
   type PageId,
   type Proposal,
 } from "@/lib/reports/proposal/v3/types";
@@ -61,6 +64,8 @@ export interface DocProps {
   onPick?: (id: PageId) => void;
   /** Build only: a finding's photo was clicked. */
   onPickFinding?: (index: number) => void;
+  /** Build only: a site-map pin was grabbed (to drag it). */
+  onPinPointerDown?: (zone: string, e: React.PointerEvent<HTMLElement>) => void;
   /** Build only: an editable element was clicked — its path inside p.d. */
   onPickField?: (id: PageId, path: string) => void;
   focusFinding?: number | null;
@@ -773,48 +778,185 @@ function Points({ text }: { text: string }) {
   );
 }
 
-function Findings({ r, s }: PageProps) {
-  const report = r.p.d.findings.style === "report";
-  const items = dataOf(s, "findings")?.items ?? [];
+type CardItem = { f: Proposal["d"]["findings"]["items"][number]; i: number; textH: number; n?: string };
+
+/** One photo card: photo, then (if any) code chips and photo number, title,
+ *  and points (standard) or description (report). */
+function FindingCard({ r, it, report }: { r: DocProps; it: CardItem; report: boolean }) {
+  const { f, i, textH, n } = it;
   const build = r.mode === "build";
+  const codes = report ? codesOf(f) : [];
   return (
-    <Sheet r={r} s={s}>
-      <Head r={r} s={s} title="Site survey & findings" intro={r.p.d.findings.intro} edit="findings.intro" />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "48px 40px", marginTop: flowTop(s) }}>
-        {items.map(({ f, i, textH }) => (
-          <div
-            key={i}
-            data-finding={i}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: textH ? 20 : 0,
-              minHeight: 0,
-              borderRadius: 24,
-              ...(build && r.focusFinding === i ? { outline: "4px solid #3e7fb0", outlineOffset: 10 } : {}),
-            }}
-          >
-            <div data-edit={`findings.items.${i}.photo`} style={photo(r.img(f.photo), { width: "100%", height: FINDING_PHOTO_H, flexShrink: 0, borderRadius: 20 })} />
-            {textH > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start", height: textH, flexShrink: 0, overflow: "hidden" }}>
-                {report && f.code && <span style={codeChip(f.code)}>{f.code}</span>}
-                {f.title.trim() && (
-                  <h3 data-edit={`findings.items.${i}.title`} style={{ ...sub, margin: report && f.code ? "4px 0 0" : 0 }}>
-                    {f.title}
-                  </h3>
-                )}
-                {richItems(f.desc).length > 0 && (
-                  <div data-edit={`findings.items.${i}.desc`} style={{ alignSelf: "stretch" }}>
-                    {report ? <Rich v={f.desc} style={secondary} /> : <Points text={f.desc} />}
-                  </div>
-                )}
+    <div
+      data-finding={i}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: textH ? 20 : 0,
+        minHeight: 0,
+        borderRadius: 24,
+        ...(build && r.focusFinding === i ? { outline: "4px solid #3e7fb0", outlineOffset: 10 } : {}),
+      }}
+    >
+      <div data-edit={`findings.items.${i}.photo`} style={photo(r.img(f.photo), { width: "100%", height: report ? REPORT_PHOTO_H : FINDING_PHOTO_H, flexShrink: 0, borderRadius: 20 })} />
+      {textH > 0 &&
+        (report ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, height: textH, flexShrink: 0, overflow: "hidden" }}>
+            {/* Codes, title and number on one line; location under it. */}
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
+              {codes.map((c) => (
+                <span key={c} data-edit={`findings.items.${i}.codes`} style={codeChip(c)}>
+                  {c}
+                </span>
+              ))}
+              <h3 data-edit={`findings.items.${i}.title`} style={{ ...sub, flex: 1, minWidth: 0, marginLeft: codes.length ? 4 : 0, paddingTop: 1 }}>
+                {f.title}
+              </h3>
+              {n && <span style={{ ...label, lineHeight: "28px", fontVariantNumeric: "tabular-nums" }}>{n}</span>}
+            </div>
+            {f.where?.trim() && (
+              <span data-edit={`findings.items.${i}.where`} style={{ ...secondary, color: INK(0.55) }}>
+                {placeLabel(f.where)}
+              </span>
+            )}
+            {richItems(f.desc).length > 0 && (
+              <div data-edit={`findings.items.${i}.desc`} style={{ marginTop: 4 }}>
+                <Rich v={f.desc} style={secondary} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start", height: textH, flexShrink: 0, overflow: "hidden" }}>
+            {f.title.trim() && (
+              <h3 data-edit={`findings.items.${i}.title`} style={{ ...sub, margin: 0 }}>
+                {f.title}
+              </h3>
+            )}
+            {richItems(f.desc).length > 0 && (
+              <div data-edit={`findings.items.${i}.desc`} style={{ alignSelf: "stretch" }}>
+                <Points text={f.desc} />
               </div>
             )}
           </div>
         ))}
-      </div>
+    </div>
+  );
+}
+
+const grid2: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "48px 40px" };
+
+function Findings({ r, s }: PageProps) {
+  const grouped = dataOf(s, "findingsGrouped");
+  const items = dataOf(s, "findings")?.items ?? [];
+  return (
+    <Sheet r={r} s={s}>
+      <Head r={r} s={s} title="Site survey & findings" intro={r.p.d.findings.intro} edit="findings.intro" />
+      {grouped ? (
+        <div style={{ marginTop: flowTop(s) }}>
+          {grouped.blocks.map((b, k) =>
+            b.t === "map" ? (
+              <SiteMapBlock key={k} r={r} b={b} />
+            ) : b.t === "head" ? (
+              <CodeGroupHead key={k} b={b} top={k === 0} />
+            ) : b.t === "steps" ? (
+              <StepsBlock key={k} b={b} />
+            ) : (
+              <div key={k} style={{ ...grid2, marginTop: grouped.blocks[k - 1]?.t === "head" ? 24 : 48 }}>
+                {b.items.map((it) => (
+                  <FindingCard key={it.i} r={r} it={it} report />
+                ))}
+              </div>
+            ),
+          )}
+        </div>
+      ) : (
+        <div style={{ ...grid2, marginTop: flowTop(s) }}>
+          {items.map((it) => (
+            <FindingCard key={it.i} r={r} it={it} report={false} />
+          ))}
+        </div>
+      )}
       <Footer r={r} s={s} />
     </Sheet>
+  );
+}
+
+/** The site map: the aerial with a pin per zone, so the client can find
+ *  "D10" on the building. Pins drag in Build. */
+function SiteMapBlock({ r, b }: { r: DocProps; b: Extract<GroupBlock, { t: "map" }> }) {
+  const drag = r.mode === "build" && r.onPinPointerDown;
+  return (
+    <div data-edit="findings.map" style={photo(r.img(b.src), { position: "relative", width: "100%", height: SITE_MAP_H, borderRadius: 20 })}>
+      {b.pins.map((pin) => (
+        <span
+          key={pin.zone}
+          onPointerDown={drag ? (e) => r.onPinPointerDown!(pin.zone, e) : undefined}
+          title={drag ? "Drag to place" : undefined}
+          style={{
+            position: "absolute",
+            left: `${pin.x}%`,
+            top: `${pin.y}%`,
+            transform: "translate(-50%,-50%)",
+            display: "inline-flex",
+            alignItems: "center",
+            height: 32,
+            padding: "0 12px",
+            borderRadius: 8,
+            background: BLUE_CARD,
+            color: NAVY,
+            fontSize: 17,
+            fontWeight: 700,
+            lineHeight: 1,
+            whiteSpace: "nowrap",
+            boxShadow: "0 2px 10px rgba(1,25,85,.3)",
+            userSelect: "none",
+            cursor: drag ? "grab" : "default",
+            touchAction: "none",
+          }}
+        >
+          {pin.zone}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** A code group's bar, as on Flagged issues. A group whose photos all sit
+ *  under a more severe code points to them instead of counting. */
+function CodeGroupHead({ b, top }: { b: Extract<GroupBlock, { t: "head" }>; top: boolean }) {
+  const band = b.code ? bandOf(b.code) : "grey";
+  const name = b.code ? (CODES[b.code]?.name ?? b.code) : "Other site photos";
+  const nums = b.refs.flatMap((x) => x.nums);
+  const desc = !b.code
+    ? "General photos from the survey."
+    : b.count
+      ? `${FLAG_GROUPS[band][0]} · ${b.count} ${b.count === 1 ? "photo" : "photos"}`
+      : `${FLAG_GROUPS[band][0]} · see ${nums.length > 1 ? "photos" : "photo"} ${nums.join(", ")}`;
+  return (
+    <div style={{ marginTop: top ? 0 : 56, display: "flex", alignItems: "center", gap: 16, padding: "16px 24px", borderRadius: 14, background: BANDS[band].bg }}>
+      {b.code && <span style={{ ...codeChip(b.code), background: "#ffffff" }}>{b.code}</span>}
+      <span style={{ ...sub, whiteSpace: "nowrap" }}>{b.cont ? `${name}, continued` : name}</span>
+      <span style={{ fontSize: "1.0625rem", color: INK(0.7), lineHeight: 1.4 }}>{desc}</span>
+    </div>
+  );
+}
+
+/** "How we fix it", under a group's photos, in two columns; then where else
+ *  this defect appears (photos filed under a more severe code). */
+function StepsBlock({ b }: { b: Extract<GroupBlock, { t: "steps" }> }) {
+  return (
+    <div data-edit={`findings.methods.${b.code}`} style={{ marginTop: 28 }}>
+      <div style={{ ...label, marginBottom: 10 }}>How we fix it</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "4px 40px" }}>
+        {b.steps.map((t, k) => (
+          <div key={k} style={{ display: "grid", gridTemplateColumns: "18px minmax(0,1fr)", ...secondary }}>
+            <span style={{ width: 5, height: 5, borderRadius: "50%", background: NAVY, marginTop: 11 }} />
+            <Inline html={t} />
+          </div>
+        ))}
+      </div>
+      {b.refs.length > 0 && <p style={{ ...secondary, marginTop: 12 }}>{refsText(b.refs)}</p>}
+    </div>
   );
 }
 
@@ -834,7 +976,7 @@ const contName = (name: string, start: boolean) => (start ? name : `${name}, con
 function Flagged({ r, s }: PageProps) {
   const d = r.p.d.flagged;
   const groups = dataOf(s, "flagged")?.groups ?? [];
-  const cols = "110px minmax(0,1fr) 200px";
+  const cols = "110px minmax(0,1fr) minmax(0,1fr) 160px";
   return (
     <Sheet r={r} s={s}>
       <Head r={r} s={s} title="Flagged issues" intro={d.intro} edit="flagged.intro" />
@@ -851,6 +993,7 @@ function Flagged({ r, s }: PageProps) {
       <div style={tableHead(cols, flowTop(s, 72))}>
         <span>Code</span>
         <span>Defect</span>
+        <span>Where</span>
         <span style={{ textAlign: "right" }}>Found</span>
       </div>
       {groups.map((g, gi) => (
@@ -862,6 +1005,7 @@ function Flagged({ r, s }: PageProps) {
               <div key={i} data-edit={`flagged.rows.${d.rows.indexOf(row)}.code`} style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 24, padding: "12px 0", borderBottom: rule(i, g.rows.length), lineHeight: 1.3 }}>
                 <span style={codeChip(row.code)}>{row.code}</span>
                 <span style={{ fontSize: "1.25rem", fontWeight: 600 }}>{codeName(row.code)}</span>
+                <span style={{ fontSize: "1.0625rem", color: INK(0.6), lineHeight: 1.3 }}>{row.where}</span>
                 <span style={{ fontSize: "1.0625rem", color: INK(0.55), textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                   {n} {n === 1 ? "location" : "locations"}
                 </span>
@@ -1029,7 +1173,7 @@ function Safety({ r, s }: PageProps) {
       </div>
       <Quote
         gap={72}
-        text="“Safety is our priority, and it’s part of our higher standards. When the team is safe, we’re confident. Quality results come from preparation, and my role is to make sure the team carries that out.”"
+        text="“High standards begin with safety. Through preparation, accountability and strong leadership, we create an environment where people can perform with confidence and deliver quality outcomes consistently.”"
         who="Archer Dutch"
         role="Height & Safety Manager"
       />

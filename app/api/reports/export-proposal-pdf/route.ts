@@ -16,7 +16,7 @@ import { derive } from "@/lib/reports/proposal/v3/derive";
 import { ASSET_DIR, isProposal, resolvePhoto, type Proposal } from "@/lib/reports/proposal/v3/types";
 import { pdfDownloadResponse, readPublicAsBase64, renderPDF } from "@/lib/server/pdf-utils";
 import { createImageResolver, type ResizeTo } from "@/lib/server/resolveReportImages";
-import { getSimproConfig, saveQuoteAttachment } from "@/lib/server/simpro";
+import { getSimproConfig, saveQuoteAttachment, saveSiteAttachment } from "@/lib/server/simpro";
 
 export const maxDuration = 60;
 
@@ -87,7 +87,15 @@ function safeName(s: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { report?: unknown; saveToQuote?: boolean; companyId?: number };
+  let body: {
+    report?: unknown;
+    /** Save to SimPRO as well as returning the PDF. */
+    destinations?: { quote?: boolean; site?: boolean };
+    /** Older callers. */
+    saveToQuote?: boolean;
+    filename?: string;
+    companyId?: number;
+  };
   try {
     body = await request.json();
   } catch {
@@ -99,7 +107,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "proposal data is required" }, { status: 400 });
   }
 
-  const filename = safeName(`Proposal - ${report.job.client || report.job.building || "Painting"} - Q${report.job.quote}`) + ".pdf";
+  const base = body.filename?.trim() || `Proposal - ${report.job.client || report.job.building || "Painting"} - Q${report.job.quote}`;
+  const filename = safeName(base.replace(/\.pdf$/i, "")) + ".pdf";
 
   let buffer: Buffer;
   try {
@@ -109,20 +118,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "PDF generation failed." }, { status: 500 });
   }
 
-  let savedToQuote = false;
+  // Each destination is independent: one failing doesn't stop the other.
+  const companyId = body.companyId ?? 0;
+  const want = { quote: !!(body.destinations?.quote ?? body.saveToQuote), site: !!body.destinations?.site };
   const quoteId = parseInt(report.quote, 10);
-  if (body.saveToQuote && quoteId > 0) {
+  const siteId = parseInt(report.siteId ?? "", 10);
+  const save = async (on: boolean, ok: boolean, run: () => Promise<unknown>, what: string) => {
+    if (!on) return "no";
+    if (!ok) return "error";
     try {
       getSimproConfig();
-      await saveQuoteAttachment(body.companyId ?? 0, quoteId, filename, buffer);
-      savedToQuote = true;
+      await run();
+      return "yes";
     } catch (err) {
-      console.error("[ExportProposalPDF] save to quote failed:", err);
+      console.error(`[ExportProposalPDF] save to ${what} failed:`, err);
+      return "error";
     }
-  }
+  };
+  const [quote, site] = await Promise.all([
+    save(want.quote, quoteId > 0, () => saveQuoteAttachment(companyId, quoteId, filename, buffer), "quote"),
+    save(want.site, siteId > 0, () => saveSiteAttachment(companyId, siteId, filename, buffer), "site"),
+  ]);
 
   const res = pdfDownloadResponse(buffer, filename);
-  res.headers.set("X-Saved-To-Quote", savedToQuote ? "yes" : "no");
+  res.headers.set("X-Saved-To-Quote", quote);
+  res.headers.set("X-Saved-To-Site", site);
   res.headers.set("X-Filename", encodeURIComponent(filename));
   return res;
 }

@@ -188,6 +188,8 @@ export interface EnrichedQuote {
   salespersonName: string;
   siteName: string;
   siteAddress: string;
+  /** SimPRO Site ID ("" if none) — for saving PDFs to the site. */
+  siteId: string;
   date: string;
   totalExTax: number;
   totalIncGst: number;
@@ -282,6 +284,7 @@ export async function fetchEnrichedQuote(
   return {
     id: String(quoteId),
     jobNo,
+    siteId: quote.Site?.ID ? String(quote.Site.ID) : "",
     name: quote.Name?.trim() || `Quote ${quoteId}`,
     clientName,
     contactName,
