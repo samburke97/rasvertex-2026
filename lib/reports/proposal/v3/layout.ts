@@ -40,8 +40,8 @@ const FINDING_GAP = 48;
  *  holds: nothing when it has no title or points, otherwise the title and
  *  points (up to five, wrapped), capped so one row can't swamp a page.
  *  Both photos in a row share the taller of the two. */
-const CARD_W = (1088 - 40) / 2;
-export function findingTextH(f: Finding, report: boolean): number {
+export const CARD_W = (1088 - 40) / 2;
+export function findingTextH(f: Finding, report: boolean, zoned = false): number {
   const title = f.title.trim();
   const items = richItems(f.desc).slice(0, report ? 99 : MAX_POINTS);
   if (!report) {
@@ -55,11 +55,18 @@ export function findingTextH(f: Finding, report: boolean): number {
   const chips = codesOf(f).length;
   const titleW = CARD_W - chips * 54 - 48;
   let h = Math.max(28, title ? textLines(title, 22, titleW, 700) * 27.5 : 0);
-  if (f.where?.trim()) h += 4 + 25.5;
+  if (shownWhere(f, zoned)) h += 4 + 25.5;
   if (items.length) h += 8 + richH(f.desc, 17, 25.5, CARD_W);
   return Math.min(Math.ceil(h) + 4, FINDING_TEXT_H + 150);
 }
 export const MAX_POINTS = 5;
+
+/** The location printed under a report card. Grouped by section, the
+ *  section bar already names the zone, so only level and unit are left. */
+export function shownWhere(f: Finding, zoned: boolean): string {
+  const w = f.where?.trim() ?? "";
+  return zoned ? w.replace(/\b[DS]\d+\b/i, "").replace(/\s+/g, " ").trim() : w;
+}
 
 /** Lines a string wraps to at a font size and width (word-greedy). */
 export function textLines(text: string, px: number, width: number, weight = 400): number {
@@ -136,7 +143,8 @@ export type GroupBlock =
   | { t: "map"; src: string; pins: { zone: string; x: number; y: number }[] }
   | {
       t: "head"; // the group's bar
-      code: string | null; // null = "Other site photos"
+      code: string | null; // null = a section, or "Other site photos"
+      zone?: string; // the section ("S1", "D4") when grouped by section
       count: number; // photos in the group
       cont: boolean; // carried over from the previous sheet
       refs: { code: string; nums: string[] }[]; // its photos shown under another code
@@ -147,7 +155,7 @@ export type GroupBlock =
       steps: string[];
       refs: { code: string; nums: string[] }[]; // "Also see…", when the group has photos of its own
     }
-  | { t: "row"; items: { f: Finding; i: number; textH: number; n: string }[] };
+  | { t: "row"; items: { f: Finding; i: number; textH: number; n: string }[]; zoned?: boolean };
 
 export interface Sheet {
   key: string; // "<id>" or "<id>:<part>"
@@ -326,6 +334,7 @@ export function layoutPage(p: Proposal, id: PageId): Sheet[] {
 
 export interface FindingGroup {
   code: string | null;
+  zone?: string;
   items: { f: Finding; i: number; n: string }[];
   refs: { code: string; nums: string[] }[];
 }
@@ -335,6 +344,7 @@ export interface FindingGroup {
  *  under its most severe; each of its other codes' groups references it by
  *  number. Numbers follow the order photos appear in the report. */
 export function groupFindings(p: Proposal): FindingGroup[] {
+  if (bySection(p)) return groupBySection(p);
   const items = p.d.findings.items.map((f, i) => ({ f, i, codes: codesOf(f) }));
   const all = [...new Set(items.flatMap((x) => x.codes))].sort((a, b) => codeRank(a) - codeRank(b));
   const groups: FindingGroup[] = all.map((code) => ({ code, items: [], refs: [] }));
@@ -367,6 +377,44 @@ export function groupFindings(p: Proposal): FindingGroup[] {
   return other.items.length ? [...groups, other] : groups;
 }
 
+/** Report style groups by section as soon as any photo is tagged with one. */
+export const bySection = (p: Proposal) => p.d.findings.items.some((f) => zoneOf(f.where));
+
+const zoneKey = (z: string) => (z[0] === "S" ? 0 : 1e6) + parseInt(z.slice(1), 10);
+
+/** By section: one group per zone (S1, S2… then D1, D2…), worst issues
+ *  first within each; then photos with no zone. After the sections, one
+ *  group per code with no photos of its own — just its "How we fix it" and
+ *  the numbers of the photos that show it. */
+function groupBySection(p: Proposal): FindingGroup[] {
+  const items = p.d.findings.items.map((f, i) => ({ f, i, codes: codesOf(f), zone: zoneOf(f.where) }));
+  const rank = (x: { codes: string[] }) => (x.codes[0] ? codeRank(x.codes[0]) : 1e6);
+  const zones = [...new Set(items.map((x) => x.zone).filter(Boolean))].sort((a, b) => zoneKey(a) - zoneKey(b));
+  let n = 0;
+  const num = new Map<number, string>();
+  const take = (list: typeof items) =>
+    list
+      .slice()
+      .sort((a, b) => rank(a) - rank(b) || a.i - b.i)
+      .map((x) => {
+        const k = String(++n).padStart(2, "0");
+        num.set(x.i, k);
+        return { f: x.f, i: x.i, n: k };
+      });
+  const groups: FindingGroup[] = zones.map((zone) => ({ code: null, zone, items: take(items.filter((x) => x.zone === zone)), refs: [] }));
+  const rest = items.filter((x) => !x.zone);
+  if (rest.length) groups.push({ code: null, items: take(rest), refs: [] });
+  const codes = [...new Set(items.flatMap((x) => x.codes))].sort((a, b) => codeRank(a) - codeRank(b));
+  for (const code of codes) {
+    const nums = items
+      .filter((x) => x.codes.includes(code))
+      .map((x) => num.get(x.i)!)
+      .sort();
+    groups.push({ code, items: [], refs: [{ code, nums }] });
+  }
+  return groups;
+}
+
 /** "Also see photo 03 under Safety hazard, and photos 05 and 07 under Spalling." */
 export function refsText(refs: { code: string; nums: string[] }[]): string {
   const and = (a: string[]) => (a.length < 2 ? a[0] : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`);
@@ -393,6 +441,7 @@ const refsH = (refs: { code: string; nums: string[] }[]) => (refs.length ? 12 + 
  *  their place; new zones start spread along the image. */
 export const SITE_MAP_H = CONTENT_W / 2; // 2:1, like the aerial
 export function siteMap(p: Proposal): { src: string; pins: { zone: string; x: number; y: number }[] } | null {
+  if (p.d.findings.showMap === false) return null;
   const src = p.d.findings.map || p.d.access.aerial;
   const zones = [...new Set(p.d.findings.items.map((f) => zoneOf(f.where)).filter(Boolean))].sort(
     (a, b) => (a[0] === b[0] ? parseInt(a.slice(1)) - parseInt(b.slice(1)) : a[0] < b[0] ? -1 : 1),
@@ -431,22 +480,40 @@ function groupedSheets(p: Proposal): SheetData[] {
   };
   const cur = () => sheets[sheets.length - 1];
 
+  // No coded photos at all: an "Other site photos" bar would label the whole
+  // page as leftovers, so the photos simply follow the intro, bar-less.
+  const bars = groups.some((g) => g.code || g.zone);
+  const zoned = bySection(p);
+
   for (const g of groups) {
     const rows: { f: Finding; i: number; textH: number; n: string }[][] = [];
     for (let k = 0; k < g.items.length; k += 2) {
       const pair = g.items.slice(k, k + 2);
-      const textH = Math.max(...pair.map((x) => findingTextH(x.f, true)));
+      const textH = Math.max(...pair.map((x) => findingTextH(x.f, true, zoned)));
       rows.push(pair.map((x) => ({ ...x, textH })));
     }
     const rowH = (r: { textH: number }[]) => REPORT_PHOTO_H + (r[0].textH ? 20 + r[0].textH : 0);
     const steps = g.code ? methodSteps(p, g.code) : [];
-    const head = (cont: boolean): GroupBlock => ({ t: "head", code: g.code, count: g.items.length, cont, refs: g.refs });
+    if (!rows.length && !steps.length) continue; // a code with nothing to say
+    const head = (cont: boolean): GroupBlock => ({ t: "head", code: g.code, zone: g.zone, count: g.items.length, cont, refs: g.refs });
     // A group with photos: bar, photos, then the steps (+ "Also see…").
     // A group whose only photos sit under another code: bar ("see photo 03")
     // and steps together.
     const stepsBlock: GroupBlock | null = steps.length ? { t: "steps", code: g.code!, steps, refs: rows.length ? g.refs : [] } : null;
     const stepsHt = stepsBlock ? 28 + stepsH(steps) + (rows.length ? refsH(g.refs) : 0) : 0;
     const top = () => !cur().length;
+
+    if (!bars) {
+      rows.forEach((r) => {
+        const h = (top() ? 0 : FINDING_GAP) + rowH(r);
+        if (h > room && !top()) {
+          newSheet();
+          room -= rowH(r);
+        } else room -= h;
+        cur().push({ t: "row", items: r, zoned });
+      });
+      continue;
+    }
 
     // The bar goes with its first row (or its steps), never alone at the foot;
     // the steps go with the last row, never alone at the top of a sheet.
@@ -462,7 +529,7 @@ function groupedSheets(p: Proposal): SheetData[] {
         cur().push(head(true));
         room -= barH(true) + 24 + rowH(r);
       } else room -= h;
-      cur().push({ t: "row", items: r });
+      cur().push({ t: "row", items: r, zoned });
     });
     if (stepsBlock) {
       if (rows.length && stepsHt > room) {

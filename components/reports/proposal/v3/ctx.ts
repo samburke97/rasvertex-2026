@@ -11,6 +11,16 @@ export interface PhotoFolderOption {
   photos: string[]; // photo refs
 }
 
+export interface Confirm {
+  title: string;
+  body?: string;
+  /** Confirm button label; danger colours it red. */
+  ok?: string;
+  danger?: boolean;
+  /** A notice: one button, nothing to cancel. */
+  notice?: boolean;
+}
+
 export interface BuilderCtx {
   p: Proposal;
   D: Derived;
@@ -40,6 +50,8 @@ export interface BuilderCtx {
   upload: (file: File) => Promise<string>;
   /** Deletes an upload, and takes it off any page that uses it. */
   removeUpload: (url: string) => void;
+  /** Ask before something that can't be undone. Resolves true on confirm. */
+  confirm: (q: Confirm) => Promise<boolean>;
   /** Compresses and stores an image (e.g. a satellite capture); adds it to
    *  uploads and returns its URL. */
   uploadData: (dataUrl: string, name: string) => Promise<string>;

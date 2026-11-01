@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import styles from "./Builder.module.css";
-import type { BuilderCtx, Path } from "./ctx";
+import type { BuilderCtx, Confirm, Path } from "./ctx";
 import DocEditor from "@/components/workspace/DocEditor";
 import { richHtml } from "@/lib/reports/proposal/v3/rich";
 import { money } from "@/lib/reports/proposal/v3/derive";
@@ -107,7 +107,17 @@ export function Rich({
           info ?? (list ? "One item per line — press Enter for the next. Select text to make it bold or italic." : "Type “/” for a bullet or numbered list. Select text to make it bold or italic.")
         }
       />
-      <div className={`${styles.rich} ${list ? styles.richList : ""}`}>
+      <div
+        className={`${styles.rich} ${list ? styles.richList : ""}`}
+        // Clicking anywhere in the box, not just on the text, puts the cursor in it.
+        onMouseDown={(e) => {
+          const ed = e.currentTarget.querySelector<HTMLElement>(".tiptap");
+          if (ed && !ed.contains(e.target as Node)) {
+            e.preventDefault();
+            ed.focus();
+          }
+        }}
+      >
         <DocEditor
           variant={list ? "list" : "prose"}
           value={value}
@@ -421,6 +431,41 @@ function PhotoModal({ ctx, title, current, onPick, onClose }: { ctx: BuilderCtx;
           ) : (
             <span className={styles.empty}>{loadingThis ? "Loading photos from SimPRO…" : "No photos here. Pick another folder, reload from SimPRO, or upload one."}</span>
           )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** In-app confirm, in place of the browser's. Enter confirms, Esc or the
+ *  backdrop cancels. */
+export function ConfirmModal({ q, onAnswer }: { q: Confirm; onAnswer: (ok: boolean) => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onAnswer(false);
+      if (e.key === "Enter") onAnswer(true);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onAnswer]);
+
+  return createPortal(
+    <div className={`${styles.vars} ${styles.modalBack}`} onMouseDown={(e) => e.target === e.currentTarget && onAnswer(false)}>
+      <div className={`${styles.modal} ${styles.confirmModal}`} role="alertdialog" aria-label={q.title}>
+        <div className={styles.confirmText}>
+          <b>{q.title}</b>
+          {q.body && <p>{q.body}</p>}
+        </div>
+        <div className={styles.modalFoot}>
+          {!q.notice && (
+            <button className={styles.ghostPill} onClick={() => onAnswer(false)}>
+              Cancel
+            </button>
+          )}
+          <button className={`${styles.darkPill} ${q.danger ? styles.dangerBtn : ""}`} onClick={() => onAnswer(true)} autoFocus>
+            {q.ok ?? (q.notice ? "OK" : "Confirm")}
+          </button>
         </div>
       </div>
     </div>,

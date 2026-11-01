@@ -85,7 +85,8 @@ export interface ParsedPhoto {
 export interface PhotoView {
   id: string;
   num: string;
-  chip: Chip;
+  /** Every code on the photo; the one it's filed under first. */
+  chips: Chip[];
   gname: string;
   desc: string;
 }
@@ -232,6 +233,13 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   };
   const zones = [...new Set(parsed.map((p) => p.zone))].sort((a, b) => zoneOrd(a) - zoneOrd(b));
 
+  // A photo with several codes shows once, filed under its most severe
+  // defect (else Overview, else Other), with every code as a chip.
+  const codeOrd = (code: string) => CODES.findIndex((c) => c.code === code);
+  const primary = (p: ParsedPhoto) =>
+    [...p.codes].filter((c) => c !== "OV" && c !== "OT").sort((a, b) => codeOrd(a) - codeOrd(b))[0] ??
+    (p.codes.includes("OV") ? "OV" : "OT");
+
   // Chapters and photo numbering (Findings display order, OT last)
   let num = 0;
   const numOf = new Map<ParsedPhoto, number>();
@@ -244,7 +252,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       const groups: { code: string; ps: ParsedPhoto[] }[] = [];
       for (const c of CODES) {
         if (c.code === "OT") continue;
-        const g = ps.filter((p) => p.codes.includes(c.code)).sort(sortLU);
+        const g = ps.filter((p) => primary(p) === c.code).sort(sortLU);
         if (g.length) groups.push({ code: c.code, ps: g });
       }
       const ovi = groups.findIndex((g) => g.code === "OV");
@@ -252,21 +260,28 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       groups.forEach((g) => g.ps.forEach(assign));
       return {
         zone,
-        ps: ps.filter((p) => !(p.codes.length === 1 && p.codes[0] === "OT")),
+        ps: ps.filter((p) => primary(p) !== "OT"),
         groups,
       };
     })
     .filter((ch) => ch.groups.length);
   const other = parsed
-    .filter((p) => p.codes.includes("OT"))
+    .filter((p) => primary(p) === "OT")
     .sort((a, b) => zoneOrd(a.zone) - zoneOrd(b.zone) || sortLU(a, b));
   other.forEach(assign);
 
   const view = (p: ParsedPhoto, withZone: boolean, code: string): PhotoView => ({
     id: p.id,
     num: pad(numOf.get(p) ?? 0),
-    chip: chip(code),
-    gname: code === "OV" ? "Overview" : CODE_MAP[code].name,
+    chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].map(chip),
+    gname: (() => {
+      const defects = [code, ...p.codes.filter((c) => c !== code)].filter((c) => !CODE_MAP[c].system);
+      if (!defects.length) return code === "OV" ? "Overview" : CODE_MAP[code].name;
+      return [...new Set(defects)]
+        .sort((a, b) => (a === code ? -1 : b === code ? 1 : codeOrd(a) - codeOrd(b)))
+        .map((c, i) => (i ? CODE_MAP[c].name.charAt(0).toLowerCase() + CODE_MAP[c].name.slice(1) : CODE_MAP[c].name))
+        .join(", ");
+    })(),
     desc:
       (withZone ? zoneTitle(p.zone) + ", " : "") +
       levelName(p.level) +

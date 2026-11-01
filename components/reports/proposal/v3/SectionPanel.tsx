@@ -4,13 +4,15 @@
 // page brings its field here into view and puts the cursor in it.
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import MapCaptureModal from "@/components/reports/inspection/MapCaptureModal";
 import styles from "./Builder.module.css";
 import type { BuilderCtx } from "./ctx";
 import { GroupHead, InfoTip, List, Money, Note, Photo, Rich, Segmented, Select, Text } from "./fields";
+import { CARD_W, FINDING_PHOTO_H, REPORT_PHOTO_H } from "@/lib/reports/proposal/v3/layout";
 import { methodHtml } from "@/lib/reports/proposal/v3/methods";
 import { isHidden, money, parseAmt } from "@/lib/reports/proposal/v3/derive";
-import { applySurvey, enabledPhotos, recodeFromTags, standardFromPhotos, taggedPhotos } from "@/lib/reports/proposal/v3/survey";
+import { applySurvey, enabledPhotos, findingFor, recodeFromTags, standardFromPhotos, taggedPhotos } from "@/lib/reports/proposal/v3/survey";
 import {
   BRANDS,
   CODES,
@@ -25,6 +27,7 @@ import {
   withCodes,
   type Brand,
   type FindingsStyle,
+  type PhotoPos,
   type PageId,
   type Proposal,
   type SpecRow,
@@ -106,11 +109,29 @@ function SiteMapField({ ctx }: { ctx: BuilderCtx }) {
   const [mapOpen, setMapOpen] = useState(false);
   const d = ctx.p.d;
   const own = !!d.findings.map;
+  const on = d.findings.showMap !== false;
+  const toggle = (
+    <div className={styles.switchRow}>
+      <span className={styles.fieldLabel}>
+        Site map
+        <InfoTip>Optional. A map of the building with a pin for each section (S1, D10…) in the photos’ names, so the client can find them.</InfoTip>
+      </span>
+      <button
+        className={`${styles.switch} ${on ? styles.switchOn : ""}`}
+        role="switch"
+        aria-checked={on}
+        title={on ? "Hide the site map" : "Show a site map"}
+        onClick={() => ctx.set(["findings", "showMap"], !on)}
+      />
+    </div>
+  );
+  if (!on) return toggle;
   return (
     <>
+      {toggle}
       <Photo
         ctx={ctx}
-        label="Site map"
+        label="Map image"
         path={["findings", "map"]}
         info="Shown above the findings with a pin for every zone in the photos’ locations. Drag the pins on the page to place them. Until you choose one, it uses the access plan’s aerial."
         extra={
@@ -198,6 +219,15 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
   const f = ctx.focusFinding != null && ctx.focusFinding < items.length ? ctx.focusFinding : null;
   const path = (k: string) => ["findings", "items", f!, k];
   const blank = (photo = "") => ({ photo, code: "", title: "", desc: "" });
+  const [adjusting, setAdjusting] = useState(false);
+  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
+  const reorder = (from: number, to: number) => {
+    if (from === to) return;
+    const next = [...items];
+    const [x] = next.splice(from, 1);
+    next.splice(to, 0, x);
+    ctx.set(["findings", "items"], next);
+  };
 
   if (f != null) {
     const it = items[f];
@@ -213,7 +243,7 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
       <>
         <div className={styles.focusBar}>
           <button className={styles.linkBtn} onClick={() => ctx.pickFinding(null, false)}>
-            ‹ All photos{report ? " & site map" : ""}
+            ‹ Back to Site survey &amp; findings
           </button>
           <span className={styles.focusCount}>
             {f + 1} of {items.length}
@@ -227,7 +257,30 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
             </button>
           </span>
         </div>
-        <Photo ctx={ctx} label="Photo" path={path("photo")} />
+        <Photo
+          ctx={ctx}
+          label="Photo"
+          path={path("photo")}
+          extra={
+            it.photo && (
+              <button className={styles.smallBtn} onClick={() => setAdjusting(true)} title="Drag to move the photo in its frame; zoom in to crop">
+                Adjust
+              </button>
+            )
+          }
+        />
+        {adjusting && it.photo && (
+          <CropModal
+            src={ctx.img(it.photo)}
+            aspect={CARD_W / (report ? REPORT_PHOTO_H : FINDING_PHOTO_H)}
+            pos={it.pos}
+            onDone={(pos) => {
+              ctx.set(path("pos"), pos);
+              setAdjusting(false);
+            }}
+            onClose={() => setAdjusting(false)}
+          />
+        )}
         {report && (
           <CodePicker ctx={ctx} index={f} />
         )}
@@ -237,12 +290,12 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
             label="Location"
             path={path("where")}
             ph="e.g. D10 L2 U403"
-            info="Zone (D# drop or S# section), level (LG, L2, LR) and unit. Prints beside the photo; the zone is pinned on the site map and listed in Flagged issues."
+            info="Zone (S# section or D# drop), level (LG, L2, LR) and unit. Photos are grouped by section on the page, so only level and unit print on the photo. The zone is pinned on the site map and listed in Flagged issues."
           />
         )}
         <Text ctx={ctx} label="Title" path={path("title")} ph="e.g. Render crack, north face level 2" />
         {report ? (
-          <Rich ctx={ctx} label="What we do about it" path={path("desc")} />
+          <Rich ctx={ctx} label="Description" path={path("desc")} ph="Optional: anything the client should know about this photo" />
         ) : (
           <Rich ctx={ctx} label="Points" path={path("desc")} list info="One point per line, up to five. Only the first five show on the page." />
         )}
@@ -298,12 +351,34 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
       {report && <MethodRows ctx={ctx} />}
       <GroupHead
         title={`On the page · ${items.length}`}
-        sub="Click a photo to edit it. Four photos to a page; pages are added as needed."
+        sub="Click a photo to edit it, or drag to reorder. Pages are added as needed."
       />
       {items.length > 0 ? (
         <div className={styles.fgrid}>
           {items.map((it, i) => (
-            <button key={i} className={styles.fcell} style={bgOf(ctx.img(it.photo))} title={it.title || `Finding ${pad(i + 1)}`} onClick={() => ctx.pickFinding(i, true)}>
+            <button
+              key={i}
+              className={`${styles.fcell} ${drag?.from === i ? styles.fcellDragging : ""} ${drag && drag.over === i && drag.from !== i ? (drag.from < i ? styles.fcellDropAfter : styles.fcellDropBefore) : ""}`}
+              style={bgOf(ctx.img(it.photo))}
+              title={it.title || `Finding ${pad(i + 1)}`}
+              onClick={() => ctx.pickFinding(i, true)}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = "move";
+                setDrag({ from: i, over: i });
+              }}
+              onDragOver={(e) => {
+                if (!drag) return;
+                e.preventDefault();
+                if (drag.over !== i) setDrag({ ...drag, over: i });
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (drag) reorder(drag.from, i);
+                setDrag(null);
+              }}
+              onDragEnd={() => setDrag(null)}
+            >
               <span className={styles.fnum}>{i + 1}</span>
             </button>
           ))}
@@ -356,7 +431,7 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
                 style={bgOf(ph.url)}
                 title={`Add “${ph.name}”`}
                 onClick={() => {
-                  ctx.set(["findings", "items"], [...items, blank("ph:" + ph.id)]);
+                  ctx.set(["findings", "items"], [...items, findingFor(ph)]);
                   ctx.pickFinding(items.length, true);
                 }}
               >
@@ -370,7 +445,7 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
               onClick={() =>
                 ctx.set(
                   ["findings", "items"],
-                  [...items, ...unused.slice(0, LIMITS.findings - items.length).map((ph) => blank("ph:" + ph.id))],
+                  [...items, ...unused.slice(0, LIMITS.findings - items.length).map(findingFor)],
                 )
               }
             >
@@ -386,8 +461,14 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
                   <button
                     className={styles.smallBtn}
                     title="Replaces what’s on the page with every photo from the switched-on folders"
-                    onClick={() => {
-                      if (confirm("Replace every finding with the SimPRO photos? Titles and points you've written will be lost.")) ctx.update(standardFromPhotos);
+                    onClick={async () => {
+                      const ok = await ctx.confirm({
+                        title: "Start the findings again?",
+                        body: "Every finding is replaced with the SimPRO photos. Titles and points you've written are lost.",
+                        ok: "Replace findings",
+                        danger: true,
+                      });
+                      if (ok) ctx.update(standardFromPhotos);
                     }}
                   >
                     Start again
@@ -749,3 +830,120 @@ export default function SectionPanel({ ctx, width }: { ctx: BuilderCtx; width: n
   );
 }
 
+
+/** Frame a photo: drag to move it, slide to zoom. The frame has the card's
+ *  proportions and is rendered the way the page renders it (focal point +
+ *  scale), so what's framed here is what prints. */
+function CropModal({ src, aspect, pos, onDone, onClose }: { src: string; aspect: number; pos?: PhotoPos; onDone: (pos: PhotoPos | undefined) => void; onClose: () => void }) {
+  const [p, setP] = useState<PhotoPos>(pos ?? { x: 50, y: 50, zoom: 1 });
+  const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
+  const frame = useRef<HTMLDivElement>(null);
+  const start = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  useEffect(() => {
+    const im = new Image();
+    im.onload = () => setNat({ w: im.naturalWidth, h: im.naturalHeight });
+    im.src = src;
+  }, [src]);
+
+  // How far the photo overflows the frame at this zoom, in frame pixels,
+  // so a drag moves the photo with the pointer.
+  const overflow = () => {
+    const el = frame.current;
+    if (!el || !nat) return { w: 0, h: 0, fw: 1, fh: 1 };
+    const fw = el.clientWidth;
+    const fh = el.clientHeight;
+    const s = Math.max(fw / nat.w, fh / nat.h);
+    return { w: nat.w * s - fw, h: nat.h * s - fh, fw, fh };
+  };
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+
+  const onDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.target as Element).setPointerCapture(e.pointerId);
+    start.current = { px: e.clientX, py: e.clientY, x: p.x, y: p.y };
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const s0 = start.current;
+    if (!s0) return;
+    const o = overflow();
+    const dx = e.clientX - s0.px;
+    const dy = e.clientY - s0.py;
+    // Distance (frame px) the focal point travels from 0 to 100 %: the
+    // cover overflow, scaled by zoom, plus what the zoom itself pushes out.
+    // Moving the photo right reveals its left, so the focal point falls.
+    const z = p.zoom;
+    const rx = o.fw * (z - 1) + o.w * z;
+    const ry = o.fh * (z - 1) + o.h * z;
+    setP((q) => ({
+      ...q,
+      x: rx > 0.5 ? clamp(s0.x - (dx / rx) * 100) : q.x,
+      y: ry > 0.5 ? clamp(s0.y - (dy / ry) * 100) : q.y,
+    }));
+  };
+  const onUp = () => (start.current = null);
+
+  return createPortal(
+    <div className={`${styles.vars} ${styles.modalBack}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={`${styles.modal} ${styles.cropModal}`} role="dialog" aria-label="Adjust photo">
+        <div className={styles.modalHead}>
+          <div>
+            <b>Adjust photo</b>
+            <small>Drag to move it in the frame. Zoom in to crop tighter.</small>
+          </div>
+          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
+            ×
+          </button>
+        </div>
+        <div
+          ref={frame}
+          className={styles.cropFrame}
+          style={{ aspectRatio: String(aspect) }}
+          onPointerDown={onDown}
+          onPointerMove={onMove}
+          onPointerUp={onUp}
+          onPointerCancel={onUp}
+          onWheel={(e) => setP((q) => ({ ...q, zoom: Math.max(1, Math.min(3, q.zoom - e.deltaY * 0.002)) }))}
+        >
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundImage: `url("${src}")`,
+              backgroundSize: "cover",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: `${p.x}% ${p.y}%`,
+              transform: p.zoom > 1 ? `scale(${p.zoom})` : undefined,
+              transformOrigin: `${p.x}% ${p.y}%`,
+              pointerEvents: "none",
+            }}
+          />
+        </div>
+        <div className={styles.cropBar}>
+          <span>Zoom</span>
+          <input type="range" min={1} max={3} step={0.01} value={p.zoom} onChange={(e) => setP({ ...p, zoom: Number(e.target.value) })} />
+          <button className={styles.linkBtn} onClick={() => setP({ x: 50, y: 50, zoom: 1 })}>
+            Reset
+          </button>
+        </div>
+        <div className={styles.modalFoot}>
+          <button className={styles.ghostPill} onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className={styles.darkPill}
+            onClick={() => onDone(p.x === 50 && p.y === 50 && p.zoom === 1 ? undefined : { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, zoom: Math.round(p.zoom * 100) / 100 })}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}

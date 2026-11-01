@@ -12,7 +12,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { codeName, money, parseAmt, type Derived } from "@/lib/reports/proposal/v3/derive";
-import { FINDING_PHOTO_H, MAX_POINTS, REPORT_PHOTO_H, SITE_MAP_H, refsText, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
+import { FINDING_PHOTO_H, MAX_POINTS, REPORT_PHOTO_H, SITE_MAP_H, refsText, shownWhere, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
 import { RICH_CSS, richHtml, richItems } from "@/lib/reports/proposal/v3/rich";
 import { placeLabel } from "@/lib/reports/proposal/v3/survey";
 import {
@@ -778,12 +778,40 @@ function Points({ text }: { text: string }) {
   );
 }
 
+/** A photo in a fixed frame, positioned by its focal point and zoomed
+ *  (set in the panel's Adjust editor). The image is scaled about the focal
+ *  point, so what's framed in the editor is what prints. */
+export function FramedPhoto({ src, pos, height, edit, radius = 20 }: { src: string; pos?: { x: number; y: number; zoom: number }; height: number; edit?: string; radius?: number }) {
+  const x = pos?.x ?? 50;
+  const y = pos?.y ?? 50;
+  const z = Math.max(1, pos?.zoom ?? 1);
+  return (
+    <div data-edit={edit} style={{ position: "relative", width: "100%", height, flexShrink: 0, borderRadius: radius, overflow: "hidden", background: CARD }}>
+      {src && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: bg(src),
+            backgroundSize: "cover",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: `${x}% ${y}%`,
+            transform: z > 1 ? `scale(${z})` : undefined,
+            transformOrigin: `${x}% ${y}%`,
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 type CardItem = { f: Proposal["d"]["findings"]["items"][number]; i: number; textH: number; n?: string };
 
 /** One photo card: photo, then (if any) code chips and photo number, title,
  *  and points (standard) or description (report). */
-function FindingCard({ r, it, report }: { r: DocProps; it: CardItem; report: boolean }) {
+function FindingCard({ r, it, report, zoned = false }: { r: DocProps; it: CardItem; report: boolean; zoned?: boolean }) {
   const { f, i, textH, n } = it;
+  const w = report ? shownWhere(f, zoned) : "";
   const build = r.mode === "build";
   const codes = report ? codesOf(f) : [];
   return (
@@ -798,7 +826,12 @@ function FindingCard({ r, it, report }: { r: DocProps; it: CardItem; report: boo
         ...(build && r.focusFinding === i ? { outline: "4px solid #3e7fb0", outlineOffset: 10 } : {}),
       }}
     >
-      <div data-edit={`findings.items.${i}.photo`} style={photo(r.img(f.photo), { width: "100%", height: report ? REPORT_PHOTO_H : FINDING_PHOTO_H, flexShrink: 0, borderRadius: 20 })} />
+      <FramedPhoto
+        edit={`findings.items.${i}.photo`}
+        src={r.img(f.photo)}
+        pos={f.pos}
+        height={report ? REPORT_PHOTO_H : FINDING_PHOTO_H}
+      />
       {textH > 0 &&
         (report ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 4, height: textH, flexShrink: 0, overflow: "hidden" }}>
@@ -814,9 +847,9 @@ function FindingCard({ r, it, report }: { r: DocProps; it: CardItem; report: boo
               </h3>
               {n && <span style={{ ...label, lineHeight: "28px", fontVariantNumeric: "tabular-nums" }}>{n}</span>}
             </div>
-            {f.where?.trim() && (
+            {w && (
               <span data-edit={`findings.items.${i}.where`} style={{ ...secondary, color: INK(0.55) }}>
-                {placeLabel(f.where)}
+                {placeLabel(w)}
               </span>
             )}
             {richItems(f.desc).length > 0 && (
@@ -861,9 +894,9 @@ function Findings({ r, s }: PageProps) {
             ) : b.t === "steps" ? (
               <StepsBlock key={k} b={b} />
             ) : (
-              <div key={k} style={{ ...grid2, marginTop: grouped.blocks[k - 1]?.t === "head" ? 24 : 48 }}>
+              <div key={k} style={{ ...grid2, marginTop: k === 0 ? 0 : grouped.blocks[k - 1]?.t === "head" ? 24 : 48 }}>
                 {b.items.map((it) => (
-                  <FindingCard key={it.i} r={r} it={it} report />
+                  <FindingCard key={it.i} r={r} it={it} report zoned={b.zoned} />
                 ))}
               </div>
             ),
@@ -924,6 +957,7 @@ function SiteMapBlock({ r, b }: { r: DocProps; b: Extract<GroupBlock, { t: "map"
 /** A code group's bar, as on Flagged issues. A group whose photos all sit
  *  under a more severe code points to them instead of counting. */
 function CodeGroupHead({ b, top }: { b: Extract<GroupBlock, { t: "head" }>; top: boolean }) {
+  if (b.zone) return <SectionHead b={b} top={top} />;
   const band = b.code ? bandOf(b.code) : "grey";
   const name = b.code ? (CODES[b.code]?.name ?? b.code) : "Other site photos";
   const nums = b.refs.flatMap((x) => x.nums);
@@ -937,6 +971,21 @@ function CodeGroupHead({ b, top }: { b: Extract<GroupBlock, { t: "head" }>; top:
       {b.code && <span style={{ ...codeChip(b.code), background: "#ffffff" }}>{b.code}</span>}
       <span style={{ ...sub, whiteSpace: "nowrap" }}>{b.cont ? `${name}, continued` : name}</span>
       <span style={{ fontSize: "1.0625rem", color: INK(0.7), lineHeight: 1.4 }}>{desc}</span>
+    </div>
+  );
+}
+
+const zoneName = (z: string) => `${z[0] === "D" ? "Drop" : "Section"} ${z.slice(1)}`;
+
+/** A section's bar: its name, how many photos, and the codes found there. */
+function SectionHead({ b, top }: { b: Extract<GroupBlock, { t: "head" }>; top: boolean }) {
+  const name = zoneName(b.zone!);
+  return (
+    <div style={{ marginTop: top ? 0 : 56, display: "flex", alignItems: "center", gap: 16, padding: "16px 24px", borderRadius: 14, background: BLUE_CARD }}>
+      <span style={{ ...sub, whiteSpace: "nowrap" }}>{b.cont ? `${name}, continued` : name}</span>
+      <span style={{ fontSize: "1.0625rem", color: INK(0.7), lineHeight: 1.4 }}>
+        {b.count} {b.count === 1 ? "photo" : "photos"}
+      </span>
     </div>
   );
 }

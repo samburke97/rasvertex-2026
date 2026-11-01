@@ -152,6 +152,12 @@ export interface SpecRow {
   coats: string;
 }
 
+export interface PhotoPos {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
 export interface Finding {
   photo: string;
   /** Report style: the most severe of `codes` ("" = none). Kept for older
@@ -162,6 +168,9 @@ export interface Finding {
   /** Report style: where it is — zone, level, unit ("D10 L2"). From the tag,
    *  editable. Its zone is pinned on the site map. */
   where?: string;
+  /** How the photo sits in its frame: focal point (0–100 %) and zoom
+   *  (1 = just fills the frame). Unset = centred, no zoom. */
+  pos?: PhotoPos;
   title: string;
   desc: string; // standard style: one point per line
 }
@@ -212,6 +221,8 @@ export interface ProposalSections {
     map?: string;
     mapView?: { lat?: number; lng?: number; zoom: number };
     pins?: Record<string, [number, number]>;
+    /** false hides the site map (it's optional); unset = shown. */
+    showMap?: boolean;
   };
   // auto: built from the findings' codes and kept in step with them
   // (survey.ts syncSurvey); editing a row makes it the rep's own.

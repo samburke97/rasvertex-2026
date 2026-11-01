@@ -143,7 +143,8 @@ export const INSPECTION_CSS = `
 .ir-photo-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}
 .ir-photo{min-width:0}
 .ir-photo__img{width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:var(--card-grey) center/cover no-repeat}
-.ir-photo__head{display:flex;align-items:center;gap:12px;margin-top:20px}
+.ir-photo__head{display:flex;align-items:center;gap:8px;margin-top:20px}
+.ir-photo__head .ir-photo__name{margin-left:4px}
 .ir-photo__name{font-size:20px;font-weight:600;line-height:1.3;flex:1;min-width:0}
 .ir-photo__num{font-size:17px;color:var(--ink-45);font-variant-numeric:tabular-nums;white-space:nowrap}
 .ir-photo__desc{font-size:17px;color:var(--ink-65);line-height:1.45;margin-top:8px;text-wrap:pretty}
@@ -205,7 +206,9 @@ function Photo({ p, ctx }: { p: PhotoView; ctx: Ctx }) {
     <div className="ir-photo">
       <div className="ir-photo__img" style={{ backgroundImage: bg(ctx.photoUrl(p.id)) }} />
       <div className="ir-photo__head">
-        <ChipView chip={p.chip} />
+        {p.chips.map((c) => (
+          <ChipView key={c.code} chip={c} />
+        ))}
         <span className="ir-photo__name">{p.gname}</span>
         <span className="ir-photo__num">Photo {p.num}</span>
       </div>
@@ -367,7 +370,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
       return (
         <div className="ir-photo-row">
           {b.photos.map((p) => (
-            <Photo key={p.id + p.chip.code} p={p} ctx={ctx} />
+            <Photo key={p.id} p={p} ctx={ctx} />
           ))}
         </div>
       );

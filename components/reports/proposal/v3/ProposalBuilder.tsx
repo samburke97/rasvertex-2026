@@ -15,13 +15,14 @@ import styles from "./Builder.module.css";
 import QuoteStep from "./QuoteStep";
 import BuildStep from "./BuildStep";
 import ReviewStep from "./ReviewStep";
-import type { BuilderCtx, Path, PhotoFolderOption } from "./ctx";
+import type { BuilderCtx, Confirm, Path, PhotoFolderOption } from "./ctx";
+import { ConfirmModal } from "./fields";
 import { getIn, setIn } from "./ctx";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import { compressMapImageDataUrl } from "@/lib/reports/compressImage";
 import { deleteReportPhoto, uploadReportPhoto } from "@/lib/reports/uploadPhoto";
 import { derive } from "@/lib/reports/proposal/v3/derive";
-import { enabledPhotos, standardFromPhotos, syncSurvey } from "@/lib/reports/proposal/v3/survey";
+import { enabledPhotos, fillTitles, standardFromPhotos, syncSurvey } from "@/lib/reports/proposal/v3/survey";
 import {
   LIBRARY_FOLDERS,
   LIMITS,
@@ -108,6 +109,8 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   const [toast, setToast] = useState<{ msg: string; undo: () => void } | null>(null);
   const [focusField, setFocusField] = useState<{ path: string; n: number } | null>(null);
   const [reloading, setReloading] = useState(false);
+  const [ask, setAsk] = useState<(Confirm & { resolve: (ok: boolean) => void }) | null>(null);
+  const confirm = useCallback((q: Confirm) => new Promise<boolean>((resolve) => setAsk({ ...q, resolve })), []);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -169,7 +172,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           pricing,
           reset ? (p?.trade ?? trade) : isProposal(draftJson?.report) ? (draftJson.report.trade ?? "painting") : trade,
         );
-        next = isProposal(draftJson?.report) ? { ...mergeDraft(draftJson.report, fresh), siteId: fresh.siteId } : fresh;
+        next = isProposal(draftJson?.report) ? fillTitles({ ...mergeDraft(draftJson.report, fresh), siteId: fresh.siteId }) : fresh;
         // A new proposal brings in every SimPRO folder; a resumed one keeps
         // the rep's choice, plus Unfiled.
         if (folderList) {
@@ -325,7 +328,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   const select = useCallback((id: PageId, scroll: boolean) => {
     setSel(id);
     setPicker(null);
-    if (id !== "findings") setFocusFinding(null);
+    setFocusFinding(null);
     if (scroll) setScrollReq((r) => ({ id, n: (r?.n ?? 0) + 1 }));
   }, []);
 
@@ -357,7 +360,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
     try {
       const res = await fetch(`/api/simpro/quotes/${p.quote}/attachments/folders`).catch(() => null);
       if (!res?.ok) {
-        alert("Couldn't reach SimPRO. Check the connection and try again.");
+        void confirm({ title: "Couldn't reach SimPRO", body: "Check the connection and try again.", notice: true });
         return;
       }
       const list: SimproFolder[] = ((await res.json()).folders ?? []).map((f: SimproFolder) => ({ ...f, id: "sp:" + f.id }));
@@ -418,10 +421,10 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   );
 
   const removeUpload = useCallback(
-    (url: string) => {
+    async (url: string) => {
       if (!p) return;
       const used = JSON.stringify(p.d).includes(JSON.stringify(url).slice(1, -1));
-      if (used && !confirm("This photo is used in the proposal. Remove it from the page too?")) return;
+      if (used && !(await confirm({ title: "Delete this upload?", body: "It's used in the proposal, so it comes off the page too.", ok: "Delete", danger: true }))) return;
       // Clears every photo field that points at it; findings using it go.
       const clear = (v: unknown): unknown =>
         v === url
@@ -479,6 +482,9 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
               // Editing a Flagged / Pre-start row makes it the rep's own.
               if ((path[0] === "flagged" || path[0] === "prestart") && path[1] === "rows" && path.length > 3)
                 d = setIn(d, [path[0], "rows", path[2], "auto"], false);
+              // A new photo starts centred: the old framing was for the old one.
+              if (path[0] === "findings" && path[1] === "items" && path[3] === "photo" && path.length === 4)
+                d = setIn(d, ["findings", "items", path[2], "pos"], undefined);
               return { ...prev, d };
             }),
           img,
@@ -489,6 +495,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           setPickFolder,
           upload,
           removeUpload,
+          confirm,
           saveAerial,
           uploadData,
           sel,
@@ -577,13 +584,14 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
             loading={loading}
             loadError={loadError}
             onLoad={() => loadQuote()}
-            onReset={() => {
-              if (
-                confirm(
-                  `Start again from SimPRO?\n\nEverything you've changed on quote ${p?.quote} is wiped: wording, photos, findings, prices and uploads. The job details, prices and photos are loaded fresh from SimPRO. This can't be undone.`,
-                )
-              )
-                void loadQuote({ reset: true });
+            onReset={async () => {
+              const ok = await confirm({
+                title: "Start again from SimPRO?",
+                body: `Everything you've changed on quote ${p?.quote} is wiped: wording, photos, findings, prices and uploads. The job details, prices and photos are loaded fresh from SimPRO. This can't be undone.`,
+                ok: "Start again",
+                danger: true,
+              });
+              if (ok) void loadQuote({ reset: true });
             }}
             loadingFolders={loadingFolders}
             onOpen={() => goBuild("cover")}
@@ -600,6 +608,16 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           </BuildStep>
         )}
       </div>
+
+      {ask && (
+        <ConfirmModal
+          q={ask}
+          onAnswer={(ok) => {
+            ask.resolve(ok);
+            setAsk(null);
+          }}
+        />
+      )}
 
       {toast && (
         <div className={styles.toast}>

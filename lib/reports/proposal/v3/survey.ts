@@ -24,23 +24,28 @@ export interface TaggedPhoto extends Tag {
   photo: SimproPhoto;
 }
 
-/** Reads a label: the part before " - " is tags, the rest is the note.
- *  Without " - ", whatever isn't a tag is the note ("North elevation"). */
+/** Reads a photo name. Tags come first, the name after:
+ *    S1 SH Cracked render beside the stairs
+ *    S1 L2 SH LF Awning fixings loose
+ *  Tags are read from the start only, so words in the name are never taken
+ *  for codes. The older "D10 L2 SH - comment" form still works: everything
+ *  before " - " is tags. */
 export function parseTag(label: string): Tag {
   const split = label.indexOf(" - ");
   const head = split >= 0 ? label.slice(0, split) : label;
   const t: Tag = { zone: null, level: null, unit: null, codes: [], note: split >= 0 ? label.slice(split + 3).trim() : "" };
-  const rest: string[] = [];
-  for (const tok of head.trim().split(/\s+/).filter(Boolean)) {
-    const x = tok.toUpperCase().replace(/[,;.]$/, "");
+  const toks = head.trim().split(/\s+/).filter(Boolean);
+  let k = 0;
+  for (; k < toks.length; k++) {
+    const x = toks[k].toUpperCase().replace(/[,;.]$/, "");
     if (/^[DS]\d+$/.test(x) && !t.zone) t.zone = x;
     else if (/^L(\d+|G|R)$/.test(x) && !t.level) t.level = x;
     else if (/^U\d+$/.test(x) && !t.unit) t.unit = x;
     else if (CODES[x]) {
       if (!t.codes.includes(x)) t.codes.push(x);
-    } else rest.push(tok);
+    } else if (split < 0) break; // the name starts here
   }
-  if (split < 0 && rest.length) t.note = rest.join(" ");
+  if (split < 0) t.note = toks.slice(k).join(" ");
   t.codes.sort((a, b) => codeRank(a) - codeRank(b));
   return t;
 }
@@ -70,17 +75,34 @@ const levelWord = (l: string) => (l === "LG" ? "ground level" : l === "LR" ? "ro
 /** "D10 L2" — for Pre-start's Where and for counting locations. */
 export const where = (t: Tag) => [t.zone, t.level, t.unit].filter(Boolean).join(" ");
 const sentence = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
-const CAMERA_NAME = /^(img|dsc|pxl|photo|image|screenshot)?[\s_-]*\d[\d\s_-]*$/i;
 
-/** A finding for a photo: codes and location from its tag, title from its
- *  note (or the code's name), else from the file name when it isn't just a
- *  camera number. The location prints beside the photo, not in the title. */
-function findingFor(ph: SimproPhoto): Finding {
+/** A photo's title: its name with the tags taken off ("S1 SH Cracked
+ *  render" → "Cracked render"); a photo that's only tags takes its code's
+ *  name. Every photo gets one, camera names included. */
+export function photoTitle(ph: SimproPhoto): string {
   const label = labelOf(ph);
   const t = parseTag(label);
-  const note = sentence(t.note);
-  const title = t.codes.length ? note || CODES[t.codes[0]].name : CAMERA_NAME.test(label) ? "" : note || sentence(label);
-  return withCodes({ photo: "ph:" + ph.id, code: "", title, desc: "", where: where(t) }, t.codes);
+  return sentence(t.note) || (t.codes[0] ? CODES[t.codes[0]].name : sentence(label));
+}
+
+/** A finding for a photo: codes and location from its tags, title from its
+ *  name. The location prints beside the photo, not in the title. */
+export function findingFor(ph: SimproPhoto): Finding {
+  const t = parseTag(labelOf(ph));
+  return withCodes({ photo: "ph:" + ph.id, code: "", title: photoTitle(ph), desc: "", where: where(t) }, t.codes);
+}
+
+/** Older drafts: give any SimPRO photo with no title its name. */
+export function fillTitles(p: Proposal): Proposal {
+  const byId = new Map(p.simpro.photos.map((ph) => [ph.id, ph]));
+  let changed = false;
+  const items = p.d.findings.items.map((f) => {
+    const ph = !f.title.trim() && f.photo.startsWith("ph:") ? byId.get(f.photo.slice(3)) : undefined;
+    if (!ph) return f;
+    changed = true;
+    return { ...f, title: photoTitle(ph) };
+  });
+  return changed ? { ...p, d: { ...p.d, findings: { ...p.d.findings, items } } } : p;
 }
 
 /** "D10 L2" → "D10 · Level 2"; for the cards and site map. */
