@@ -88,7 +88,9 @@ export interface PhotoView {
   /** Every code on the photo; the one it's filed under first. */
   chips: Chip[];
   gname: string;
-  desc: string;
+  /** Zone (outside a zone chapter), level and unit. */
+  where: string;
+  note: string;
 }
 
 export type SectionKey = "about" | "map" | "defects" | "findings" | "index" | "summary" | "works";
@@ -282,11 +284,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
         .map((c, i) => (i ? CODE_MAP[c].name.charAt(0).toLowerCase() + CODE_MAP[c].name.slice(1) : CODE_MAP[c].name))
         .join(", ");
     })(),
-    desc:
-      (withZone ? zoneTitle(p.zone) + ", " : "") +
-      levelName(p.level) +
-      (p.unit ? ", Unit " + p.unit.slice(1) : "") +
-      (p.note ? " · " + cap(p.note) : ""),
+    where: (withZone ? zoneTitle(p.zone) + ", " : "") + levelName(p.level) + (p.unit ? ", Unit " + p.unit.slice(1) : ""),
+    note: p.note ? cap(p.note) : "",
   });
 
   // Counts and generated copy
@@ -380,8 +379,15 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   add({ type: "why", key: "why", gap: 56, est: 480 });
   const ordered = [...parsed].sort((a, b) => (numOf.get(a) ?? 0) - (numOf.get(b) ?? 0));
   const notOv = (p: ParsedPhoto) => p.codes.some((c) => c !== "OV");
+  // The example reads best with one code and a note; a photo with several
+  // codes is used only when there's nothing simpler.
+  const single = (p: ParsedPhoto) => p.codes.length === 1 && notOv(p);
+  const red = (p: ParsedPhoto) => p.codes.some((c) => CODE_MAP[c].band === "red");
   const exP =
-    ordered.find((p) => notOv(p) && p.note && p.codes.some((c) => CODE_MAP[c].band === "red")) ??
+    ordered.find((p) => single(p) && p.note && red(p)) ??
+    ordered.find((p) => single(p) && p.note) ??
+    ordered.find((p) => single(p) && red(p)) ??
+    ordered.find(single) ??
     ordered.find((p) => notOv(p) && p.note) ??
     ordered.find(notOv) ??
     ordered[0];

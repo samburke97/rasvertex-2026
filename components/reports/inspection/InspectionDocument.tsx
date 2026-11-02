@@ -143,10 +143,10 @@ export const INSPECTION_CSS = `
 .ir-photo-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}
 .ir-photo{min-width:0}
 .ir-photo__img{width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:var(--card-grey) center/cover no-repeat}
-.ir-photo__head{display:flex;align-items:center;gap:8px;margin-top:20px}
-.ir-photo__head .ir-photo__name{margin-left:4px}
-.ir-photo__name{font-size:20px;font-weight:600;line-height:1.3;flex:1;min-width:0}
-.ir-photo__num{font-size:17px;color:var(--ink-45);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ir-photo__head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px}
+.ir-photo__name{font-size:20px;font-weight:600;line-height:1.3;margin-top:12px;text-wrap:pretty}
+.ir-photo__head .ir-chips{flex-shrink:0;gap:8px}
+.ir-photo__num{font-size:17px;color:var(--ink-45);font-variant-numeric:tabular-nums;text-align:right;min-width:0}
 .ir-photo__desc{font-size:17px;color:var(--ink-65);line-height:1.45;margin-top:8px;text-wrap:pretty}
 
 .ir-stats{background:var(--card-blue);border-radius:24px;padding:40px 48px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;margin-bottom:32px}
@@ -205,14 +205,20 @@ function Photo({ p, ctx }: { p: PhotoView; ctx: Ctx }) {
   return (
     <div className="ir-photo">
       <div className="ir-photo__img" style={{ backgroundImage: bg(ctx.photoUrl(p.id)) }} />
+      {/* Stacked: codes left with location and number right, then the
+          defect name, then the technician's note. */}
       <div className="ir-photo__head">
-        {p.chips.map((c) => (
-          <ChipView key={c.code} chip={c} />
-        ))}
-        <span className="ir-photo__name">{p.gname}</span>
-        <span className="ir-photo__num">Photo {p.num}</span>
+        <div className="ir-chips">
+          {p.chips.map((c) => (
+            <ChipView key={c.code} chip={c} />
+          ))}
+        </div>
+        <span className="ir-photo__num">
+          {p.where} · Photo {p.num}
+        </span>
       </div>
-      <div className="ir-photo__desc">{p.desc}</div>
+      <div className="ir-photo__name">{p.gname}</div>
+      {p.note && <div className="ir-photo__desc">{p.note}</div>}
     </div>
   );
 }
