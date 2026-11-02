@@ -306,6 +306,9 @@ export interface Library {
   blurb: (street: string) => string;
   /** Roof photos may leave out the level; it defaults to LR. */
   defaultLevel: string | null;
+  /** Services offered for the maintenance plan, in order; whenAny: ticked
+   *  to start with when one of these codes is in the report. */
+  plan: { service: string; interval: string; priority: "required" | "recommended"; whenAny?: string[] }[];
   /** The made-up photo on "Reading a photo": one code, a location, a note. */
   example: { img: ImageKey; code: string; zone: string; level: string; note: string };
 }
@@ -326,6 +329,19 @@ const ANNUAL: ExtraDef = {
 export const LIBRARIES: Record<ReportKind, Library> = {
   building: {
     kind: "building",
+    plan: [
+      { service: "Height safety anchor inspection and recertification", interval: "Annually", priority: "required" },
+      { service: "Gutter and roof drainage clean", interval: "Every 6 months", priority: "required", whenAny: ["BD", "WI"] },
+      { service: "Balustrade and handrail inspection", interval: "Annually", priority: "required", whenAny: ["BL", "SH"] },
+      { service: "Building wash", interval: "Annually", priority: "recommended" },
+      { service: "Window clean", interval: "Every 6 months", priority: "recommended" },
+      { service: "Sealant and joint inspection, with resealing as needed", interval: "Every 2 years", priority: "recommended", whenAny: ["SF", "WS"] },
+      { service: "Render and concrete inspection (cracking, spalling)", interval: "Every 2 years", priority: "recommended", whenAny: ["RC", "SP", "SC", "DR", "HC"] },
+      { service: "Corrosion treatment and touch-ups", interval: "Every 2 years", priority: "recommended", whenAny: ["CO", "RS"] },
+      { service: "Coating inspection and touch-ups", interval: "Every 2 years", priority: "recommended", whenAny: ["CD"] },
+      { service: "Full external repaint", interval: "Every 8–10 years", priority: "recommended" },
+      { service: "Building condition inspection and report", interval: "Every 3 years", priority: "recommended" },
+    ],
     example: { img: "exampleBuilding", code: "SF", zone: "D3", level: "L2", note: "Expansion joint sealant split and pulling away" },
     label: "Building inspection",
     reportRef: "Condition",
@@ -362,6 +378,16 @@ export const LIBRARIES: Record<ReportKind, Library> = {
   },
   roof: {
     kind: "roof",
+    plan: [
+      { service: "Height safety anchor inspection and recertification", interval: "Annually", priority: "required" },
+      { service: "Gutter, outlet and drainage clean", interval: "Every 6 months", priority: "required", whenAny: ["BD", "PW"] },
+      { service: "Roof clean (debris and growth)", interval: "Annually", priority: "recommended", whenAny: ["DB"] },
+      { service: "Membrane inspection, with spot repairs", interval: "Annually", priority: "recommended", whenAny: ["MT", "LS", "DL", "BS", "CK", "AL"] },
+      { service: "Upturn, flashing and penetration check", interval: "Annually", priority: "recommended", whenAny: ["UF", "PF"] },
+      { service: "UV-stable top coat", interval: "Every 5 years", priority: "recommended", whenAny: ["UV", "SW"] },
+      { service: "Full membrane replacement", interval: "Every 15–20 years", priority: "recommended" },
+      { service: "Roof condition inspection and report", interval: "Every 2 years", priority: "recommended" },
+    ],
     example: { img: "exampleRoof", code: "MT", zone: "S1", level: "LR", note: "Membrane split along the lap, open to water" },
     label: "Roof inspection",
     reportRef: "Roof",
@@ -405,3 +431,16 @@ export const LIBRARIES: Record<ReportKind, Library> = {
 export function libraryFor(kind: ReportKind | undefined): Library {
   return LIBRARIES[kind ?? "building"];
 }
+
+/** Frequencies offered for maintenance plan services (any text works too). */
+export const PLAN_INTERVALS = [
+  "Every 3 months",
+  "Every 6 months",
+  "Annually",
+  "Every 2 years",
+  "Every 3 years",
+  "Every 5 years",
+  "Every 8–10 years",
+  "Every 15–20 years",
+  "As needed",
+];

@@ -17,7 +17,7 @@ export function usePagePanel(initial: string) {
 
   const focusField = (field: string) =>
     requestAnimationFrame(() => {
-      const input = panelRef.current?.querySelector<HTMLElement>(`[data-panel-field="${field}"] :is(input, textarea)`);
+      const input = panelRef.current?.querySelector<HTMLElement>(`[data-panel-field="${field}"] :is(input, textarea, .tiptap)`);
       input?.scrollIntoView({ block: "center" });
       input?.focus();
     });

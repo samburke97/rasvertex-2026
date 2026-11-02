@@ -17,6 +17,8 @@ import type {
 import type { AnchorImportStatus } from "./AnchorInspectionPage";
 import type { PhotoImportStatus } from "../shared/PhotoSection";
 import Slider from "@/components/ui/Slider";
+import InfoTip from "@/components/reports/shared/builder/InfoTip";
+import RichBox from "@/components/reports/shared/builder/RichBox";
 
 interface AnchorOptionsPanelProps {
   zones: Zone[];
@@ -211,16 +213,10 @@ export default function AnchorOptionsPanel({
             />
           </label>
         ))}
-        <label className={styles.field} data-panel-field="description">
+        <div className={styles.field} data-panel-field="description">
           <span className={styles.subLabel}>Cover introduction</span>
-          <textarea
-            className={styles.textarea}
-            rows={4}
-            value={job.description ?? ""}
-            placeholder="Left blank, a standard line naming the address is used."
-            onChange={(e) => onJob("description", e.target.value)}
-          />
-        </label>
+          <RichBox value={job.description ?? ""} placeholder="Left blank, a standard line naming the address is used." onChange={(v) => onJob("description", v)} />
+        </div>
       </div>
 
       {/* ── Zones ────────────────────────────────────────────────────────── */}
@@ -313,7 +309,9 @@ export default function AnchorOptionsPanel({
 
       {/* ── Cover photo ──────────────────────────────────────────────────── */}
       <div className={styles.group} data-pages="cover">
-        <div className={styles.groupLabel}>Cover photo</div>
+        <div className={styles.groupLabel}>
+          Cover photo <InfoTip>Drag the photo on the cover to reposition it.</InfoTip>
+        </div>
         <input
           ref={coverRef}
           type="file"
@@ -352,32 +350,22 @@ export default function AnchorOptionsPanel({
           onChange={onCoverZoom}
           className={styles.range}
         />
-        <div className={styles.subLabel}>
-          Drag the photo on the cover preview to reposition it.
-        </div>
       </div>
 
       {/* ── Technician notes (under the asset register) ─────────────────── */}
       <div className={styles.group} data-pages="register">
-        <div className={styles.groupLabel}>Technician notes</div>
+        <div className={styles.groupLabel}>
+          Technician notes <InfoTip>Type / for headings, lists and checklists. Shown under the asset register.</InfoTip>
+        </div>
         <div className={styles.editorBox}>
           <DocEditor value={technicianNotes} onChange={onTechnicianNotes} />
-        </div>
-        <div className={styles.subLabel}>
-          Type / for headings, lists and checklists. Shown under the asset register.
         </div>
       </div>
 
       {/* ── Certification comments ───────────────────────────────────────── */}
       <div className={styles.group} data-pages="cert">
         <div className={styles.groupLabel}>Certification comments</div>
-        <textarea
-          value={comments}
-          onChange={(e) => onComments(e.target.value)}
-          rows={3}
-          placeholder="Optional — shown under Please note"
-          className={styles.textarea}
-        />
+        <RichBox value={comments} onChange={onComments} placeholder="Optional: shown under Please note" />
       </div>
 
       {/* ── Supporting Photos — optional, off by default ────────────────── */}

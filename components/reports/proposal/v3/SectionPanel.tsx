@@ -4,6 +4,7 @@
 // page brings its field here into view and puts the cursor in it.
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { AddCell, CodeChips, PhotoGrid, PhotoTray } from "@/components/reports/shared/builder/PhotoGrid";
 import MapCaptureModal from "@/components/reports/shared/MapCaptureModal";
 import styles from "./Builder.module.css";
 import type { BuilderCtx } from "./ctx";
@@ -65,7 +66,6 @@ function setFindingsStyle(p: Proposal, style: FindingsStyle): Proposal {
   };
 }
 
-const bgOf = (url: string): CSSProperties => ({ backgroundImage: url ? `url("${url}")` : "none" });
 
 /** A finding's codes as toggle chips: tap to add or remove. The most
  *  severe one decides which group the photo sits in. */
@@ -82,23 +82,11 @@ function CodePicker({ ctx, index }: { ctx: BuilderCtx; index: number }) {
           Tap every defect in this photo. It shows once, under its most severe code; the other codes’ groups point to it. Codes also fill Flagged issues and Pre-start. No code puts it in “Other site photos”.
         </InfoTip>
       </span>
-      <div className={styles.codeGrid}>
-        {CODE_LIST.map(({ v, label }) => {
-          const b = BANDS[CODES[v].band];
-          const sel = on.includes(v);
-          return (
-            <button
-              key={v}
-              className={`${styles.codeChip} ${sel ? styles.codeChipOn : ""}`}
-              style={sel ? { background: b.bg, color: b.fg, borderColor: "transparent" } : undefined}
-              title={label}
-              onClick={() => toggle(v)}
-            >
-              {v}
-            </button>
-          );
-        })}
-      </div>
+      <CodeChips
+        codes={CODE_LIST.map(({ v }) => ({ code: v, name: CODES[v].name, ...BANDS[CODES[v].band] }))}
+        on={on}
+        onToggle={toggle}
+      />
       <span className={styles.note}>{on.length ? on.map((c) => CODES[c].name).join(" · ") : "No code: shown under Other site photos"}</span>
     </div>
   );
@@ -219,9 +207,7 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
   const f = ctx.focusFinding != null && ctx.focusFinding < items.length ? ctx.focusFinding : null;
   const path = (k: string) => ["findings", "items", f!, k];
   const blank = (photo = "") => ({ photo, code: "", title: "", desc: "" });
-  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
   const reorder = (from: number, to: number) => {
-    if (from === to) return;
     const next = [...items];
     const [x] = next.splice(from, 1);
     next.splice(to, 0, x);
@@ -330,47 +316,21 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
         sub="Click a photo to edit it, or drag to reorder. Pages are added as needed."
       />
       {items.length > 0 ? (
-        <div className={styles.fgrid}>
-          {items.map((it, i) => (
-            <button
-              key={i}
-              className={`${styles.fcell} ${drag?.from === i ? styles.fcellDragging : ""} ${drag && drag.over === i && drag.from !== i ? (drag.from < i ? styles.fcellDropAfter : styles.fcellDropBefore) : ""}`}
-              style={bgOf(ctx.img(it.photo))}
-              title={it.title || `Finding ${pad(i + 1)}`}
-              onClick={() => ctx.pickFinding(i, true)}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.effectAllowed = "move";
-                setDrag({ from: i, over: i });
-              }}
-              onDragOver={(e) => {
-                if (!drag) return;
-                e.preventDefault();
-                if (drag.over !== i) setDrag({ ...drag, over: i });
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (drag) reorder(drag.from, i);
-                setDrag(null);
-              }}
-              onDragEnd={() => setDrag(null)}
-            >
-              <span className={styles.fnum}>{i + 1}</span>
-            </button>
-          ))}
+        <PhotoGrid
+          items={items.map((it, i) => ({ id: `${i}-${it.photo}`, src: ctx.img(it.photo), title: it.title || `Finding ${pad(i + 1)}` }))}
+          onOpen={(i) => ctx.pickFinding(i, true)}
+          onMove={reorder}
+        >
           {items.length < LIMITS.findings && (
-            <button
-              className={`${styles.fcell} ${styles.fadd}`}
+            <AddCell
               title="Add a finding with its own photo"
               onClick={() => {
                 ctx.set(["findings", "items"], [...items, blank()]);
                 ctx.pickFinding(items.length, true);
               }}
-            >
-              +
-            </button>
+            />
           )}
-        </div>
+        </PhotoGrid>
       ) : (
         <Note>No photos on this page yet. Bring some in from SimPRO below.</Note>
       )}
@@ -399,22 +359,13 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
       {ctx.loadingFolders.length > 0 && <Note>Loading photos from SimPRO…</Note>}
       {unused.length > 0 && (
         <>
-          <div className={styles.fgrid}>
-            {unused.slice(0, 40).map((ph) => (
-              <button
-                key={ph.id}
-                className={`${styles.fcell} ${styles.fcellAdd}`}
-                style={bgOf(ph.url)}
-                title={`Add “${ph.name}”`}
-                onClick={() => {
-                  ctx.set(["findings", "items"], [...items, findingFor(ph)]);
-                  ctx.pickFinding(items.length, true);
-                }}
-              >
-                <span className={styles.fplus}>+</span>
-              </button>
-            ))}
-          </div>
+          <PhotoTray
+            items={unused.slice(0, 40).map((ph) => ({ id: ph.id, src: ph.url, title: `Add “${ph.name}”` }))}
+            onAdd={(i) => {
+              ctx.set(["findings", "items"], [...items, findingFor(unused[i])]);
+              ctx.pickFinding(items.length, true);
+            }}
+          />
           <div className={styles.itemActions}>
             <button
               className={styles.smallBtn}

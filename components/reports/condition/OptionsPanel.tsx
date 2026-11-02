@@ -21,6 +21,8 @@ import type {
   ScheduleImportStatus,
 } from "@/lib/reports/condition.types";
 import Slider from "@/components/ui/Slider";
+import InfoTip from "@/components/reports/shared/builder/InfoTip";
+import RichBox from "@/components/reports/shared/builder/RichBox";
 
 interface OptionsPanelProps {
   settings: ReportSettings;
@@ -120,17 +122,6 @@ function detectPreset(
 }
 
 /** The intro field is plain text; older drafts saved rich text. */
-function plainIntro(v: string): string {
-  if (!v.trim().startsWith("<")) return v;
-  return v
-    .replace(/<\/(p|li|h2|h3)>/gi, "\n")
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/\n{2,}/g, "\n")
-    .trim();
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -230,16 +221,10 @@ export default function OptionsPanel({
             />
           </label>
         ))}
-        <label className={styles.field} data-panel-field="intro">
+        <div className={styles.field} data-panel-field="intro">
           <span className={styles.subLabel}>Introduction</span>
-          <textarea
-            className={styles.textarea}
-            rows={4}
-            // Older drafts hold rich text here; the cover shows plain text.
-            value={plainIntro(job.intro)}
-            onChange={(e) => onJob("intro", e.target.value)}
-          />
-        </label>
+          <RichBox value={job.intro} onChange={(v) => onJob("intro", v)} />
+        </div>
       </div>
 
       {/* ── Cover photo ──────────────────────────────────────────────────── */}
@@ -524,7 +509,9 @@ export default function OptionsPanel({
               onChange={(v) => set({ showScopeItems: v })}
               disabled={!scope?.items.length}
             />
-            <div className={styles.subLabel}>Comments</div>
+            <div className={styles.subLabel}>
+              Comments <InfoTip>Type / for headings, lists and checklists. Leave one empty to leave it off the report.</InfoTip>
+            </div>
             <div className={styles.editorBox}>
               <DocEditor value={comments} onChange={onComments} />
             </div>
@@ -532,7 +519,6 @@ export default function OptionsPanel({
             <div className={styles.editorBox}>
               <DocEditor value={recommendations} onChange={onRecommendations} />
             </div>
-            <div className={styles.subLabel}>Type / for headings, lists and checklists. Leave one empty to leave it out.</div>
           </>
         )}
       </div>

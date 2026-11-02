@@ -26,6 +26,10 @@ export interface InspectionPhoto {
   desc?: string;
   /** How it sits in its frame, set in Adjust. Unset = centred. */
   pos?: PhotoPos;
+  /** Taken off the page in the builder; can be added back. */
+  off?: boolean;
+  /** Set by dragging in the builder: order within its zone and code. */
+  order?: number;
   /** Uploaded in the builder rather than imported from SimPRO — kept when
    *  the SimPRO photos are re-imported. */
   uploaded?: boolean;
@@ -93,9 +97,30 @@ export interface InspectionReportData {
   text?: Record<string, string>;
   /** Sections left out of the report. */
   hidden?: Partial<Record<SectionKey, boolean>>;
+  /** Maintenance plan (optional section): the services picked and the
+   *  technician's comments. */
+  plan?: { items: PlanItem[]; notes?: string };
 }
 
-export type SectionKey = "about" | "map" | "defects" | "findings" | "index" | "summary" | "works";
+export type SectionKey = "about" | "map" | "defects" | "findings" | "index" | "summary" | "plan" | "works";
+
+export type PlanPriority = "required" | "recommended";
+
+export interface PlanItem {
+  service: string;
+  interval: string;
+  priority: PlanPriority;
+  /** "March 2027", "With the next repaint" … optional. */
+  next?: string;
+  /** A line under the service, e.g. what's included. Optional. */
+  note?: string;
+}
+
+/** Sections that are off until switched on (the maintenance plan); the rest
+ *  show until hidden. */
+const OPT_IN: SectionKey[] = ["plan"];
+export const sectionHidden = (d: Pick<InspectionReportData, "hidden">, k: SectionKey) =>
+  OPT_IN.includes(k) ? d.hidden?.[k] !== false : !!d.hidden?.[k];
 
 /** An image picked in the builder: uploaded / captured, or a job photo. */
 export type ImageChoice =
@@ -195,6 +220,12 @@ export function photoLabel(p: InspectionPhoto): string {
     .trim();
 }
 
+/** The label for a photo's tags and name, as the builder edits them. */
+export function composeLabel(t: { zone: string; level: string; unit: string | null; codes: string[]; note: string }): string {
+  const head = [t.zone, t.level, t.unit, ...t.codes].filter(Boolean).join(" ");
+  return t.note ? (head ? `${head} - ${t.note}` : t.note) : head;
+}
+
 export type ParsedLabel =
   | { kind: "map" }
   | {
@@ -207,8 +238,7 @@ export type ParsedLabel =
       head: string;
       /** Tokens that weren't a zone, level, unit or code. */
       ignored: string[];
-    }
-  | { kind: "rejected"; reason: string };
+    };
 
 const SITE_PLAN = /^(map|site\s*plan|aer?i[ae]l|arei?l|ari[ae]l)\b/i;
 
@@ -216,8 +246,8 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
   const label = raw.trim();
   if (SITE_PLAN.test(label)) return { kind: "map" };
 
-  // Tags first, then the note: after " - ", or (without one) from the first
-  // word that isn't a tag, so "RC hairline at window" works too.
+  // Tags first, then the name: after " - ", or (without one) from the first
+  // word that isn't a tag, as in the proposal: "S1 RC Hairline at window".
   const split = label.indexOf(" - ");
   const head = (split >= 0 ? label.slice(0, split) : label).trim();
   let note = split >= 0 ? label.slice(split + 3).trim() : "";
@@ -239,7 +269,7 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
       if (!unit) unit = x;
     } else if (lib.codeMap[x]) {
       if (!codes.includes(x)) codes.push(x);
-    } else if (split < 0 && codes.length) {
+    } else if (split < 0) {
       note = toks.slice(k).join(" ");
       break;
     } else {
@@ -247,8 +277,7 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
     }
   }
 
-  // Only a code is required. Zone, level and unit just structure the report:
-  // a single apartment needs none of them.
-  if (!codes.length) return { kind: "rejected", reason: "No valid code" };
+  // Nothing is required. Zone, level and unit structure the report (a single
+  // apartment needs none); a photo with no code goes under Other items.
   return { kind: "photo", zone: zone ?? "", level: level ?? lib.defaultLevel ?? "", unit, codes, note, head: head.toUpperCase(), ignored };
 }

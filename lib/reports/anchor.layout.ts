@@ -196,13 +196,13 @@ export function buildAnchorModel(
   const { job } = report;
   const site =
     job.buildingName || shortAddress(job.address) || "Anchor inspection";
-  const desc = job.description?.trim();
+  const desc = sanitizeNotesHtml(job.description);
   const blurb =
-    desc && !desc.startsWith(OLD_BLURB_START)
+    !notesIsEmpty(desc) && !desc.includes(OLD_BLURB_START)
       ? desc
-      : `This report records the inspection, load testing and certification of the roof access and fall prevention systems${
+      : `<p>This report records the inspection, load testing and certification of the roof access and fall prevention systems${
           job.address ? ` at ${shortAddress(job.address)}` : ""
-        }.`;
+        }.</p>`;
 
   // ── Zones: map pins and type table ──
   const order = anchorGroupOrder(report.zones);
@@ -498,7 +498,7 @@ export function buildAnchorModel(
     ],
     certRows,
     certNumber: job.certNumber,
-    comments: job.certComments?.trim() ?? "",
+    comments: notesIsEmpty(sanitizeNotesHtml(job.certComments)) ? "" : sanitizeNotesHtml(job.certComments),
   };
 }
 

@@ -114,9 +114,7 @@ function Cover({ ctx }: { ctx: Ctx }) {
         <h1 className="ar-h1" style={{ marginTop: 48 }} data-panel-field="site">
           {model.site}.
         </h1>
-        <p className="ar-lede" style={{ fontSize: 22, marginTop: 24 }} data-panel-field="intro">
-          {model.blurb}
-        </p>
+        <div className="ar-lede ar-rich" style={{ fontSize: 22, marginTop: 24 }} data-panel-field="intro" dangerouslySetInnerHTML={{ __html: model.blurb }} />
         <div
           className={`ar-cover-photo${ctx.onCoverPointerDown ? " ar-cover-photo--drag" : ""}`}
           style={{ marginTop: 64 }}

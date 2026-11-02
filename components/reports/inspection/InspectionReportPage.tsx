@@ -26,12 +26,13 @@ import {
 import styles from "./InspectionReportPage.module.css";
 import AppleSelect from "./AppleSelect";
 import MapCaptureModal, { type MapView } from "@/components/reports/shared/MapCaptureModal";
-import TagModal from "./TagModal";
 import SaveReportModal from "@/components/reports/shared/SaveReportModal";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import DocEditor from "@/components/workspace/DocEditor";
 import PageRail, { type RailRow } from "@/components/reports/shared/builder/PageRail";
 import RichBox from "@/components/reports/shared/builder/RichBox";
+import { CodeChips, PhotoGrid, PhotoTray } from "@/components/reports/shared/builder/PhotoGrid";
+import ToggleRow from "@/components/reports/shared/ToggleRow";
 import { notesIsEmpty } from "@/lib/reports/richText";
 import PanelResizer, { usePanelWidth } from "@/components/reports/shared/builder/PanelResizer";
 import InspectionDocument, {
@@ -49,6 +50,8 @@ import {
   LOGO_IMAGE,
   libraryFor,
   type ImageKey,
+  BANDS,
+  PLAN_INTERVALS,
   type Library,
   type ReportKind,
 } from "@/lib/reports/inspection/codes";
@@ -57,6 +60,7 @@ import {
   createInspectionReport,
   draftKey,
   isInspectionData,
+  composeLabel,
   photoLabel,
   parseLabel,
   reportImages,
@@ -66,12 +70,15 @@ import {
   type ImageChoice,
   type InspectionJob,
   type InspectionPhoto,
+  type PlanItem,
+  sectionHidden,
   type InspectionReportData,
 } from "@/lib/reports/inspection/types";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
 import Slider from "@/components/ui/Slider";
 import CropModal from "@/components/reports/shared/builder/CropModal";
+import InfoTip from "@/components/reports/shared/builder/InfoTip";
 
 interface Props {
   onBack: () => void;
@@ -108,10 +115,10 @@ function readBlobAsDataUrl(blob: Blob): Promise<string> {
 
 const CONTACT_OPTIONS = CONTACTS.map((c) => ({ value: c.name, label: c.name, detail: c.title || undefined }));
 
-type Kept = Pick<InspectionPhoto, "label" | "title" | "desc" | "pos">;
+type Kept = Pick<InspectionPhoto, "label" | "title" | "desc" | "pos" | "off" | "order">;
 
 type Sel = "cover" | SectionKey;
-const SECTION_ORDER: SectionKey[] = ["about", "map", "defects", "findings", "index", "summary", "works"];
+const SECTION_ORDER: SectionKey[] = ["about", "map", "defects", "findings", "index", "summary", "plan", "works"];
 const SECTION_NAMES: Record<SectionKey, string> = {
   about: "About this report",
   map: "Site map",
@@ -119,10 +126,11 @@ const SECTION_NAMES: Record<SectionKey, string> = {
   findings: "Findings",
   index: "Location index",
   summary: "Summary",
+  plan: "Maintenance plan",
   works: "Recommended works",
 };
 /** Sections the builder can leave out (the rest always print). */
-const HIDEABLE: Sel[] = ["map", "defects", "index", "summary"];
+const HIDEABLE: Sel[] = ["map", "defects", "index", "summary", "plan"];
 
 /** The section a clicked key on the page belongs to. */
 function sectionOfKey(key: string): Sel {
@@ -135,6 +143,7 @@ function sectionOfKey(key: string): Sel {
   if (a === "map") return "map";
   if (a === "defect") return "defects";
   if (a === "sum") return "summary";
+  if (a === "plan") return "plan";
   return "cover";
 }
 
@@ -217,8 +226,8 @@ export default function InspectionReportPage({ onBack }: Props) {
     // Labels, titles and descriptions typed here survive a re-import.
     const keep = new Map<string, Kept>(
       r.photos
-        .filter((p) => p.label != null || p.title != null || p.desc != null || p.pos != null)
-        .map((p) => [p.id, { label: p.label, title: p.title, desc: p.desc, pos: p.pos }]),
+        .filter((p) => p.label != null || p.title != null || p.desc != null || p.pos != null || p.off || p.order != null)
+        .map((p) => [p.id, { label: p.label, title: p.title, desc: p.desc, pos: p.pos, off: p.off, order: p.order }]),
     );
     if (folder != null) update((p) => ({ ...p, folder: f }));
     importPhotos(r.jobId, f, keep);
@@ -429,7 +438,6 @@ export default function InspectionReportPage({ onBack }: Props) {
   );
 
   // ── Upload & tag photos ───────────────────────────────────────────────────
-  const [tagQueue, setTagQueue] = useState<string[] | null>(null);
   const photoFileRef = useRef<HTMLInputElement>(null);
 
   const uploadPhotos = async (files: File[]) => {
@@ -454,9 +462,6 @@ export default function InspectionReportPage({ onBack }: Props) {
       ),
     );
     setUploading(null);
-    // Anything whose filename isn't already a valid label needs tagging.
-    const untagged = added.filter((p) => parseLabel(photoLabel(p), libraryFor(r.kind)).kind === "rejected");
-    if (untagged.length) setTagQueue(untagged.map((p) => p.id));
   };
 
   const removePhoto = (photo: InspectionPhoto) => {
@@ -465,18 +470,6 @@ export default function InspectionReportPage({ onBack }: Props) {
   };
 
   // ── Labels needing attention ──────────────────────────────────────────────
-  const labelRows = useMemo(() => {
-    if (!r || !model) return [];
-    const rejected = new Map(model.rejected.map((x) => [x.photo.id, x.reason]));
-    const warned = new Map(model.warnings.map((x) => [x.photo.id, x.ignored]));
-    return r.photos
-      .filter((p) => rejected.has(p.id) || warned.has(p.id) || p.label != null || p.uploaded)
-      .map((p) => ({
-        photo: p,
-        reason: rejected.get(p.id) ?? null,
-        ignored: warned.get(p.id) ?? null,
-      }));
-  }, [r, model]);
 
   const setPhoto = (id: string, patch: Partial<Kept>) =>
     update((p) => ({ ...p, photos: p.photos.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
@@ -490,6 +483,13 @@ export default function InspectionReportPage({ onBack }: Props) {
       if (b.type === "row") for (const v of b.photos) if (!out.some((x) => x.id === v.id)) out.push(v);
     return out;
   }, [model]);
+  const offPhotos = r?.photos.filter((p) => p.off) ?? [];
+  /** Drag in the grid: the new order, kept within each zone and code. */
+  const movePhoto = (from: number, to: number) => {
+    const ids = photoViews.map((v) => v.id);
+    ids.splice(to, 0, ids.splice(from, 1)[0]);
+    update((p) => ({ ...p, photos: p.photos.map((x) => (ids.includes(x.id) ? { ...x, order: ids.indexOf(x.id) } : x)) }));
+  };
   const pickPhoto = (id: string | null, scroll = false) => {
     setEditing(id);
     if (id && scroll)
@@ -508,7 +508,7 @@ export default function InspectionReportPage({ onBack }: Props) {
   const railRows: RailRow[] = (["cover", ...SECTION_ORDER] as Sel[]).map((key) => {
     if (key === "cover") return { id: key, name: "Cover", num: "C" };
     const s = secOf(key);
-    const hidden = !!r?.hidden?.[key];
+    const hidden = !!r && sectionHidden(r, key);
     // Site map needs zones, the index needs locations: without them the
     // section is left out on its own.
     const absent = !s && !hidden;
@@ -519,7 +519,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       hideable: HIDEABLE.includes(key),
       hidden,
       absent,
-      title: absent ? "Nothing to show: no photo is tagged with a location" : undefined,
+      title: absent ? (key === "plan" ? "No services picked yet" : "Nothing to show: no photo is tagged with a location") : undefined,
     };
   });
   const scrollToPage = (n: number | undefined) =>
@@ -685,7 +685,7 @@ export default function InspectionReportPage({ onBack }: Props) {
             rows={railRows}
             sel={sel}
             onPick={(k) => pickSection(k as Sel, true)}
-            onToggle={(k) => update((p) => ({ ...p, hidden: { ...p.hidden, [k]: !p.hidden?.[k as SectionKey] } }))}
+            onToggle={(k) => update((p) => ({ ...p, hidden: { ...p.hidden, [k]: !sectionHidden(p, k as SectionKey) } }))}
           />
 
           <main ref={previewRef} className={styles.preview}>
@@ -824,6 +824,9 @@ export default function InspectionReportPage({ onBack }: Props) {
                   <section className={styles.group}>
                     <Field {...txt("ex.title", exBlock.title)} label="Reading a photo · title" />
                     <Field {...txt("ex.intro", exBlock.intro)} label="Text" multiline />
+                    {exBlock.legend.map((l, i) => (
+                      <Field key={l.part} {...txt(`ex.mean.${i}`, l.mean)} label={l.part} multiline />
+                    ))}
                   </section>
                 )}
               </>
@@ -945,6 +948,7 @@ export default function InspectionReportPage({ onBack }: Props) {
             {sel === "findings" &&
               (editPhoto && editView ? (
                 <PhotoEditor
+                  key={editPhoto.id}
                   photo={editPhoto}
                   view={editView}
                   index={photoViews.indexOf(editView)}
@@ -953,19 +957,24 @@ export default function InspectionReportPage({ onBack }: Props) {
                   onBack={() => pickPhoto(null)}
                   onStep={(by) => pickPhoto(photoViews[photoViews.indexOf(editView) + by]?.id ?? editView.id, true)}
                   onChange={(patch) => setPhoto(editPhoto.id, patch)}
-                  onTag={() => setTagQueue([editPhoto.id])}
+                  onRemove={() => {
+                    if (editPhoto.uploaded) removePhoto(editPhoto);
+                    else setPhoto(editPhoto.id, { off: true });
+                    pickPhoto(null);
+                  }}
                 />
               ) : (
                 <>
                   <section className={styles.group}>
                     <Field {...txt("sec.findings.title", secOf("findings")?.title ?? "")} label="Title" />
                     <Field {...txt("sec.findings.intro", secOf("findings")?.intro ?? "")} label="Intro" multiline />
-                    <p className={styles.hint}>Click a photo on the page to edit its title and description.</p>
                   </section>
             {/* Photos & labels */}
             <section className={styles.group}>
               <div className={styles.groupHead}>
-                <h2 className={styles.groupTitle}>Photos</h2>
+                <h2 className={styles.groupTitle}>
+                  Photos <InfoTip>Click a photo to edit its codes, location, title and description. Drag to reorder it within its section and code.</InfoTip>
+                </h2>
                 <button className={styles.linkBtn} onClick={() => reimport()} disabled={importing}>
                   Re-import
                 </button>
@@ -990,11 +999,6 @@ export default function InspectionReportPage({ onBack }: Props) {
                 >
                   Upload photos
                 </button>
-                {model.rejected.length > 0 && (
-                  <button className={styles.smallBtn} onClick={() => setTagQueue(model.rejected.map((x) => x.photo.id))}>
-                    Tag {model.rejected.length} untagged
-                  </button>
-                )}
               </div>
               {uploading && (
                 <div className={styles.progress}>
@@ -1033,34 +1037,21 @@ export default function InspectionReportPage({ onBack }: Props) {
                 </div>
               )}
               {importError && <div className={styles.error}>{importError}</div>}
-              <div className={styles.stats}>
-                <span>
-                  <b>{model.parsed.length}</b> in report
-                </span>
-                <span className={model.rejected.length ? styles.statBad : ""}>
-                  <b>{model.rejected.length}</b> rejected
-                </span>
-                <span>{model.mapPhotoId ? "Site plan found" : "No MAP photo"}</span>
-              </div>
-
-              {labelRows.length > 0 && (
-                <div className={styles.labels}>
-                  {labelRows.map(({ photo, reason, ignored }) => (
-                    <LabelRow
-                      key={photo.id}
-                      photo={photo}
-                      reason={reason}
-                      ignored={ignored}
-                      lib={lib}
-                      onChange={(v) => setLabel(photo.id, v)}
-                      onTag={() => setTagQueue([photo.id])}
-                      onRemove={photo.uploaded ? () => removePhoto(photo) : undefined}
-                    />
-                  ))}
-                </div>
+              {photoViews.length > 0 && (
+                <PhotoGrid
+                  items={photoViews.map((v) => ({ id: v.id, src: photoUrl(v.id) ?? "", title: v.gname }))}
+                  onOpen={(i) => pickPhoto(photoViews[i].id, true)}
+                  onMove={movePhoto}
+                />
               )}
-              {!importing && r.photos.length > 0 && model.rejected.length === 0 && (
-                <p className={styles.hint}>All labels are valid.</p>
+              {offPhotos.length > 0 && (
+                <>
+                  <h2 className={styles.groupTitle}>Not on the page · {offPhotos.length}</h2>
+                  <PhotoTray
+                    items={offPhotos.map((p) => ({ id: p.id, src: p.url, title: `Add “${photoLabel(p)}”` }))}
+                    onAdd={(i) => setPhoto(offPhotos[i].id, { off: undefined })}
+                  />
+                </>
               )}
               {!importing && r.photos.length === 0 && !importError && (
                 <p className={styles.hint}>No photos are attached to this job in SimPRO. Upload them here instead.</p>
@@ -1068,11 +1059,12 @@ export default function InspectionReportPage({ onBack }: Props) {
             </section>
 
             <section className={styles.group} data-field="job.technicianNotes">
-              <h2 className={styles.groupTitle}>Technician comments</h2>
+              <h2 className={styles.groupTitle}>
+                Technician comments <InfoTip>Type / for headings and lists. Printed after the findings.</InfoTip>
+              </h2>
               <div className={styles.editorBox}>
                 <DocEditor value={r.job.technicianNotes ?? ""} onChange={(technicianNotes) => setJob({ technicianNotes })} />
               </div>
-              <p className={styles.hint}>Type / for headings and lists. Printed after the findings.</p>
             </section>
 
                 </>
@@ -1095,12 +1087,28 @@ export default function InspectionReportPage({ onBack }: Props) {
               </section>
             )}
 
+            {sel === "plan" && r && (
+              <PlanEditor
+                lib={lib}
+                plan={r.plan}
+                on={!sectionHidden(r, "plan")}
+                present={model.works.items.map((w) => w.chip.code)}
+                title={txt("sec.plan.title", secOf("plan")?.title ?? "Maintenance plan")}
+                intro={txt("sec.plan.intro", secOf("plan")?.intro ?? "Future maintenance considerations and lifecycle planning to assist with ongoing asset management and budgeting.")}
+                onOn={(v) => update((p) => ({ ...p, hidden: { ...p.hidden, plan: !v } }))}
+                onPlan={(plan) => update((p) => ({ ...p, plan }))}
+              />
+            )}
+
             {sel === "summary" && (
               <section className={styles.group}>
                 {secOf("summary") ? (
                   <>
                     <Field {...txt("sec.summary.title", secOf("summary")!.title)} label="Title" />
                     <Field {...txt("sec.summary.intro", secOf("summary")!.intro)} label="Intro" multiline />
+                    {sumBlock?.rows.map((row) => (
+                      <Field key={row.band} {...txt(`sum.${row.band}`, row.text)} label={row.name} multiline />
+                    ))}
                     {sumBlock && <Field {...txt("sum.note", sumBlock.note)} label="Please note" multiline />}
                   </>
                 ) : (
@@ -1162,16 +1170,6 @@ export default function InspectionReportPage({ onBack }: Props) {
         />
       )}
 
-      {tagQueue && r && model && (
-        <TagModal
-          photos={tagQueue.map((id) => r.photos.find((p) => p.id === id)).filter((p): p is InspectionPhoto => !!p)}
-          lib={lib}
-          zones={model.zoneRows.map((z) => z.zone)}
-          onSave={(id, label) => setLabel(id, label)}
-          onClose={() => setTagQueue(null)}
-        />
-      )}
-
       {mapModal && r && (
         <MapCaptureModal
           address={r.job.address}
@@ -1215,59 +1213,6 @@ function PhotoPicker({
   );
 }
 
-function LabelRow({
-  photo,
-  reason,
-  ignored,
-  lib,
-  onChange,
-  onTag,
-  onRemove,
-}: {
-  photo: InspectionPhoto;
-  reason: string | null;
-  ignored: string[] | null;
-  lib: Library;
-  onChange: (label: string | undefined) => void;
-  onTag: () => void;
-  /** Uploaded photos only. */
-  onRemove?: () => void;
-}) {
-  const label = photoLabel(photo);
-  const ok = parseLabel(label, lib).kind !== "rejected";
-  return (
-    <div className={styles.labelRow}>
-      <div className={styles.labelThumb} style={{ backgroundImage: `url("${photo.url}")` }} />
-      <div className={styles.labelBody}>
-        <input
-          className={`${styles.input} ${styles.labelInput} ${ok ? "" : styles.inputBad}`}
-          value={label}
-          spellCheck={false}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        <span className={reason ? styles.labelBad : ignored ? styles.labelWarn : styles.labelOk}>
-          <span>{reason ?? (ignored ? `Ignored: ${ignored.join(", ")}` : photo.uploaded ? "Uploaded" : "Fixed in app")}</span>
-          <span className={styles.labelActions}>
-            <button className={styles.linkBtn} onClick={onTag}>
-              Tag
-            </button>
-            {photo.label != null && !photo.uploaded && (
-              <button className={styles.linkBtn} onClick={() => onChange(undefined)} title={photo.name}>
-                Use filename
-              </button>
-            )}
-            {onRemove && (
-              <button className={styles.linkBtn} onClick={onRemove}>
-                Remove
-              </button>
-            )}
-          </span>
-        </span>
-      </div>
-    </div>
-  );
-}
-
 /** One photo, picked on the page: its label (tags), and the title and
  *  description the card prints. Left blank, the card uses the defect names
  *  and the label's note. */
@@ -1280,7 +1225,7 @@ function PhotoEditor({
   onBack,
   onStep,
   onChange,
-  onTag,
+  onRemove,
 }: {
   photo: InspectionPhoto;
   view: PhotoView;
@@ -1290,11 +1235,27 @@ function PhotoEditor({
   onBack: () => void;
   onStep: (by: number) => void;
   onChange: (patch: Partial<Kept>) => void;
-  onTag: () => void;
+  onRemove: () => void;
 }) {
-  const label = photoLabel(photo);
-  const parsed = parseLabel(label, lib);
+  const parsed = parseLabel(photoLabel(photo), lib);
+  const tags = parsed.kind === "photo" ? parsed : { zone: "", level: "", unit: null, codes: [] as string[], note: "" };
   const [adjusting, setAdjusting] = useState(false);
+  // Typed freely; only complete tags (D10, L2, U403) reach the label.
+  const [where, setWhere] = useState([tags.zone, tags.level, tags.unit].filter(Boolean).join(" "));
+  const setLocation = (v: string) => {
+    setWhere(v);
+    const t = v.toUpperCase().split(/\s+/);
+    onChange({
+      label: composeLabel({
+        ...tags,
+        zone: t.find((x) => /^[DS]\d+$/.test(x)) ?? "",
+        level: t.find((x) => /^L(\d+|G|R)$/.test(x)) ?? "",
+        unit: t.find((x) => /^U\d+$/.test(x)) ?? null,
+      }),
+    });
+  };
+  const toggle = (c: string) =>
+    onChange({ label: composeLabel({ ...tags, codes: tags.codes.includes(c) ? tags.codes.filter((x) => x !== c) : [...tags.codes, c] }) });
   return (
     <section className={styles.group}>
       <div className={styles.focusBar}>
@@ -1330,25 +1291,23 @@ function PhotoEditor({
         />
       )}
 
-      <label className={styles.field}>
-        <span className={styles.fieldLabel}>Label</span>
-        <input
-          className={`${styles.input} ${parsed.kind === "rejected" ? styles.inputBad : ""}`}
-          value={label}
-          spellCheck={false}
-          onChange={(e) => onChange({ label: e.target.value })}
+      <div className={styles.field}>
+        <span className={styles.fieldLabel}>Codes</span>
+        <CodeChips
+          codes={lib.codes.map((c) => ({ code: c.code, name: c.name, bg: BANDS[c.band].bg, fg: BANDS[c.band].fg }))}
+          on={tags.codes}
+          onToggle={toggle}
         />
         <span className={styles.editHint}>
-          {parsed.kind === "rejected" ? parsed.reason : "A code is all that’s needed, e.g. MT torn at outlet. Zone, level and unit (D1 L2 U4) are optional."}
-          <button className={styles.linkBtn} onClick={onTag}>
-            Tag
-          </button>
-          {photo.label != null && !photo.uploaded && (
-            <button className={styles.linkBtn} onClick={() => onChange({ label: undefined })} title={photo.name}>
-              Use filename
-            </button>
-          )}
+          {tags.codes.length ? tags.codes.map((c) => lib.codeMap[c].name).join(" · ") : "No code: shown under Other items of note"}
         </span>
+      </div>
+
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>
+          Location <InfoTip>Optional. Zone (S# or D#), level (LG, L2, LR) and unit.</InfoTip>
+        </span>
+        <input className={styles.input} value={where} placeholder="e.g. D10 L2 U403" onChange={(e) => setLocation(e.target.value)} />
       </label>
 
       <label className={styles.field}>
@@ -1365,11 +1324,15 @@ function PhotoEditor({
         <span className={styles.fieldLabel}>Description</span>
         <RichBox
           value={photo.desc ?? ""}
-          placeholder={view.autoNote || "Optional: anything the client should know about this photo"}
+          placeholder="Optional: anything the client should know about this photo"
           onChange={(html) => onChange({ desc: notesIsEmpty(html) ? undefined : html })}
         />
       </div>
-      <p className={styles.hint}>Left blank, the title is the defect name and the description is the note in the label.</p>
+      <div className={styles.btnRow}>
+        <button className={styles.smallBtn} onClick={onRemove}>
+          Remove from page
+        </button>
+      </div>
     </section>
   );
 }
@@ -1406,5 +1369,126 @@ function Field({
         <input className={styles.input} value={value} onChange={(e) => onChange(e.target.value)} />
       )}
     </div>
+  );
+}
+
+/** Maintenance plan: on or off, the wording, then the services. Tick a
+ *  preset (or add your own), set how often and whether it's required; the
+ *  technician's comments print under the table. Switching it on the first
+ *  time ticks the required services and any that match defects found. */
+type TextProps = { fieldKey: string; value: string; onChange: (v: string) => void; onReset?: () => void };
+
+function PlanEditor({
+  lib,
+  plan,
+  on,
+  present,
+  title,
+  intro,
+  onOn,
+  onPlan,
+}: {
+  lib: Library;
+  plan: InspectionReportData["plan"];
+  on: boolean;
+  present: string[];
+  /** Editable wordings, as txt() gives them. */
+  title: TextProps;
+  intro: TextProps;
+  onOn: (v: boolean) => void;
+  onPlan: (plan: NonNullable<InspectionReportData["plan"]>) => void;
+}) {
+  const items = plan?.items ?? [];
+  const set = (next: PlanItem[]) => onPlan({ ...plan, items: next });
+  const patch = (i: number, p: Partial<PlanItem>) => set(items.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  const custom = items.filter((x) => !lib.plan.some((s) => s.service === x.service));
+  const switchOn = (v: boolean) => {
+    if (v && !items.length)
+      onPlan({
+        ...plan,
+        items: lib.plan
+          .filter((s) => s.priority === "required" || s.whenAny?.some((c) => present.includes(c)))
+          .map(({ service, interval, priority }) => ({ service, interval, priority })),
+      });
+    onOn(v);
+  };
+  const row = (x: PlanItem, i: number, own: boolean) => (
+    <div key={own ? `own-${i}` : x.service} className={styles.planItem}>
+      {own && <input className={styles.input} value={x.service} placeholder="Service" onChange={(e) => patch(i, { service: e.target.value })} />}
+      <div className={styles.planControls}>
+        <select className={styles.input} value={x.interval} onChange={(e) => patch(i, { interval: e.target.value })}>
+          {[...new Set([x.interval, ...PLAN_INTERVALS])].map((v) => (
+            <option key={v}>{v}</option>
+          ))}
+        </select>
+        <div className={styles.planPrio}>
+          {(["required", "recommended"] as const).map((p) => (
+            <button key={p} className={x.priority === p ? styles.planPrioOn : ""} onClick={() => patch(i, { priority: p })}>
+              {p === "required" ? "Required" : "Recommended"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <input className={styles.input} value={x.next ?? ""} placeholder="Next due (optional), e.g. March 2027" onChange={(e) => patch(i, { next: e.target.value || undefined })} />
+      {own && (
+        <button className={styles.linkBtn} onClick={() => set(items.filter((_, j) => j !== i))}>
+          Remove
+        </button>
+      )}
+    </div>
+  );
+  return (
+    <>
+      <section className={styles.group}>
+        <ToggleRow label="Include a maintenance plan" sub="Services, how often, and what's required" checked={on} onChange={switchOn} />
+      </section>
+      {on && (
+        <>
+          <section className={styles.group}>
+            <Field {...title} label="Title" />
+            <Field {...intro} label="Intro" multiline />
+          </section>
+          <section className={styles.group}>
+            <h2 className={styles.groupTitle}>
+              Services <InfoTip>Tick each service the plan includes. Required ones print first.</InfoTip>
+            </h2>
+            {lib.plan.map((s) => {
+              const i = items.findIndex((x) => x.service === s.service);
+              return (
+                <div key={s.service} className={styles.planService}>
+                  <label className={styles.planTick}>
+                    <input
+                      type="checkbox"
+                      checked={i >= 0}
+                      onChange={(e) =>
+                        set(
+                          e.target.checked
+                            ? [...items, { service: s.service, interval: s.interval, priority: s.priority }]
+                            : items.filter((x) => x.service !== s.service),
+                        )
+                      }
+                    />
+                    <span>{s.service}</span>
+                  </label>
+                  {i >= 0 && row(items[i], i, false)}
+                </div>
+              );
+            })}
+            {custom.map((x) => row(x, items.indexOf(x), true))}
+            <div className={styles.btnRow}>
+              <button className={styles.smallBtn} onClick={() => set([...items, { service: "", interval: "Annually", priority: "recommended" }])}>
+                Add a service
+              </button>
+            </div>
+          </section>
+          <section className={styles.group} data-field="plan.notes">
+            <h2 className={styles.groupTitle}>
+              Technician comments <InfoTip>What this plan looks like in practice: priorities, budgeting, anything to watch. Printed under the table.</InfoTip>
+            </h2>
+            <RichBox value={plan?.notes ?? ""} onChange={(notes) => onPlan({ items, ...plan, notes })} />
+          </section>
+        </>
+      )}
+    </>
   );
 }

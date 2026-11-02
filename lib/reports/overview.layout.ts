@@ -132,21 +132,6 @@ export interface OverviewModel {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Rich text from the editor (or older plain text) → one line of plain text. */
-export function plainText(html: string | null | undefined): string {
-  return (html ?? "")
-    .replace(/<\/(p|h2|h3|li)>/gi, " ")
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 const hrs = (n: number) => (Math.round(n * 100) / 100).toFixed(2);
 export { hrs as formatHours };
 
@@ -224,9 +209,10 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   const { job, settings } = report;
   const street = job.address.split(",")[0]?.trim() || "";
   const site = (job.site || street || job.project || "Job overview").trim();
-  const blurb =
-    plainText(job.intro) ||
-    "This report outlines the works completed, including any updates, adjustments and variations from the original scope.";
+  const intro = sanitizeNotesHtml(job.intro);
+  const blurb = notesIsEmpty(intro)
+    ? "<p>This report outlines the works completed, including any updates, adjustments and variations from the original scope.</p>"
+    : intro;
 
   // What the report shows — the same date filter applies to photos and hours.
   const range = (from: string | null, to: string | null) => (settings.filterByDate ? [from, to] : [null, null]) as [string | null, string | null];

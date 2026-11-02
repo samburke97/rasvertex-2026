@@ -113,6 +113,12 @@ export const INSPECTION_CSS = `
 .ir-cols-def{grid-template-columns:90px 320px minmax(0,1fr) minmax(0,1fr)}
 .ir-cols-ix{grid-template-columns:150px 110px 110px minmax(0,1fr) 220px}
 .ir-cols-works{grid-template-columns:64px 340px minmax(0,1fr) 180px}
+.ir-cols-plan{grid-template-columns:minmax(0,1fr) 200px 170px}
+.ir-cols-plan-next{grid-template-columns:minmax(0,1fr) 190px 170px 170px}
+.ir-cols-plan.ir-tbl-row,.ir-cols-plan-next.ir-tbl-row{padding:16px 0}
+.ir-prio{justify-self:start}
+.ir-prio--required{background:#fcf0dc;color:#86561a}
+.ir-prio--recommended{background:#eef1f6;color:rgba(1,25,85,.72)}
 .ir-cell{font-size:20px}
 .ir-cell--strong{font-size:20px;font-weight:600}
 .ir-cell--muted{font-size:20px;color:var(--ink-65)}
@@ -171,7 +177,7 @@ export const INSPECTION_CSS = `
 .ir-sum-row:last-child{border-bottom:0}
 .ir-sum-row__meta{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 .ir-sum-row__count{font-size:17px;color:var(--ink-60);line-height:1.4}
-.ir-sum-row p{font-size:20px;line-height:1.6;color:var(--ink-80);text-wrap:pretty}
+.ir-sum-row__text{font-size:20px;line-height:1.6;color:var(--ink-80);text-wrap:pretty}
 .ir-note{display:flex;flex-direction:column;gap:10px;margin-top:56px}
 .ir-notes{display:flex;flex-direction:column;gap:24px}
 .ir-rich{display:flex;flex-direction:column;gap:12px;font-size:20px;line-height:1.6;color:var(--ink-80)}
@@ -314,11 +320,11 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
               <Photo p={b.photo} ctx={ctx} />
             </div>
             <div className="ir-explainer__legend">
-              {b.legend.map((l) => (
+              {b.legend.map((l, i) => (
                 <div key={l.part} className="ir-legend-item">
                   <span className="ir-label">{l.part}</span>
                   <span className="ir-legend-item__ex">{l.ex}</span>
-                  <span className="ir-legend-item__mean">{l.mean}</span>
+                  <Rt className="ir-legend-item__mean" edit={`ex.mean.${i}`} v={l.mean} />
                 </div>
               ))}
             </div>
@@ -452,6 +458,40 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
           <span>Photos</span>
         </div>
       );
+    case "planHead":
+      return (
+        <div className={`ir-tbl-head ${b.next ? "ir-cols-plan-next" : "ir-cols-plan"}`}>
+          <span>Service</span>
+          <span>Frequency</span>
+          <span>Priority</span>
+          {b.next && <span>Next due</span>}
+        </div>
+      );
+    case "planRow":
+      return (
+        <div className={rowCls(b.next ? "ir-cols-plan-next" : "ir-cols-plan")} data-edit="plan">
+          <div>
+            <div className="ir-cell--strong">{b.item.service}</div>
+            {b.item.note?.trim() && <div className="ir-cell--small">{b.item.note}</div>}
+          </div>
+          <span className="ir-cell--muted">{b.item.interval}</span>
+          <span className={`ir-chip ir-chip--band ir-prio ir-prio--${b.item.priority}`}>{b.item.priority === "required" ? "Required" : "Recommended"}</span>
+          {b.next && <span className="ir-cell--muted">{b.item.next || "—"}</span>}
+        </div>
+      );
+    case "planNotes":
+      return (
+        <div className="ir-notes" data-edit="plan.notes">
+          <h3 className="ir-h-card">Technician comments</h3>
+          <div className="ir-rich" dangerouslySetInnerHTML={{ __html: b.html }} />
+        </div>
+      );
+    case "ixMore":
+      return (
+        <p className="ir-cell--small">
+          Plus {b.n} additional {b.n === 1 ? "photo" : "photos"} with no location, shown in the Findings.
+        </p>
+      );
     case "ixRow":
       return (
         <div className={rowCls("ir-cols-ix")}>
@@ -489,7 +529,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
                       </span>
                       <span className="ir-sum-row__count">{r.count}</span>
                     </div>
-                    <p>{r.text}</p>
+                    <Rt edit={`sum.${r.band}`} className="ir-sum-row__text" v={r.text} />
                   </div>
                 );
               })}
@@ -571,7 +611,7 @@ function Contents({ ctx, layout }: { ctx: Ctx; layout: Layout }) {
   const groups = [
     { title: "About this report", items: [it("about"), it("map"), it("defects")] },
     { title: "Findings", items: findings },
-    { title: "Summary and next steps", items: [it("summary"), it("works")] },
+    { title: "Summary and next steps", items: [it("summary"), it("plan"), it("works")] },
   ].map((g) => ({ ...g, items: g.items.filter((x) => x.name) }));
   return (
     <div className="ir-sheet">

@@ -39,6 +39,8 @@ import {
   type InspectionPhoto,
   type InspectionReportData,
   type SectionKey,
+  type PlanItem,
+  sectionHidden,
 } from "./types";
 import type { PhotoPos } from "@/lib/reports/photos";
 
@@ -110,6 +112,7 @@ export interface ParsedPhoto {
   title?: string;
   desc?: string;
   pos?: PhotoPos;
+  order?: number;
 }
 
 export interface PhotoView {
@@ -169,7 +172,11 @@ export type Block = BlockBase &
     | { type: "cont"; text: string }
     | { type: "row"; photos: PhotoView[] }
     | { type: "notes"; html: string }
+    | { type: "planHead"; next: boolean }
+    | { type: "planRow"; item: PlanItem; next: boolean }
+    | { type: "planNotes"; html: string }
     | { type: "ixHead" }
+    | { type: "ixMore"; n: number }
     | { type: "ixRow"; zone: string; level: string; unit: string; chips: Chip[]; photos: string }
     | {
         type: "sum";
@@ -197,7 +204,6 @@ export interface WorkItem {
 
 export interface InspectionModel {
   parsed: ParsedPhoto[];
-  rejected: { photo: InspectionPhoto; label: string; reason: string }[];
   /** Accepted labels with tokens that were ignored (likely typos). */
   warnings: { photo: InspectionPhoto; label: string; ignored: string[] }[];
   /** Site map image: the builder's choice, else a MAP/Aerial photo. */
@@ -245,7 +251,6 @@ export function buildModel(data: InspectionReportData): InspectionModel {
 
   // Parse labels
   const parsed: ParsedPhoto[] = [];
-  const rejected: InspectionModel["rejected"] = [];
   const warnings: InspectionModel["warnings"] = [];
   let mapPhotoId: string | null = null;
   data.photos.forEach((photo, i) => {
@@ -253,9 +258,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     const r = parseLabel(label, lib);
     if (r.kind === "map") {
       mapPhotoId ??= photo.id;
-    } else if (r.kind === "rejected") {
-      rejected.push({ photo, label, reason: r.reason });
-    } else {
+    } else if (!photo.off) {
       if (r.ignored.length) warnings.push({ photo, label, ignored: r.ignored });
       parsed.push({
         id: photo.id,
@@ -269,6 +272,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
         title: photo.title?.trim() || undefined,
         desc: photo.desc && !notesIsEmpty(sanitizeNotesHtml(photo.desc)) ? photo.desc : undefined,
         pos: photo.pos,
+        order: photo.order,
       });
     }
   });
@@ -278,6 +282,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   if (chosenMapId) mapPhotoId = chosenMapId;
 
   const sortLU = (a: ParsedPhoto, b: ParsedPhoto) =>
+    (a.order ?? 1e6) - (b.order ?? 1e6) ||
     levelOrd(a.level) - levelOrd(b.level) || unitOrd(a.unit) - unitOrd(b.unit) || a.ord - b.ord;
   const levelsTxt = (ps: ParsedPhoto[]) => {
     const lv = [...new Set(ps.map((p) => p.level).filter(Boolean))].sort((a, b) => levelOrd(a) - levelOrd(b));
@@ -336,14 +341,15 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   const placeOf = (p: ParsedPhoto, withZone: boolean) =>
     [withZone ? zoneTitle(p.zone) : "", levelName(p.level), p.unit ? "Unit " + p.unit.slice(1) : ""].filter(Boolean).join(", ");
   const view = (p: ParsedPhoto, withZone: boolean, code: string): PhotoView => {
-    // Other items of note take their title from what was typed in the label.
-    const other = code === "OT";
-    const autoName = other ? cap(p.note) || "Other item of note" : defectNames(p, code);
-    const autoNote = other ? "" : p.note ? cap(p.note) : "";
+    // As in the proposal: the name in the label is the title, and a photo
+    // that's only tags takes its defect names. The description is the
+    // builder's own.
+    const autoName = cap(p.note) || (p.codes.length ? (code === "OT" ? "Other item of note" : defectNames(p, code)) : "Site photo");
+    const autoNote = "";
     return {
       id: p.id,
       num: pad(numOf.get(p) ?? 0),
-      chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].map(chip),
+      chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].filter((c) => p.codes.includes(c)).map(chip),
       gname: p.title ?? autoName,
       pos: p.pos,
       where: placeOf(p, withZone),
@@ -375,7 +381,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       band,
       name: BANDS[band].name,
       count: plural(n, "defect"),
-      text: parts.join("; ") + ". " + BANDS[band].tail,
+      text: T(`sum.${band}`, parts.join("; ") + ". " + BANDS[band].tail),
       n,
     });
   }
@@ -412,12 +418,20 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     ["findings", "Findings", "One chapter per zone. Overview photos come first, then defects in order of severity."],
     ["index", "Location index", "Every location inspected, the defects found there and the photos that show them."],
     ["summary", "Summary", sumIntro],
+    [
+      "plan",
+      "Maintenance plan",
+      "Future maintenance considerations and lifecycle planning to assist with ongoing asset management and budgeting.",
+    ],
     ["works", "Recommended works", "What needs to be done, in order of priority, and why."],
   ];
   // The site map needs zones and the index needs locations; either can also
   // be hidden in the builder, as can Defects explained and the Summary.
   const shown = (k: SectionKey) =>
-    !(k === "map" && !hasZones) && !(k === "index" && !hasPlaces) && !(hidden[k] && k !== "about" && k !== "findings" && k !== "works");
+    !(k === "map" && !hasZones) &&
+    !(k === "index" && !hasPlaces) &&
+    !(k === "plan" && !data.plan?.items.length) &&
+    (k === "about" || k === "findings" || k === "works" || !sectionHidden(data, k));
   const visible = secDefs.filter(([k]) => shown(k));
   const N = visible.length;
   const sections = visible.map(([key, title, intro], i) => ({
@@ -463,11 +477,11 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       img: ex.img,
       num: "01",
       chips: [chip(ex.code)],
-      gname: CODE_MAP[ex.code].name,
+      gname: ex.note,
       where: zoneTitle(ex.zone) + ", " + levelName(ex.level),
-      note: ex.note,
-      autoName: CODE_MAP[ex.code].name,
-      autoNote: ex.note,
+      note: "",
+      autoName: ex.note,
+      autoNote: "",
     };
     add({
       type: "ex",
@@ -476,10 +490,10 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       intro: T("ex.intro", "Every photo in this report is labelled the same way, like this example."),
       photo: exV,
       legend: [
-        { part: "Code", ex: ex.code, mean: "The type of defect. Its colour shows the severity." },
-        { part: "Photo number", ex: "Photo 01", mean: "Use it to find the photo in the Location index." },
-        { part: "Location", ex: exV.where, mean: "Optional. D is a rope drop, S a section. LG is ground, LR the roof." },
-        { part: "Note", ex: ex.note, mean: "The technician’s comment on site." },
+        { part: "Code", ex: ex.code, mean: T("ex.mean.0", "The type of defect. Its colour shows the severity.") },
+        { part: "Photo number", ex: "Photo 01", mean: T("ex.mean.1", "Use it to find the photo in the Location index.") },
+        { part: "Location", ex: exV.where, mean: T("ex.mean.2", "D is a rope drop, S a section. LG is ground, LR the roof.") },
+        { part: "Title", ex: ex.note, mean: T("ex.mean.3", "What we found at this spot.") },
       ],
       gap: 56,
       est: 720,
@@ -572,7 +586,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   if (other.length) {
     chapList.push({
       key: "OT",
-      title: "Other items of note",
+      // On their own they just follow the Findings heading.
+      title: chapters.length ? "Other items of note" : "",
       meta: plural(other.length, "photo") + " · Items that do not fit a defect code",
       items: other.map((p) => [p, "OT"] as const),
       withZone: true,
@@ -620,7 +635,9 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     const ixHead: Block = { type: "ixHead", key: "ixhead", gap: 0, est: 40 };
     add({ ...ixHead, gap: 56, keep: true });
     const ix = new Map<string, { p: ParsedPhoto; codes: Set<string>; nums: number[] }>();
-    [...parsed]
+    // Only located photos are listed; the rest are counted on a closing line.
+    const located = parsed.filter((p) => p.zone || p.level || p.unit);
+    [...located]
       .sort((a, b) => zoneOrd(a.zone) - zoneOrd(b.zone) || sortLU(a, b))
       .forEach((p) => {
         const k = p.zone + "|" + p.level + "|" + (p.unit ?? "");
@@ -631,7 +648,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       });
     [...ix.values()].forEach((e, i) => {
       let codes = CODES.map((c) => c.code).filter((c) => c !== "OV" && e.codes.has(c));
-      if (!codes.length) codes = ["OV"];
+      if (!codes.length && e.codes.has("OV")) codes = ["OV"];
       add({
         type: "ixRow",
         key: "ix-" + i,
@@ -645,6 +662,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
         cont: ixHead,
       });
     });
+    const unlocated = parsed.length - located.length;
+    if (unlocated) add({ type: "ixMore", key: "ix-more", n: unlocated, gap: 24, est: 30, cont: ixHead });
   }
 
   // 06 Summary
@@ -664,6 +683,19 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       gap: 56,
       est: 330 + sumRows.length * 210,
     });
+  }
+
+  // 07 Maintenance plan (optional): required services first.
+  if (shown("plan")) {
+    sec("plan", true);
+    const items = [...data.plan!.items].sort((a, b) => (a.priority === b.priority ? 0 : a.priority === "required" ? -1 : 1));
+    const next = items.some((x) => x.next?.trim());
+    const planHead: Block = { type: "planHead", key: "planhead", next, gap: 0, est: 40 };
+    add({ ...planHead, gap: 56, keep: true });
+    items.forEach((item, i) => add({ type: "planRow", key: `plan-${i}`, item, next, gap: 0, est: 64, cont: planHead }));
+    const notes = sanitizeNotesHtml(data.plan!.notes);
+    if (!notesIsEmpty(notes))
+      add({ type: "planNotes", key: "plan-notes", html: notes, gap: 72, est: 120 + notesLineCount(notes) * 32 });
   }
 
   // 07 Recommended works (own page, rendered outside the flow)
@@ -699,7 +731,6 @@ export function buildModel(data: InspectionReportData): InspectionModel {
 
   return {
     parsed,
-    rejected,
     warnings,
     mapPhotoId,
     mapSource: chosenMapId ? data.siteMap!.source : labelMapId ? "label" : null,
@@ -743,7 +774,7 @@ export interface Layout {
 }
 
 /** Table rows that lose their bottom rule as the last row on a page. */
-const RULED: BlockType[] = ["kRow", "defect", "ixRow"];
+const RULED: BlockType[] = ["kRow", "defect", "ixRow", "planRow"];
 
 /** First flowed page's number (after Cover and Contents). */
 const FIRST_FLOW_PAGE = 3;

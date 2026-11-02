@@ -198,9 +198,7 @@ function Cover({ ctx }: { ctx: Ctx }) {
         <h1 className="ar-h1" style={{ marginTop: 48 }} data-panel-field="buildingName">
           {model.site}.
         </h1>
-        <p className="ar-lede" style={{ fontSize: 22, marginTop: 24 }} data-panel-field="description">
-          {model.blurb}
-        </p>
+        <div className="ar-lede ar-rich" style={{ fontSize: 22, marginTop: 24 }} data-panel-field="description" dangerouslySetInnerHTML={{ __html: model.blurb }} />
         <div
           className={`ar-cover-photo${ctx.onCoverPointerDown ? " ar-cover-photo--drag" : ""}`}
           style={{ marginTop: 64 }}
@@ -739,7 +737,7 @@ function CertPage({
           }}
         >
           <span className="ar-label">Comments</span>
-          <p className="ar-note">{model.comments}</p>
+          <div className="ar-note ar-rich" dangerouslySetInnerHTML={{ __html: model.comments }} />
         </div>
       )}
       <div
