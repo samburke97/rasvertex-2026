@@ -618,3 +618,13 @@ html :where(.root) :is(h1, h2, p, span) {
   display: flex;
   justify-content: center;
 }
+
+/* Photo editor (click a photo on the page) */
+.focusBar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.focusBar .linkBtn { margin-right: auto; }
+.focusCount { font-size: 12px; color: rgba(23, 23, 26, 0.5); font-variant-numeric: tabular-nums; }
+.stepBtn { width: 28px; height: 28px; border: 1px solid rgba(23, 23, 26, 0.12); border-radius: 8px; background: #fff; color: inherit; cursor: pointer; font-size: 13px; }
+.stepBtn:disabled { opacity: 0.35; cursor: default; }
+.editThumb { width: 100%; aspect-ratio: 4 / 3; border-radius: 12px; background: #edf0f0 center / cover no-repeat; }
+.editHint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: rgba(23, 23, 26, 0.5); }
+.editHint .linkBtn:first-of-type { margin-left: auto; }

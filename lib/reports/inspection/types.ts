@@ -19,6 +19,10 @@ export interface InspectionPhoto {
   dateAdded?: string | null;
   /** Label typed in the app; overrides the one read from the filename. */
   label?: string;
+  /** Title typed in the builder; replaces the defect name(s) on the card. */
+  title?: string;
+  /** Description typed in the builder; replaces the label's note. */
+  desc?: string;
   /** Uploaded in the builder rather than imported from SimPRO — kept when
    *  the SimPRO photos are re-imported. */
   uploaded?: boolean;

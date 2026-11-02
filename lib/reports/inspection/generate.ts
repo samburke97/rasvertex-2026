@@ -24,6 +24,7 @@ import {
   type Band,
   type CardDef,
   type ExtraDef,
+  type ImageKey,
 } from "./codes";
 import {
   COVER_ID,
@@ -44,6 +45,8 @@ export const FLOW_H = 1620;
 /** Width of the content column the blocks are measured in. */
 export const CONTENT_W = PAGE_W - 96 * 2;
 const PER_ROW = 2;
+/** Works rows that leave room on the page for the extras and the button. */
+const WORKS_FIT = 4;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -63,6 +66,10 @@ const uploadOrd = (p: InspectionPhoto, i: number) => {
   return m ? parseInt(m[1], 10) : i;
 };
 
+/** A name mid-sentence: "Surface wear" → "surface wear", but acronyms stay
+ *  ("UV degradation"). */
+const lower = (s: string) => (/^[A-Z]{2}/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1));
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface Chip {
@@ -80,10 +87,14 @@ export interface ParsedPhoto {
   codes: string[];
   note: string;
   head: string;
+  title?: string;
+  desc?: string;
 }
 
 export interface PhotoView {
   id: string;
+  /** A built-in image instead of a job photo (the "Reading a photo" example). */
+  img?: ImageKey;
   num: string;
   /** Every code on the photo; the one it's filed under first. */
   chips: Chip[];
@@ -91,6 +102,9 @@ export interface PhotoView {
   /** Zone (outside a zone chapter), level and unit. */
   where: string;
   note: string;
+  /** What the card says when the builder leaves title / description blank. */
+  autoName: string;
+  autoNote: string;
 }
 
 export type SectionKey = "about" | "map" | "defects" | "findings" | "index" | "summary" | "works";
@@ -178,7 +192,9 @@ export interface InspectionModel {
   hasOther: boolean;
   /** About this report cards for this report kind. */
   about: CardDef[];
-  works: { items: WorkItem[]; extras: ExtraDef[]; href: string };
+  /** split: the works table is too long to share its page, so "Also worth
+   *  adding" and the quote button get a closing page of their own. */
+  works: { items: WorkItem[]; extras: ExtraDef[]; href: string; split: boolean };
   nDefects: number;
 }
 
@@ -218,6 +234,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
         codes: r.codes,
         note: r.note,
         head: r.head,
+        title: photo.title?.trim() || undefined,
+        desc: photo.desc?.trim() || undefined,
       });
     }
   });
@@ -272,20 +290,25 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     .sort((a, b) => zoneOrd(a.zone) - zoneOrd(b.zone) || sortLU(a, b));
   other.forEach(assign);
 
+  /** "Membrane tear or puncture, UV degradation": every defect on the
+   *  photo, the one it's filed under first. */
+  const defectNames = (p: ParsedPhoto, code: string) => {
+    const defects = [code, ...p.codes.filter((c) => c !== code)].filter((c) => !CODE_MAP[c].system);
+    if (!defects.length) return code === "OV" ? "Overview" : CODE_MAP[code].name;
+    return [...new Set(defects)]
+      .sort((a, b) => (a === code ? -1 : b === code ? 1 : codeOrd(a) - codeOrd(b)))
+      .map((c, i) => (i ? lower(CODE_MAP[c].name) : CODE_MAP[c].name))
+      .join(", ");
+  };
   const view = (p: ParsedPhoto, withZone: boolean, code: string): PhotoView => ({
     id: p.id,
     num: pad(numOf.get(p) ?? 0),
     chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].map(chip),
-    gname: (() => {
-      const defects = [code, ...p.codes.filter((c) => c !== code)].filter((c) => !CODE_MAP[c].system);
-      if (!defects.length) return code === "OV" ? "Overview" : CODE_MAP[code].name;
-      return [...new Set(defects)]
-        .sort((a, b) => (a === code ? -1 : b === code ? 1 : codeOrd(a) - codeOrd(b)))
-        .map((c, i) => (i ? CODE_MAP[c].name.charAt(0).toLowerCase() + CODE_MAP[c].name.slice(1) : CODE_MAP[c].name))
-        .join(", ");
-    })(),
+    gname: p.title ?? defectNames(p, code),
     where: (withZone ? zoneTitle(p.zone) + ", " : "") + levelName(p.level) + (p.unit ? ", Unit " + p.unit.slice(1) : ""),
-    note: p.note ? cap(p.note) : "",
+    note: p.desc ?? (p.note ? cap(p.note) : ""),
+    autoName: defectNames(p, code),
+    autoNote: p.note ? cap(p.note) : "",
   });
 
   // Counts and generated copy
@@ -303,7 +326,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     const n = cs.reduce((t, c) => t + withCode(c).length, 0);
     const parts = cs.map((c, i) => {
       const nm = CODE_MAP[c].name;
-      return (i ? nm.charAt(0).toLowerCase() + nm.slice(1) : nm) + " at " + andList(zonesOf(c));
+      return (i ? lower(nm) : nm) + " at " + andList(zonesOf(c));
     });
     sumRows.push({
       band,
@@ -376,39 +399,34 @@ export function buildModel(data: InspectionReportData): InspectionModel {
 
   // 01 About
   sec("about");
-  add({ type: "why", key: "why", gap: 56, est: 480 });
-  const ordered = [...parsed].sort((a, b) => (numOf.get(a) ?? 0) - (numOf.get(b) ?? 0));
-  const notOv = (p: ParsedPhoto) => p.codes.some((c) => c !== "OV");
-  // The example reads best with one code and a note; a photo with several
-  // codes is used only when there's nothing simpler.
-  const single = (p: ParsedPhoto) => p.codes.length === 1 && notOv(p);
-  const red = (p: ParsedPhoto) => p.codes.some((c) => CODE_MAP[c].band === "red");
-  const exP =
-    ordered.find((p) => single(p) && p.note && red(p)) ??
-    ordered.find((p) => single(p) && p.note) ??
-    ordered.find((p) => single(p) && red(p)) ??
-    ordered.find(single) ??
-    ordered.find((p) => notOv(p) && p.note) ??
-    ordered.find(notOv) ??
-    ordered[0];
-  if (exP) {
-    const exCode = exP.codes.find((c) => c !== "OV") ?? exP.codes[0];
-    const exV = view(exP, true, exCode);
+  // About and "Reading a photo" always share the first page.
+  add({ type: "why", key: "why", gap: 56, est: 480, keep: true });
+  // "Reading a photo" uses a made-up example with a single code, so it
+  // reads the same whatever the job's photos carry.
+  {
+    const ex = lib.example;
+    const exV: PhotoView = {
+      id: "example",
+      img: ex.img,
+      num: "01",
+      chips: [chip(ex.code)],
+      gname: CODE_MAP[ex.code].name,
+      where: zoneTitle(ex.zone) + ", " + levelName(ex.level),
+      note: ex.note,
+      autoName: CODE_MAP[ex.code].name,
+      autoNote: ex.note,
+    };
     add({
       type: "ex",
       key: "ex",
       photo: exV,
       legend: [
-        { part: "Code", ex: exCode, mean: "The type of defect. Its colour shows the severity." },
-        { part: "Photo number", ex: "Photo " + exV.num, mean: "Use it to find the photo in the Location index." },
-        {
-          part: "Location",
-          ex: zoneTitle(exP.zone) + ", " + levelName(exP.level),
-          mean: "D is a rope drop, S a section. LG is ground, LR the roof.",
-        },
-        { part: "Note", ex: exP.note ? cap(exP.note) : "—", mean: "The technician’s comment on site." },
+        { part: "Code", ex: ex.code, mean: "The type of defect. Its colour shows the severity." },
+        { part: "Photo number", ex: "Photo 01", mean: "Use it to find the photo in the Location index." },
+        { part: "Location", ex: exV.where, mean: "D is a rope drop, S a section. LG is ground, LR the roof." },
+        { part: "Note", ex: ex.note, mean: "The technician’s comment on site." },
       ],
-      gap: 72,
+      gap: 56,
       est: 720,
     });
   }
@@ -584,6 +602,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     "&body=" +
     encodeURIComponent(body);
 
+  const ordered = [...parsed].sort((a, b) => (numOf.get(a) ?? 0) - (numOf.get(b) ?? 0));
   const coverPhotoId =
     choiceId(data, data.cover, COVER_ID) ??
     ordered.find((p) => p.codes.includes("OV"))?.id ??
@@ -610,7 +629,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     zoneRows,
     hasOther: other.length > 0,
     about: lib.about,
-    works: { items, extras, href },
+    works: { items, extras, href, split: extras.length > 0 && items.length > WORKS_FIT },
     nDefects: nDef,
   };
 }
@@ -638,7 +657,9 @@ const RULED: BlockType[] = ["kRow", "defect", "ixRow"];
 /** First flowed page's number (after Cover and Contents). */
 const FIRST_FLOW_PAGE = 3;
 
-export function paginate(blocks: Block[], heights: Record<string, number>): Layout {
+/** tail: sheets after the flow (Recommended works, plus its closing page
+ *  when split). */
+export function paginate(blocks: Block[], heights: Record<string, number>, tail = 1): Layout {
   const hOf = (b: Block) => heights[b.key] ?? b.est;
   const pages: PlacedBlock[][] = [];
   const startPage = new Map<Block, number>();
@@ -683,8 +704,8 @@ export function paginate(blocks: Block[], heights: Record<string, number>): Layo
     if (b.secKey) secPage[b.secKey] = n + FIRST_FLOW_PAGE;
     if (b.chapKey) chapPage[b.chapKey] = n + FIRST_FLOW_PAGE;
   }
-  const total = pages.length + FIRST_FLOW_PAGE;
-  secPage.works = total;
+  const total = pages.length + FIRST_FLOW_PAGE + tail - 1;
+  secPage.works = pages.length + FIRST_FLOW_PAGE;
   return { pages, total, secPage, chapPage };
 }
 

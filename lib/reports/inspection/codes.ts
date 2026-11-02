@@ -274,6 +274,8 @@ export const CARD_IMAGES = {
   height: "reports/proposal/assets/nav-height.png",
   painting: "reports/proposal/assets/nav-painting.png",
   cleaning: "reports/proposal/assets/nav-cleaning.png",
+  exampleBuilding: "reports/inspection/example-building.jpg",
+  exampleRoof: "reports/inspection/example-roof.jpg",
 } as const;
 export type ImageKey = keyof typeof CARD_IMAGES;
 
@@ -304,6 +306,8 @@ export interface Library {
   blurb: (street: string) => string;
   /** Roof photos may leave out the level; it defaults to LR. */
   defaultLevel: string | null;
+  /** The made-up photo on "Reading a photo": one code, a location, a note. */
+  example: { img: ImageKey; code: string; zone: string; level: string; note: string };
 }
 
 const byCode = (codes: DefectCode[]) => Object.fromEntries(codes.map((d) => [d.code, d]));
@@ -322,6 +326,7 @@ const ANNUAL: ExtraDef = {
 export const LIBRARIES: Record<ReportKind, Library> = {
   building: {
     kind: "building",
+    example: { img: "exampleBuilding", code: "SF", zone: "D3", level: "L2", note: "Expansion joint sealant split and pulling away" },
     label: "Building inspection",
     reportRef: "Condition",
     codes: BUILDING_CODES,
@@ -357,6 +362,7 @@ export const LIBRARIES: Record<ReportKind, Library> = {
   },
   roof: {
     kind: "roof",
+    example: { img: "exampleRoof", code: "MT", zone: "S1", level: "LR", note: "Membrane split along the lap, open to water" },
     label: "Roof inspection",
     reportRef: "Roof",
     codes: ROOF_CODES,

@@ -45,7 +45,7 @@ import {
   type Library,
   type ReportKind,
 } from "@/lib/reports/inspection/codes";
-import { buildModel, paginate, PAGE_W } from "@/lib/reports/inspection/generate";
+import { buildModel, paginate, PAGE_W, type PhotoView } from "@/lib/reports/inspection/generate";
 import {
   createInspectionReport,
   draftKey,
@@ -101,6 +101,8 @@ function readBlobAsDataUrl(blob: Blob): Promise<string> {
 
 const CONTACT_OPTIONS = CONTACTS.map((c) => ({ value: c.name, label: c.name, detail: c.title || undefined }));
 
+type Kept = Pick<InspectionPhoto, "label" | "title" | "desc">;
+
 export default function InspectionReportPage({ onBack }: Props) {
   const [r, setR] = useState<InspectionReportData | null>(null);
   const [jobInput, setJobInput] = useState("");
@@ -127,7 +129,7 @@ export default function InspectionReportPage({ onBack }: Props) {
   // ── Photo import ──────────────────────────────────────────────────────────
   // Replaces the draft's SimPRO photos with the job's current attachments,
   // keeping photos uploaded in the builder and any label already fixed.
-  const importPhotos = useCallback((jobId: string, folder: string, keepLabels: Map<string, string>) => {
+  const importPhotos = useCallback((jobId: string, folder: string, keepLabels: Map<string, Kept>) => {
     const gen = ++importGen.current;
     setImporting(true);
     setImportError(null);
@@ -155,7 +157,7 @@ export default function InspectionReportPage({ onBack }: Props) {
                       name: photo.name,
                       url: photo.url,
                       dateAdded: photo.dateAdded,
-                      ...(keepLabels.has(photo.id) ? { label: keepLabels.get(photo.id) } : {}),
+                      ...keepLabels.get(photo.id),
                     },
                   ],
                 },
@@ -177,7 +179,12 @@ export default function InspectionReportPage({ onBack }: Props) {
   const reimport = (folder?: string) => {
     if (!r) return;
     const f = folder ?? r.folder;
-    const keep = new Map(r.photos.filter((p) => p.label != null).map((p) => [p.id, p.label!]));
+    // Labels, titles and descriptions typed here survive a re-import.
+    const keep = new Map<string, Kept>(
+      r.photos
+        .filter((p) => p.label != null || p.title != null || p.desc != null)
+        .map((p) => [p.id, { label: p.label, title: p.title, desc: p.desc }]),
+    );
     if (folder != null) update((p) => ({ ...p, folder: f }));
     importPhotos(r.jobId, f, keep);
   };
@@ -284,7 +291,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     if (changed) setHeights(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r?.photos, r?.job, !!model?.mapPhotoId, fontsReady, !!model]);
-  const layout = useMemo(() => (model ? paginate(model.blocks, heights) : null), [model, heights]);
+  const layout = useMemo(() => (model ? paginate(model.blocks, heights, model.works.split ? 2 : 1) : null), [model, heights]);
 
   const urlById = useMemo(() => new Map((r ? reportImages(r) : []).map((p) => [p.id, p.url])), [r]);
   const photoUrl = useCallback((id: string | null) => (id ? (urlById.get(id) ?? null) : null), [urlById]);
@@ -456,6 +463,32 @@ export default function InspectionReportPage({ onBack }: Props) {
       }));
   }, [r, model]);
 
+  const setPhoto = (id: string, patch: Partial<Kept>) =>
+    update((p) => ({ ...p, photos: p.photos.map((x) => (x.id === id ? { ...x, ...patch } : x)) }));
+
+  // Click a photo on the page to edit it; the panel shows just that photo.
+  const [editing, setEditing] = useState<string | null>(null);
+  const docRef = useRef<HTMLDivElement>(null);
+  const photoViews = useMemo(() => {
+    const out: PhotoView[] = [];
+    for (const b of model?.blocks ?? [])
+      if (b.type === "row") for (const v of b.photos) if (!out.some((x) => x.id === v.id)) out.push(v);
+    return out;
+  }, [model]);
+  const pickPhoto = (id: string | null, scroll = false) => {
+    setEditing(id);
+    if (id && scroll)
+      requestAnimationFrame(() =>
+        docRef.current?.querySelector(`[data-photo="${id}"]`)?.scrollIntoView({ block: "center" }),
+      );
+  };
+
+  const editPhoto = editing ? r?.photos.find((p) => p.id === editing) : undefined;
+  // A photo whose label stops parsing drops off the page; keep editing it.
+  const editView: PhotoView | undefined = editPhoto
+    ? (photoViews.find((v) => v.id === editPhoto.id) ?? { id: editPhoto.id, num: "—", chips: [], gname: "", where: "", note: "", autoName: "", autoNote: "" })
+    : undefined;
+
   const setLabel = (id: string, label: string | undefined) =>
     update((p) => ({
       ...p,
@@ -595,6 +628,20 @@ export default function InspectionReportPage({ onBack }: Props) {
             )}
             {exp.phase === "error" && <div className={styles.error}>{exp.message}</div>}
 
+            {editPhoto && editView ? (
+              <PhotoEditor
+                photo={editPhoto}
+                view={editView}
+                index={photoViews.indexOf(editView)}
+                count={photoViews.length}
+                lib={lib}
+                onBack={() => pickPhoto(null)}
+                onStep={(by) => pickPhoto(photoViews[photoViews.indexOf(editView) + by]?.id ?? editView.id, true)}
+                onChange={(patch) => setPhoto(editPhoto.id, patch)}
+                onTag={() => setTagQueue([editPhoto.id])}
+              />
+            ) : (
+            <>
             {/* Photos & labels */}
             <section className={styles.group}>
               <div className={styles.groupHead}>
@@ -851,14 +898,18 @@ export default function InspectionReportPage({ onBack }: Props) {
                 onChange={(e) => setJob({ scope: e.target.value })}
               />
             </section>
+            </>
+            )}
           </aside>
 
           <main ref={previewRef} className={styles.preview}>
             <div ref={measureRef}>
               <InspectionMeasure model={model} assets={ASSETS} />
             </div>
-            <div style={{ zoom }}>
+            <div ref={docRef} style={{ zoom }}>
               <InspectionDocument
+                onPhotoClick={(id) => pickPhoto(id)}
+                editing={editing}
                 model={model}
                 layout={layout}
                 job={r.job}
@@ -976,5 +1027,95 @@ function LabelRow({
         </span>
       </div>
     </div>
+  );
+}
+
+/** One photo, picked on the page: its label (tags), and the title and
+ *  description the card prints. Left blank, the card uses the defect names
+ *  and the label's note. */
+function PhotoEditor({
+  photo,
+  view,
+  index,
+  count,
+  lib,
+  onBack,
+  onStep,
+  onChange,
+  onTag,
+}: {
+  photo: InspectionPhoto;
+  view: PhotoView;
+  index: number;
+  count: number;
+  lib: Library;
+  onBack: () => void;
+  onStep: (by: number) => void;
+  onChange: (patch: Partial<Pick<InspectionPhoto, "label" | "title" | "desc">>) => void;
+  onTag: () => void;
+}) {
+  const label = photoLabel(photo);
+  const parsed = parseLabel(label, lib);
+  return (
+    <section className={styles.group}>
+      <div className={styles.focusBar}>
+        <button className={styles.linkBtn} onClick={onBack}>
+          ‹ Back
+        </button>
+        <span className={styles.focusCount}>
+          {index + 1} / {count}
+        </span>
+        <button className={styles.stepBtn} title="Previous photo" disabled={index <= 0} onClick={() => onStep(-1)}>
+          ↑
+        </button>
+        <button className={styles.stepBtn} title="Next photo" disabled={index >= count - 1} onClick={() => onStep(1)}>
+          ↓
+        </button>
+      </div>
+      <div className={styles.editThumb} style={{ backgroundImage: `url("${photo.url}")` }} />
+
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Label</span>
+        <input
+          className={`${styles.input} ${parsed.kind === "rejected" ? styles.inputBad : ""}`}
+          value={label}
+          spellCheck={false}
+          onChange={(e) => onChange({ label: e.target.value })}
+        />
+        <span className={styles.editHint}>
+          {parsed.kind === "rejected" ? parsed.reason : "Zone, level, unit and codes, e.g. D1 L2 MT AL - torn at outlet"}
+          <button className={styles.linkBtn} onClick={onTag}>
+            Tag
+          </button>
+          {photo.label != null && !photo.uploaded && (
+            <button className={styles.linkBtn} onClick={() => onChange({ label: undefined })} title={photo.name}>
+              Use filename
+            </button>
+          )}
+        </span>
+      </label>
+
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Title</span>
+        <input
+          className={styles.input}
+          value={photo.title ?? ""}
+          placeholder={view.autoName}
+          onChange={(e) => onChange({ title: e.target.value || undefined })}
+        />
+      </label>
+
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Description</span>
+        <textarea
+          className={styles.input}
+          rows={4}
+          value={photo.desc ?? ""}
+          placeholder={view.autoNote || "Optional: anything the client should know about this photo"}
+          onChange={(e) => onChange({ desc: e.target.value || undefined })}
+        />
+      </label>
+      <p className={styles.hint}>Left blank, the title is the defect name and the description is the note in the label.</p>
+    </section>
   );
 }
