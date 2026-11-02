@@ -31,6 +31,8 @@ import SaveReportModal from "@/components/reports/shared/SaveReportModal";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import DocEditor from "@/components/workspace/DocEditor";
 import PageRail, { type RailRow } from "@/components/reports/shared/builder/PageRail";
+import RichBox from "@/components/reports/shared/builder/RichBox";
+import { notesIsEmpty } from "@/lib/reports/richText";
 import PanelResizer, { usePanelWidth } from "@/components/reports/shared/builder/PanelResizer";
 import InspectionDocument, {
   InspectionMeasure,
@@ -1340,16 +1342,14 @@ function PhotoEditor({
         />
       </label>
 
-      <label className={styles.field}>
+      <div className={styles.field}>
         <span className={styles.fieldLabel}>Description</span>
-        <textarea
-          className={styles.input}
-          rows={4}
+        <RichBox
           value={photo.desc ?? ""}
           placeholder={view.autoNote || "Optional: anything the client should know about this photo"}
-          onChange={(e) => onChange({ desc: e.target.value || undefined })}
+          onChange={(html) => onChange({ desc: notesIsEmpty(html) ? undefined : html })}
         />
-      </label>
+      </div>
       <p className={styles.hint}>Left blank, the title is the defect name and the description is the note in the label.</p>
     </section>
   );
@@ -1382,12 +1382,7 @@ function Field({
         )}
       </span>
       {multiline ? (
-        <textarea
-          className={styles.input}
-          rows={Math.min(10, Math.max(2, Math.ceil(value.length / 42)))}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        <RichBox value={value} onChange={onChange} />
       ) : (
         <input className={styles.input} value={value} onChange={(e) => onChange(e.target.value)} />
       )}

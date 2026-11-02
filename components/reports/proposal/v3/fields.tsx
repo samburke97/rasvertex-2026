@@ -6,10 +6,9 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import RichBox from "@/components/reports/shared/builder/RichBox";
 import styles from "./Builder.module.css";
 import type { BuilderCtx, Confirm, Path } from "./ctx";
-import DocEditor from "@/components/workspace/DocEditor";
-import { richHtml } from "@/lib/reports/proposal/v3/rich";
 import { money } from "@/lib/reports/proposal/v3/derive";
 
 const str = (v: unknown) => (v == null ? "" : String(v));
@@ -96,9 +95,7 @@ export function Rich({
   /** Shown (and edited from) when the field is empty, e.g. standard steps. */
   fallback?: string;
 }) {
-  const raw = str(ctx.get(path)) || fallback || "";
-  // Plain-text values from older drafts: one paragraph per line.
-  const value = raw && !raw.trim().startsWith("<") ? richHtml(raw) : raw;
+  const value = str(ctx.get(path)) || fallback || "";
   return (
     <div className={styles.field} data-field={key(path)}>
       <Label
@@ -107,24 +104,7 @@ export function Rich({
           info ?? (list ? "One item per line — press Enter for the next. Select text to make it bold or italic." : "Type “/” for a bullet or numbered list. Select text to make it bold or italic.")
         }
       />
-      <div
-        className={`${styles.rich} ${list ? styles.richList : ""}`}
-        // Clicking anywhere in the box, not just on the text, puts the cursor in it.
-        onMouseDown={(e) => {
-          const ed = e.currentTarget.querySelector<HTMLElement>(".tiptap");
-          if (ed && !ed.contains(e.target as Node)) {
-            e.preventDefault();
-            ed.focus();
-          }
-        }}
-      >
-        <DocEditor
-          variant={list ? "list" : "prose"}
-          value={value}
-          placeholder={ph ?? (list ? "One per line" : "Type, or “/” for a list")}
-          onChange={(html) => ctx.set(path, html)}
-        />
-      </div>
+      <RichBox value={value} list={list} placeholder={ph} onChange={(html) => ctx.set(path, html)} />
     </div>
   );
 }

@@ -13,7 +13,8 @@
 // content width; its [data-bk] heights feed paginate() (lib/reports/
 // inspection/generate.ts), which decides what goes on each page.
 
-import type { PointerEvent, ReactNode } from "react";
+import type { CSSProperties, PointerEvent, ReactNode } from "react";
+import { sanitizeNotesHtml } from "@/lib/reports/richText";
 import { BANDS, type ImageKey } from "@/lib/reports/inspection/codes";
 import {
   CONTENT_W,
@@ -53,6 +54,11 @@ export const INSPECTION_CSS = `
   font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--navy);line-height:1.7;font-size:20px;-webkit-print-color-adjust:exact;print-color-adjust:exact;text-align:left}
 .ir :where(h1,h2,h3,p,span,div,a,strong){color:inherit;font:inherit;letter-spacing:inherit;margin:0;padding:0;box-sizing:border-box}
 .ir *{box-sizing:border-box}
+.ir-rt>*+*{margin-top:.6em}
+.ir-rt :where(ul,ol){margin:0;padding-left:1.3em}
+.ir-rt ul{list-style:disc}.ir-rt ol{list-style:decimal}
+.ir-rt li+li{margin-top:.2em}
+.ir-rt em{font-style:italic}
 .ir strong{font-weight:700}
 .ir--screen{display:flex;flex-direction:column;align-items:center;gap:40px}
 .ir--screen .ir-sheet{box-shadow:0 1px 2px rgba(23,23,26,.06),0 12px 32px -12px rgba(23,23,26,.22)}
@@ -124,10 +130,10 @@ export const INSPECTION_CSS = `
 .ir-about{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
 .ir-about__img{width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:var(--img-empty) center/cover no-repeat}
 .ir-about .ir-h-sub{margin:24px 0 8px}
-.ir-about p{font-size:17px;line-height:1.6;color:var(--ink-65);text-wrap:pretty}
+.ir-about__text{font-size:17px;line-height:1.6;color:var(--ink-65);text-wrap:pretty}
 
 .ir-card-blue{background:var(--card-blue);border-radius:32px;padding:40px 48px 48px}
-.ir-card-blue>p{font-size:20px;line-height:1.6;color:var(--ink-70);margin-top:12px;max-width:900px;text-wrap:pretty}
+.ir-card-blue__intro{font-size:20px;line-height:1.6;color:var(--ink-70);margin-top:12px;max-width:900px;text-wrap:pretty}
 .ir-explainer{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:48px;align-items:start;margin-top:40px}
 .ir-explainer__photo{min-width:0}
 .ir-explainer__legend{background:#fff;border-radius:20px;padding:8px 32px;display:flex;flex-direction:column;min-width:0}
@@ -186,7 +192,7 @@ export const INSPECTION_CSS = `
 .ir-extra__img{width:100%;flex:1 1 0;min-height:120px;max-height:300px;border-radius:16px;overflow:hidden;background:var(--img-empty) center/cover no-repeat}
 .ir-extra .ir-h-sub{margin:20px 0 8px}
 .ir-extra .ir-h-sub:first-child{margin-top:0}
-.ir-extra p{font-size:17px;line-height:1.5;color:var(--ink-60);min-height:3em;text-wrap:pretty}
+.ir-extra__text{font-size:17px;line-height:1.5;color:var(--ink-60);min-height:3em;text-wrap:pretty}
 .ir-cta{margin-top:56px;display:flex;flex-direction:column;gap:40px}
 .ir-btn{align-self:flex-start;display:inline-flex;align-items:center;gap:16px;height:64px;padding:0 36px;border-radius:14px;font-size:20px;font-weight:700;letter-spacing:-.01em;text-decoration:none}
 .ir-btn--primary{background:var(--navy);color:#fff}
@@ -240,8 +246,21 @@ function Photo({ p, ctx }: { p: PhotoView; ctx: Ctx }) {
         </span>
       </div>
       <div className="ir-photo__name">{p.gname}</div>
-      {p.note && <div className="ir-photo__desc">{p.note}</div>}
+      {p.note && <Rt className="ir-photo__desc" v={p.note} />}
     </div>
+  );
+}
+
+/** Text written in the builder: paragraphs (one per line typed), lists, bold
+ *  and italic, in the surrounding type. Sanitised (lib/reports/richText). */
+function Rt({ v, className, edit, style }: { v: string; className?: string; edit?: string; style?: CSSProperties }) {
+  return (
+    <div
+      className={`ir-rt${className ? " " + className : ""}`}
+      data-edit={edit}
+      style={style}
+      dangerouslySetInnerHTML={{ __html: sanitizeNotesHtml(v) }}
+    />
   );
 }
 
@@ -260,9 +279,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
             {b.title}
           </h2>
           {b.intro && (
-            <p className="ir-intro" data-edit={b.secKey === "about" ? "job.scope" : `sec.${b.secKey}.intro`}>
-              {b.intro}
-            </p>
+            <Rt className="ir-intro" edit={b.secKey === "about" ? "job.scope" : `sec.${b.secKey}.intro`} v={b.intro} />
           )}
         </>
       );
@@ -275,7 +292,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
               <h3 className="ir-h-sub" data-edit={`about.${i}.t`}>
                 {a.t}
               </h3>
-              <p data-edit={`about.${i}.d`}>{a.d}</p>
+              <Rt className="ir-about__text" edit={`about.${i}.d`} v={a.d} />
             </div>
           ))}
         </div>
@@ -286,7 +303,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
           <h3 className="ir-h-card" data-edit="ex.title">
             {b.title}
           </h3>
-          <p data-edit="ex.intro">{b.intro}</p>
+          <Rt className="ir-card-blue__intro" edit="ex.intro" v={b.intro} />
           <div className="ir-explainer">
             <div className="ir-explainer__photo">
               <Photo p={b.photo} ctx={ctx} />
@@ -387,12 +404,8 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
         <div className={rowCls("ir-cols-def")}>
           <ChipView chip={b.chip} />
           <span className="ir-def-name">{b.name}</span>
-          <p className="ir-def-what" data-edit={`defect.${b.chip.code}.what`}>
-            {b.what}
-          </p>
-          <p className="ir-def-act" data-edit={`defect.${b.chip.code}.act`}>
-            {b.act}
-          </p>
+          <Rt className="ir-def-what" edit={`defect.${b.chip.code}.what`} v={b.what} />
+          <Rt className="ir-def-act" edit={`defect.${b.chip.code}.act`} v={b.act} />
         </div>
       );
     case "chap":
@@ -479,7 +492,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
           )}
           <div className="ir-note">
             <span className="ir-label">Please note</span>
-            <p data-edit="sum.note">{b.note}</p>
+            <Rt edit="sum.note" v={b.note} />
           </div>
         </div>
       );
@@ -506,9 +519,7 @@ function Cover({ ctx, job }: { ctx: Ctx; job: InspectionJob }) {
         <h1 className="ir-h-cover" style={{ marginTop: 48 }} data-edit="job.site">
           {job.site}.
         </h1>
-        <p className="ir-lede" style={{ maxWidth: 820, marginTop: 24 }} data-edit="job.blurb">
-          {job.blurb}
-        </p>
+        <Rt className="ir-lede" style={{ maxWidth: 820, marginTop: 24 }} edit="job.blurb" v={job.blurb} />
         <div
           className={`ir-cover-photo${ctx.onCoverPointerDown ? " ir-cover-photo--drag" : ""}`}
           style={{ marginTop: 64 }}
@@ -596,7 +607,7 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
             <h3 className="ir-h-sub" data-edit={`extra.${x.n}.t`}>
               {x.t}
             </h3>
-            <p data-edit={`extra.${x.n}.d`}>{x.d}</p>
+            <Rt className="ir-extra__text" edit={`extra.${x.n}.d`} v={x.d} />
           </div>
         ))}
       </div>
@@ -628,9 +639,7 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
               <span className="ir-cell--strong" data-edit={`works.${w.chip.code}.name`}>
                 {w.name}
               </span>
-              <span className="ir-cell--small" style={{ textWrap: "pretty" }} data-edit={`works.${w.chip.code}.why`}>
-                {w.why}
-              </span>
+              <Rt className="ir-cell--small" edit={`works.${w.chip.code}.why`} v={w.why} />
               <span className="ir-cell--small">{w.zones || "—"}</span>
             </div>
           ))}

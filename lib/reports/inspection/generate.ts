@@ -57,7 +57,7 @@ const wrapLines = (s: string, px: number, w: number, bold = false) =>
  *  at all. Heights follow the page's CSS. */
 function worksFit(items: WorkItem[]): "images" | "text" | "none" {
   const rows = items.reduce(
-    (h, w) => h + 32 + Math.max(wrapLines(w.name, 20, 340, true) * 28, wrapLines(w.why, 17, 432) * 24, wrapLines(w.zones, 17, 180) * 24),
+    (h, w) => h + 32 + Math.max(wrapLines(w.name, 20, 340, true) * 28, wrapLines(w.why.replace(/<[^>]*>/g, ""), 17, 432) * 24, wrapLines(w.zones, 17, 180) * 24),
     0,
   );
   const left = PAGE_H - 80 - 96 - 115 /* label, title */ - 80 /* table head */ - rows - 210 /* button, contact */ - 30;
@@ -236,7 +236,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   /** Wording edited in the builder, else the generated text. */
   const T = (key: string, def: string) => {
     const v = data.text?.[key];
-    return v != null && v.trim() ? v : def;
+    return v != null && !notesIsEmpty(sanitizeNotesHtml(v)) ? v : def;
   };
   const hidden = data.hidden ?? {};
 
@@ -264,7 +264,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
         note: r.note,
         head: r.head,
         title: photo.title?.trim() || undefined,
-        desc: photo.desc?.trim() || undefined,
+        desc: photo.desc && !notesIsEmpty(sanitizeNotesHtml(photo.desc)) ? photo.desc : undefined,
       });
     }
   });
