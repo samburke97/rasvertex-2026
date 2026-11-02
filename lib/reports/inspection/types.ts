@@ -40,6 +40,8 @@ export interface InspectionJob {
   /** Name of one of CONTACTS — who quote requests go to. */
   contact: string;
   scope: string;
+  /** Technician comments (rich text), printed after the findings. */
+  technicianNotes?: string;
   /** SimPRO Site ID, kept for saving the PDF — not rendered. */
   siteId: string;
 }
@@ -83,7 +85,14 @@ export interface InspectionReportData {
   cover?: ImageChoice | null;
   /** How the cover photo sits in its frame. */
   coverPos?: CoverPos;
+  /** Wording edited in the builder, by key ("sec.about.title",
+   *  "defect.SH.what"…). A blank or missing key uses the generated text. */
+  text?: Record<string, string>;
+  /** Sections left out of the report. */
+  hidden?: Partial<Record<SectionKey, boolean>>;
 }
+
+export type SectionKey = "about" | "map" | "defects" | "findings" | "index" | "summary" | "works";
 
 /** An image picked in the builder: uploaded / captured, or a job photo. */
 export type ImageChoice =
@@ -187,8 +196,8 @@ export type ParsedLabel =
   | { kind: "map" }
   | {
       kind: "photo";
-      zone: string; // D10 / S2
-      level: string; // LG / L2 / LR
+      zone: string; // D10 / S2, or "" (optional)
+      level: string; // LG / L2 / LR, or "" (optional)
       unit: string | null; // U401
       codes: string[];
       note: string;
@@ -204,16 +213,20 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
   const label = raw.trim();
   if (SITE_PLAN.test(label)) return { kind: "map" };
 
+  // Tags first, then the note: after " - ", or (without one) from the first
+  // word that isn't a tag, so "RC hairline at window" works too.
   const split = label.indexOf(" - ");
   const head = (split >= 0 ? label.slice(0, split) : label).trim();
-  const note = split >= 0 ? label.slice(split + 3).trim() : "";
+  let note = split >= 0 ? label.slice(split + 3).trim() : "";
 
   let zone: string | null = null;
   let level: string | null = null;
   let unit: string | null = null;
   const codes: string[] = [];
   const ignored: string[] = [];
-  for (const tok of head.split(/\s+/).filter(Boolean)) {
+  const toks = head.split(/\s+/).filter(Boolean);
+  for (let k = 0; k < toks.length; k++) {
+    const tok = toks[k];
     const x = tok.toUpperCase();
     if (/^[DS]\d+$/.test(x)) {
       if (!zone) zone = x;
@@ -223,14 +236,16 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
       if (!unit) unit = x;
     } else if (lib.codeMap[x]) {
       if (!codes.includes(x)) codes.push(x);
+    } else if (split < 0 && codes.length) {
+      note = toks.slice(k).join(" ");
+      break;
     } else {
       ignored.push(tok);
     }
   }
 
-  if (!zone) return { kind: "rejected", reason: "No zone (D# or S#)" };
-  level ??= lib.defaultLevel;
-  if (!level) return { kind: "rejected", reason: "No level (LG, L#, LR)" };
+  // Only a code is required. Zone, level and unit just structure the report:
+  // a single apartment needs none of them.
   if (!codes.length) return { kind: "rejected", reason: "No valid code" };
-  return { kind: "photo", zone, level, unit, codes, note, head: head.toUpperCase(), ignored };
+  return { kind: "photo", zone: zone ?? "", level: level ?? lib.defaultLevel ?? "", unit, codes, note, head: head.toUpperCase(), ignored };
 }

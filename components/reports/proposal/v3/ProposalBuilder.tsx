@@ -18,6 +18,8 @@ import ReviewStep from "./ReviewStep";
 import type { BuilderCtx, Confirm, Path, PhotoFolderOption } from "./ctx";
 import { ConfirmModal } from "./fields";
 import { getIn, setIn } from "./ctx";
+import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
+import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import { compressMapImageDataUrl } from "@/lib/reports/compressImage";
 import { deleteReportPhoto, uploadReportPhoto } from "@/lib/reports/uploadPhoto";
@@ -44,10 +46,7 @@ import {
 
 type Step = "start" | "build" | "review";
 export type ScrollReq = { id: PageId; n: number; finding?: number };
-type SaveStatus = "idle" | "saving" | "saved" | "error";
 
-const AUTOSAVE_MS = 500;
-const RETRY_MS = 5000;
 const TOAST_MS = 4500;
 // Unfiled photos are often the important ones; it's always switched on.
 const UNFILED = "sp:none";
@@ -104,7 +103,6 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   const [focusFinding, setFocusFinding] = useState<number | null>(null);
   const [picker, setPicker] = useState<string | null>(null);
   const [pickFolder, setPickFolder] = useState("all");
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [loadingFolders, setLoadingFolders] = useState<string[]>([]);
   const [toast, setToast] = useState<{ msg: string; undo: () => void } | null>(null);
   const [focusField, setFocusField] = useState<{ path: string; n: number } | null>(null);
@@ -112,7 +110,6 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   const [ask, setAsk] = useState<(Confirm & { resolve: (ok: boolean) => void }) | null>(null);
   const confirm = useCallback((q: Confirm) => new Promise<boolean>((resolve) => setAsk({ ...q, resolve })), []);
 
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGen = useRef(0);
   const startedFolders = useRef(new Set<string>());
@@ -273,32 +270,12 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   }, [p, loadingFolders.length, update]);
 
   // ── Autosave (debounced; never mid-import, photos are still data: URLs) ───
-  useEffect(() => {
-    if (!p || !dirty.current || loadingFolders.length) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    if (saveStatus !== "saving") setSaveStatus("saving");
-    const body = p;
-    saveTimer.current = setTimeout(
-      async () => {
-        try {
-          const res = await fetch(`/api/proposal-reports/${body.quote}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-          });
-          if (res.ok) dirty.current = false;
-          setSaveStatus(res.ok ? "saved" : "error");
-        } catch {
-          setSaveStatus("error");
-        }
-      },
-      saveStatus === "error" ? RETRY_MS : AUTOSAVE_MS,
-    );
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p, loadingFolders.length]);
+  // Only changes are saved: loading a draft doesn't write it straight back.
+  const { status: saveStatus, setStatus: setSaveStatus } = useDraftAutosave(
+    p ? `/api/proposal-reports/${p.quote}` : null,
+    p,
+    { ready: dirty.current && !loadingFolders.length, delay: 500, onSaved: () => (dirty.current = false) },
+  );
 
   useEffect(
     () => () => {
@@ -455,20 +432,6 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
     [p, update],
   );
 
-  const saveAerial = useCallback(
-    async (dataUrl: string, view: { lat?: number; lng?: number; zoom: number }) => {
-      if (!p) return;
-      const data = await compressMapImageDataUrl(dataUrl);
-      const url = await uploadReportPhoto(data, `proposal-reports/${p.quote}/aerial-${uid()}.jpg`);
-      update((prev) => ({
-        ...prev,
-        uploads: [url, ...prev.uploads].slice(0, LIMITS.uploads),
-        d: { ...prev.d, access: { ...prev.d.access, aerial: url, aerialView: view } },
-      }));
-    },
-    [p, update],
-  );
-
   const ctx: BuilderCtx | null =
     p && D
       ? {
@@ -496,7 +459,6 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
           upload,
           removeUpload,
           confirm,
-          saveAerial,
           uploadData,
           sel,
           select,
@@ -518,31 +480,14 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
 
   const stepIdx = STEPS.findIndex(([id]) => id === step);
   const showDoc = step !== "start" && !!ctx;
-  const saveLabel =
-    saveStatus === "error"
-      ? "Save failed, retrying"
-      : loadingFolders.length
-        ? "Loading photos…"
-        : saveStatus === "saving"
-          ? "Saving…"
-          : "Draft saved";
-  const saveDot = saveStatus === "error" ? "#a83a3a" : saveStatus === "saving" || loadingFolders.length ? "#b8860b" : "#3f8f68";
-
   return (
     <div className={styles.root}>
-      <header className={styles.header}>
-        <button className={styles.back} onClick={onBack} aria-label="Back to report types">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M11 6l-6 6 6 6" />
-          </svg>
-        </button>
-        <div className={styles.titleBlock}>
-          <span className={styles.title}>
-            {p ? `${p.job.building} · ${TRADES[p.trade].label} proposal` : "New proposal"}
-          </span>
-          <span className={styles.subtitle}>{p ? `Quote ${p.job.quote} · ${p.job.client}` : "Not started"}</span>
-        </div>
-        <div className={styles.stepsWrap}>
+      <BuilderHeader
+        onBack={onBack}
+        title={p ? `${p.job.building} · ${TRADES[p.trade].label} proposal` : "New proposal"}
+        subtitle={p ? `Quote ${p.job.quote} · ${p.job.client}` : "Not started"}
+        status={showDoc ? (loadingFolders.length && saveStatus !== "error" ? { text: "Loading photos…", busy: true } : saveStatus === "idle" ? "saved" : saveStatus) : undefined}
+        centre={
           <div className={styles.steps}>
             {STEPS.map(([id, label], i) => (
               <button
@@ -556,24 +501,17 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
               </button>
             ))}
           </div>
-        </div>
-        <div className={styles.headerRight}>
-          {showDoc && (
-            <span className={styles.save}>
-              <span className={styles.saveDot} style={{ background: saveDot }} />
-              {saveLabel}
-            </span>
-          )}
-          {step === "build" && ctx && (
-            <button className={styles.darkPill} onClick={() => setStep("review")}>
-              Review &amp; export
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-            </button>
-          )}
-        </div>
-      </header>
+        }
+      >
+        {step === "build" && ctx && (
+          <HeaderButton primary onClick={() => setStep("review")}>
+            Review &amp; export
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </HeaderButton>
+        )}
+      </BuilderHeader>
 
       <div className={styles.body}>
         {step === "start" && (

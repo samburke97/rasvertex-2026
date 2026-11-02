@@ -66,25 +66,26 @@
 .brand {
   padding: 0 16px;
   border: none;
-  color: #fff;
-  background: var(--blue-grad);
-  box-shadow: var(--shadow-primary);
+  background: var(--btn-primary);
+  color: var(--btn-primary-ink);
+  box-shadow: none;
 }
 
 .primary:hover:not(:disabled),
 .brand:hover:not(:disabled) {
-  box-shadow: var(--shadow-primary-hover);
-  transform: translateY(-1px);
+  background: var(--btn-primary-hover);
+  box-shadow: none;
+  transform: none;
 }
 
 .secondary {
   background: var(--surface);
-  color: var(--blue-600);
-  border-color: var(--blue-ring);
+  color: var(--ink);
+  border-color: var(--border-strong);
 }
 
 .secondary:hover:not(:disabled) {
-  background: var(--blue-50);
+  background: var(--fill);
 }
 
 .outline {

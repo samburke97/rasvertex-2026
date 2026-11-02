@@ -181,9 +181,9 @@ export function reviewChecks(p: Proposal, D: Derived): Check[] {
     ...(!isHidden(p, "project") && !p.d.project.program.trim()
       ? [{ ok: false, title: "Program missing", detail: "Your project · how long the works take", fix: "project" as PageId }]
       : []),
-    !isHidden(p, "access") && !p.d.access.aerial
-      ? { ok: false, title: "Aerial photo missing", detail: "Access & disruption plan", fix: "access" }
-      : { ok: true, title: "Photos", detail: "Every photo space is filled" },
+    !isHidden(p, "runs") && !p.d.runs.stages.length
+      ? { ok: false, title: "No project stages", detail: "How your project runs", fix: "runs" }
+      : { ok: true, title: "Project stages", detail: `${p.d.runs.stages.length} stages` },
     ...(!isHidden(p, "findings") && !p.d.findings.items.length
       ? [{ ok: false, title: "No findings added", detail: "Site survey & findings", fix: "findings" as PageId }]
       : []),

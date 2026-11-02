@@ -14,8 +14,8 @@ import styles from "../shared/ReportPage.module.css";
 import OptionsPanel from "./OptionsPanel";
 import HoursEditor from "./HoursEditor";
 import OverviewDocument, { OverviewStyles, type OverviewAssets } from "./OverviewDocument";
-import SaveReportModal from "../shared/SaveReportModal";
-import SavedBadge from "../shared/SavedBadge";
+import SaveReportModal, { postSave } from "../shared/SaveReportModal";
+import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import { compressImageDataUrl } from "@/lib/reports/compressImage";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import { uploadReportPhoto, deleteReportPhoto } from "@/lib/reports/uploadPhoto";
@@ -38,6 +38,7 @@ import {
   type ScheduleRow,
 } from "@/lib/reports/condition.types";
 import type { EnrichedJob } from "@/lib/simpro/types";
+import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
 
 const pub = (rel: string) => "/" + rel;
 const ASSETS: OverviewAssets = {
@@ -49,9 +50,6 @@ interface ConditionReportPageProps {
   onBack: () => void;
 }
 
-type SaveStatus = "idle" | "saving" | "saved" | "error" | "too-large";
-const AUTOSAVE_DEBOUNCE_MS = 1500;
-const AUTOSAVE_RETRY_MS = 5000;
 
 const DEFAULT_SETTINGS: ReportSettings = {
   showPhotos: true,
@@ -115,8 +113,6 @@ export default function ConditionReportPage({
     useState<ScheduleCostCenter | null>(null);
   const [loadedJobId, setLoadedJobId] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Guards the job-detail + folder/cost-centre-list fetches that happen once
   // per job import.
   const currentLoadId = useRef(0);
@@ -447,50 +443,14 @@ export default function ConditionReportPage({
   );
 
   // ── Autosave the draft, debounced, whenever the report changes ───────────
-  // Only persist once import is fully "done". `loadedJobId` is set (for the
-  // OptionsPanel's onImport callback, see below) before the job/draft fetch
-  // resolves, so `report` sits at the blank DEFAULT_REPORT for a moment on
-  // every load — if autosave weren't blocked here, a save could fire during
-  // that window (or later, while photos are still streaming in) and PATCH a
-  // blank/partial report over a real saved draft. That's exactly what wiped
-  // job 10970's draft. Once importStatus reaches "done" this effect re-runs
-  // (it's a dependency below) and saves the by-then-complete report.
-  useEffect(() => {
-    if (!loadedJobId) return;
-    if (importStatus.phase !== "done") return;
-    // Same guard, for the manual "Refresh from SimPRO" schedule button —
-    // fetchSchedule briefly sets report.schedule to [] while it re-fetches,
-    // and that shouldn't be persisted if the request is slow.
-    if (scheduleStatus.phase === "loading") return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-
-    const delay =
-      saveStatus === "error" || saveStatus === "too-large"
-        ? AUTOSAVE_RETRY_MS
-        : AUTOSAVE_DEBOUNCE_MS;
-    autosaveTimer.current = setTimeout(async () => {
-      setSaveStatus("saving");
-      try {
-        const res = await fetch(`/api/condition-reports/${loadedJobId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(report),
-        });
-        // 413 means this exact draft can never save as-is — it needs fewer
-        // photos, not another retry — so it's tracked separately from a
-        // transient "error" to show an accurate, actionable status instead
-        // of retrying forever with a message that implies it might resolve.
-        setSaveStatus(res.ok ? "saved" : res.status === 413 ? "too-large" : "error");
-      } catch {
-        setSaveStatus("error");
-      }
-    }, delay);
-
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report, loadedJobId, importStatus.phase, scheduleStatus.phase]);
+  // Only once the import is fully done: `report` sits at the blank default
+  // while a job loads, and a manual schedule refresh briefly empties
+  // report.schedule. Saving then would overwrite the real draft.
+  const { status: saveStatus, setStatus: setSaveStatus } = useDraftAutosave(
+    loadedJobId ? `/api/condition-reports/${loadedJobId}` : null,
+    report,
+    { ready: importStatus.phase === "done" && scheduleStatus.phase !== "loading" },
+  );
 
   // Discards the saved draft for the current job and re-imports everything
   // fresh from SimPRO — the self-serve fix for a draft that got stuck with
@@ -650,49 +610,27 @@ export default function ConditionReportPage({
 
   return (
     <div className={styles.page}>
-      {/* ── Top bar ── */}
-      <div className={styles.topBar}>
-        <button className={styles.back} onClick={onBack} aria-label="Back to report types">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <div className={styles.topBarRight}>
-          <span className={styles.topBarTitle}>Job overview</span>
-          <span className={styles.badge}>
-            {report.photos.length} photo{report.photos.length !== 1 ? "s" : ""}
-          </span>
-          {report.settings.showSchedule && filteredSchedule.length > 0 && (
-            <span className={styles.badge}>{model.totalHours.toFixed(2).replace(/\.00$/, "")} hours</span>
-          )}
-          {photoStatus && <span className={styles.draftStatus}>{photoStatus}</span>}
-          {savedFilename && <SavedBadge />}
-          {loadedJobId && saveStatus !== "idle" && !photoStatus && (
-            <span
-              className={`${styles.draftStatus} ${
-                saveStatus === "error" || saveStatus === "too-large" ? styles.draftStatusError : ""
-              }`}
-            >
-              {saveStatus === "saving"
-                ? "Saving draft…"
-                : saveStatus === "error"
-                  ? "Draft save failed — retrying"
-                  : saveStatus === "too-large"
-                    ? "Too many photos to save — remove some to continue"
-                    : "Draft saved"}
-            </span>
-          )}
-          <button className={styles.topBtn} onClick={handleResetDraft} disabled={!loadedJobId}>
-            Reload from SimPRO
-          </button>
-          <button className={styles.topBtn} onClick={() => setShowSaveModal(true)} disabled={!hasReport || !loadedJobId}>
-            Save
-          </button>
-          <button className={styles.topBtnPrimary} onClick={handleExportPDF} disabled={!hasReport || isExporting}>
-            {isExporting ? "Exporting…" : "Export PDF"}
-          </button>
-        </div>
-      </div>
+      <BuilderHeader
+        onBack={onBack}
+        title="Job overview"
+        subtitle={loadedJobId ? `Job ${loadedJobId}` : undefined}
+        badges={[
+          `${report.photos.length} photo${report.photos.length !== 1 ? "s" : ""}`,
+          report.settings.showSchedule && filteredSchedule.length > 0 && `${model.totalHours.toFixed(2).replace(/\.00$/, "")} hours`,
+          savedFilename && "Saved to SimPRO",
+        ]}
+        status={photoStatus ? { text: photoStatus, busy: true } : loadedJobId ? saveStatus : undefined}
+      >
+        <HeaderButton onClick={handleResetDraft} disabled={!loadedJobId}>
+          Reload from SimPRO
+        </HeaderButton>
+        <HeaderButton onClick={handleExportPDF} disabled={!hasReport || isExporting}>
+          {isExporting ? "Exporting…" : "Download PDF"}
+        </HeaderButton>
+        <HeaderButton primary onClick={() => setShowSaveModal(true)} disabled={!hasReport || !loadedJobId}>
+          Save to SimPRO
+        </HeaderButton>
+      </BuilderHeader>
 
       {/* ── Body ── */}
       <div className={styles.editorBody}>
@@ -758,20 +696,19 @@ export default function ConditionReportPage({
       {/* Save Report Modal */}
       {showSaveModal && (
         <SaveReportModal
-          jobId={loadedJobId}
-          jobNo={`#${loadedJobId}`}
-          companyId={0}
+          owner={{ kind: "Job", no: `#${loadedJobId}` }}
           siteId={report.job.siteId}
           defaultFilename={`Job Overview - ${new Date().getFullYear()}`}
-          saveEndpoint={`/api/simpro/jobs/${loadedJobId}/save-report`}
-          prepareBody={async (filename, companyId, destinations) => ({
-            filename,
-            companyId,
-            jobId: loadedJobId,
-            siteId: report.job.siteId,
-            destinations,
-            report: await reportForTransfer(),
-          })}
+          save={async (filename, d) =>
+            postSave(`/api/simpro/jobs/${loadedJobId}/save-report`, {
+              filename,
+              companyId: 0,
+              jobId: loadedJobId,
+              siteId: report.job.siteId,
+              destinations: { job: d.owner, site: d.site },
+              report: await reportForTransfer(),
+            })
+          }
           onClose={() => setShowSaveModal(false)}
           onSuccess={(filename) => {
             setSavedFilename(filename);

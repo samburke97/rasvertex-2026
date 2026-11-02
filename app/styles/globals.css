@@ -106,6 +106,12 @@ body {
     var(--blue-600) 100%
   );
 
+  /* Primary buttons, site-wide: solid near-black, as in the proposal
+     builder. Darken on hover; no colour, glow or lift. */
+  --btn-primary: #17171a;
+  --btn-primary-hover: #2a2a2e;
+  --btn-primary-ink: #ffffff;
+
   /* Status — only ever means status */
   --red: #b8492b;
   --red-hover: #9e3d23;
@@ -324,6 +330,9 @@ body {
 
 /* ── Dark theme — <html data-theme="dark"> (toggle in the top bar) ───────── */
 :root[data-theme="dark"] {
+  --btn-primary: #f4f7f9;
+  --btn-primary-hover: #dfe3e7;
+  --btn-primary-ink: #17171a;
   --canvas: #0b0d10;
   --surface: #15181c;
   --surface-soft: #1a1e23;

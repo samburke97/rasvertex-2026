@@ -47,110 +47,11 @@ html :where(.root) :is(h1, h2, p, span) {
   line-height: inherit;
 }
 
-/* ── Header ── */
-.header {
-  height: 56px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 16px 0 12px;
-  border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
-}
-
-.back {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--r-md);
-  border: 0;
-  background: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--ink);
-  flex-shrink: 0;
-}
-
-.back:hover {
-  background: var(--fill);
-}
-
-.titleBlock {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.title {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.subtitle {
-  font-size: 12px;
-  color: rgba(var(--ink-rgb), 0.5);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.spacer {
-  flex: 1;
-}
-
-.headerRight {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0;
-}
-
-.saveState {
-  font-size: 12.5px;
-  color: rgba(var(--ink-rgb), 0.5);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.saveDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--green);
-}
-
-.saveDotPending {
-  background: rgba(var(--ink-rgb), 0.3);
-}
-
-.saveDotError {
-  background: var(--red);
-}
-
-.checkLabel {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: rgba(var(--ink-rgb), 0.7);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
 .darkPill {
   height: 36px;
   padding: 0 16px;
   border: 0;
   border-radius: var(--r-md);
-  background: var(--blue-grad);
-  color: #fff;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -158,12 +59,16 @@ html :where(.root) :is(h1, h2, p, span) {
   align-items: center;
   gap: 8px;
   white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
   transition: box-shadow 0.14s ease-out;
+  background: var(--btn-primary);
+  color: var(--btn-primary-ink);
+  box-shadow: none;
 }
 
 .darkPill:hover {
-  box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
+  background: var(--btn-primary-hover);
+  box-shadow: none;
+  transform: none;
 }
 
 .darkPill:disabled {
@@ -326,10 +231,10 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .panel {
-  width: 340px;
+  width: 360px;
   flex-shrink: 0;
   overflow-y: auto;
-  border-right: 1px solid rgba(var(--ink-rgb), 0.07);
+  border-left: 1px solid rgba(var(--ink-rgb), 0.07);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -383,6 +288,10 @@ html :where(.root) :is(h1, h2, p, span) {
 .fieldLabel {
   font-size: 12px;
   color: rgba(var(--ink-rgb), 0.55);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .input {
@@ -546,15 +455,15 @@ html :where(.root) :is(h1, h2, p, span) {
 }
 
 .smallBtnPrimary {
+  background: var(--btn-primary);
+  color: var(--btn-primary-ink);
+  box-shadow: none;
   border-color: transparent;
-  background: var(--blue-grad);
-  color: #fff;
-  box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
 }
 
 .smallBtnPrimary:hover {
-  background: var(--blue-grad) !important;
-  box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
+  background: var(--btn-primary-hover) !important;
+  box-shadow: none;
 }
 
 .smallBtnOn {
@@ -628,3 +537,10 @@ html :where(.root) :is(h1, h2, p, span) {
 .editThumb { width: 100%; aspect-ratio: 4 / 3; border-radius: 12px; background: #edf0f0 center / cover no-repeat; }
 .editHint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: rgba(23, 23, 26, 0.5); }
 .editHint .linkBtn:first-of-type { margin-left: auto; }
+
+/* Technician comments editor */
+.editorBox { border: 1px solid rgba(23, 23, 26, 0.12); border-radius: 10px; padding: 10px 12px; background: #fff; min-height: 120px; }
+
+/* ── Panel head (the rail and resizer are shared: shared/builder) ── */
+.panelHead { padding: 16px 20px; border-bottom: 1px solid rgba(var(--ink-rgb), 0.07); flex-shrink: 0; }
+.panelTitle { font-size: 15px; font-weight: 600; }

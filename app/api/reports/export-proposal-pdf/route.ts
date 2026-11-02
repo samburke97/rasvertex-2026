@@ -57,7 +57,7 @@ async function buildHTML(p: Proposal): Promise<string> {
   const resolve = createImageResolver();
   const resolved = new Map<string, string>();
   const findingPhotos = new Set(p.d.findings.items.map((f) => f.photo));
-  const fullWidth = new Set([p.d.cover.photo, p.d.project.photo, p.d.access.aerial]);
+  const fullWidth = new Set([p.d.cover.photo, p.d.project.photo]);
   await Promise.all(
     [...refs].map(async (ref) => {
       const url = resolvePhoto(p, ref);

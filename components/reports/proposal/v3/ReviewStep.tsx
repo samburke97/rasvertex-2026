@@ -3,11 +3,10 @@
 // SimPRO (the quote's and/or the site's attachments). The PDF is rendered on
 // the server from the same page components as the preview.
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
+import SaveReportModal from "@/components/reports/shared/SaveReportModal";
 import styles from "./Builder.module.css";
 import type { BuilderCtx } from "./ctx";
-import { InfoTip } from "./fields";
 import { money, reviewChecks } from "@/lib/reports/proposal/v3/derive";
 import type { PageId } from "@/lib/reports/proposal/v3/types";
 
@@ -118,13 +117,19 @@ export default function ReviewStep({ ctx, onFix, onBack }: { ctx: BuilderCtx; on
         </button>
       </div>
       {saving && (
-        <SaveModal
-          ctx={ctx}
-          onClose={() => setSaving(false)}
-          onSaved={(r) => {
-            setSaved(r);
-            setSaving(false);
+        <SaveReportModal
+          owner={{ kind: "Quote", no: p.job.quote }}
+          siteId={p.siteId}
+          defaultFilename={defaultName(ctx)}
+          save={async (filename, d) => {
+            const res = await renderPdf(ctx, { filename, destinations: { quote: d.owner, site: d.site } });
+            const r = { quote: res.headers.get("X-Saved-To-Quote") ?? "no", site: res.headers.get("X-Saved-To-Site") ?? "no" };
+            const out = (want: boolean, v: string) => (want ? { success: v === "yes", error: v === "yes" ? undefined : "Upload failed" } : undefined);
+            const name = decodeURIComponent(res.headers.get("X-Filename") ?? filename);
+            setSaved({ ...r, filename: name });
+            return { filename: name, owner: out(d.owner, r.quote), site: out(d.site, r.site) };
           }}
+          onClose={() => setSaving(false)}
         />
       )}
     </aside>
@@ -143,89 +148,5 @@ function SavedNote({ saved, ctx }: { saved: Saved; ctx: BuilderCtx }) {
       )}
       {failed.length > 0 && <div className={styles.exportErr}>Couldn’t save to {failed.join(" or ")}. Try again in a moment.</div>}
     </>
-  );
-}
-
-/** Save to SimPRO: filename and destinations. A same-name file is replaced. */
-function SaveModal({ ctx, onClose, onSaved }: { ctx: BuilderCtx; onClose: () => void; onSaved: (r: Saved) => void }) {
-  const hasSite = !!ctx.p.siteId;
-  const [name, setName] = useState(defaultName(ctx));
-  const [quote, setQuote] = useState(true);
-  const [site, setSite] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, busy]);
-
-  const save = async () => {
-    if (busy || (!quote && !site) || !name.trim()) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await renderPdf(ctx, { filename: name.trim(), destinations: { quote, site } });
-      onSaved({
-        quote: res.headers.get("X-Saved-To-Quote") ?? "no",
-        site: res.headers.get("X-Saved-To-Site") ?? "no",
-        filename: decodeURIComponent(res.headers.get("X-Filename") ?? name),
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn’t save to SimPRO.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return createPortal(
-    <div className={`${styles.vars} ${styles.modalBack}`} onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <div className={`${styles.modal} ${styles.saveModal}`} role="dialog" aria-label="Save to SimPRO">
-        <div className={styles.modalHead}>
-          <div>
-            <b>Save to SimPRO</b>
-            <small>Quote {ctx.p.job.quote} · {ctx.p.job.client}</small>
-          </div>
-          <button className={styles.modalClose} onClick={onClose} disabled={busy} aria-label="Close">
-            ×
-          </button>
-        </div>
-        <label className={styles.field}>
-          <span className={styles.fieldLabel}>
-            File name
-            <InfoTip>Saving again with the same name replaces the earlier file, so the quote always has the latest version.</InfoTip>
-          </span>
-          <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <div className={styles.field}>
-          <span className={styles.fieldLabel}>Save to</span>
-          <label className={styles.check}>
-            <input type="checkbox" checked={quote} onChange={(e) => setQuote(e.target.checked)} />
-            <span>
-              <b>Quote attachments</b>
-              <small>Quote {ctx.p.job.quote}</small>
-            </span>
-          </label>
-          <label className={`${styles.check} ${hasSite ? "" : styles.checkOff}`}>
-            <input type="checkbox" checked={site} disabled={!hasSite} onChange={(e) => setSite(e.target.checked)} />
-            <span>
-              <b>Site attachments</b>
-              <small>{hasSite ? "Shows in the Customer Portal" : "This quote has no site in SimPRO"}</small>
-            </span>
-          </label>
-        </div>
-        {error && <div className={styles.exportErr}>{error}</div>}
-        <div className={styles.modalFoot}>
-          <button className={styles.ghostPill} onClick={onClose} disabled={busy}>
-            Cancel
-          </button>
-          <button className={styles.darkPill} onClick={save} disabled={busy || (!quote && !site) || !name.trim()}>
-            {busy ? "Saving…" : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }

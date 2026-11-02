@@ -11,7 +11,7 @@
 // estimates wrap word by word at a slightly generous character width, so a
 // block is more likely to move to the next sheet early than to be clipped.
 
-import { BAND_ORDER, CODES, bandOf, codeRank, codesOf, zoneOf, type Band, type Finding, type PageId, type Proposal } from "./types";
+import { BAND_ORDER, CODES, bandOf, codeRank, codesOf, zoneOf, type Band, type Finding, type PageId, type Proposal, type RunStage } from "./types";
 import { methodSteps } from "./methods";
 import { richItems, richText } from "./rich";
 
@@ -25,6 +25,10 @@ const BOTTOM = 1640;
 const CONTENT_W = 1088;
 
 const SEC_LABEL = 58; // 18 label + 40 margin
+/** How your project runs: the figures panel, and the stage text widths. */
+export const RUN_STATS_H = 156;
+const RUN_NAME_W = 840;
+const RUN_DESC_W = 900;
 const H2 = 53; // 48 × 1.1
 const TABLE_HEAD = 37; // label line + 14 padding + 1 rule
 
@@ -121,7 +125,7 @@ export type SheetData =
   | { kind: "findingsGrouped"; blocks: GroupBlock[] }
   | { kind: "flagged"; groups: GroupSlice<Proposal["d"]["flagged"]["rows"][number]>[] }
   | { kind: "prestart"; groups: GroupSlice<Proposal["d"]["prestart"]["rows"][number]>[]; note: boolean }
-  | { kind: "access"; drops: Proposal["d"]["access"]["drops"] }
+  | { kind: "runs"; stages: { s: RunStage; i: number }[]; stats: boolean; note: boolean }
   | {
       kind: "pricing";
       rows: { x: Proposal["d"]["pricing"]["stages"][number]; i: number }[];
@@ -273,17 +277,24 @@ export function layoutPage(p: Proposal, id: PageId): Sheet[] {
       else (parts[parts.length - 1] as { note: boolean }).note = !!noteH;
       return sheetsOf(id, parts);
     }
-    case "access": {
-      const n = Math.max(1, d.access.stages.length);
-      const stageW = (CONTENT_W - 40 * (n - 1)) / n;
-      const stagesH = Math.max(
-        0,
-        ...d.access.stages.map((s) => 28 + 14 + textLines(s.what, 22, stageW, 700) * 28 + 8 + textLines(s.where, 17, stageW) * 26),
-      );
-      const head = firstHead(d.access.intro, 860) + CONTENT_W / 2 + 56 + stagesH + 72 + TABLE_HEAD;
-      const dropH = (x: Proposal["d"]["access"]["drops"][number]) => 25 + Math.max(28, textLines(x.where, 20, 330, 600) * 26);
-      const drops = pack(d.access.drops, dropH, cap(head), cap(SEC_LABEL + TABLE_HEAD));
-      return sheetsOf(id, drops.map((x) => ({ kind: "access", drops: x })));
+    case "runs": {
+      // The figures panel, then the stages as a numbered timeline; the
+      // timing note sits at the foot of the last sheet.
+      const stepH = (x: RunStage) =>
+        8 +
+        Math.max(27, textLines(x.name, 22, RUN_NAME_W, 700) * 28.6) +
+        (x.where.trim() ? 2 + textLines(x.where, 16, RUN_DESC_W) * 23.2 : 0) +
+        (x.desc.trim() ? 6 + textLines(x.desc, 17, RUN_DESC_W) * 26.4 : 0) +
+        26;
+      const items = d.runs.stages.map((s, i) => ({ s, i }));
+      const groups = pack(items, (x) => stepH(x.s), cap(firstHead(d.runs.intro) + RUN_STATS_H + 52), cap(SEC_LABEL));
+      const noteH = d.runs.note.trim() ? 24 + textLines(d.runs.note, 16, 960) * 24.8 : 0;
+      const parts: SheetData[] = groups.map((g, k) => ({ kind: "runs", stages: g, stats: k === 0, note: false }));
+      const last = groups[groups.length - 1];
+      const used = (groups.length === 1 ? firstHead(d.runs.intro) + RUN_STATS_H + 52 : SEC_LABEL) + last.reduce((t, x) => t + stepH(x.s), 0);
+      if (noteH && used + noteH > BOTTOM - TOP) parts.push({ kind: "runs", stages: [], stats: false, note: true });
+      else (parts[parts.length - 1] as { note: boolean }).note = !!noteH;
+      return sheetsOf(id, parts);
     }
     case "pricing": {
       const rowH = (x: Proposal["d"]["pricing"]["stages"][number]) => 45 + textLines(`${x.label} ${x.note}`, 20, 840) * 30;
@@ -436,13 +447,12 @@ function stepsH(steps: string[]): number {
 }
 const refsH = (refs: { code: string; nums: string[] }[]) => (refs.length ? 12 + textLines(refsText(refs), 17, CONTENT_W) * 25.5 : 0);
 
-/** Report style's site map: the chosen map, else the access plan's aerial,
- *  with a pin per zone found in the photos' locations. Dragged pins keep
+/** Report style's site map: the chosen map, with a pin per zone found in the photos' locations. Dragged pins keep
  *  their place; new zones start spread along the image. */
-export const SITE_MAP_H = CONTENT_W / 2; // 2:1, like the aerial
+export const SITE_MAP_H = CONTENT_W / 2; // 2:1
 export function siteMap(p: Proposal): { src: string; pins: { zone: string; x: number; y: number }[] } | null {
   if (p.d.findings.showMap === false) return null;
-  const src = p.d.findings.map || p.d.access.aerial;
+  const src = p.d.findings.map;
   const zones = [...new Set(p.d.findings.items.map((f) => zoneOf(f.where)).filter(Boolean))].sort(
     (a, b) => (a[0] === b[0] ? parseInt(a.slice(1)) - parseInt(b.slice(1)) : a[0] < b[0] ? -1 : 1),
   );

@@ -5,8 +5,8 @@ import React, { useState, useCallback, useRef } from "react";
 import styles from "../shared/ReportPage.module.css";
 import ScheduleSection from "../condition/sections/ScheduleSection";
 import HoursBreakdownOptionsPanel from "./HoursBreakdownOptionsPanel";
-import HoursSaveToJobModal from "./HoursSaveToJobModal";
-import SavedBadge from "../shared/SavedBadge";
+import SaveReportModal, { postSave } from "../shared/SaveReportModal";
+import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import {
   filterScheduleByDateRange,
   type ScheduleRow,
@@ -208,49 +208,19 @@ export default function HoursBreakdownPage({ onBack }: Props) {
 
   return (
     <div className={styles.page}>
-      {/* ── Top bar — identical structure to ConditionReportPage ── */}
-      <div className={styles.topBar}>
-        <button
-          className={styles.back}
-          onClick={onBack}
-          aria-label="Back to report types"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <div className={styles.topBarRight}>
-          <span className={styles.topBarTitle}>Hours breakdown</span>
-          <span className={styles.badge}>
-            {filteredSchedule.length} row
-            {filteredSchedule.length !== 1 ? "s" : ""}
-          </span>
-          {savedFilename && <SavedBadge />}
-          <button
-            className={styles.topBtn}
-            onClick={() => setShowSaveModal(true)}
-            disabled={!hasReport || !loadedJobId}
-          >
-            Save to Job
-          </button>
-          <button
-            className={styles.topBtnPrimary}
-            onClick={handleExportPDF}
-            disabled={!hasReport || isExporting}
-          >
-            {isExporting ? "Exporting…" : "Export PDF"}
-          </button>
-        </div>
-      </div>
+      <BuilderHeader
+        onBack={onBack}
+        title="Hours breakdown"
+        subtitle={loadedJobId ? `Job ${loadedJobId}` : undefined}
+        badges={[`${filteredSchedule.length} row${filteredSchedule.length !== 1 ? "s" : ""}`, savedFilename && "Saved to SimPRO"]}
+      >
+        <HeaderButton onClick={handleExportPDF} disabled={!hasReport || isExporting}>
+          {isExporting ? "Exporting…" : "Download PDF"}
+        </HeaderButton>
+        <HeaderButton primary onClick={() => setShowSaveModal(true)} disabled={!hasReport || !loadedJobId}>
+          Save to SimPRO
+        </HeaderButton>
+      </BuilderHeader>
 
       {/* ── Body ── */}
       <div className={styles.editorBody}>
@@ -282,11 +252,17 @@ export default function HoursBreakdownPage({ onBack }: Props) {
 
       {/* ── Save to Job Modal ── */}
       {showSaveModal && (
-        <HoursSaveToJobModal
-          jobId={loadedJobId}
-          jobNo={`#${loadedJobId}`}
-          companyId={0}
-          report={report}
+        <SaveReportModal
+          owner={{ kind: "Job", no: `#${loadedJobId}` }}
+          defaultFilename={`Hours Breakdown ${loadedJobId}`}
+          save={(filename, d) =>
+            postSave(`/api/simpro/jobs/${loadedJobId}/save-hours-report`, {
+              filename,
+              companyId: 0,
+              destinations: { job: d.owner, site: d.site },
+              report,
+            })
+          }
           onClose={() => setShowSaveModal(false)}
           onSuccess={(filename) => {
             setSavedFilename(filename);

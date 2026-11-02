@@ -145,6 +145,7 @@ export const INSPECTION_CSS = `
 .ir-photo-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}
 .ir-photo{min-width:0}
 .ir-photo--edit{cursor:pointer}
+.ir--edit [data-edit]{cursor:pointer}
 .ir-photo.is-editing{outline:4px solid #3e7fb0;outline-offset:10px;border-radius:20px}
 .ir-photo__img{width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:var(--card-grey) center/cover no-repeat}
 .ir-photo__head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px}
@@ -164,6 +165,17 @@ export const INSPECTION_CSS = `
 .ir-sum-row__count{font-size:17px;color:var(--ink-60);line-height:1.4}
 .ir-sum-row p{font-size:20px;line-height:1.6;color:var(--ink-80);text-wrap:pretty}
 .ir-note{display:flex;flex-direction:column;gap:10px;margin-top:56px}
+.ir-notes{display:flex;flex-direction:column;gap:24px}
+.ir-rich{display:flex;flex-direction:column;gap:12px;font-size:20px;line-height:1.6;color:var(--ink-80)}
+.ir-rich p{margin:0;text-wrap:pretty}
+.ir-rich :where(ul,ol){margin:0;padding-left:26px;display:flex;flex-direction:column;gap:6px}
+.ir-rich ul{list-style:disc}.ir-rich ol{list-style:decimal}
+.ir-rich li p{margin:0}
+.ir-rich h2,.ir-rich h3{font-size:22px;font-weight:700;letter-spacing:-.03em;color:var(--navy);line-height:1.3;margin-top:8px}
+.ir-rich strong,.ir-rich b{font-weight:700;color:var(--navy)}
+.ir-rich em,.ir-rich i{font-style:italic}
+.ir-rich s{text-decoration:line-through}
+.ir-rich blockquote{border-left:3px solid rgba(1,25,85,.15);padding-left:16px}
 .ir-note p{font-size:17px;line-height:1.6;color:var(--ink-60);text-wrap:pretty}
 
 .ir-works-tbl{margin-top:48px;display:flex;flex-direction:column}
@@ -244,18 +256,26 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
           <div className="ir-seclabel">
             <span>{b.label}</span>
           </div>
-          <h2 className="ir-h-section">{b.title}</h2>
-          {b.intro && <p className="ir-intro">{b.intro}</p>}
+          <h2 className="ir-h-section" data-edit={`sec.${b.secKey}.title`}>
+            {b.title}
+          </h2>
+          {b.intro && (
+            <p className="ir-intro" data-edit={b.secKey === "about" ? "job.scope" : `sec.${b.secKey}.intro`}>
+              {b.intro}
+            </p>
+          )}
         </>
       );
     case "why":
       return (
         <div className="ir-about">
-          {ctx.model.about.map((a) => (
-            <div key={a.t}>
+          {ctx.model.about.map((a, i) => (
+            <div key={i}>
               <div className="ir-about__img" style={{ backgroundImage: bg(ctx.assets.images[a.img]) }} />
-              <h3 className="ir-h-sub">{a.t}</h3>
-              <p>{a.d}</p>
+              <h3 className="ir-h-sub" data-edit={`about.${i}.t`}>
+                {a.t}
+              </h3>
+              <p data-edit={`about.${i}.d`}>{a.d}</p>
             </div>
           ))}
         </div>
@@ -263,8 +283,10 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
     case "ex":
       return (
         <div className="ir-card-blue">
-          <h3 className="ir-h-card">Reading a photo</h3>
-          <p>Every photo in this report is labelled the same way, like this example.</p>
+          <h3 className="ir-h-card" data-edit="ex.title">
+            {b.title}
+          </h3>
+          <p data-edit="ex.intro">{b.intro}</p>
           <div className="ir-explainer">
             <div className="ir-explainer__photo">
               <Photo p={b.photo} ctx={ctx} />
@@ -314,7 +336,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
       );
     case "map":
       return (
-        <div className="ir-map" style={{ backgroundImage: bg(ctx.photoUrl(b.photoId)) }}>
+        <div className="ir-map" data-edit="map" style={{ backgroundImage: bg(ctx.photoUrl(b.photoId)) }}>
           {b.pins.map((pin) => (
             <span
               key={pin.zone}
@@ -365,8 +387,12 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
         <div className={rowCls("ir-cols-def")}>
           <ChipView chip={b.chip} />
           <span className="ir-def-name">{b.name}</span>
-          <p className="ir-def-what">{b.what}</p>
-          <p className="ir-def-act">{b.act}</p>
+          <p className="ir-def-what" data-edit={`defect.${b.chip.code}.what`}>
+            {b.what}
+          </p>
+          <p className="ir-def-act" data-edit={`defect.${b.chip.code}.act`}>
+            {b.act}
+          </p>
         </div>
       );
     case "chap":
@@ -374,6 +400,14 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
         <div className="ir-chapter">
           <h3 className="ir-h-card">{b.title}</h3>
           <span className="ir-chapter__meta">{b.meta}</span>
+        </div>
+      );
+    case "notes":
+      return (
+        <div className="ir-notes" data-edit="job.technicianNotes">
+          <h3 className="ir-h-card">Technician comments</h3>
+          {/* Sanitised in buildModel (lib/reports/richText.ts). */}
+          <div className="ir-rich" dangerouslySetInnerHTML={{ __html: b.html }} />
         </div>
       );
     case "cont":
@@ -403,9 +437,9 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
     case "ixRow":
       return (
         <div className={rowCls("ir-cols-ix")}>
-          <span className="ir-zone">{b.zone}</span>
-          <span className="ir-cell">{b.level}</span>
-          <span className="ir-cell">{b.unit}</span>
+          <span className="ir-zone">{b.zone || "—"}</span>
+          <span className="ir-cell">{b.level || "—"}</span>
+          <span className="ir-cell">{b.unit || "—"}</span>
           <div className="ir-chips">
             {b.chips.map((c) => (
               <ChipView key={c.code} chip={c} />
@@ -445,7 +479,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
           )}
           <div className="ir-note">
             <span className="ir-label">Please note</span>
-            <p>{b.note}</p>
+            <p data-edit="sum.note">{b.note}</p>
           </div>
         </div>
       );
@@ -454,19 +488,25 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
 
 // ── Fixed pages ──────────────────────────────────────────────────────────────
 
+const FACT_EDIT: Record<string, string> = {
+  "Prepared for": "job.forName",
+  "Prepared by": "job.by",
+  Date: "job.date",
+};
+
 function Cover({ ctx, job }: { ctx: Ctx; job: InspectionJob }) {
   const { model } = ctx;
   const coverSrc = ctx.photoUrl(model.coverPhotoId);
   const { x, y, zoom } = model.coverPos;
   return (
-    <div className="ir-sheet">
+    <div className="ir-sheet" data-pageno={1}>
       <section className="ir-page ir-page--cover">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="ir-logo" src={ctx.assets.logo} alt="RAS-VERTEX Maintenance Solutions" />
-        <h1 className="ir-h-cover" style={{ marginTop: 48 }}>
+        <h1 className="ir-h-cover" style={{ marginTop: 48 }} data-edit="job.site">
           {job.site}.
         </h1>
-        <p className="ir-lede" style={{ maxWidth: 820, marginTop: 24 }}>
+        <p className="ir-lede" style={{ maxWidth: 820, marginTop: 24 }} data-edit="job.blurb">
           {job.blurb}
         </p>
         <div
@@ -492,7 +532,7 @@ function Cover({ ctx, job }: { ctx: Ctx; job: InspectionJob }) {
         </div>
         <div className="ir-facts" style={{ marginTop: 64 }}>
           {model.facts.map((f) => (
-            <div key={f.k} className="ir-fact">
+            <div key={f.k} className="ir-fact" data-edit={FACT_EDIT[f.k]}>
               <div className="ir-label">{f.k}</div>
               <div className="ir-fact__v">{f.v}</div>
             </div>
@@ -507,20 +547,19 @@ function Contents({ ctx, layout }: { ctx: Ctx; layout: Layout }) {
   const { model } = ctx;
   const title = (k: string) => model.sections.find((s) => s.key === k)?.title ?? "";
   const it = (k: keyof Layout["secPage"]) => ({ name: title(k), page: layout.secPage[k] });
-  const findings: { name: string; page: number | undefined }[] = model.zoneRows.map((z) => ({
-    name: z.title,
-    page: layout.chapPage[z.zone],
-  }));
-  if (model.hasOther) findings.push({ name: "Other items of note", page: layout.chapPage.OT });
+  // Sections left out (hidden, or no zones / locations) drop off the list.
+  const findings: { name: string; page: number | undefined }[] = model.chapters.length
+    ? model.chapters.map((c) => ({ name: c.title, page: layout.chapPage[c.key] }))
+    : [it("findings")];
   findings.push(it("index"));
   const groups = [
     { title: "About this report", items: [it("about"), it("map"), it("defects")] },
     { title: "Findings", items: findings },
     { title: "Summary and next steps", items: [it("summary"), it("works")] },
-  ];
+  ].map((g) => ({ ...g, items: g.items.filter((x) => x.name) }));
   return (
     <div className="ir-sheet">
-      <section className="ir-page ir-page--contents">
+      <section className="ir-page ir-page--contents" data-pageno={2}>
         <h2 className="ir-h-section">Contents</h2>
         <div className="ir-toc">
           {groups.map((g) => (
@@ -554,20 +593,24 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
         {works.extras.map((x) => (
           <div key={x.t} className="ir-extra">
             {works.fit === "images" && <div className="ir-extra__img" style={{ backgroundImage: bg(ctx.assets.images[x.img]) }} />}
-            <h3 className="ir-h-sub">{x.t}</h3>
-            <p>{x.d}</p>
+            <h3 className="ir-h-sub" data-edit={`extra.${x.n}.t`}>
+              {x.t}
+            </h3>
+            <p data-edit={`extra.${x.n}.d`}>{x.d}</p>
           </div>
         ))}
       </div>
     </>
   );
   return (
-    <div className="ir-sheet">
+    <div className="ir-sheet" data-pageno={layout.total}>
       <section className="ir-page ir-page--works">
         <div className="ir-seclabel">
           <span>{sec.label}</span>
         </div>
-        <h2 className="ir-h-section">{sec.title}</h2>
+        <h2 className="ir-h-section" data-edit="sec.works.title">
+          {sec.title}
+        </h2>
 
         <div className="ir-works-tbl">
           <div className="ir-tbl-head ir-cols-works">
@@ -582,11 +625,13 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
               className={`ir-tbl-row ir-cols-works${i < works.items.length - 1 ? " is-ruled" : ""}`}
             >
               <ChipView chip={w.chip} />
-              <span className="ir-cell--strong">{w.name}</span>
-              <span className="ir-cell--small" style={{ textWrap: "pretty" }}>
+              <span className="ir-cell--strong" data-edit={`works.${w.chip.code}.name`}>
+                {w.name}
+              </span>
+              <span className="ir-cell--small" style={{ textWrap: "pretty" }} data-edit={`works.${w.chip.code}.why`}>
                 {w.why}
               </span>
-              <span className="ir-cell--small">{w.zones}</span>
+              <span className="ir-cell--small">{w.zones || "—"}</span>
             </div>
           ))}
         </div>
@@ -602,7 +647,7 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
               <path d="M5 12h14M13 6l6 6-6 6" />
             </svg>
           </a>
-          <div className="ir-contact">
+          <div className="ir-contact" data-edit="job.contact">
             <h3 className="ir-h-sub">Any questions? Reach out.</h3>
             <p>
               {contact.name}
@@ -629,6 +674,8 @@ interface DocProps {
   onCoverPointerDown?: (e: PointerEvent<HTMLElement>) => void;
   onPhotoClick?: (id: string) => void;
   editing?: string | null;
+  /** Builder only: click any editable text to edit it in the panel. */
+  onEdit?: (key: string) => void;
 }
 
 export default function InspectionDocument(props: DocProps) {
@@ -644,11 +691,21 @@ export default function InspectionDocument(props: DocProps) {
     editing: props.editing,
   };
   return (
-    <div className={`ir${props.screen ? " ir--screen" : ""}`}>
+    <div
+      className={`ir${props.screen ? " ir--screen" : ""}${props.onEdit ? " ir--edit" : ""}`}
+      onClick={
+        props.onEdit
+          ? (e) => {
+              const el = (e.target as HTMLElement).closest<HTMLElement>("[data-edit]");
+              if (el) props.onEdit!(el.dataset.edit!);
+            }
+          : undefined
+      }
+    >
       <Cover ctx={ctx} job={job} />
       <Contents ctx={ctx} layout={layout} />
       {layout.pages.map((blocks, pi) => (
-        <div key={pi} className="ir-sheet">
+        <div key={pi} className="ir-sheet" data-pageno={pi + 3}>
           <section className="ir-page">
             {blocks.map((b, i) => (
               <div key={`${i}-${b.key}`} style={{ paddingTop: b.pt }}>

@@ -25,7 +25,7 @@ export const PAGE_IDS = [
   "findings",
   "flagged",
   "prestart",
-  "access",
+  "runs",
   "safety",
   "pricing",
   "maintenance",
@@ -66,7 +66,6 @@ interface Registry {
   bands: Record<Band, { bg: string; fg: string }>;
   flaggedGroups: Record<Band, [string, string]>;
   prestartGroups: Record<Band, [string, string]>;
-  stageColours: { bg: string; fg: string }[];
   paintBrands: Record<string, { name: string; logo: string }>;
 }
 
@@ -83,7 +82,6 @@ export const CODES = registry.defectCodes;
 export const BANDS = registry.bands;
 export const FLAG_GROUPS = registry.flaggedGroups;
 export const PRESTART_GROUPS = registry.prestartGroups;
-export const STAGE_COLOURS = registry.stageColours;
 export const BAND_ORDER: Band[] = ["red", "amber", "grey"];
 export const TERMS = termsJson as { k: string; v: string }[];
 
@@ -216,8 +214,8 @@ export interface ProposalSections {
     /** Per-proposal "How we fix it" steps by code (list HTML); unset =
      *  the standard steps in methods.ts. */
     methods?: Partial<Record<string, string>>;
-    /** Report style: the site map (photo ref) — falls back to the access
-     *  plan's aerial — and each zone's pin, as [x%, y%]. */
+    /** Report style: the site map (photo ref) and each zone's pin, as
+     *  [x%, y%]. */
     map?: string;
     mapView?: { lat?: number; lng?: number; zoom: number };
     pins?: Record<string, [number, number]>;
@@ -228,18 +226,35 @@ export interface ProposalSections {
   // (survey.ts syncSurvey); editing a row makes it the rep's own.
   flagged: { intro: string; rows: { code: string; count: string; where?: string; auto?: boolean }[] };
   prestart: { intro: string; rows: { code: string; work: string; where: string; auto?: boolean }[]; note: string };
-  access: {
-    intro: string;
-    aerial: string;
-    /** Where the satellite view was last framed, to reopen there. */
-    aerialView?: { lat?: number; lng?: number; zoom: number };
-    stages: { when: string; what: string; where: string }[];
-    drops: { d: string; where: string; access: string; levels: string; stage: string }[];
-  };
+  /** How your project runs: the stages in order, each with when and where. */
+  runs: { intro: string; stages: RunStage[]; note: string };
   pricing: { intro: string; stages: { label: string; note: string; amt: string }[]; terms: string };
   maintenance: { intro: string; price: string };
   accept: { intro: string };
 }
+
+export type StageKind = "prep" | "clean" | "works" | "handover";
+
+export interface RunStage {
+  kind: StageKind;
+  name: string;
+  /** "Week 1", "Weeks 2–4"; the highest week number is the time on site. */
+  when: string;
+  where: string;
+  desc: string;
+}
+
+/** Stage kinds: the colour of the number and the weeks chip. */
+export const STAGE_KINDS: Record<StageKind, { label: string; bg: string; fg: string }> = {
+  prep: { label: "Setup / prep", bg: "#eef1f6", fg: "rgba(1,25,85,0.72)" },
+  clean: { label: "Wash / clean", bg: "#deeeff", fg: "#2563a8" },
+  works: { label: "Main works", bg: "#dff2e6", fg: "#2f7a55" },
+  handover: { label: "Handover", bg: "#fcf0dc", fg: "#86561a" },
+};
+
+/** Weeks on site: the highest week number in the stages' "when". */
+export const weeksOnSite = (stages: RunStage[]) =>
+  Math.max(0, ...stages.flatMap((s) => (s.when.match(/\d+/g) ?? []).map(Number)));
 
 export interface Proposal {
   version: 3;
@@ -266,8 +281,7 @@ export const LIMITS = {
   findings: 120,
   flagged: 40,
   prestart: 40,
-  stages: 4,
-  drops: 40,
+  runStages: 16,
   priceStages: 40,
   uploads: 20,
 };
@@ -324,7 +338,7 @@ export function resolvePhoto(p: Proposal, ref: string): string {
 /** Every photo the visible document shows — the PDF export inlines these. */
 export function referencedPhotos(p: Proposal): string[] {
   const d = p.d;
-  return [d.cover.photo, d.project.photo, d.access.aerial, ...d.findings.items.map((f) => f.photo)].filter(Boolean);
+  return [d.cover.photo, d.project.photo, ...d.findings.items.map((f) => f.photo)].filter(Boolean);
 }
 
 /** Merges a saved draft over fresh defaults, and puts any page the draft
@@ -509,7 +523,7 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
             "Repair of every defect flagged in the site survey, by our own remedial team",
             "Manufacturer-approved membrane system, coastal grade",
             "Joint, penetration and upstand sealing",
-            "All access as set out in the access plan",
+            "All access equipment for every stage of the programme",
             "Full site clean-up and waste removal on completion",
           ]
         : [
@@ -517,7 +531,7 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
             "Crack injection and substrate repair",
             "Repair of every defect flagged in the site survey, by our own remedial team",
             "Two-coat premium coating system, coastal grade",
-            "All access as set out in the access plan",
+            "All access equipment for every stage of the programme",
             "Full site clean-up and waste removal on completion",
           ]
       ).join("\n"),
@@ -556,23 +570,32 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
         ? "Before the membrane goes down, our dedicated maintenance team works through every item above and reports back to the committee with photos. It’s how we hold ourselves to a higher standard, and why we’ve been the Sunshine Coast’s trusted waterproofing partner for over 25 years."
         : "Before painting starts, our dedicated maintenance team works through every item above and reports back to the committee with photos. Only then does the coating go on. It’s how we hold ourselves to a higher standard, and why we’ve been the Sunshine Coast’s trusted painting partner for over 25 years.",
     },
-    access: {
-      intro:
-        "Planned face by face so residents always know where we’ll be. Rope access works the building from the roof down, and residents get 48 hours’ notice before we reach their floor.",
-      aerial: "",
-      stages: W
-        ? [
-            { when: "Weeks 1 to 2", what: "Clean & prep", where: "" },
-            { when: "Weeks 3 to 4", what: "Repairs & detailing", where: "" },
-            { when: "Weeks 5 to 6", what: "Membrane & sign-off", where: "" },
-          ]
-        : [
-            { when: "Weeks 1 to 2", what: "Wash & prep", where: "" },
-            { when: "Weeks 3 to 5", what: "Remedial repairs", where: "" },
-            { when: "Weeks 6 to 9", what: "Coating & sign-off", where: "" },
+    runs: W
+      ? {
+          intro:
+            "We clean and prepare every area first, then lay the membrane one section at a time. Each section is checked and signed off before we move on.",
+          stages: [
+            { kind: "prep", name: "Site setup & resident notices", when: "Week 1", where: "Whole site", desc: "We walk the site with the committee, set up secure storage and exclusion zones, and give residents the dates for their areas." },
+            { kind: "clean", name: "Clean & preparation", when: "Weeks 1–2", where: "All membrane areas", desc: "Every surface is cleaned, old coatings and loose material removed, and cracks repaired so the membrane bonds to a sound substrate." },
+            { kind: "works", name: "Membrane · section A", when: "Weeks 2–4", where: "", desc: "Primer, reinforcement at joints and penetrations, then the full membrane system, checked and photographed before we move on." },
+            { kind: "works", name: "Membrane · section B", when: "Weeks 4–6", where: "", desc: "The same system on the next area, with upstands, outlets and penetrations detailed and flood tested where it applies." },
+            { kind: "handover", name: "Final walkthrough & handover", when: "Week 7", where: "Whole site, with the committee", desc: "We walk the site with the committee, list anything that needs attention, fix it, and hand over your warranty and completion report." },
           ],
-      drops: [],
-    },
+          note: "Timeframes are based on normal working weeks and exclude wet weather. If rain stops work, we let the committee know the same day and update the programme.",
+        }
+      : {
+          intro:
+            "We wash the building first, then repaint it one section at a time. Each section is signed off before we move on.",
+          stages: [
+            { kind: "prep", name: "Site setup & resident notices", when: "Week 1", where: "Whole site", desc: "We walk the site with the committee, set up secure storage and exclusion zones, and give every resident the dates for their floor." },
+            { kind: "clean", name: "Building wash", when: "Weeks 1–2", where: "All painted and rendered surfaces, roof down", desc: "Every surface is pressure cleaned from the roof down to strip salt, mould and chalking, then left to dry fully before any repair or paint." },
+            { kind: "works", name: "Repaint · section A", when: "Weeks 2–4", where: "", desc: "Repairs, prep, sealer and two full coats, drop by drop from the roof down. Each drop is checked and photographed before we move across." },
+            { kind: "works", name: "Repaint · section B", when: "Weeks 4–6", where: "", desc: "The same system on the next faces, worked from rope access or a knuckle boom so there’s no scaffold in the way." },
+            { kind: "works", name: "Repaint · section C", when: "Weeks 6–8", where: "", desc: "The entry and lower faces are done last, once the rest of the building is finished, so the main walkway is only affected for a short time." },
+            { kind: "handover", name: "Final walkthrough & handover", when: "Week 9", where: "Whole building, with the committee", desc: "We walk the whole building with the committee, list anything that needs attention, fix it, and hand over your warranty and completion report." },
+          ],
+          note: "Timeframes are based on normal working weeks and exclude wet weather. If rain stops work, we let the committee know the same day and update the programme.",
+        },
     pricing: {
       intro:
         "One fixed price, broken down by stage. Repair allowances are included, and anything beyond them is priced in writing first.",

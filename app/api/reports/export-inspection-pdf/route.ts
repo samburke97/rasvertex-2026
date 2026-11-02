@@ -7,9 +7,10 @@
 //   2. print   — paginate() lays the blocks onto pages with those heights,
 //      and the paginated document is printed at 1280px pages of A4 shape
 //
-// With saveToJob, the finished PDF is also attached to the SimPRO job
-// (replacing an earlier export of the same name). The download is returned
-// either way; X-Saved-To-Job says whether the attachment succeeded.
+// With destinations, the finished PDF is also attached to the SimPRO job
+// and/or site (replacing an earlier save of the same name). The PDF is
+// returned either way; X-Saved-To-Job / X-Saved-To-Site ("yes", "no",
+// "error") say how each went.
 
 import fs from "fs";
 import path from "path";
@@ -35,7 +36,7 @@ import {
   renderPDF,
 } from "@/lib/server/pdf-utils";
 import { createImageResolver, GRID_PHOTO_RESIZE } from "@/lib/server/resolveReportImages";
-import { getSimproConfig, saveJobAttachment } from "@/lib/server/simpro";
+import { getSimproConfig, saveReportToDestinations } from "@/lib/server/simpro";
 
 export const maxDuration = 60;
 
@@ -146,7 +147,7 @@ function safeName(s: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { report?: unknown; saveToJob?: boolean; companyId?: number };
+  let body: { report?: unknown; filename?: string; destinations?: { job?: boolean; site?: boolean }; companyId?: number };
   try {
     body = await request.json();
   } catch {
@@ -159,7 +160,7 @@ export async function POST(request: NextRequest) {
   }
 
   const filename =
-    safeName(`Inspection Report - ${report.job.site || "Building"} - J${report.jobId}`) + ".pdf";
+    safeName(body.filename?.trim() || `Inspection Report - ${report.job.site || "Building"} - J${report.jobId}`).replace(/\.pdf$/i, "") + ".pdf";
 
   let buffer: Buffer;
   try {
@@ -169,20 +170,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "PDF generation failed." }, { status: 500 });
   }
 
-  let savedToJob = false;
+  const want = { job: !!body.destinations?.job, site: !!body.destinations?.site };
   const jobId = parseInt(report.jobId, 10);
-  if (body.saveToJob && jobId > 0) {
+  const saved = { job: "no", site: "no" };
+  if ((want.job || want.site) && jobId > 0) {
     try {
       getSimproConfig();
-      await saveJobAttachment(body.companyId ?? 0, jobId, filename, buffer);
-      savedToJob = true;
     } catch (err) {
-      console.error("[ExportInspectionPDF] save to job failed:", err);
+      console.error("[ExportInspectionPDF] SimPRO not configured:", err);
+      return NextResponse.json({ error: "SimPRO configuration missing" }, { status: 500 });
     }
+    const r = await saveReportToDestinations(
+      body.companyId ?? 0,
+      jobId,
+      report.job.siteId,
+      want,
+      filename,
+      buffer,
+      "[ExportInspectionPDF]",
+    );
+    if (want.job) saved.job = r.job?.success ? "yes" : "error";
+    if (want.site) saved.site = r.site?.success ? "yes" : "error";
   }
 
   const res = pdfDownloadResponse(buffer, filename);
-  res.headers.set("X-Saved-To-Job", savedToJob ? "yes" : "no");
+  res.headers.set("X-Saved-To-Job", saved.job);
+  res.headers.set("X-Saved-To-Site", saved.site);
   res.headers.set("X-Filename", encodeURIComponent(filename));
   return res;
 }

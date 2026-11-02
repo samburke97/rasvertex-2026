@@ -1,6 +1,6 @@
 /* components/reports/shared/ReportPage.module.css
-   Report builder shell in the CRM style: white top bar with a hairline,
-   warm grey canvas behind the pages, one blue primary action. */
+   Shell for the condition, anchor and hours builders (the header is
+   shared/builder/BuilderHeader): side panel and the canvas behind the pages. */
 
 .page {
   margin: -1.5rem;
@@ -14,131 +14,6 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Top bar ─────────────────────────────────────────────────────────────── */
-.topBar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px 0 12px;
-  height: 56px;
-  background: var(--surface);
-  border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
-  gap: 16px;
-}
-
-.topBarRight {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.topBarTitle {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--ink);
-  margin-right: 4px;
-  white-space: nowrap;
-}
-
-.badge {
-  font-size: 12px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-62);
-  background: rgba(var(--ink-rgb), 0.05);
-  padding: 3px 9px;
-  border-radius: 7px;
-  white-space: nowrap;
-}
-
-.savedBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--green);
-  background: var(--green-tint);
-  padding: 3px 9px;
-  border-radius: 7px;
-}
-
-.draftStatus {
-  font-size: 12.5px;
-  color: var(--ink-55);
-  white-space: nowrap;
-  margin: 0 4px;
-}
-
-.draftStatusError {
-  color: var(--red);
-}
-
-/* Buttons in the top bar: neutral by default, one blue primary. */
-.back,
-.topBtn,
-.topBtnPrimary {
-  height: 36px;
-  border-radius: var(--r-md);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  white-space: nowrap;
-  transition:
-    background 0.14s ease-out,
-    box-shadow 0.14s ease-out;
-}
-
-.back {
-  width: 36px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--ink);
-  flex-shrink: 0;
-}
-
-.back:hover {
-  background: var(--fill);
-}
-
-.topBtn {
-  padding: 0 14px;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.topBtn:hover:not(:disabled) {
-  background: var(--fill-hover);
-}
-
-.topBtnPrimary {
-  padding: 0 16px;
-  border: 0;
-  background: var(--blue-grad);
-  color: #fff;
-  box-shadow: 0 1px 2px rgba(62, 127, 176, 0.15);
-}
-
-.topBtnPrimary:hover:not(:disabled) {
-  box-shadow: 0 4px 10px rgba(62, 127, 176, 0.25);
-}
-
-.topBtn:disabled,
-.topBtnPrimary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 /* ── Body ────────────────────────────────────────────────────────────────── */
 .editorBody {
   flex: 1;
@@ -148,15 +23,6 @@
 }
 
 @media (max-width: 1024px) {
-  .topBar {
-    flex-wrap: wrap;
-    height: auto;
-    padding: 8px 12px;
-  }
-
-  .topBarRight {
-    flex-wrap: wrap;
-  }
 
   .editorBody {
     flex-direction: column;

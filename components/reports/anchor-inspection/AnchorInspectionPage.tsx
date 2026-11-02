@@ -11,7 +11,8 @@ import React, {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import styles from "../shared/ReportPage.module.css";
-import SaveReportModal from "../shared/SaveReportModal";
+import SaveReportModal, { postSave } from "../shared/SaveReportModal";
+import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import {
   compressImageDataUrl,
   compressMapImageDataUrl,
@@ -21,7 +22,6 @@ import {
   uploadReportPhoto,
   deleteReportPhoto,
 } from "@/lib/reports/uploadPhoto";
-import SavedBadge from "../shared/SavedBadge";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
 import AnchorDocument, {
@@ -56,13 +56,13 @@ import {
   parseReportDate,
 } from "@/lib/reports/format-report-date";
 import type { EnrichedJob } from "@/lib/simpro/types";
+import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
 
 interface AnchorInspectionPageProps {
   onBack: () => void;
 }
 
 type View = "editor" | "zone-map";
-type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export type AnchorImportStatus =
   | { phase: "idle" }
@@ -96,8 +96,6 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-const AUTOSAVE_DEBOUNCE_MS = 1500;
-const AUTOSAVE_RETRY_MS = 5000;
 
 export default function AnchorInspectionPage({
   onBack,
@@ -113,8 +111,6 @@ export default function AnchorInspectionPage({
   const [savedFilename, setSavedFilename] = useState<string | null>(null);
   const currentLoadId = useRef(0);
   const [isExporting, setIsExporting] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Supporting photos (optional) ───────────────────────────────────────
   const [photoImportStatus, setPhotoImportStatus] = useState<PhotoLoadStatus>({
@@ -332,39 +328,13 @@ export default function AnchorInspectionPage({
   );
 
   // ── Autosave the draft, debounced, whenever the report changes ───────────
-  // Never persist while photos are still streaming in — see the identical
-  // guard + explanation in ConditionReportPage.tsx's autosave effect. A
-  // draft saved mid-stream here would resume with a partial photo set next
-  // time, exactly like the bug that hit Condition Report job 10970.
-  useEffect(() => {
-    if (!loadedJobId) return;
-    if (photoImportStatus.phase === "fetching-photos") return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-
-    const delay =
-      saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
-    autosaveTimer.current = setTimeout(async () => {
-      setSaveStatus("saving");
-      try {
-        const res = await fetch(
-          `/api/anchor-inspection-reports/${loadedJobId}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(report),
-          },
-        );
-        setSaveStatus(res.ok ? "saved" : "error");
-      } catch {
-        setSaveStatus("error");
-      }
-    }, delay);
-
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [report, loadedJobId, photoImportStatus.phase]);
+  // Never while photos are still streaming in: the draft would resume with a
+  // partial photo set (see useDraftAutosave).
+  const { status: saveStatus, setStatus: setSaveStatus } = useDraftAutosave(
+    loadedJobId ? `/api/anchor-inspection-reports/${loadedJobId}` : null,
+    report,
+    { ready: photoImportStatus.phase !== "fetching-photos" },
+  );
 
   // ── Zone handlers ──────────────────────────────────────────────────────
   const addZone = useCallback(() => {
@@ -737,73 +707,27 @@ export default function AnchorInspectionPage({
 
   return (
     <div className={styles.page}>
-      {/* ── Top bar ── */}
-      <div className={styles.topBar}>
-        <button
-          className={styles.back}
-          onClick={onBack}
-          aria-label="Back to report types"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <div className={styles.topBarRight}>
-          <span className={styles.topBarTitle}>Anchor inspection</span>
-          <span className={styles.badge}>
-            {report.zones.length} zone{report.zones.length !== 1 ? "s" : ""}
-          </span>
-          {totalAnchors > 0 && (
-            <span className={styles.badge}>
-              {totalAnchors} anchor{totalAnchors !== 1 ? "s" : ""}
-            </span>
-          )}
-          {savedFilename && <SavedBadge />}
-          {loadedJobId && saveStatus !== "idle" && (
-            <span
-              className={`${styles.draftStatus} ${
-                saveStatus === "error" ? styles.draftStatusError : ""
-              }`}
-            >
-              {saveStatus === "saving"
-                ? "Saving draft…"
-                : saveStatus === "error"
-                  ? "Draft save failed — retrying"
-                  : "Draft saved"}
-            </span>
-          )}
-          <button
-            className={styles.topBtn}
-            onClick={handleResetDraft}
-            disabled={!loadedJobId}
-          >
-            Reload from SimPRO
-          </button>
-          <button
-            className={styles.topBtn}
-            onClick={() => setShowSaveModal(true)}
-            disabled={!loadedJobId}
-          >
-            Save
-          </button>
-          <button
-            className={styles.topBtnPrimary}
-            onClick={handleExport}
-            disabled={isExporting}
-          >
-            {isExporting ? "Exporting…" : "Export PDF"}
-          </button>
-        </div>
-      </div>
+      <BuilderHeader
+        onBack={onBack}
+        title="Anchor inspection"
+        subtitle={loadedJobId ? `Job ${loadedJobId}` : undefined}
+        badges={[
+          `${report.zones.length} zone${report.zones.length !== 1 ? "s" : ""}`,
+          totalAnchors > 0 && `${totalAnchors} anchor${totalAnchors !== 1 ? "s" : ""}`,
+          savedFilename && "Saved to SimPRO",
+        ]}
+        status={loadedJobId ? saveStatus : undefined}
+      >
+        <HeaderButton onClick={handleResetDraft} disabled={!loadedJobId}>
+          Reload from SimPRO
+        </HeaderButton>
+        <HeaderButton onClick={handleExport} disabled={isExporting}>
+          {isExporting ? "Exporting…" : "Download PDF"}
+        </HeaderButton>
+        <HeaderButton primary onClick={() => setShowSaveModal(true)} disabled={!loadedJobId}>
+          Save to SimPRO
+        </HeaderButton>
+      </BuilderHeader>
 
       {/* ── Body ── */}
       <div className={styles.editorBody}>
@@ -858,19 +782,18 @@ export default function AnchorInspectionPage({
       {/* Save Report Modal */}
       {showSaveModal && (
         <SaveReportModal
-          jobId={loadedJobId}
-          jobNo={`#${loadedJobId}`}
-          companyId={0}
+          owner={{ kind: "Job", no: `#${loadedJobId}` }}
           siteId={report.job.siteId}
           defaultFilename={`Anchor Inspection Report - ${new Date().getFullYear()}`}
-          saveEndpoint={`/api/simpro/jobs/${loadedJobId}/save-anchor-report`}
-          prepareBody={async (filename, companyId, destinations) => ({
-            filename,
-            companyId,
-            siteId: report.job.siteId,
-            destinations,
-            report: await compressReportForTransfer(report),
-          })}
+          save={async (filename, d) =>
+            postSave(`/api/simpro/jobs/${loadedJobId}/save-anchor-report`, {
+              filename,
+              companyId: 0,
+              siteId: report.job.siteId,
+              destinations: { job: d.owner, site: d.site },
+              report: await compressReportForTransfer(report),
+            })
+          }
           onClose={() => setShowSaveModal(false)}
           onSuccess={(filename) => {
             setSavedFilename(filename);

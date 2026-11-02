@@ -1,71 +1,81 @@
 "use client";
 // components/reports/shared/SaveReportModal.tsx
 //
-// Generic "Save report" modal used by all report types. Lets the user save
-// the report as a PDF to the SimPRO Job, the SimPRO Site (visible in the
-// Customer Portal), or both at once.
+// "Save to SimPRO" for every report: the PDF goes to the job's (or the
+// quote's) attachments, the site's (shown in the Customer Portal), or both.
 //
-// The caller provides:
-//   - saveEndpoint: which API route to POST to
-//   - defaultFilename: pre-filled filename (year-based, e.g. "Anchor Inspection Report - 2026")
-//   - siteId: SimPRO Site ID for this job, or "" if unavailable (disables the Site checkbox)
-//   - prepareBody: function that returns the POST body (allows photo stripping etc.)
-//
-// Filenames are predictable-by-design (one per report type per year), so the
-// backend replaces any existing same-name file rather than blocking — this
-// modal never shows a "duplicate" state, only success or per-destination error.
+// The report supplies `save`, which renders the PDF and uploads it to the
+// chosen destinations, returning how each went. Filenames are predictable
+// by design (one per report per year or quote), so saving again replaces
+// the earlier file rather than blocking.
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import styles from "./SaveReportModal.module.css";
 import Button from "@/components/ui/Button";
 
-interface DestinationResult {
+export interface DestinationResult {
   success: boolean;
   error?: string;
 }
 
+export interface SaveResult {
+  filename?: string;
+  owner?: DestinationResult;
+  site?: DestinationResult;
+}
+
+export type SaveDestinations = { owner: boolean; site: boolean };
+
 interface SaveReportModalProps {
-  jobId: string;
-  jobNo: string;
-  companyId?: number;
+  /** What the report belongs to in SimPRO: a job or a quote, and its number. */
+  owner: { kind: "Job" | "Quote"; no: string };
+  /** SimPRO Site ID, or "" / undefined when unknown (disables Site). */
   siteId?: string;
   defaultFilename: string;
-  saveEndpoint: string;
-  /** Return the JSON body to POST. Runs just before save so it can be async. */
-  prepareBody: (
-    filename: string,
-    companyId: number,
-    destinations: { job: boolean; site: boolean },
-  ) => Record<string, unknown> | Promise<Record<string, unknown>>;
+  save: (filename: string, destinations: SaveDestinations) => Promise<SaveResult>;
   onClose: () => void;
-  onSuccess: (filename: string) => void;
+  onSuccess?: (filename: string) => void;
 }
 
 type ModalState =
   | { phase: "idle" }
   | { phase: "saving" }
   | { phase: "error"; message: string }
-  | { phase: "success"; filename: string; job: boolean; site: boolean };
+  | { phase: "success"; filename: string; owner: boolean; site: boolean };
 
-export default function SaveReportModal({
-  jobId,
-  jobNo,
-  companyId = 0,
-  siteId,
-  defaultFilename,
-  saveEndpoint,
-  prepareBody,
-  onClose,
-  onSuccess,
-}: SaveReportModalProps) {
+/** For JSON save routes ({ filename, job, site }): POST and read the result. */
+export async function postSave(endpoint: string, body: Record<string, unknown>): Promise<SaveResult> {
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  // A payload over the platform's size limit (too many embedded photos)
+  // never reaches the route: the reply is plain text, not JSON.
+  let data: { error?: string; filename?: string; job?: DestinationResult; site?: DestinationResult };
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(
+      res.status === 413
+        ? "This report is too large to save. It likely has too many photos; remove some and try again."
+        : `Save failed (server returned ${res.status}). Please try again.`,
+    );
+  }
+  if (!res.ok) throw new Error(data.error ?? "An unexpected error occurred.");
+  return { filename: data.filename, owner: data.job, site: data.site };
+}
+
+export default function SaveReportModal({ owner, siteId, defaultFilename, save, onClose, onSuccess }: SaveReportModalProps) {
   const [filename, setFilename] = useState(defaultFilename);
   const hasSite = !!siteId;
-  const [saveToJob, setSaveToJob] = useState(true);
+  const [saveToOwner, setSaveToOwner] = useState(true);
   const [saveToSite, setSaveToSite] = useState(hasSite);
   const [modalState, setModalState] = useState<ModalState>({ phase: "idle" });
   const inputRef = useRef<HTMLInputElement>(null);
   const isSaving = modalState.phase === "saving";
-  const noDestination = !saveToJob && !saveToSite;
+  const noDestination = !saveToOwner && !saveToSite;
+  const jobNo = owner.no;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -75,7 +85,7 @@ export default function SaveReportModal({
   useEffect(() => {
     if (modalState.phase === "success") {
       const timer = setTimeout(() => {
-        onSuccess(modalState.filename);
+        onSuccess?.(modalState.filename);
         onClose();
       }, 1500);
       return () => clearTimeout(timer);
@@ -97,83 +107,24 @@ export default function SaveReportModal({
       return;
     }
     setModalState({ phase: "saving" });
-
-    const destinations = { job: saveToJob, site: saveToSite };
-
+    const destinations = { owner: saveToOwner, site: saveToSite };
     try {
-      const body = await prepareBody(trimmed, companyId, destinations);
-      const res = await fetch(saveEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      // A payload over the platform's request-size limit (e.g. too many
-      // embedded photos) never reaches our route handler — the platform
-      // rejects it and returns a plain-text body, not JSON. Guard the parse
-      // so that shows a clear message instead of crashing on "Unexpected
-      // token" from trying to JSON.parse plain text.
-      let data: { error?: string; filename?: string; job?: DestinationResult; site?: DestinationResult };
-      try {
-        data = await res.json();
-      } catch {
-        setModalState({
-          phase: "error",
-          message:
-            res.status === 413
-              ? "This report is too large to save — it likely has too many photos. Remove some photos and try again."
-              : `Save failed (server returned ${res.status}). Please try again.`,
-        });
-        return;
-      }
-
-      if (!res.ok) {
-        setModalState({
-          phase: "error",
-          message: data.error ?? "An unexpected error occurred.",
-        });
-        return;
-      }
-
-      const jobResult: DestinationResult | undefined = data.job;
-      const siteResult: DestinationResult | undefined = data.site;
-      const jobFailed = destinations.job && jobResult && !jobResult.success;
-      const siteFailed = destinations.site && siteResult && !siteResult.success;
-
-      if (jobFailed || siteFailed) {
+      const r = await save(trimmed, destinations);
+      const ownerFailed = destinations.owner && !r.owner?.success;
+      const siteFailed = destinations.site && !r.site?.success;
+      if (ownerFailed || siteFailed) {
         const parts: string[] = [];
-        if (destinations.job)
-          parts.push(
-            jobResult?.success
-              ? "Saved to Job."
-              : `Job failed: ${jobResult?.error ?? "unknown error"}`,
-          );
-        if (destinations.site)
-          parts.push(
-            siteResult?.success
-              ? "Saved to Site."
-              : `Site failed: ${siteResult?.error ?? "unknown error"}`,
-          );
+        if (destinations.owner)
+          parts.push(r.owner?.success ? `Saved to ${owner.kind}.` : `${owner.kind} failed: ${r.owner?.error ?? "unknown error"}`);
+        if (destinations.site) parts.push(r.site?.success ? "Saved to Site." : `Site failed: ${r.site?.error ?? "unknown error"}`);
         setModalState({ phase: "error", message: parts.join(" ") });
         return;
       }
-
-      setModalState({
-        phase: "success",
-        filename: data.filename ?? trimmed,
-        job: destinations.job,
-        site: destinations.site,
-      });
+      setModalState({ phase: "success", filename: r.filename ?? trimmed, owner: destinations.owner, site: destinations.site });
     } catch (err) {
-      setModalState({
-        phase: "error",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Network error. Check your connection.",
-      });
+      setModalState({ phase: "error", message: err instanceof Error ? err.message : "Network error. Check your connection." });
     }
-  }, [filename, noDestination, saveToJob, saveToSite, prepareBody, saveEndpoint, companyId]);
+  }, [filename, noDestination, saveToOwner, saveToSite, save, owner.kind]);
 
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!isSaving && e.target === e.currentTarget) onClose();
@@ -182,10 +133,10 @@ export default function SaveReportModal({
   const isSuccess = modalState.phase === "success";
 
   const successText = isSuccess
-    ? modalState.job && modalState.site
-      ? `"${modalState.filename}" added to Job ${jobNo} and to the Site`
-      : modalState.job
-        ? `"${modalState.filename}" added to Job ${jobNo}`
+    ? modalState.owner && modalState.site
+      ? `"${modalState.filename}" added to ${owner.kind} ${jobNo} and to the Site`
+      : modalState.owner
+        ? `"${modalState.filename}" added to ${owner.kind} ${jobNo}`
         : `"${modalState.filename}" added to the Site`
     : "";
 
@@ -238,12 +189,12 @@ export default function SaveReportModal({
           </div>
           <div>
             <h2 className={styles.title} id="modal-title">
-              {isSuccess ? "Saved" : "Save report"}
+              {isSuccess ? "Saved" : "Save to SimPRO"}
             </h2>
             <p className={styles.subtitle}>
               {isSuccess
                 ? successText
-                : "Attach this report as a PDF to SimPRO"}
+                : `Attach this report as a PDF to SimPRO`}
             </p>
           </div>
           {!isSaving && !isSuccess && (
@@ -354,11 +305,16 @@ export default function SaveReportModal({
               <label className={styles.checkRow}>
                 <input
                   type="checkbox"
-                  checked={saveToJob}
-                  onChange={(e) => setSaveToJob(e.target.checked)}
+                  checked={saveToOwner}
+                  onChange={(e) => setSaveToOwner(e.target.checked)}
                   disabled={isSaving}
                 />
-                <span>Save to Job</span>
+                <span>
+                  Save to {owner.kind}
+                  <span className={styles.checkHint}>
+                    {owner.kind} {jobNo} attachments
+                  </span>
+                </span>
               </label>
               <label
                 className={`${styles.checkRow} ${!hasSite ? styles.checkRowDisabled : ""}`}
@@ -371,11 +327,9 @@ export default function SaveReportModal({
                 />
                 <span>
                   Save to Site
-                  {!hasSite && (
-                    <span className={styles.checkHint}>
-                      Site ID unavailable for this job
-                    </span>
-                  )}
+                  <span className={styles.checkHint}>
+                    {hasSite ? "Shows in the Customer Portal" : `No site in SimPRO for this ${owner.kind.toLowerCase()}`}
+                  </span>
                 </span>
               </label>
             </div>

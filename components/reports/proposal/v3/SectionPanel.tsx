@@ -5,7 +5,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import MapCaptureModal from "@/components/reports/inspection/MapCaptureModal";
+import MapCaptureModal from "@/components/reports/shared/MapCaptureModal";
 import styles from "./Builder.module.css";
 import type { BuilderCtx } from "./ctx";
 import { GroupHead, InfoTip, List, Money, Note, Photo, Rich, Segmented, Select, Text } from "./fields";
@@ -19,6 +19,7 @@ import {
   JOB_FIELDS,
   LIMITS,
   LOCK_NOTES,
+  STAGE_KINDS,
   PAGE,
   TRADES,
   BANDS,
@@ -30,6 +31,8 @@ import {
   type PhotoPos,
   type PageId,
   type Proposal,
+  type RunStage,
+  type StageKind,
   type SpecRow,
 } from "@/lib/reports/proposal/v3/types";
 
@@ -133,7 +136,7 @@ function SiteMapField({ ctx }: { ctx: BuilderCtx }) {
         ctx={ctx}
         label="Map image"
         path={["findings", "map"]}
-        info="Shown above the findings with a pin for every zone in the photos’ locations. Drag the pins on the page to place them. Until you choose one, it uses the access plan’s aerial."
+        info="Shown above the findings with a pin for every zone in the photos’ locations. Drag the pins on the page to place them."
         extra={
           ctx.p.job.site ? (
             <button className={styles.smallBtn} onClick={() => setMapOpen(true)}>
@@ -142,12 +145,12 @@ function SiteMapField({ ctx }: { ctx: BuilderCtx }) {
           ) : null
         }
       />
-      {!own && <Note>{d.access.aerial ? "Using the access plan’s aerial photo." : "No map yet: choose a photo or capture one from satellite."}</Note>}
+      {!own && <Note>No map yet: choose a photo or capture one from satellite.</Note>}
       {mapOpen && (
         <MapCaptureModal
           address={ctx.p.job.site}
           size={{ w: 640, h: 320 }}
-          initial={d.findings.mapView ?? d.access.aerialView}
+          initial={d.findings.mapView}
           onCancel={() => setMapOpen(false)}
           onCapture={async (dataUrl, view) => {
             const url = await ctx.uploadData(dataUrl, "site-map");
@@ -483,7 +486,6 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
 
 function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
   const d = ctx.p.d;
-  const [mapOpen, setMapOpen] = useState(false);
   switch (id) {
     case "cover":
       return (
@@ -638,70 +640,37 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
           <Rich ctx={ctx} label="Please note" path={["prestart", "note"]} />
         </>
       );
-    case "access": {
-      const stageOpts = d.access.stages.map((x, i) => ({ v: String(i), label: x.what || `Stage ${i + 1}` }));
+    case "runs": {
+      const W = ctx.p.trade === "waterproofing";
+      const kinds = (Object.keys(STAGE_KINDS) as StageKind[]).map((k) => ({
+        v: k,
+        label: k === "works" ? (W ? "Membrane works" : "Painting works") : STAGE_KINDS[k].label,
+      }));
       return (
         <>
-          <Rich ctx={ctx} label="Intro" path={["access", "intro"]} />
-          <Photo
-            ctx={ctx}
-            label="Aerial or elevation photo"
-            path={["access", "aerial"]}
-            info="Required before export. “Satellite” opens Google Maps at the site address: pan and zoom until the building fills the frame, then use that view."
-            extra={
-              ctx.p.job.site ? (
-                <button className={styles.smallBtn} onClick={() => setMapOpen(true)}>
-                  Satellite
-                </button>
-              ) : null
-            }
+          <Rich ctx={ctx} label="Intro" path={["runs", "intro"]} />
+          <GroupHead
+            title="Stages"
+            info={`In order. The weeks on site come from the highest week in “When”; the ${W ? "membrane" : "repaint"} sections are the stages marked as main works.`}
           />
-          {mapOpen && (
-            <MapCaptureModal
-              address={ctx.p.job.site}
-              size={{ w: 640, h: 320 }}
-              initial={d.access.aerialView}
-              onCancel={() => setMapOpen(false)}
-              onCapture={async (dataUrl, view) => {
-                await ctx.saveAerial(dataUrl, view);
-                setMapOpen(false);
-              }}
-            />
-          )}
-          <GroupHead title="Programme" info="Up to four stages. Each drop below is coloured by the stage it belongs to." />
-          <List
+          <List<RunStage>
             ctx={ctx}
-            path={["access", "stages"]}
-            max={LIMITS.stages}
-            blank={() => ({ when: "Weeks", what: "", where: "" })}
-            title={(_, i) => `Stage ${i + 1}`}
-            meta={(x) => x.what}
+            path={["runs", "stages"]}
+            max={LIMITS.runStages}
+            blank={() => ({ kind: "works", name: "", when: "", where: "", desc: "" })}
+            title={(x, i) => x.name || `Stage ${i + 1}`}
+            meta={(x) => x.when}
             render={(i) => (
               <>
-                <Text ctx={ctx} label="When" path={["access", "stages", i, "when"]} />
-                <Text ctx={ctx} label="Stage" path={["access", "stages", i, "what"]} />
-                <Text ctx={ctx} label="Drops" path={["access", "stages", i, "where"]} />
+                <Select ctx={ctx} label="Kind" path={["runs", "stages", i, "kind"]} options={kinds} info="Sets the colour of the stage number and weeks." />
+                <Text ctx={ctx} label="Stage" path={["runs", "stages", i, "name"]} />
+                <Text ctx={ctx} label="When" path={["runs", "stages", i, "when"]} ph="e.g. Weeks 2–4" />
+                <Text ctx={ctx} label="Where" path={["runs", "stages", i, "where"]} ph="e.g. D1 north face · rope access" />
+                <Text ctx={ctx} label="What happens" path={["runs", "stages", i, "desc"]} />
               </>
             )}
           />
-          <GroupHead title="Drops" />
-          <List<{ d: string; where: string }>
-            ctx={ctx}
-            path={["access", "drops"]}
-            max={LIMITS.drops}
-            blank={() => ({ d: `D${d.access.drops.length + 1}`, where: "", access: "Rope access", levels: "", stage: "0" })}
-            title={(x, i) => x.d || `Drop ${i + 1}`}
-            meta={(x) => x.where}
-            render={(i) => (
-              <>
-                <Text ctx={ctx} label="Drop" path={["access", "drops", i, "d"]} />
-                <Text ctx={ctx} label="Where" path={["access", "drops", i, "where"]} />
-                <Text ctx={ctx} label="Access" path={["access", "drops", i, "access"]} />
-                <Text ctx={ctx} label="Levels" path={["access", "drops", i, "levels"]} />
-                <Select ctx={ctx} label="Stage" path={["access", "drops", i, "stage"]} options={stageOpts} />
-              </>
-            )}
-          />
+          <Text ctx={ctx} label="Timing note" path={["runs", "note"]} />
         </>
       );
     }
@@ -787,7 +756,7 @@ export default function SectionPanel({ ctx, width }: { ctx: BuilderCtx; width: n
       el.scrollIntoView({ block: "center" });
       const input = el.querySelector<HTMLElement>("input:not([type=file]), select, .tiptap");
       if (input) input.focus({ preventScroll: true });
-      else if (/photo|aerial$/.test(target)) ctx.setPicker(el.dataset.field ?? null);
+      else if (/photo$/.test(target)) ctx.setPicker(el.dataset.field ?? null);
     });
     return () => cancelAnimationFrame(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps

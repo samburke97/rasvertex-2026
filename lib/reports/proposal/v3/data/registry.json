@@ -57,8 +57,8 @@
       "cat": "Your project"
     },
     {
-      "id": "access",
-      "name": "Access & disruption plan",
+      "id": "runs",
+      "name": "How your project runs",
       "cat": "Your project"
     },
     {
@@ -297,24 +297,6 @@
       "Handled as part of the full coating system."
     ]
   },
-  "stageColours": [
-    {
-      "bg": "#dff2e6",
-      "fg": "#2f7a55"
-    },
-    {
-      "bg": "#deeeff",
-      "fg": "#2563a8"
-    },
-    {
-      "bg": "#eef1f6",
-      "fg": "rgba(1,25,85,0.72)"
-    },
-    {
-      "bg": "#fcf0dc",
-      "fg": "#86561a"
-    }
-  ],
   "paintBrands": {
     "dulux": {
       "name": "Dulux",

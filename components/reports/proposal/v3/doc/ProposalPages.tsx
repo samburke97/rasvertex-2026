@@ -12,7 +12,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { codeName, money, parseAmt, type Derived } from "@/lib/reports/proposal/v3/derive";
-import { FINDING_PHOTO_H, MAX_POINTS, REPORT_PHOTO_H, SITE_MAP_H, refsText, shownWhere, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
+import { FINDING_PHOTO_H, MAX_POINTS, REPORT_PHOTO_H, RUN_STATS_H, SITE_MAP_H, refsText, shownWhere, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
 import { RICH_CSS, richHtml, richItems } from "@/lib/reports/proposal/v3/rich";
 import { placeLabel } from "@/lib/reports/proposal/v3/survey";
 import {
@@ -21,10 +21,11 @@ import {
   CODES,
   FLAG_GROUPS,
   PRESTART_GROUPS,
-  STAGE_COLOURS,
+  STAGE_KINDS,
   TERMS,
   asset,
   tradeOf,
+  weeksOnSite,
   bandOf,
   codesOf,
   type PageId,
@@ -914,7 +915,7 @@ function Findings({ r, s }: PageProps) {
   );
 }
 
-/** The site map: the aerial with a pin per zone, so the client can find
+/** The site map: the map image with a pin per zone, so the client can find
  *  "D10" on the building. Pins drag in Build. */
 function SiteMapBlock({ r, b }: { r: DocProps; b: Extract<GroupBlock, { t: "map" }> }) {
   const drag = r.mode === "build" && r.onPinPointerDown;
@@ -1106,87 +1107,72 @@ function Prestart({ r, s }: PageProps) {
   );
 }
 
-function Access({ r, s }: PageProps) {
-  const d = r.p.d.access;
-  const drops = dataOf(s, "access")?.drops ?? [];
-  const cols = "110px minmax(0,1fr) minmax(0,1.2fr) 160px";
-  const stageC = (i: number) => STAGE_COLOURS[(i < 0 ? 0 : i) % STAGE_COLOURS.length];
+/** How your project runs: the figures (weeks on site, stages, sections),
+ *  then each stage as a numbered timeline coloured by its kind. */
+function Runs({ r, s }: PageProps) {
+  const d = r.p.d.runs;
+  const data = dataOf(s, "runs");
+  const W = r.p.trade === "waterproofing";
+  const weeks = weeksOnSite(d.stages);
+  const stats: [string, string][] = [
+    [weeks ? String(weeks) : "—", weeks === 1 ? "Week on site" : "Weeks on site"],
+    [String(d.stages.length), d.stages.length === 1 ? "Stage" : "Stages"],
+    [String(d.stages.filter((x) => x.kind === "works").length), W ? "Membrane sections" : "Repaint sections"],
+  ];
+  const stages = data?.stages ?? [];
   return (
     <Sheet r={r} s={s}>
-      <Head r={r} s={s} title="Access & disruption plan" intro={d.intro} width={860} edit="access.intro" />
-      {!s.part && (
-        <>
-          <div
-            data-edit="access.aerial"
-            style={photo(r.img(d.aerial), {
-              marginTop: 56,
-              width: "100%",
-              aspectRatio: "2/1",
-              flexShrink: 0,
-              borderRadius: 20,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            })}
-          >
-            {!d.aerial && r.mode !== "print" && (
-              <span data-ph="1" className="pb3-ph" style={{ fontSize: "1.375rem", fontWeight: 600, color: INK(0.4) }}>
-                Add an aerial or elevation photo
-              </span>
-            )}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.max(1, d.stages.length)},minmax(0,1fr))`, gap: 40, marginTop: 56 }}>
-            {d.stages.map((sg, i) => (
-              <div key={i} data-edit={`access.stages.${i}.what`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <span
-                  style={{
-                    alignSelf: "flex-start",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    height: 28,
-                    padding: "0 10px",
-                    borderRadius: 8,
-                    background: stageC(i).bg,
-                    color: stageC(i).fg,
-                    fontSize: 13,
-                    fontWeight: 700,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    lineHeight: 1,
-                  }}
-                >
-                  {sg.when}
-                </span>
-                <span style={{ ...sub, marginTop: 6 }}>{sg.what}</span>
-                <span style={{ fontSize: "1.0625rem", color: INK(0.6), lineHeight: 1.5 }}>{sg.where}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-      {drops.length > 0 && (
-        <>
-          <div style={tableHead(cols, flowTop(s, 72))}>
-            <span>Drop</span>
-            <span>Where</span>
-            <span>Access</span>
-            <span style={{ textAlign: "right" }}>Levels</span>
-          </div>
-          {drops.map((x, i) => (
-            <div key={i} data-edit={`access.drops.${d.drops.indexOf(x)}.where`} style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 24, padding: "12px 0", borderBottom: rule(i, drops.length), lineHeight: 1.3 }}>
-              <span style={chip(stageC(parseInt(x.stage, 10) || 0))}>{x.d}</span>
-              <span style={{ fontSize: "1.25rem", fontWeight: 600 }}>{x.where}</span>
-              <span style={{ fontSize: "1.0625rem", color: INK(0.65) }}>{x.access}</span>
-              <span style={{ fontSize: "1.0625rem", color: INK(0.55), textAlign: "right" }}>{x.levels}</span>
+      <Head r={r} s={s} title="How your project runs" intro={d.intro} edit="runs.intro" />
+      {data?.stats && (
+        <div style={{ marginTop: 56, padding: "32px 48px", borderRadius: 24, background: BLUE_CARD, display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 24, height: RUN_STATS_H, flexShrink: 0 }}>
+          {stats.map(([v, k]) => (
+            <div key={k} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 11, textAlign: "center" }}>
+              <span style={{ fontSize: 64, fontWeight: 700, letterSpacing: "-0.05em", lineHeight: 1 }}>{v}</span>
+              <span style={{ ...label, color: INK(0.55) }}>{k}</span>
             </div>
           ))}
-        </>
+        </div>
+      )}
+      {stages.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", marginTop: data?.stats ? 52 : 0 }}>
+          {stages.map(({ s: x, i }, k) => {
+            const c = STAGE_KINDS[x.kind] ?? STAGE_KINDS.works;
+            const lastOnPage = k === stages.length - 1;
+            const lastStage = i === d.stages.length - 1;
+            return (
+              <div key={i} data-edit={`runs.stages.${i}.name`} style={{ display: "grid", gridTemplateColumns: "52px minmax(0,1fr)", columnGap: 27 }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span style={{ width: 52, height: 52, borderRadius: "50%", background: c.bg, color: c.fg, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 17, fontWeight: 700, lineHeight: 1, flexShrink: 0 }}>
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  {!(lastOnPage && lastStage) && <span style={{ flex: 1, width: 2, margin: "6px 0", background: RULE }} />}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, padding: "8px 0 26px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+                    <span style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.3, letterSpacing: "-0.04em" }}>{x.name}</span>
+                    {x.when && (
+                      <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0, height: 27, padding: "0 10px", borderRadius: 8, background: c.bg, color: c.fg, fontSize: 13, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", lineHeight: 1, whiteSpace: "nowrap" }}>
+                        {x.when}
+                      </span>
+                    )}
+                  </div>
+                  {x.where.trim() && <span style={{ fontSize: 16, lineHeight: 1.45, color: INK(0.5) }}>{x.where}</span>}
+                  {x.desc.trim() && <p style={{ maxWidth: 900, margin: "6px 0 0", fontSize: 17, lineHeight: 1.55, color: INK(0.72), textWrap: "pretty" }}>{x.desc}</p>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {data?.note && (
+        <p data-edit="runs.note" style={{ maxWidth: 960, margin: "auto 0 0", paddingTop: 24, fontSize: 16, lineHeight: 1.55, color: INK(0.5), textWrap: "pretty" }}>
+          {d.note}
+        </p>
       )}
       <Footer r={r} s={s} />
     </Sheet>
   );
 }
-
 
 function Safety({ r, s }: PageProps) {
   const stats = [
@@ -1509,7 +1495,7 @@ const RENDER: Record<PageId, (props: PageProps) => ReactNode> = {
   findings: Findings,
   flagged: Flagged,
   prestart: Prestart,
-  access: Access,
+  runs: Runs,
   safety: Safety,
   pricing: Pricing,
   maintenance: Maintenance,

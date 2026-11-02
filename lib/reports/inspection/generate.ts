@@ -26,6 +26,7 @@ import {
   type ExtraDef,
   type ImageKey,
 } from "./codes";
+import { notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "@/lib/reports/richText";
 import {
   COVER_ID,
   DEFAULT_COVER_POS,
@@ -37,6 +38,7 @@ import {
   type CoverPos,
   type InspectionPhoto,
   type InspectionReportData,
+  type SectionKey,
 } from "./types";
 
 export const PAGE_W = 1280;
@@ -69,10 +71,12 @@ const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? o
 const andList = (a: string[]) =>
   a.length < 2 ? (a[0] ?? "") : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
 
-export const levelOrd = (l: string) => (l === "LG" ? 0 : l === "LR" ? 999 : parseInt(l.slice(1), 10));
-export const levelName = (l: string) => (l === "LG" ? "Ground" : l === "LR" ? "Roof" : "Level " + l.slice(1));
-export const zoneOrd = (z: string) => (z[0] === "D" ? 0 : 10000) + parseInt(z.slice(1), 10);
-export const zoneTitle = (z: string) => (z[0] === "D" ? "Drop " : "Section ") + z.slice(1);
+// Zone and level are optional: "" sorts last (zone) / first (level) and
+// prints as nothing.
+export const levelOrd = (l: string) => (!l ? -1 : l === "LG" ? 0 : l === "LR" ? 999 : parseInt(l.slice(1), 10));
+export const levelName = (l: string) => (!l ? "" : l === "LG" ? "Ground" : l === "LR" ? "Roof" : "Level " + l.slice(1));
+export const zoneOrd = (z: string) => (!z ? 1e9 : (z[0] === "D" ? 0 : 10000) + parseInt(z.slice(1), 10));
+export const zoneTitle = (z: string) => (!z ? "" : (z[0] === "D" ? "Drop " : "Section ") + z.slice(1));
 const unitOrd = (u: string | null) => (u ? parseInt(u.slice(1), 10) : -1);
 
 // SimPRO attachment ids rise with each upload, so they give upload order.
@@ -122,7 +126,7 @@ export interface PhotoView {
   autoNote: string;
 }
 
-export type SectionKey = "about" | "map" | "defects" | "findings" | "index" | "summary" | "works";
+export type { SectionKey };
 
 interface BlockBase {
   /** Unique per distinct block; doubles as its measured-height key. */
@@ -149,7 +153,7 @@ export type Block = BlockBase &
   (
     | { type: "sec"; label: string; title: string; intro: string }
     | { type: "why" }
-    | { type: "ex"; photo: PhotoView; legend: { part: string; ex: string; mean: string }[] }
+    | { type: "ex"; title: string; intro: string; photo: PhotoView; legend: { part: string; ex: string; mean: string }[] }
     | { type: "sub"; title: string }
     | { type: "kHead" }
     | { type: "kGroup"; band: Band; first: boolean }
@@ -161,6 +165,7 @@ export type Block = BlockBase &
     | { type: "chap"; title: string; meta: string }
     | { type: "cont"; text: string }
     | { type: "row"; photos: PhotoView[] }
+    | { type: "notes"; html: string }
     | { type: "ixHead" }
     | { type: "ixRow"; zone: string; level: string; unit: string; chips: Chip[]; photos: string }
     | {
@@ -201,7 +206,9 @@ export interface InspectionModel {
   coverPhotoId: string | null;
   coverPos: CoverPos;
   facts: { k: string; v: string }[];
-  sections: { key: SectionKey; title: string; label: string }[];
+  sections: { key: SectionKey; title: string; intro: string; label: string }[];
+  /** Findings chapters with a heading, for the contents. */
+  chapters: { key: string; title: string }[];
   blocks: Block[];
   zoneRows: ZoneRow[];
   hasOther: boolean;
@@ -209,7 +216,7 @@ export interface InspectionModel {
   about: CardDef[];
   /** fit: how much of "Also worth adding" the space under the works table
    *  holds: the cards with photos, the cards without, or nothing. */
-  works: { items: WorkItem[]; extras: ExtraDef[]; href: string; fit: "images" | "text" | "none" };
+  works: { items: WorkItem[]; extras: (ExtraDef & { n: number })[]; href: string; fit: "images" | "text" | "none" };
   nDefects: number;
 }
 
@@ -225,6 +232,13 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     const b = BANDS[CODE_MAP[code].band];
     return { code, fg: b.fg, bg: b.bg };
   };
+
+  /** Wording edited in the builder, else the generated text. */
+  const T = (key: string, def: string) => {
+    const v = data.text?.[key];
+    return v != null && v.trim() ? v : def;
+  };
+  const hidden = data.hidden ?? {};
 
   // Parse labels
   const parsed: ParsedPhoto[] = [];
@@ -262,7 +276,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   const sortLU = (a: ParsedPhoto, b: ParsedPhoto) =>
     levelOrd(a.level) - levelOrd(b.level) || unitOrd(a.unit) - unitOrd(b.unit) || a.ord - b.ord;
   const levelsTxt = (ps: ParsedPhoto[]) => {
-    const lv = [...new Set(ps.map((p) => p.level))].sort((a, b) => levelOrd(a) - levelOrd(b));
+    const lv = [...new Set(ps.map((p) => p.level).filter(Boolean))].sort((a, b) => levelOrd(a) - levelOrd(b));
     if (!lv.length) return "";
     return lv.length === 1 ? levelName(lv[0]) : levelName(lv[0]) + " to " + levelName(lv[lv.length - 1]);
   };
@@ -315,16 +329,24 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       .map((c, i) => (i ? lower(CODE_MAP[c].name) : CODE_MAP[c].name))
       .join(", ");
   };
-  const view = (p: ParsedPhoto, withZone: boolean, code: string): PhotoView => ({
-    id: p.id,
-    num: pad(numOf.get(p) ?? 0),
-    chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].map(chip),
-    gname: p.title ?? defectNames(p, code),
-    where: (withZone ? zoneTitle(p.zone) + ", " : "") + levelName(p.level) + (p.unit ? ", Unit " + p.unit.slice(1) : ""),
-    note: p.desc ?? (p.note ? cap(p.note) : ""),
-    autoName: defectNames(p, code),
-    autoNote: p.note ? cap(p.note) : "",
-  });
+  const placeOf = (p: ParsedPhoto, withZone: boolean) =>
+    [withZone ? zoneTitle(p.zone) : "", levelName(p.level), p.unit ? "Unit " + p.unit.slice(1) : ""].filter(Boolean).join(", ");
+  const view = (p: ParsedPhoto, withZone: boolean, code: string): PhotoView => {
+    // Other items of note take their title from what was typed in the label.
+    const other = code === "OT";
+    const autoName = other ? cap(p.note) || "Other item of note" : defectNames(p, code);
+    const autoNote = other ? "" : p.note ? cap(p.note) : "";
+    return {
+      id: p.id,
+      num: pad(numOf.get(p) ?? 0),
+      chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].map(chip),
+      gname: p.title ?? autoName,
+      where: placeOf(p, withZone),
+      note: p.desc ?? autoNote,
+      autoName,
+      autoNote,
+    };
+  };
 
   // Counts and generated copy
   const present = CODES.filter((c) => !c.system && parsed.some((p) => p.codes.includes(c.code))).map(
@@ -332,7 +354,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   );
   const withCode = (code: string) => parsed.filter((p) => p.codes.includes(code));
   const zonesOf = (code: string) =>
-    [...new Set(withCode(code).map((p) => p.zone))].sort((a, b) => zoneOrd(a) - zoneOrd(b));
+    [...new Set(withCode(code).map((p) => p.zone).filter(Boolean))].sort((a, b) => zoneOrd(a) - zoneOrd(b));
 
   const sumRows: SummaryRow[] = [];
   for (const band of BAND_ORDER) {
@@ -341,7 +363,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     const n = cs.reduce((t, c) => t + withCode(c).length, 0);
     const parts = cs.map((c, i) => {
       const nm = CODE_MAP[c].name;
-      return (i ? lower(nm) : nm) + " at " + andList(zonesOf(c));
+      const z = zonesOf(c);
+      return (i ? lower(nm) : nm) + (z.length ? " at " + andList(z) : "");
     });
     sumRows.push({
       band,
@@ -356,14 +379,18 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   const zCount: Record<string, number> = {};
   for (const p of parsed) {
     const k = p.codes.filter((c) => !CODE_MAP[c].system).length;
-    if (k) zCount[p.zone] = (zCount[p.zone] ?? 0) + k;
+    if (k && p.zone) zCount[p.zone] = (zCount[p.zone] ?? 0) + k;
   }
   const topZ = Object.keys(zCount)
     .sort((a, b) => zCount[b] - zCount[a] || zoneOrd(a) - zoneOrd(b))
     .slice(0, 3);
-  const nZones = chapters.length;
+  const nZones = chapters.filter((c) => c.zone).length;
+  const hasZones = nZones > 0;
+  const hasPlaces = parsed.some((p) => p.zone || p.level || p.unit);
   const sumIntro =
-    `We inspected ${plural(nZones, "zone")} and recorded ${plural(nDef, "defect")} across ${plural(present.length, "defect type")}. ` +
+    (hasZones
+      ? `We inspected ${plural(nZones, "zone")} and recorded ${plural(nDef, "defect")} across ${plural(present.length, "defect type")}. `
+      : `We recorded ${plural(nDef, "defect")} across ${plural(present.length, "defect type")}. `) +
     (nRed ? `${nRed} ${nRed === 1 ? "needs" : "need"} attention now. ` : "None need urgent attention. ") +
     (topZ.length ? "Most were found at " + andList(topZ) + "." : "");
 
@@ -382,10 +409,16 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     ["summary", "Summary", sumIntro],
     ["works", "Recommended works", "What needs to be done, in order of priority, and why."],
   ];
-  const N = secDefs.length;
-  const sections = secDefs.map(([key, title], i) => ({
+  // The site map needs zones and the index needs locations; either can also
+  // be hidden in the builder, as can Defects explained and the Summary.
+  const shown = (k: SectionKey) =>
+    !(k === "map" && !hasZones) && !(k === "index" && !hasPlaces) && !(hidden[k] && k !== "about" && k !== "findings" && k !== "works");
+  const visible = secDefs.filter(([k]) => shown(k));
+  const N = visible.length;
+  const sections = visible.map(([key, title, intro], i) => ({
     key,
-    title,
+    title: T(`sec.${key}.title`, title),
+    intro: key === "about" ? intro : T(`sec.${key}.intro`, intro),
     label: `Section ${pad(i + 1)} / ${pad(N)}`,
   }));
   const secLabel = (k: SectionKey) => sections.find((s) => s.key === k)!.label;
@@ -397,7 +430,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     return b;
   };
   const sec = (key: SectionKey, force = false) => {
-    const [, title, intro] = secDefs.find((s) => s[0] === key)!;
+    const { title, intro } = sections.find((s) => s.key === key)!;
     add({
       type: "sec",
       key: "sec-" + key,
@@ -434,11 +467,13 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     add({
       type: "ex",
       key: "ex",
+      title: T("ex.title", "Reading a photo"),
+      intro: T("ex.intro", "Every photo in this report is labelled the same way, like this example."),
       photo: exV,
       legend: [
         { part: "Code", ex: ex.code, mean: "The type of defect. Its colour shows the severity." },
         { part: "Photo number", ex: "Photo 01", mean: "Use it to find the photo in the Location index." },
-        { part: "Location", ex: exV.where, mean: "D is a rope drop, S a section. LG is ground, LR the roof." },
+        { part: "Location", ex: exV.where, mean: "Optional. D is a rope drop, S a section. LG is ground, LR the roof." },
         { part: "Note", ex: ex.note, mean: "The technician’s comment on site." },
       ],
       gap: 56,
@@ -466,21 +501,22 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   });
 
   // 02 Site map
-  sec("map", true);
-  const dl = chapters.map((c) => c.zone).filter((z) => z[0] === "D");
-  const sl = chapters.map((c) => c.zone).filter((z) => z[0] !== "D");
+  const zoned = chapters.filter((c) => c.zone);
+  const dl = zoned.map((c) => c.zone).filter((z) => z[0] === "D");
+  const sl = zoned.map((c) => c.zone).filter((z) => z[0] !== "D");
   const defPos = (z: string): [number, number] => {
     const isD = z[0] === "D";
     const arr = isD ? dl : sl;
     const i = arr.indexOf(z);
     return isD ? [24 + (62 * (i + 0.5)) / arr.length, 69] : [32 + (48 * (i + 0.5)) / arr.length, 54];
   };
-  if (mapPhotoId) {
+  if (shown("map")) sec("map", true);
+  if (shown("map") && mapPhotoId) {
     add({
       type: "map",
       key: "map",
       photoId: mapPhotoId,
-      pins: chapters.map((c) => {
+      pins: zoned.map((c) => {
         const [x, y] = data.pins[c.zone] ?? defPos(c.zone);
         return { zone: c.zone, x, y };
       }),
@@ -488,29 +524,43 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       est: 725,
     });
   }
-  const zoneRows: ZoneRow[] = chapters.map((c) => ({
+  const zoneRows: ZoneRow[] = zoned.map((c) => ({
     zone: c.zone,
     title: zoneTitle(c.zone),
     levels: levelsTxt(c.ps),
     count: c.ps.length,
   }));
-  add({ type: "zones", key: "zones", gap: 72, est: 40 + zoneRows.length * 51 });
+  if (shown("map")) add({ type: "zones", key: "zones", gap: 72, est: 40 + zoneRows.length * 51 });
 
   // 03 Defects explained
-  sec("defects");
-  const dHead: Block = { type: "dHead", key: "dhead", gap: 0, est: 40 };
-  add({ ...dHead, gap: 56, keep: true });
-  for (const code of present) {
-    const c = CODE_MAP[code];
-    add({ type: "defect", key: "def-" + code, chip: chip(code), name: c.name, what: c.what, act: c.action, gap: 0, est: 92, cont: dHead });
+  if (shown("defects")) {
+    sec("defects");
+    const dHead: Block = { type: "dHead", key: "dhead", gap: 0, est: 40 };
+    add({ ...dHead, gap: 56, keep: true });
+    for (const code of present) {
+      const c = CODE_MAP[code];
+      add({
+        type: "defect",
+        key: "def-" + code,
+        chip: chip(code),
+        name: c.name,
+        what: T(`defect.${code}.what`, c.what),
+        act: T(`defect.${code}.act`, c.action),
+        gap: 0,
+        est: 92,
+        cont: dHead,
+      });
+    }
   }
 
   // 04 Findings
   sec("findings", true);
+  // Photos with no zone: "Other areas" beside zoned chapters, or no
+  // chapter heading at all when the report has no zones.
   const chapList = chapters.map((ch) => ({
-    key: ch.zone,
-    title: zoneTitle(ch.zone),
-    meta: plural(ch.ps.length, "photo") + " · " + levelsTxt(ch.ps),
+    key: ch.zone || "ALL",
+    title: zoneTitle(ch.zone) || (hasZones ? "Other areas" : ""),
+    meta: [plural(ch.ps.length, "photo"), levelsTxt(ch.ps)].filter(Boolean).join(" · "),
     items: ch.groups.flatMap((g) => g.ps.map((p) => [p, g.code] as const)),
     withZone: false,
   }));
@@ -524,7 +574,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     });
   }
   chapList.forEach((ch, ci) => {
-    add({
+    if (ch.title) add({
       type: "chap",
       key: "chap-" + ch.key,
       title: ch.title,
@@ -534,79 +584,98 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       est: 120,
       chapKey: ch.key,
     });
-    const cont: Block = { type: "cont", key: "cont-" + ch.key, text: ch.title + ", continued", gap: 0, est: 20 };
+    const cont: Block = { type: "cont", key: "cont-" + ch.key, text: (ch.title || "Findings") + ", continued", gap: 0, est: 20 };
     for (let r = 0; r < ch.items.length; r += PER_ROW) {
       add({
         type: "row",
         key: `row-${ch.key}-${r}`,
         photos: ch.items.slice(r, r + PER_ROW).map(([p, c]) => view(p, ch.withZone, c)),
-        gap: r ? 48 : 40,
+        gap: r ? 48 : ch.title ? 40 : 56,
         est: 560,
         cont,
       });
     }
   });
 
-  // 05 Location index
-  sec("index", true);
-  const ixHead: Block = { type: "ixHead", key: "ixhead", gap: 0, est: 40 };
-  add({ ...ixHead, gap: 56, keep: true });
-  const ix = new Map<string, { p: ParsedPhoto; codes: Set<string>; nums: number[] }>();
-  [...parsed]
-    .sort((a, b) => zoneOrd(a.zone) - zoneOrd(b.zone) || sortLU(a, b))
-    .forEach((p) => {
-      const k = p.zone + "|" + p.level + "|" + (p.unit ?? "");
-      if (!ix.has(k)) ix.set(k, { p, codes: new Set(), nums: [] });
-      const e = ix.get(k)!;
-      p.codes.forEach((c) => e.codes.add(c));
-      e.nums.push(numOf.get(p) ?? 0);
-    });
-  [...ix.values()].forEach((e, i) => {
-    let codes = CODES.map((c) => c.code).filter((c) => c !== "OV" && e.codes.has(c));
-    if (!codes.length) codes = ["OV"];
+  // Technician comments close the findings, as in the anchor report.
+  const notesHtml = sanitizeNotesHtml(job.technicianNotes);
+  if (!notesIsEmpty(notesHtml)) {
     add({
-      type: "ixRow",
-      key: "ix-" + i,
-      zone: e.p.zone,
-      level: e.p.level,
-      unit: e.p.unit ?? "",
-      chips: codes.map(chip),
-      photos: [...new Set(e.nums)].sort((a, b) => a - b).map(pad).join(", "),
-      gap: 0,
-      est: 54,
-      cont: ixHead,
+      type: "notes",
+      key: "notes",
+      html: notesHtml,
+      gap: 96,
+      est: 120 + notesLineCount(notesHtml) * 32,
     });
-  });
+  }
+
+  // 05 Location index
+  if (shown("index")) {
+    sec("index", true);
+    const ixHead: Block = { type: "ixHead", key: "ixhead", gap: 0, est: 40 };
+    add({ ...ixHead, gap: 56, keep: true });
+    const ix = new Map<string, { p: ParsedPhoto; codes: Set<string>; nums: number[] }>();
+    [...parsed]
+      .sort((a, b) => zoneOrd(a.zone) - zoneOrd(b.zone) || sortLU(a, b))
+      .forEach((p) => {
+        const k = p.zone + "|" + p.level + "|" + (p.unit ?? "");
+        if (!ix.has(k)) ix.set(k, { p, codes: new Set(), nums: [] });
+        const e = ix.get(k)!;
+        p.codes.forEach((c) => e.codes.add(c));
+        e.nums.push(numOf.get(p) ?? 0);
+      });
+    [...ix.values()].forEach((e, i) => {
+      let codes = CODES.map((c) => c.code).filter((c) => c !== "OV" && e.codes.has(c));
+      if (!codes.length) codes = ["OV"];
+      add({
+        type: "ixRow",
+        key: "ix-" + i,
+        zone: e.p.zone,
+        level: e.p.level,
+        unit: e.p.unit ?? "",
+        chips: codes.map(chip),
+        photos: [...new Set(e.nums)].sort((a, b) => a - b).map(pad).join(", "),
+        gap: 0,
+        est: 54,
+        cont: ixHead,
+      });
+    });
+  }
 
   // 06 Summary
-  sec("summary", true);
-  add({
-    type: "sum",
-    key: "sum",
-    note: EXCLUSIONS.join(" "),
-    rows: sumRows,
-    stats: [
-      { v: nDef, k: "Defects recorded" },
-      { v: nRed, k: "Need action now" },
-      { v: present.length, k: "Defect types" },
-      { v: nZones, k: "Zones inspected" },
-    ],
-    gap: 56,
-    est: 330 + sumRows.length * 210,
-  });
+  if (shown("summary")) {
+    sec("summary", true);
+    add({
+      type: "sum",
+      key: "sum",
+      note: T("sum.note", EXCLUSIONS.join(" ")),
+      rows: sumRows,
+      stats: [
+        { v: nDef, k: "Defects recorded" },
+        { v: nRed, k: "Need action now" },
+        { v: present.length, k: "Defect types" },
+        hasZones ? { v: nZones, k: "Zones inspected" } : { v: parsed.length, k: "Photos" },
+      ],
+      gap: 56,
+      est: 330 + sumRows.length * 210,
+    });
+  }
 
   // 07 Recommended works (own page, rendered outside the flow)
   const items: WorkItem[] = present.map((code) => ({
     chip: chip(code),
-    name: CODE_MAP[code].work,
-    why: CODE_MAP[code].why,
+    name: T(`works.${code}.name`, CODE_MAP[code].work),
+    why: T(`works.${code}.why`, CODE_MAP[code].why),
     zones: zonesOf(code).join(", "),
   }));
-  const extras = lib.extras.filter((x) => !x.whenAny || present.some((c) => x.whenAny!.includes(c)));
+  // n: the card's place in the library, which keys its edited wording.
+  const extras = lib.extras
+    .map((x, n) => ({ ...x, n, t: T(`extra.${n}.t`, x.t), d: T(`extra.${n}.d`, x.d) }))
+    .filter((x) => !x.whenAny || present.some((c) => x.whenAny!.includes(c)));
   const reportName = lib.label.toLowerCase() + " report";
   const body =
     `Hi RAS-VERTEX team,\n\nPlease quote the following works from ${reportName} ${job.ref} for ${job.site}, ${job.address}:\n\n` +
-    items.map((w) => `- ${w.name} (${w.zones})`).join("\n") +
+    items.map((w) => `- ${w.name}${w.zones ? ` (${w.zones})` : ""}`).join("\n") +
     "\n\nThanks,";
   const href =
     // Quote requests go to the team inbox; the contact is named on the page.
@@ -641,8 +710,9 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     sections,
     blocks: B,
     zoneRows,
+    chapters: chapList.filter((c) => c.title).map((c) => ({ key: c.key, title: c.title })),
     hasOther: other.length > 0,
-    about: lib.about,
+    about: lib.about.map((a, i) => ({ ...a, t: T(`about.${i}.t`, a.t), d: T(`about.${i}.d`, a.d) })),
     works: { items, extras, href, fit: extras.length ? worksFit(items) : "none" },
     nDefects: nDef,
   };

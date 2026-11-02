@@ -266,8 +266,11 @@
 }
 
 .primary {
-  background: var(--ink);
-  color: #fff;
+  background: var(--btn-primary);
+  color: var(--btn-primary-ink);
+}
+.primary:hover:not(:disabled) {
+  background: var(--btn-primary-hover);
 }
 
 .primary:disabled {

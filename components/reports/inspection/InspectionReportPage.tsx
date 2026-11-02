@@ -25,8 +25,13 @@ import {
 } from "react";
 import styles from "./InspectionReportPage.module.css";
 import AppleSelect from "./AppleSelect";
-import MapCaptureModal, { type MapView } from "./MapCaptureModal";
+import MapCaptureModal, { type MapView } from "@/components/reports/shared/MapCaptureModal";
 import TagModal from "./TagModal";
+import SaveReportModal from "@/components/reports/shared/SaveReportModal";
+import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
+import DocEditor from "@/components/workspace/DocEditor";
+import PageRail, { type RailRow } from "@/components/reports/shared/builder/PageRail";
+import PanelResizer, { usePanelWidth } from "@/components/reports/shared/builder/PanelResizer";
 import InspectionDocument, {
   InspectionMeasure,
   InspectionStyles,
@@ -45,7 +50,7 @@ import {
   type Library,
   type ReportKind,
 } from "@/lib/reports/inspection/codes";
-import { buildModel, paginate, PAGE_W, type PhotoView } from "@/lib/reports/inspection/generate";
+import { buildModel, paginate, PAGE_W, type Block, type PhotoView, type SectionKey } from "@/lib/reports/inspection/generate";
 import {
   createInspectionReport,
   draftKey,
@@ -62,20 +67,18 @@ import {
   type InspectionReportData,
 } from "@/lib/reports/inspection/types";
 import type { EnrichedJob } from "@/lib/simpro/types";
+import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
 
 interface Props {
   onBack: () => void;
 }
 
-type SaveStatus = "idle" | "saving" | "saved" | "error";
 type ExportState =
   | { phase: "idle" }
   | { phase: "exporting" }
-  | { phase: "done"; savedToJob: boolean }
+  | { phase: "done" }
   | { phase: "error"; message: string };
 
-const AUTOSAVE_DEBOUNCE_MS = 1500;
-const AUTOSAVE_RETRY_MS = 5000;
 
 const pub = (rel: string) => "/" + rel;
 const ASSETS: InspectionAssets = {
@@ -103,6 +106,36 @@ const CONTACT_OPTIONS = CONTACTS.map((c) => ({ value: c.name, label: c.name, det
 
 type Kept = Pick<InspectionPhoto, "label" | "title" | "desc">;
 
+type Sel = "cover" | SectionKey;
+const SECTION_ORDER: SectionKey[] = ["about", "map", "defects", "findings", "index", "summary", "works"];
+const SECTION_NAMES: Record<SectionKey, string> = {
+  about: "About this report",
+  map: "Site map",
+  defects: "Defects explained",
+  findings: "Findings",
+  index: "Location index",
+  summary: "Summary",
+  works: "Recommended works",
+};
+/** Sections the builder can leave out (the rest always print). */
+const HIDEABLE: Sel[] = ["map", "defects", "index", "summary"];
+
+/** The section a clicked key on the page belongs to. */
+function sectionOfKey(key: string): Sel {
+  const [a, b] = key.split(".");
+  if (a === "sec") return b as SectionKey;
+  if (key === "job.scope" || a === "about" || a === "ex") return "about";
+  if (key === "job.technicianNotes") return "findings";
+  if (key === "job.contact" || a === "works" || a === "extra") return "works";
+  if (a === "job") return "cover";
+  if (a === "map") return "map";
+  if (a === "defect") return "defects";
+  if (a === "sum") return "summary";
+  return "cover";
+}
+
+
+
 export default function InspectionReportPage({ onBack }: Props) {
   const [r, setR] = useState<InspectionReportData | null>(null);
   const [jobInput, setJobInput] = useState("");
@@ -114,12 +147,10 @@ export default function InspectionReportPage({ onBack }: Props) {
   const [progress, setProgress] = useState({ loaded: 0, total: 0 });
   const [importError, setImportError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
-  const [saveToJob, setSaveToJob] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [exp, setExp] = useState<ExportState>({ phase: "idle" });
 
   const importGen = useRef(0);
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const update = useCallback((fn: (prev: InspectionReportData) => InspectionReportData) => {
     setR((prev) => (prev ? fn(prev) : prev));
@@ -238,32 +269,12 @@ export default function InspectionReportPage({ onBack }: Props) {
     }
   }, [jobInput, kind, loading, importPhotos]);
 
-  // ── Autosave ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!r) return;
-    // Never persist mid-import: photos sit on large data: URLs until their
-    // Blob uploads finish.
-    if (importing || uploading) return;
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    const delay = saveStatus === "error" ? AUTOSAVE_RETRY_MS : AUTOSAVE_DEBOUNCE_MS;
-    autosaveTimer.current = setTimeout(async () => {
-      setSaveStatus("saving");
-      try {
-        const res = await fetch(`/api/inspection-reports/${draftKey(r.jobId, r.kind ?? "building")}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(r),
-        });
-        setSaveStatus(res.ok ? "saved" : "error");
-      } catch {
-        setSaveStatus("error");
-      }
-    }, delay);
-    return () => {
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [r, importing, uploading]);
+  // ── Autosave (never mid-import: photos sit on data: URLs until uploaded) ──
+  const { status: saveStatus, setStatus: setSaveStatus } = useDraftAutosave(
+    r ? `/api/inspection-reports/${draftKey(r.jobId, r.kind ?? "building")}` : null,
+    r,
+    { ready: !importing && !uploading },
+  );
 
   // ── Generate, measure, paginate ───────────────────────────────────────────
   const model = useMemo(() => (r ? buildModel(r) : null), [r]);
@@ -290,7 +301,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     });
     if (changed) setHeights(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [r?.photos, r?.job, !!model?.mapPhotoId, fontsReady, !!model]);
+  }, [r?.photos, r?.job, r?.text, r?.hidden, !!model?.mapPhotoId, fontsReady, !!model]);
   const layout = useMemo(() => (model ? paginate(model.blocks, heights) : null), [model, heights]);
 
   const urlById = useMemo(() => new Map((r ? reportImages(r) : []).map((p) => [p.id, p.url])), [r]);
@@ -483,6 +494,73 @@ export default function InspectionReportPage({ onBack }: Props) {
       );
   };
 
+  // ── Sections: rail, panel and click-to-edit ───────────────────────────────
+  const [sel, setSel] = useState<Sel>("cover");
+  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const panel = usePanelWidth("ir-panel-width", 360);
+  const secOf = (k: SectionKey) => model?.sections.find((s) => s.key === k);
+  const pageOf = (k: Sel) => (k === "cover" ? 1 : layout?.secPage[k]);
+  const railRows: RailRow[] = (["cover", ...SECTION_ORDER] as Sel[]).map((key) => {
+    if (key === "cover") return { id: key, name: "Cover", num: "C" };
+    const s = secOf(key);
+    const hidden = !!r?.hidden?.[key];
+    // Site map needs zones, the index needs locations: without them the
+    // section is left out on its own.
+    const absent = !s && !hidden;
+    return {
+      id: key,
+      name: s?.title ?? SECTION_NAMES[key],
+      num: pageOf(key) != null ? String(pageOf(key)).padStart(2, "0") : "",
+      hideable: HIDEABLE.includes(key),
+      hidden,
+      absent,
+      title: absent ? "Nothing to show: no photo is tagged with a location" : undefined,
+    };
+  });
+  const scrollToPage = (n: number | undefined) =>
+    n && requestAnimationFrame(() => docRef.current?.querySelector(`[data-pageno="${n}"]`)?.scrollIntoView({ block: "start" }));
+  const pickSection = (k: Sel, scroll = false) => {
+    setSel(k);
+    setEditing(null);
+    setFocusKey(null);
+    if (scroll) scrollToPage(pageOf(k));
+  };
+  const editKey = (key: string) => {
+    setSel(sectionOfKey(key));
+    setEditing(null);
+    setFocusKey(key);
+  };
+  // Clicked text on the page: bring its field into view and focus it.
+  useEffect(() => {
+    if (!focusKey) return;
+    const id = requestAnimationFrame(() => {
+      const el = panelRef.current?.querySelector<HTMLElement>(`[data-field="${focusKey}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: "center" });
+      el.querySelector<HTMLElement>("input, textarea, .tiptap")?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [focusKey, sel]);
+
+  const setText = (key: string, v: string | undefined) =>
+    update((p) => {
+      const text = { ...p.text };
+      if (v === undefined) delete text[key];
+      else text[key] = v;
+      return { ...p, text };
+    });
+  /** An editable wording: the edit if there is one, else what's printed. */
+  const txt = (key: string, printed: string) => ({
+    fieldKey: key,
+    value: r?.text?.[key] ?? printed,
+    onChange: (v: string) => setText(key, v),
+    onReset: r?.text?.[key] != null ? () => setText(key, undefined) : undefined,
+  });
+  const exBlock = model?.blocks.find((b): b is Extract<Block, { type: "ex" }> => b.type === "ex");
+  const sumBlock = model?.blocks.find((b): b is Extract<Block, { type: "sum" }> => b.type === "sum");
+  const defectBlocks = (model?.blocks ?? []).filter((b): b is Extract<Block, { type: "defect" }> => b.type === "defect");
+
   const editPhoto = editing ? r?.photos.find((p) => p.id === editing) : undefined;
   // A photo whose label stops parsing drops off the page; keep editing it.
   const editView: PhotoView | undefined = editPhoto
@@ -505,7 +583,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       const res = await fetch("/api/reports/export-inspection-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ report: r, saveToJob }),
+        body: JSON.stringify({ report: r }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -513,7 +591,6 @@ export default function InspectionReportPage({ onBack }: Props) {
       }
       const filename =
         decodeURIComponent(res.headers.get("X-Filename") ?? "") || `Inspection Report J${r.jobId}.pdf`;
-      const savedToJob = res.headers.get("X-Saved-To-Job") === "yes";
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = url;
@@ -522,7 +599,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      setExp({ phase: "done", savedToJob });
+      setExp({ phase: "done" });
     } catch (err) {
       setExp({ phase: "error", message: err instanceof Error ? err.message : "Export failed" });
     }
@@ -534,43 +611,23 @@ export default function InspectionReportPage({ onBack }: Props) {
   return (
     <div className={styles.root}>
       <InspectionStyles />
-      <header className={styles.header}>
-        <button className={styles.back} onClick={onBack} aria-label="Back to report types">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M11 6l-6 6 6 6" />
-          </svg>
-        </button>
-        <div className={styles.titleBlock}>
-          <span className={styles.title}>{r ? `${r.job.site} · ${lib.label}` : "New inspection report"}</span>
-          <span className={styles.subtitle}>{r ? `Job ${r.jobId} · ${r.job.forName}` : "Not started"}</span>
-        </div>
-        <div className={styles.spacer} />
+      <BuilderHeader
+        onBack={onBack}
+        title={r ? `${r.job.site} · ${lib.label}` : "New inspection report"}
+        subtitle={r ? `Job ${r.jobId} · ${r.job.forName}` : "Not started"}
+        status={r ? (importing ? { text: "Loading photos…", busy: true } : saveStatus) : undefined}
+      >
         {r && (
-          <div className={styles.headerRight}>
-            <span className={styles.saveState}>
-              <span
-                className={`${styles.saveDot} ${
-                  saveStatus === "error" ? styles.saveDotError : saveStatus === "saved" ? "" : styles.saveDotPending
-                }`}
-              />
-              {importing
-                ? "Loading photos…"
-                : saveStatus === "error"
-                  ? "Save failed, retrying"
-                  : saveStatus === "saved"
-                    ? "Draft saved"
-                    : "Saving…"}
-            </span>
-            <label className={styles.checkLabel}>
-              <input type="checkbox" checked={saveToJob} onChange={(e) => setSaveToJob(e.target.checked)} />
-              Attach to job
-            </label>
-            <button className={styles.darkPill} onClick={exportPdf} disabled={!canExport || exp.phase === "exporting"}>
-              {exp.phase === "exporting" ? "Exporting…" : "Export PDF"}
-            </button>
-          </div>
+          <>
+            <HeaderButton onClick={exportPdf} disabled={!canExport || exp.phase === "exporting"}>
+              {exp.phase === "exporting" ? "Exporting…" : "Download PDF"}
+            </HeaderButton>
+            <HeaderButton primary onClick={() => setSaving(true)} disabled={!canExport}>
+              Save to SimPRO
+            </HeaderButton>
+          </>
         )}
-      </header>
+      </BuilderHeader>
 
       {!r && (
         <div className={styles.start}>
@@ -620,28 +677,286 @@ export default function InspectionReportPage({ onBack }: Props) {
 
       {r && model && layout && (
         <div className={styles.body}>
-          <aside className={styles.panel}>
+          <PageRail
+            rows={railRows}
+            sel={sel}
+            onPick={(k) => pickSection(k as Sel, true)}
+            onToggle={(k) => update((p) => ({ ...p, hidden: { ...p.hidden, [k]: !p.hidden?.[k as SectionKey] } }))}
+          />
+
+          <main ref={previewRef} className={styles.preview}>
+            <div ref={measureRef}>
+              <InspectionMeasure model={model} assets={ASSETS} />
+            </div>
+            <div ref={docRef} style={{ zoom }}>
+              <InspectionDocument
+                onPhotoClick={(id) => {
+                  setSel("findings");
+                  pickPhoto(id);
+                }}
+                onEdit={editKey}
+                editing={editing}
+                model={model}
+                layout={layout}
+                job={r.job}
+                photoUrl={photoUrl}
+                assets={ASSETS}
+                screen
+                onPinPointerDown={onPinPointerDown}
+                onCoverPointerDown={onCoverPointerDown}
+              />
+            </div>
+          </main>
+
+          <PanelResizer panel={panel} />
+
+          <aside ref={panelRef} className={styles.panel} style={{ width: panel.w }}>
+            <div className={styles.panelHead}>
+              <span className={styles.panelTitle}>{railRows.find((x) => x.id === sel)?.name}</span>
+            </div>
             {exp.phase === "done" && (
               <div className={styles.notice}>
-                PDF downloaded{exp.savedToJob ? " and attached to the job." : saveToJob ? ", but attaching it to the job failed." : "."}
+                PDF downloaded.
               </div>
             )}
             {exp.phase === "error" && <div className={styles.error}>{exp.message}</div>}
+            <input ref={mapFileRef} type="file" accept="image/*" hidden onChange={onFile("map")} />
+            <input ref={coverFileRef} type="file" accept="image/*" hidden onChange={onFile("cover")} />
 
-            {editPhoto && editView ? (
-              <PhotoEditor
-                photo={editPhoto}
-                view={editView}
-                index={photoViews.indexOf(editView)}
-                count={photoViews.length}
-                lib={lib}
-                onBack={() => pickPhoto(null)}
-                onStep={(by) => pickPhoto(photoViews[photoViews.indexOf(editView) + by]?.id ?? editView.id, true)}
-                onChange={(patch) => setPhoto(editPhoto.id, patch)}
-                onTag={() => setTagQueue([editPhoto.id])}
-              />
-            ) : (
-            <>
+
+            {sel === "cover" && (
+              <>
+                <section className={styles.group}>
+                  <Field label="Building name" fieldKey="job.site" value={r.job.site} onChange={(site) => setJob({ site })} />
+                  <Field label="Intro" fieldKey="job.blurb" value={r.job.blurb} multiline onChange={(blurb) => setJob({ blurb })} />
+                  <Field label="Prepared for" fieldKey="job.forName" value={r.job.forName} onChange={(forName) => setJob({ forName })} />
+                  <Field label="Prepared by" fieldKey="job.by" value={r.job.by} onChange={(by) => setJob({ by })} />
+                  <Field label="Their title" fieldKey="job.byTitle" value={r.job.byTitle} onChange={(byTitle) => setJob({ byTitle })} />
+                  <Field label="Date" fieldKey="job.date" value={r.job.date} onChange={(date) => setJob({ date })} />
+                </section>
+            {/* Cover photo */}
+            <section className={styles.group}>
+              <div className={styles.groupHead}>
+                <h2 className={styles.groupTitle}>Cover photo</h2>
+                {r.cover && (
+                  <button className={styles.linkBtn} onClick={() => setChoice("cover", null)}>
+                    Use first overview
+                  </button>
+                )}
+              </div>
+              <div className={styles.btnRow}>
+                <button
+                  className={`${styles.smallBtn} ${styles.smallBtnPrimary}`}
+                  disabled={!!imgBusy}
+                  onClick={() => coverFileRef.current?.click()}
+                >
+                  Upload photo
+                </button>
+                <button
+                  className={`${styles.smallBtn} ${picker === "cover" ? styles.smallBtnOn : ""}`}
+                  disabled={!!imgBusy || !r.photos.length}
+                  onClick={() => setPicker(picker === "cover" ? null : "cover")}
+                >
+                  Job photo
+                </button>
+              </div>
+              {picker === "cover" && (
+                <PhotoPicker
+                  photos={r.photos}
+                  selected={model.coverPhotoId}
+                  onPick={(id) => {
+                    setChoice("cover", { source: "photo", photoId: id });
+                    setPicker(null);
+                  }}
+                />
+              )}
+              {imgBusy === "cover" && <p className={styles.hint}>Uploading cover photo…</p>}
+              {imgError?.which === "cover" && <div className={styles.error}>{imgError.message}</div>}
+              {model.coverPhotoId && (
+                <>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>
+                      Zoom <span className={styles.fieldValue}>{Math.round(model.coverPos.zoom * 100)}%</span>
+                    </span>
+                    <input
+                      className={styles.range}
+                      type="range"
+                      min={1}
+                      max={3}
+                      step={0.05}
+                      value={model.coverPos.zoom}
+                      onChange={(e) => setCoverPos({ zoom: Number(e.target.value) })}
+                    />
+                  </label>
+                  <p className={styles.hint}>
+                    Drag the photo on the cover in the preview to reposition it.{" "}
+                    {(model.coverPos.x !== 50 || model.coverPos.y !== 50 || model.coverPos.zoom !== 1) && (
+                      <button className={styles.linkBtn} onClick={() => setCoverPos({ ...DEFAULT_COVER_POS })}>
+                        Reset
+                      </button>
+                    )}
+                  </p>
+                </>
+              )}
+            </section>
+
+              </>
+            )}
+
+            {sel === "about" && (
+              <>
+                <section className={styles.group}>
+                  <Field {...txt("sec.about.title", secOf("about")?.title ?? "")} label="Title" />
+                  <Field label="Intro" fieldKey="job.scope" value={r.job.scope} multiline onChange={(scope) => setJob({ scope })} />
+                </section>
+                {model.about.map((a, i) => (
+                  <section key={i} className={styles.group}>
+                    <Field {...txt(`about.${i}.t`, a.t)} label={`Card ${i + 1} title`} />
+                    <Field {...txt(`about.${i}.d`, a.d)} label="Text" multiline />
+                  </section>
+                ))}
+                {exBlock && (
+                  <section className={styles.group}>
+                    <Field {...txt("ex.title", exBlock.title)} label="Reading a photo · title" />
+                    <Field {...txt("ex.intro", exBlock.intro)} label="Text" multiline />
+                  </section>
+                )}
+              </>
+            )}
+
+            {sel === "map" && (
+              <>
+                {secOf("map") ? (
+                  <section className={styles.group}>
+                    <Field {...txt("sec.map.title", secOf("map")!.title)} label="Title" />
+                    <Field {...txt("sec.map.intro", secOf("map")!.intro)} label="Intro" multiline />
+                  </section>
+                ) : (
+                  <section className={styles.group}>
+                    <p className={styles.hint}>
+                      {model.zoneRows.length
+                        ? "Hidden. Show it from the eye in the page list."
+                        : "Left out: no photo is tagged with a drop (D#) or section (S#). Tag one and the site map comes back."}
+                    </p>
+                  </section>
+                )}
+            {/* Site map */}
+            <section className={styles.group} data-field="map">
+              <div className={styles.groupHead}>
+                <h2 className={styles.groupTitle}>Site map</h2>
+                {r.siteMap && (
+                  <button className={styles.linkBtn} onClick={() => setChoice("map", null)}>
+                    {model.labelMapPhotoId ? "Use photo labelled Aerial" : "Remove"}
+                  </button>
+                )}
+              </div>
+              {model.mapPhotoId && (
+                <div className={styles.mapThumb} style={{ backgroundImage: `url("${photoUrl(model.mapPhotoId)}")` }} />
+              )}
+              <p className={styles.hint}>
+                {model.mapSource === "label"
+                  ? `Using the job photo labelled “${photoLabel(r.photos.find((p) => p.id === model.mapPhotoId) ?? r.photos[0])}”.`
+                  : model.mapSource === "upload"
+                    ? "Using an uploaded image."
+                    : model.mapSource === "satellite"
+                      ? "Using a Google Maps capture."
+                      : model.mapSource === "photo"
+                        ? "Using a job photo."
+                        : "No photo labelled “Aerial” on this job. Upload a site map or capture one from Google Maps."}
+              </p>
+              <div className={styles.btnRow}>
+                <button
+                  className={`${styles.smallBtn} ${styles.smallBtnPrimary}`}
+                  disabled={!!imgBusy}
+                  onClick={() => mapFileRef.current?.click()}
+                >
+                  Upload image
+                </button>
+                <button
+                  className={styles.smallBtn}
+                  disabled={!!imgBusy || !r.job.address}
+                  onClick={() => setMapModal(true)}
+                >
+                  Capture from map
+                </button>
+                <button
+                  className={`${styles.smallBtn} ${picker === "map" ? styles.smallBtnOn : ""}`}
+                  disabled={!!imgBusy || !r.photos.length}
+                  onClick={() => setPicker(picker === "map" ? null : "map")}
+                >
+                  Job photo
+                </button>
+              </div>
+              {picker === "map" && (
+                <PhotoPicker
+                  photos={r.photos}
+                  selected={r.siteMap?.source === "photo" ? r.siteMap.photoId : null}
+                  onPick={(id) => {
+                    setChoice("map", { source: "photo", photoId: id });
+                    setPicker(null);
+                  }}
+                />
+              )}
+              {imgBusy === "map" && <p className={styles.hint}>Adding site map…</p>}
+              {imgError?.which === "map" && <div className={styles.error}>{imgError.message}</div>}
+              {model.zoneRows.length > 0 && (
+                <p className={styles.hint}>
+                  {model.zoneRows.length} tag{model.zoneRows.length === 1 ? "" : "s"} from the photo labels (
+                  {model.zoneRows.map((z) => z.zone).join(", ")})
+                  {model.mapPhotoId ? ". Drag them into place on the map in the preview." : "."}
+                </p>
+              )}
+            </section>
+
+              </>
+            )}
+
+            {sel === "defects" && (
+              <>
+                {secOf("defects") ? (
+                  <>
+                    <section className={styles.group}>
+                      <Field {...txt("sec.defects.title", secOf("defects")!.title)} label="Title" />
+                      <Field {...txt("sec.defects.intro", secOf("defects")!.intro)} label="Intro" multiline />
+                    </section>
+                    {defectBlocks.map((b) => (
+                      <section key={b.chip.code} className={styles.group}>
+                        <h2 className={styles.groupTitle}>
+                          {b.chip.code} · {b.name}
+                        </h2>
+                        <Field {...txt(`defect.${b.chip.code}.what`, b.what)} label="What it is" multiline />
+                        <Field {...txt(`defect.${b.chip.code}.act`, b.act)} label="Recommended action" multiline />
+                      </section>
+                    ))}
+                  </>
+                ) : (
+                  <section className={styles.group}>
+                    <p className={styles.hint}>Hidden. Show it from the eye in the page list.</p>
+                  </section>
+                )}
+              </>
+            )}
+
+            {sel === "findings" &&
+              (editPhoto && editView ? (
+                <PhotoEditor
+                  photo={editPhoto}
+                  view={editView}
+                  index={photoViews.indexOf(editView)}
+                  count={photoViews.length}
+                  lib={lib}
+                  onBack={() => pickPhoto(null)}
+                  onStep={(by) => pickPhoto(photoViews[photoViews.indexOf(editView) + by]?.id ?? editView.id, true)}
+                  onChange={(patch) => setPhoto(editPhoto.id, patch)}
+                  onTag={() => setTagQueue([editPhoto.id])}
+                />
+              ) : (
+                <>
+                  <section className={styles.group}>
+                    <Field {...txt("sec.findings.title", secOf("findings")?.title ?? "")} label="Title" />
+                    <Field {...txt("sec.findings.intro", secOf("findings")?.intro ?? "")} label="Intro" multiline />
+                    <p className={styles.hint}>Click a photo on the page to edit its title and description.</p>
+                  </section>
             {/* Photos & labels */}
             <section className={styles.group}>
               <div className={styles.groupHead}>
@@ -747,181 +1062,99 @@ export default function InspectionReportPage({ onBack }: Props) {
               )}
             </section>
 
-            <input ref={mapFileRef} type="file" accept="image/*" hidden onChange={onFile("map")} />
-            <input ref={coverFileRef} type="file" accept="image/*" hidden onChange={onFile("cover")} />
-
-            {/* Site map */}
-            <section className={styles.group}>
-              <div className={styles.groupHead}>
-                <h2 className={styles.groupTitle}>Site map</h2>
-                {r.siteMap && (
-                  <button className={styles.linkBtn} onClick={() => setChoice("map", null)}>
-                    {model.labelMapPhotoId ? "Use photo labelled Aerial" : "Remove"}
-                  </button>
-                )}
+            <section className={styles.group} data-field="job.technicianNotes">
+              <h2 className={styles.groupTitle}>Technician comments</h2>
+              <div className={styles.editorBox}>
+                <DocEditor value={r.job.technicianNotes ?? ""} onChange={(technicianNotes) => setJob({ technicianNotes })} />
               </div>
-              {model.mapPhotoId && (
-                <div className={styles.mapThumb} style={{ backgroundImage: `url("${photoUrl(model.mapPhotoId)}")` }} />
-              )}
-              <p className={styles.hint}>
-                {model.mapSource === "label"
-                  ? `Using the job photo labelled “${photoLabel(r.photos.find((p) => p.id === model.mapPhotoId) ?? r.photos[0])}”.`
-                  : model.mapSource === "upload"
-                    ? "Using an uploaded image."
-                    : model.mapSource === "satellite"
-                      ? "Using a Google Maps capture."
-                      : model.mapSource === "photo"
-                        ? "Using a job photo."
-                        : "No photo labelled “Aerial” on this job. Upload a site map or capture one from Google Maps."}
-              </p>
-              <div className={styles.btnRow}>
-                <button
-                  className={`${styles.smallBtn} ${styles.smallBtnPrimary}`}
-                  disabled={!!imgBusy}
-                  onClick={() => mapFileRef.current?.click()}
-                >
-                  Upload image
-                </button>
-                <button
-                  className={styles.smallBtn}
-                  disabled={!!imgBusy || !r.job.address}
-                  onClick={() => setMapModal(true)}
-                >
-                  Capture from map
-                </button>
-                <button
-                  className={`${styles.smallBtn} ${picker === "map" ? styles.smallBtnOn : ""}`}
-                  disabled={!!imgBusy || !r.photos.length}
-                  onClick={() => setPicker(picker === "map" ? null : "map")}
-                >
-                  Job photo
-                </button>
-              </div>
-              {picker === "map" && (
-                <PhotoPicker
-                  photos={r.photos}
-                  selected={r.siteMap?.source === "photo" ? r.siteMap.photoId : null}
-                  onPick={(id) => {
-                    setChoice("map", { source: "photo", photoId: id });
-                    setPicker(null);
-                  }}
-                />
-              )}
-              {imgBusy === "map" && <p className={styles.hint}>Adding site map…</p>}
-              {imgError?.which === "map" && <div className={styles.error}>{imgError.message}</div>}
-              {model.zoneRows.length > 0 && (
-                <p className={styles.hint}>
-                  {model.zoneRows.length} tag{model.zoneRows.length === 1 ? "" : "s"} from the photo labels (
-                  {model.zoneRows.map((z) => z.zone).join(", ")})
-                  {model.mapPhotoId ? ". Drag them into place on the map in the preview." : "."}
-                </p>
-              )}
+              <p className={styles.hint}>Type / for headings and lists. Printed after the findings.</p>
             </section>
 
-            {/* Cover photo */}
-            <section className={styles.group}>
-              <div className={styles.groupHead}>
-                <h2 className={styles.groupTitle}>Cover photo</h2>
-                {r.cover && (
-                  <button className={styles.linkBtn} onClick={() => setChoice("cover", null)}>
-                    Use first overview
-                  </button>
-                )}
-              </div>
-              <div className={styles.btnRow}>
-                <button
-                  className={`${styles.smallBtn} ${styles.smallBtnPrimary}`}
-                  disabled={!!imgBusy}
-                  onClick={() => coverFileRef.current?.click()}
-                >
-                  Upload photo
-                </button>
-                <button
-                  className={`${styles.smallBtn} ${picker === "cover" ? styles.smallBtnOn : ""}`}
-                  disabled={!!imgBusy || !r.photos.length}
-                  onClick={() => setPicker(picker === "cover" ? null : "cover")}
-                >
-                  Job photo
-                </button>
-              </div>
-              {picker === "cover" && (
-                <PhotoPicker
-                  photos={r.photos}
-                  selected={model.coverPhotoId}
-                  onPick={(id) => {
-                    setChoice("cover", { source: "photo", photoId: id });
-                    setPicker(null);
-                  }}
-                />
-              )}
-              {imgBusy === "cover" && <p className={styles.hint}>Uploading cover photo…</p>}
-              {imgError?.which === "cover" && <div className={styles.error}>{imgError.message}</div>}
-              {model.coverPhotoId && (
-                <>
-                  <label className={styles.field}>
-                    <span className={styles.fieldLabel}>
-                      Zoom <span className={styles.fieldValue}>{Math.round(model.coverPos.zoom * 100)}%</span>
-                    </span>
-                    <input
-                      className={styles.range}
-                      type="range"
-                      min={1}
-                      max={3}
-                      step={0.05}
-                      value={model.coverPos.zoom}
-                      onChange={(e) => setCoverPos({ zoom: Number(e.target.value) })}
-                    />
-                  </label>
-                  <p className={styles.hint}>
-                    Drag the photo on the cover in the preview to reposition it.{" "}
-                    {(model.coverPos.x !== 50 || model.coverPos.y !== 50 || model.coverPos.zoom !== 1) && (
-                      <button className={styles.linkBtn} onClick={() => setCoverPos({ ...DEFAULT_COVER_POS })}>
-                        Reset
-                      </button>
-                    )}
-                  </p>
                 </>
-              )}
-            </section>
+              ))}
 
-            <section className={styles.group}>
+            {sel === "index" && (
+              <section className={styles.group}>
+                {secOf("index") ? (
+                  <>
+                    <Field {...txt("sec.index.title", secOf("index")!.title)} label="Title" />
+                    <Field {...txt("sec.index.intro", secOf("index")!.intro)} label="Intro" multiline />
+                  </>
+                ) : (
+                  <p className={styles.hint}>
+                    {r.hidden?.index
+                      ? "Hidden. Show it from the eye in the page list."
+                      : "Left out: no photo has a zone, level or unit, so there are no locations to list."}
+                  </p>
+                )}
+              </section>
+            )}
+
+            {sel === "summary" && (
+              <section className={styles.group}>
+                {secOf("summary") ? (
+                  <>
+                    <Field {...txt("sec.summary.title", secOf("summary")!.title)} label="Title" />
+                    <Field {...txt("sec.summary.intro", secOf("summary")!.intro)} label="Intro" multiline />
+                    {sumBlock && <Field {...txt("sum.note", sumBlock.note)} label="Please note" multiline />}
+                  </>
+                ) : (
+                  <p className={styles.hint}>Hidden. Show it from the eye in the page list.</p>
+                )}
+              </section>
+            )}
+
+            {sel === "works" && (
+              <>
+                <section className={styles.group}>
+                  <Field {...txt("sec.works.title", secOf("works")?.title ?? "")} label="Title" />
+                </section>
+                {model.works.items.map((w) => (
+                  <section key={w.chip.code} className={styles.group}>
+                    <h2 className={styles.groupTitle}>{w.chip.code}</h2>
+                    <Field {...txt(`works.${w.chip.code}.name`, w.name)} label="Work" />
+                    <Field {...txt(`works.${w.chip.code}.why`, w.why)} label="Why" multiline />
+                  </section>
+                ))}
+                {model.works.extras.map((x) => (
+                  <section key={x.n} className={styles.group}>
+                    <Field {...txt(`extra.${x.n}.t`, x.t)} label="Also worth adding · title" />
+                    <Field {...txt(`extra.${x.n}.d`, x.d)} label="Text" multiline />
+                  </section>
+                ))}
+            <section className={styles.group} data-field="job.contact">
               <h2 className={styles.groupTitle}>Contact for quotes</h2>
               <AppleSelect value={r.job.contact} options={CONTACT_OPTIONS} onChange={(contact) => setJob({ contact })} />
             </section>
 
-            <section className={styles.group}>
-              <h2 className={styles.groupTitle}>Scope</h2>
-              <textarea
-                className={styles.input}
-                rows={4}
-                value={r.job.scope}
-                onChange={(e) => setJob({ scope: e.target.value })}
-              />
-            </section>
-            </>
+              </>
             )}
           </aside>
-
-          <main ref={previewRef} className={styles.preview}>
-            <div ref={measureRef}>
-              <InspectionMeasure model={model} assets={ASSETS} />
-            </div>
-            <div ref={docRef} style={{ zoom }}>
-              <InspectionDocument
-                onPhotoClick={(id) => pickPhoto(id)}
-                editing={editing}
-                model={model}
-                layout={layout}
-                job={r.job}
-                photoUrl={photoUrl}
-                assets={ASSETS}
-                screen
-                onPinPointerDown={onPinPointerDown}
-                onCoverPointerDown={onCoverPointerDown}
-              />
-            </div>
-          </main>
         </div>
+      )}
+
+      {saving && r && (
+        <SaveReportModal
+          owner={{ kind: "Job", no: `#${r.jobId}` }}
+          siteId={r.job.siteId}
+          defaultFilename={`${lib.label} Report - ${r.job.site || "Building"} - J${r.jobId}`}
+          save={async (filename, d) => {
+            const res = await fetch("/api/reports/export-inspection-pdf", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ report: r, filename, destinations: { job: d.owner, site: d.site } }),
+            });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "PDF generation failed.");
+            const out = (want: boolean, v: string | null) =>
+              want ? { success: v === "yes", error: v === "yes" ? undefined : "Upload failed" } : undefined;
+            return {
+              filename: decodeURIComponent(res.headers.get("X-Filename") ?? filename),
+              owner: out(d.owner, res.headers.get("X-Saved-To-Job")),
+              site: out(d.site, res.headers.get("X-Saved-To-Site")),
+            };
+          }}
+          onClose={() => setSaving(false)}
+        />
       )}
 
       {tagQueue && r && model && (
@@ -1083,7 +1316,7 @@ function PhotoEditor({
           onChange={(e) => onChange({ label: e.target.value })}
         />
         <span className={styles.editHint}>
-          {parsed.kind === "rejected" ? parsed.reason : "Zone, level, unit and codes, e.g. D1 L2 MT AL - torn at outlet"}
+          {parsed.kind === "rejected" ? parsed.reason : "A code is all that’s needed, e.g. MT torn at outlet. Zone, level and unit (D1 L2 U4) are optional."}
           <button className={styles.linkBtn} onClick={onTag}>
             Tag
           </button>
@@ -1117,5 +1350,45 @@ function PhotoEditor({
       </label>
       <p className={styles.hint}>Left blank, the title is the defect name and the description is the note in the label.</p>
     </section>
+  );
+}
+
+/** A text field in the panel. data-field lets a click on the page find it. */
+function Field({
+  label,
+  fieldKey,
+  value,
+  onChange,
+  onReset,
+  multiline,
+}: {
+  label: string;
+  fieldKey: string;
+  value: string;
+  onChange: (v: string) => void;
+  onReset?: () => void;
+  multiline?: boolean;
+}) {
+  return (
+    <div className={styles.field} data-field={fieldKey}>
+      <span className={styles.fieldLabel}>
+        {label}
+        {onReset && (
+          <button className={styles.linkBtn} onClick={onReset} title="Back to the standard wording">
+            Reset
+          </button>
+        )}
+      </span>
+      {multiline ? (
+        <textarea
+          className={styles.input}
+          rows={Math.min(10, Math.max(2, Math.ceil(value.length / 42)))}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <input className={styles.input} value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </div>
   );
 }
