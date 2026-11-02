@@ -70,6 +70,8 @@ import {
 } from "@/lib/reports/inspection/types";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
+import Slider from "@/components/ui/Slider";
+import CropModal from "@/components/reports/shared/builder/CropModal";
 
 interface Props {
   onBack: () => void;
@@ -106,7 +108,7 @@ function readBlobAsDataUrl(blob: Blob): Promise<string> {
 
 const CONTACT_OPTIONS = CONTACTS.map((c) => ({ value: c.name, label: c.name, detail: c.title || undefined }));
 
-type Kept = Pick<InspectionPhoto, "label" | "title" | "desc">;
+type Kept = Pick<InspectionPhoto, "label" | "title" | "desc" | "pos">;
 
 type Sel = "cover" | SectionKey;
 const SECTION_ORDER: SectionKey[] = ["about", "map", "defects", "findings", "index", "summary", "works"];
@@ -215,8 +217,8 @@ export default function InspectionReportPage({ onBack }: Props) {
     // Labels, titles and descriptions typed here survive a re-import.
     const keep = new Map<string, Kept>(
       r.photos
-        .filter((p) => p.label != null || p.title != null || p.desc != null)
-        .map((p) => [p.id, { label: p.label, title: p.title, desc: p.desc }]),
+        .filter((p) => p.label != null || p.title != null || p.desc != null || p.pos != null)
+        .map((p) => [p.id, { label: p.label, title: p.title, desc: p.desc, pos: p.pos }]),
     );
     if (folder != null) update((p) => ({ ...p, folder: f }));
     importPhotos(r.jobId, f, keep);
@@ -782,14 +784,13 @@ export default function InspectionReportPage({ onBack }: Props) {
                     <span className={styles.fieldLabel}>
                       Zoom <span className={styles.fieldValue}>{Math.round(model.coverPos.zoom * 100)}%</span>
                     </span>
-                    <input
+                    <Slider
                       className={styles.range}
-                      type="range"
                       min={1}
                       max={3}
                       step={0.05}
                       value={model.coverPos.zoom}
-                      onChange={(e) => setCoverPos({ zoom: Number(e.target.value) })}
+                      onChange={(zoom) => setCoverPos({ zoom })}
                     />
                   </label>
                   <p className={styles.hint}>
@@ -1288,11 +1289,12 @@ function PhotoEditor({
   lib: Library;
   onBack: () => void;
   onStep: (by: number) => void;
-  onChange: (patch: Partial<Pick<InspectionPhoto, "label" | "title" | "desc">>) => void;
+  onChange: (patch: Partial<Kept>) => void;
   onTag: () => void;
 }) {
   const label = photoLabel(photo);
   const parsed = parseLabel(label, lib);
+  const [adjusting, setAdjusting] = useState(false);
   return (
     <section className={styles.group}>
       <div className={styles.focusBar}>
@@ -1310,6 +1312,23 @@ function PhotoEditor({
         </button>
       </div>
       <div className={styles.editThumb} style={{ backgroundImage: `url("${photo.url}")` }} />
+      <div className={styles.btnRow}>
+        <button className={styles.smallBtn} onClick={() => setAdjusting(true)} title="Drag to move the photo in its frame; zoom in to crop">
+          Adjust
+        </button>
+      </div>
+      {adjusting && (
+        <CropModal
+          src={photo.url}
+          aspect={4 / 3}
+          pos={photo.pos}
+          onDone={(pos) => {
+            onChange({ pos });
+            setAdjusting(false);
+          }}
+          onClose={() => setAdjusting(false)}
+        />
+      )}
 
       <label className={styles.field}>
         <span className={styles.fieldLabel}>Label</span>

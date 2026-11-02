@@ -13,6 +13,30 @@ export interface ReportPhoto {
   url: string;
   size: number;
   dateAdded?: string | null;
+  /** How it sits in its frame, set in Adjust. Unset = centred. */
+  pos?: PhotoPos;
+}
+
+/** How a photo sits in its frame: focal point (0–100 %) and zoom (1 = just
+ *  fills the frame). */
+export interface PhotoPos {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+/** Style for an <img> filling its frame (which clips it), so every report
+ *  frames a photo the same way, on screen and in the PDF. */
+export function photoPosStyle(pos?: PhotoPos | null) {
+  const x = pos?.x ?? 50;
+  const y = pos?.y ?? 50;
+  const z = Math.max(1, pos?.zoom ?? 1);
+  return {
+    objectFit: "cover" as const,
+    objectPosition: `${x}% ${y}%`,
+    transform: z > 1 ? `scale(${z})` : undefined,
+    transformOrigin: `${x}% ${y}%`,
+  };
 }
 
 // ── Attachment folders (SimPRO job attachments, grouped) ────────────────────

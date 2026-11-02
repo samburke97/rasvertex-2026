@@ -19,6 +19,7 @@ import type {
   ZoneBlock,
 } from "@/lib/reports/anchor.layout";
 import { pad } from "@/lib/reports/anchor.layout";
+import { photoPosStyle } from "@/lib/reports/photos";
 
 export interface AnchorAssets {
   images: Record<AnchorImageKey, string>;
@@ -32,6 +33,8 @@ interface Ctx {
   onCoverPointerDown?: (e: PointerEvent<HTMLElement>) => void;
   onPhotoRename?: (id: string, name: string) => void;
   onPhotoRemove?: (id: string) => void;
+  /** Preview only: click a photo to adjust it in its frame. */
+  onPhotoAdjust?: (id: string, frame: HTMLElement) => void;
 }
 
 // ── Stylesheet (scoped under .ar) ────────────────────────────────────────────
@@ -184,7 +187,7 @@ function Cover({ ctx }: { ctx: Ctx }) {
   const { model } = ctx;
   const { x, y, zoom } = model.coverPos;
   return (
-    <div className="ar-sheet" data-panel="cover">
+    <div className="ar-sheet" data-page="cover">
       <section className="ar-page ar-page--cover">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -192,10 +195,10 @@ function Cover({ ctx }: { ctx: Ctx }) {
           src={ctx.assets.images.logo}
           alt="RAS-VERTEX Maintenance Solutions"
         />
-        <h1 className="ar-h1" style={{ marginTop: 48 }} data-panel="details" data-panel-field="buildingName">
+        <h1 className="ar-h1" style={{ marginTop: 48 }} data-panel-field="buildingName">
           {model.site}.
         </h1>
-        <p className="ar-lede" style={{ fontSize: 22, marginTop: 24 }} data-panel="details" data-panel-field="description">
+        <p className="ar-lede" style={{ fontSize: 22, marginTop: 24 }} data-panel-field="description">
           {model.blurb}
         </p>
         <div
@@ -220,7 +223,7 @@ function Cover({ ctx }: { ctx: Ctx }) {
         </div>
         <div className="ar-facts" style={{ marginTop: 64 }}>
           {model.facts.map((f) => (
-            <div key={f.k} className="ar-fact" data-panel="details" data-panel-field={FACT_FIELD[f.k]}>
+            <div key={f.k} className="ar-fact" data-panel-field={FACT_FIELD[f.k]}>
               <div className="ar-label">{f.k}</div>
               <div className="ar-fact__v">{f.v || "—"}</div>
             </div>
@@ -446,7 +449,6 @@ function RegisterPage({
 function Notes({ html, top }: { html: string; top: boolean }) {
   return (
     <div
-      data-panel="notes"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -557,7 +559,13 @@ function PhotosPage({
           <div key={p.id} style={{ minWidth: 0 }}>
             <div className="ar-photo">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.url} alt="" />
+              <img
+                src={p.url}
+                alt=""
+                title={ctx.onPhotoAdjust ? "Click to adjust" : undefined}
+                style={{ ...photoPosStyle(p.pos), cursor: ctx.onPhotoAdjust ? "pointer" : undefined }}
+                onClick={ctx.onPhotoAdjust ? (e) => ctx.onPhotoAdjust!(p.id, e.currentTarget.parentElement!) : undefined}
+              />
               {ctx.onPhotoRemove && (
                 <button
                   type="button"
@@ -642,12 +650,12 @@ function CertPage({
     <section className="ar-page ar-page--end">
       <SecLabel text={secText(3)} />
       <h2 className="ar-h2">Certification</h2>
-      <p className="ar-lede" style={{ marginTop: 20 }} data-panel="details" data-panel-field="certNumber">
+      <p className="ar-lede" style={{ marginTop: 20 }} data-panel-field="certNumber">
         Certification of test and examination #{model.certNumber}.
       </p>
       <div className="ar-certfacts">
         {model.certFacts.map((f) => (
-          <div key={f.k} data-panel="details" data-panel-field={FACT_FIELD[f.k]}>
+          <div key={f.k} data-panel-field={FACT_FIELD[f.k]}>
             <span className="ar-label">{f.k}</span>
             <b>{f.v || "—"}</b>
           </div>
@@ -977,8 +985,8 @@ const FACT_FIELD: Record<string, string> = {
   "Next inspection date": "nextInspectionDate",
 };
 
-/** Builder: the side-panel group each page's settings live in. */
-const PAGE_PANEL: Record<string, string> = { summary: "zones", register: "zones", photos: "photos", cert: "cert" };
+/** Builder: the page (rail row) each sheet belongs to. */
+const PAGE_OF: Record<string, string> = { summary: "zones", register: "register", photos: "photos", cert: "cert" };
 
 interface DocProps {
   model: AnchorModel;
@@ -988,6 +996,8 @@ interface DocProps {
   /** Preview only: captions on photo pages become editable. */
   onPhotoRename?: (id: string, name: string) => void;
   onPhotoRemove?: (id: string) => void;
+  /** Preview only: click a photo to adjust it in its frame. */
+  onPhotoAdjust?: (id: string, frame: HTMLElement) => void;
 }
 
 export default function AnchorDocument({
@@ -997,6 +1007,7 @@ export default function AnchorDocument({
   onCoverPointerDown,
   onPhotoRename,
   onPhotoRemove,
+  onPhotoAdjust,
 }: DocProps) {
   const ctx: Ctx = {
     model,
@@ -1004,13 +1015,14 @@ export default function AnchorDocument({
     onCoverPointerDown,
     onPhotoRename,
     onPhotoRemove,
+    onPhotoAdjust,
   };
   return (
     <div className={`ar${screen ? " ar--screen" : ""}`}>
       <Cover ctx={ctx} />
       <Contents ctx={ctx} />
       {model.pages.map((p) => (
-        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-panel={PAGE_PANEL[p.kind]}>
+        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-page={PAGE_OF[p.kind]}>
           {p.kind === "summary" ? (
             <SummaryPage ctx={ctx} page={p} />
           ) : p.kind === "register" ? (

@@ -38,11 +38,6 @@
   border-bottom: 1px solid rgba(var(--ink-rgb), 0.07);
 }
 
-/* The group for the page last clicked in the preview (usePageToPanel). */
-.group[data-sel] {
-  background: rgba(var(--ink-rgb), 0.035);
-}
-
 .group:last-child {
   border-bottom: 0;
 }
@@ -353,7 +348,6 @@
 
 .range {
   width: 100%;
-  accent-color: var(--blue-500);
 }
 
 /* ── Misc ────────────────────────────────────────────────────────────────── */

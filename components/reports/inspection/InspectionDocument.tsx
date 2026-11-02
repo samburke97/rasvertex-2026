@@ -26,6 +26,7 @@ import {
   type PhotoView,
 } from "@/lib/reports/inspection/generate";
 import { contactFor, type InspectionJob } from "@/lib/reports/inspection/types";
+import { photoPosStyle } from "@/lib/reports/photos";
 
 export interface InspectionAssets {
   logo: string;
@@ -233,7 +234,10 @@ function Photo({ p, ctx }: { p: PhotoView; ctx: Ctx }) {
       data-photo={p.img ? undefined : p.id}
       onClick={ctx.onPhotoClick && !p.img ? () => ctx.onPhotoClick!(p.id) : undefined}
     >
-      <div className="ir-photo__img" style={{ backgroundImage: bg(p.img ? ctx.assets.images[p.img] : ctx.photoUrl(p.id)) }} />
+      <div className="ir-photo__img">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={(p.img ? ctx.assets.images[p.img] : ctx.photoUrl(p.id)) ?? undefined} alt="" style={{ width: "100%", height: "100%", display: "block", ...photoPosStyle(p.pos) }} />
+      </div>
       {/* Stacked: codes left with location and number right, then the
           defect name, then the technician's note. */}
       <div className="ir-photo__head">

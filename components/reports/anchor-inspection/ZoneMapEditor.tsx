@@ -27,6 +27,7 @@ import {
   type AnchorType,
   type Zone,
 } from "@/lib/reports/anchor.types";
+import Slider from "@/components/ui/Slider";
 
 interface ZoneMapEditorProps {
   zone: Zone;
@@ -1149,13 +1150,12 @@ export default function ZoneMapEditor({
                       >
                         ⟲
                       </button>
-                      <input
-                        type="range"
+                      <Slider
                         min={-180}
                         max={180}
                         step={1}
                         value={mapRotation}
-                        onChange={(e) => setMapRotation(Number(e.target.value))}
+                        onChange={setMapRotation}
                         className={styles.rotateSlider}
                         aria-label="Straighten angle, applied when captured"
                       />

@@ -16,6 +16,7 @@ import type {
 } from "@/lib/reports/anchor.types";
 import type { AnchorImportStatus } from "./AnchorInspectionPage";
 import type { PhotoImportStatus } from "../shared/PhotoSection";
+import Slider from "@/components/ui/Slider";
 
 interface AnchorOptionsPanelProps {
   zones: Zone[];
@@ -187,7 +188,7 @@ export default function AnchorOptionsPanel({
   return (
     <aside className={styles.panel}>
       {/* ── Job Number ───────────────────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-pages="cover">
         <div className={styles.groupLabel}>Job number</div>
         <JobImportInput
           onImport={onImport}
@@ -197,7 +198,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Report details: cover and certificate ────────────────────────── */}
-      <div className={styles.group} data-panel-group="details">
+      <div className={styles.group} data-pages="cover cert">
         <div className={styles.groupLabel}>Report details</div>
         {DETAIL_FIELDS.map((f) => (
           <label key={f.key} className={styles.field} data-panel-field={f.key}>
@@ -223,7 +224,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Zones ────────────────────────────────────────────────────────── */}
-      <div className={styles.group} data-panel-group="zones">
+      <div className={styles.group} data-pages="zones register">
         <div className={styles.groupLabelRow}>
           <span className={styles.groupLabel}>Zones</span>
           {totalAnchors > 0 && (
@@ -311,7 +312,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Cover photo ──────────────────────────────────────────────────── */}
-      <div className={styles.group} data-panel-group="cover">
+      <div className={styles.group} data-pages="cover">
         <div className={styles.groupLabel}>Cover photo</div>
         <input
           ref={coverRef}
@@ -343,13 +344,12 @@ export default function AnchorOptionsPanel({
           </div>
         </div>
         <div className={styles.subLabel}>Zoom · {Math.round(coverZoom * 100)}%</div>
-        <input
-          type="range"
+        <Slider
           min={1}
           max={3}
           step={0.05}
           value={coverZoom}
-          onChange={(e) => onCoverZoom(Number(e.target.value))}
+          onChange={onCoverZoom}
           className={styles.range}
         />
         <div className={styles.subLabel}>
@@ -358,7 +358,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Technician notes (under the asset register) ─────────────────── */}
-      <div className={styles.group} data-panel-group="notes">
+      <div className={styles.group} data-pages="register">
         <div className={styles.groupLabel}>Technician notes</div>
         <div className={styles.editorBox}>
           <DocEditor value={technicianNotes} onChange={onTechnicianNotes} />
@@ -369,7 +369,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Certification comments ───────────────────────────────────────── */}
-      <div className={styles.group} data-panel-group="cert">
+      <div className={styles.group} data-pages="cert">
         <div className={styles.groupLabel}>Certification comments</div>
         <textarea
           value={comments}
@@ -381,7 +381,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Supporting Photos — optional, off by default ────────────────── */}
-      <div className={styles.group} data-panel-group="photos">
+      <div className={styles.group} data-pages="photos">
         <div className={styles.groupLabelRow}>
           <span className={styles.groupLabel}>Supporting photos</span>
         </div>

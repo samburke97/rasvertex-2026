@@ -489,7 +489,6 @@ html :where(.root) :is(h1, h2, p, span) {
 
 .range {
   width: 100%;
-  accent-color: var(--blue-500);
 }
 
 /* Job photo picker */

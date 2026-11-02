@@ -57,7 +57,10 @@ import {
 } from "@/lib/reports/format-report-date";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
-import { usePageToPanel } from "@/components/reports/shared/builder/usePageToPanel";
+import { usePagePanel, SidePanel } from "@/components/reports/shared/builder/PagePanel";
+import PageRail from "@/components/reports/shared/builder/PageRail";
+import PanelResizer, { usePanelWidth } from "@/components/reports/shared/builder/PanelResizer";
+import { usePhotoAdjust } from "@/components/reports/shared/builder/CropModal";
 
 interface AnchorInspectionPageProps {
   onBack: () => void;
@@ -97,6 +100,16 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+
+/** Pages in the rail; each sheet's data-page and each panel group's
+ *  data-pages refer to these ids. */
+const PAGE_ROWS = [
+  { id: "cover", name: "Cover", num: "C" },
+  { id: "zones", name: "Zones & summary" },
+  { id: "register", name: "Asset register" },
+  { id: "photos", name: "Supporting photos" },
+  { id: "cert", name: "Certification" },
+];
 
 export default function AnchorInspectionPage({
   onBack,
@@ -670,7 +683,11 @@ export default function AnchorInspectionPage({
 
   // ── Preview zoom (fixed 1280px pages, scaled to the column) ────────────
   const previewRef = useRef<HTMLDivElement>(null);
-  const pageToPanel = usePageToPanel();
+  const pagePanel = usePagePanel("cover");
+  const photoAdjust = usePhotoAdjust(report.photos, (id, pos) =>
+    setReport((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id ? { ...p, pos } : p)) })),
+  );
+  const panelWidth = usePanelWidth("AnchorInspectionPage-panel-width", 340);
   const [zoom, setZoom] = useState(0.5);
   useLayoutEffect(() => {
     const el = previewRef.current;
@@ -733,7 +750,25 @@ export default function AnchorInspectionPage({
 
       {/* ── Body ── */}
       <div className={styles.editorBody}>
-        <div ref={pageToPanel.panelRef} style={{ display: "contents" }}>
+        <PageRail rows={PAGE_ROWS} sel={pagePanel.sel} onPick={(id) => pagePanel.pick(id, previewRef.current)} />
+
+        {/* ── Preview: the report itself, scaled to the column ── */}
+        <div ref={previewRef} className={styles.canvas} onClick={pagePanel.onDocClick}>
+          <AnchorStyles />
+          <div style={{ zoom }}>
+            <AnchorDocument
+              model={model}
+              assets={ASSETS}
+              screen
+              onCoverPointerDown={onCoverPointerDown}
+              onPhotoRename={renamePhoto}
+              onPhotoRemove={removePhoto}
+              onPhotoAdjust={photoAdjust.adjust}
+            />
+          </div>
+        </div>
+        <PanelResizer panel={panelWidth} />
+        <SidePanel panel={pagePanel} title={PAGE_ROWS.find((x) => x.id === pagePanel.sel)?.name ?? ""} width={panelWidth.w}>
           <AnchorOptionsPanel
             zones={report.zones}
             onAddZone={addZone}
@@ -767,23 +802,9 @@ export default function AnchorInspectionPage({
             technicianNotes={report.job.technicianNotes ?? ""}
             onTechnicianNotes={(v) => updateJob("technicianNotes", v)}
           />
-        </div>
-
-        {/* ── Preview: the report itself, scaled to the column ── */}
-        <div ref={previewRef} className={styles.canvas} onClick={pageToPanel.onDocClick}>
-          <AnchorStyles />
-          <div style={{ zoom }}>
-            <AnchorDocument
-              model={model}
-              assets={ASSETS}
-              screen
-              onCoverPointerDown={onCoverPointerDown}
-              onPhotoRename={renamePhoto}
-              onPhotoRemove={removePhoto}
-            />
-          </div>
-        </div>
+        </SidePanel>
       </div>
+      {photoAdjust.modal}
 
       {/* Save Report Modal */}
       {showSaveModal && (

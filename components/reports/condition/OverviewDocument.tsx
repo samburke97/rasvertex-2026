@@ -21,6 +21,7 @@ import {
   type OverviewModel,
   type Page,
 } from "@/lib/reports/overview.layout";
+import { photoPosStyle } from "@/lib/reports/photos";
 
 export interface OverviewAssets {
   /** Logo plus the closing page's service and client images. */
@@ -33,6 +34,8 @@ interface Ctx {
   onCoverPointerDown?: (e: PointerEvent<HTMLElement>) => void;
   onPhotoRename?: (id: string, name: string) => void;
   onPhotoRemove?: (id: string) => void;
+  /** Preview only: click a photo to adjust it in its frame. */
+  onPhotoAdjust?: (id: string, frame: HTMLElement) => void;
 }
 
 // ── Stylesheet: the Anchor report's, plus the parts only this report has ─────
@@ -104,7 +107,7 @@ function Cover({ ctx }: { ctx: Ctx }) {
   const { model } = ctx;
   const { x, y, zoom } = model.coverPos;
   return (
-    <div className="ar-sheet" data-panel="details">
+    <div className="ar-sheet" data-page="cover">
       <section className="ar-page ar-page--cover">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="ar-logo" src={ctx.assets.images.logo} alt="RAS-VERTEX Maintenance Solutions" />
@@ -329,7 +332,13 @@ function PhotosPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "phot
               <div key={p.id} style={{ minWidth: 0 }}>
                 <div className="ar-photo">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.url} alt="" />
+                  <img
+                    src={p.url}
+                    alt=""
+                    title={ctx.onPhotoAdjust ? "Click to adjust" : undefined}
+                    style={{ ...photoPosStyle(p.pos), cursor: ctx.onPhotoAdjust ? "pointer" : undefined }}
+                    onClick={ctx.onPhotoAdjust ? (e) => ctx.onPhotoAdjust!(p.id, e.currentTarget.parentElement!) : undefined}
+                  />
                   {ctx.onPhotoRemove && (
                     <button
                       type="button"
@@ -388,16 +397,18 @@ interface DocProps {
   /** Preview only: captions on photo pages become editable. */
   onPhotoRename?: (id: string, name: string) => void;
   onPhotoRemove?: (id: string) => void;
+  /** Preview only: click a photo to adjust it in its frame. */
+  onPhotoAdjust?: (id: string, frame: HTMLElement) => void;
 }
 
-export default function OverviewDocument({ model, assets, screen, onCoverPointerDown, onPhotoRename, onPhotoRemove }: DocProps) {
-  const ctx: Ctx = { model, assets, onCoverPointerDown, onPhotoRename, onPhotoRemove };
+export default function OverviewDocument({ model, assets, screen, onCoverPointerDown, onPhotoRename, onPhotoRemove, onPhotoAdjust }: DocProps) {
+  const ctx: Ctx = { model, assets, onCoverPointerDown, onPhotoRename, onPhotoRemove, onPhotoAdjust };
   return (
     <div className={`ar jo${screen ? " ar--screen" : ""}`}>
       <Cover ctx={ctx} />
       <Contents ctx={ctx} />
       {model.pages.map((p) => (
-        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-panel={p.kind}>
+        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-page={p.kind}>
           {p.kind === "summary" ? (
             <SummaryPage ctx={ctx} page={p} />
           ) : p.kind === "hours" ? (

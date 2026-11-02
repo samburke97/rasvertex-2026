@@ -446,8 +446,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
               if ((path[0] === "flagged" || path[0] === "prestart") && path[1] === "rows" && path.length > 3)
                 d = setIn(d, [path[0], "rows", path[2], "auto"], false);
               // A new photo starts centred: the old framing was for the old one.
-              if (path[0] === "findings" && path[1] === "items" && path[3] === "photo" && path.length === 4)
-                d = setIn(d, ["findings", "items", path[2], "pos"], undefined);
+              if (path[path.length - 1] === "photo") d = setIn(d, [...path.slice(0, -1), "pos"], undefined);
               return { ...prev, d };
             }),
           img,

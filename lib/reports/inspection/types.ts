@@ -9,6 +9,7 @@
 
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { libraryFor, type Library, type ReportKind } from "./codes";
+import type { PhotoPos } from "@/lib/reports/photos";
 
 export type { ReportKind };
 
@@ -23,6 +24,8 @@ export interface InspectionPhoto {
   title?: string;
   /** Description typed in the builder; replaces the label's note. */
   desc?: string;
+  /** How it sits in its frame, set in Adjust. Unset = centred. */
+  pos?: PhotoPos;
   /** Uploaded in the builder rather than imported from SimPRO — kept when
    *  the SimPRO photos are re-imported. */
   uploaded?: boolean;

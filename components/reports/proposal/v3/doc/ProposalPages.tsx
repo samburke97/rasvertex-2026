@@ -31,6 +31,7 @@ import {
   type PageId,
   type Proposal,
 } from "@/lib/reports/proposal/v3/types";
+import { photoPosStyle, type PhotoPos } from "@/lib/reports/photos";
 
 // ── Tokens (styles/tokens.css, document layer) ───────────────────────────────
 const NAVY = "#011955";
@@ -316,7 +317,7 @@ function Cover({ r, s }: PageProps) {
         <Bind build={b}>{v.building}</Bind>.
       </h1>
       <Rich v={r.p.d.cover.blurb} edit="cover.blurb" style={{ ...lede(820, 24), fontSize: "1.375rem" }} />
-      <div data-edit="cover.photo" style={photo(r.img(r.p.d.cover.photo), { width: "100%", flex: "1 1 0", minHeight: 0, borderRadius: 24, overflow: "hidden", marginTop: 64 })} />
+      <FramedPhoto edit="cover.photo" src={r.img(r.p.d.cover.photo)} pos={r.p.d.cover.pos} style={{ width: "100%", flex: "1 1 0", minHeight: 0, borderRadius: 24, marginTop: 64 }} />
       <div
         style={{
           display: "grid",
@@ -665,28 +666,36 @@ function Project({ r, s }: PageProps) {
           </div>
         ))}
       </div>
-      <div data-edit="project.photo" style={photo(r.img(d.photo), { width: "100%", flex: "1 1 0", minHeight: 360, borderRadius: 20, overflow: "hidden", marginTop: 56 })} />
+      <FramedPhoto edit="project.photo" src={r.img(d.photo)} pos={d.pos} style={{ width: "100%", flex: "1 1 0", minHeight: 360, borderRadius: 20, marginTop: 56 }} />
       <div style={{ marginTop: 72 }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <h3 style={h3card}>Higher standards.</h3>
-          <Rich v={d.specIntro} edit="project.specIntro" style={lede(860, 0)} />
+          {d.hideSpec ? (
+            <Rich v={d.noSpecIntro} edit="project.noSpecIntro" style={lede(860, 0)} />
+          ) : (
+            <Rich v={d.specIntro} edit="project.specIntro" style={lede(860, 0)} />
+          )}
         </div>
-        <div style={{ ...tableHead(cols, 48), gap: 40, lineHeight: 1.3 }}>
-          <span>Surface</span>
-          <span>System</span>
-          <span>{tradeOf(r.p.trade).coatsLabel}</span>
-        </div>
-        {rows.map((sr, i) => (
-          <div key={i} data-edit={`project.rows.${d.brand}.${i}.surface`} style={{ display: "grid", gridTemplateColumns: cols, gap: 40, padding: "18px 0", borderBottom: rule(i, rows.length), fontSize: "1.25rem", lineHeight: 1.5 }}>
-            <span style={{ fontWeight: 600 }}>{sr.surface}</span>
-            <span>{sr.system}</span>
-            <span style={{ color: INK(0.65) }}>{sr.coats}</span>
+        {!d.hideSpec && (
+          <>
+          <div style={{ ...tableHead(cols, 48), gap: 40, lineHeight: 1.3 }}>
+            <span>Surface</span>
+            <span>System</span>
+            <span>{tradeOf(r.p.trade).coatsLabel}</span>
           </div>
-        ))}
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 24, marginTop: 32 }}>
-          <img src={r.img(brand.logo) || undefined} alt={brand.name} style={{ height: brand.height, width: "auto", display: "block" }} />
-          <span data-edit="project.note" style={{ fontSize: "1.0625rem", lineHeight: 1, color: INK(0.6), paddingBottom: 2 }}>{d.note}</span>
-        </div>
+          {rows.map((sr, i) => (
+            <div key={i} data-edit={`project.rows.${d.brand}.${i}.surface`} style={{ display: "grid", gridTemplateColumns: cols, gap: 40, padding: "18px 0", borderBottom: rule(i, rows.length), fontSize: "1.25rem", lineHeight: 1.5 }}>
+              <span style={{ fontWeight: 600 }}>{sr.surface}</span>
+              <span>{sr.system}</span>
+              <span style={{ color: INK(0.65) }}>{sr.coats}</span>
+            </div>
+          ))}
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 24, marginTop: 32 }}>
+            <img src={r.img(brand.logo) || undefined} alt={brand.name} style={{ height: brand.height, width: "auto", display: "block" }} />
+            <span data-edit="project.note" style={{ fontSize: "1.0625rem", lineHeight: 1, color: INK(0.6), paddingBottom: 2 }}>{d.note}</span>
+          </div>
+          </>
+        )}
       </div>
       <Footer r={r} s={s} />
     </Sheet>
@@ -779,29 +788,12 @@ function Points({ text }: { text: string }) {
   );
 }
 
-/** A photo in a fixed frame, positioned by its focal point and zoomed
- *  (set in the panel's Adjust editor). The image is scaled about the focal
- *  point, so what's framed in the editor is what prints. */
-export function FramedPhoto({ src, pos, height, edit, radius = 20 }: { src: string; pos?: { x: number; y: number; zoom: number }; height: number; edit?: string; radius?: number }) {
-  const x = pos?.x ?? 50;
-  const y = pos?.y ?? 50;
-  const z = Math.max(1, pos?.zoom ?? 1);
+/** A photo in its frame, placed by the Adjust editor. */
+function FramedPhoto({ src, pos, edit, style }: { src: string; pos?: PhotoPos; edit?: string; style: CSSProperties }) {
   return (
-    <div data-edit={edit} style={{ position: "relative", width: "100%", height, flexShrink: 0, borderRadius: radius, overflow: "hidden", background: CARD }}>
-      {src && (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: bg(src),
-            backgroundSize: "cover",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: `${x}% ${y}%`,
-            transform: z > 1 ? `scale(${z})` : undefined,
-            transformOrigin: `${x}% ${y}%`,
-          }}
-        />
-      )}
+    <div data-edit={edit} style={{ position: "relative", overflow: "hidden", background: CARD, ...style }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {src && <img src={src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", ...photoPosStyle(pos) }} />}
     </div>
   );
 }
@@ -831,7 +823,7 @@ function FindingCard({ r, it, report, zoned = false }: { r: DocProps; it: CardIt
         edit={`findings.items.${i}.photo`}
         src={r.img(f.photo)}
         pos={f.pos}
-        height={report ? REPORT_PHOTO_H : FINDING_PHOTO_H}
+        style={{ width: "100%", height: report ? REPORT_PHOTO_H : FINDING_PHOTO_H, flexShrink: 0, borderRadius: 20 }}
       />
       {textH > 0 &&
         (report ? (
@@ -1176,7 +1168,6 @@ function Runs({ r, s }: PageProps) {
 
 function Safety({ r, s }: PageProps) {
   const stats = [
-    ["0", "Incidents since we began"],
     ["30+", "IRATA certified techs"],
     ["Daily", "Pre-start safety checks"],
     ["Annual", "Safety audits and training"],
@@ -1188,7 +1179,7 @@ function Safety({ r, s }: PageProps) {
       <p style={lede()}>
         We take pride in our safety. Every technician on your building is IRATA certified and current, every drop is checked before it’s used, and every shift is reported accurately. When our team works safely, your residents and your building are in safe hands.
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12, marginTop: 56 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12, marginTop: 56 }}>
         {stats.map(([v, k]) => (
           <div key={k} style={{ background: CARD, borderRadius: 16, padding: 28, display: "flex", flexDirection: "column", gap: 8 }}>
             <span style={{ fontSize: 48, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.05em" }}>{v}</span>

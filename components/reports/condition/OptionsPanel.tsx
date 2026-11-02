@@ -20,6 +20,7 @@ import type {
   ScheduleCostCenter,
   ScheduleImportStatus,
 } from "@/lib/reports/condition.types";
+import Slider from "@/components/ui/Slider";
 
 interface OptionsPanelProps {
   settings: ReportSettings;
@@ -203,7 +204,7 @@ export default function OptionsPanel({
   return (
     <aside className={styles.panel}>
       {/* ── Import ───────────────────────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-pages="cover">
         <div className={styles.groupLabel}>Import</div>
         <JobImportInput onImport={onImport} importStatus={importStatus} />
         {importStatus.phase === "fetching-photos" && progressPct !== null && (
@@ -217,7 +218,7 @@ export default function OptionsPanel({
       </div>
 
       {/* ── Report details ───────────────────────────────────────────────── */}
-      <div className={styles.group} data-panel-group="details">
+      <div className={styles.group} data-pages="cover">
         <div className={styles.groupLabel}>Report details</div>
         {DETAIL_FIELDS.map((f) => (
           <label key={f.key} className={styles.field} data-panel-field={f.key}>
@@ -242,7 +243,7 @@ export default function OptionsPanel({
       </div>
 
       {/* ── Cover photo ──────────────────────────────────────────────────── */}
-      <div className={styles.group} data-panel-group="cover">
+      <div className={styles.group} data-pages="cover">
         <div className={styles.groupLabel}>Cover photo</div>
         <div className={styles.coverPhotoPreview}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -266,20 +267,19 @@ export default function OptionsPanel({
           onChange={handleCoverPhotoChange}
         />
         <div className={styles.subLabel}>Zoom · {Math.round(coverZoom * 100)}%</div>
-        <input
-          type="range"
+        <Slider
           min={1}
           max={3}
           step={0.05}
           value={coverZoom}
-          onChange={(e) => onCoverZoom(Number(e.target.value))}
+          onChange={onCoverZoom}
           className={styles.range}
         />
         <div className={styles.subLabel}>Drag the photo on the cover preview to reposition it.</div>
       </div>
 
       {/* ── Photos ───────────────────────────────────────────────────────── */}
-      <div className={styles.group} data-panel-group="photos">
+      <div className={styles.group} data-pages="photos">
         <div className={styles.groupLabel}>Photos</div>
 
         <ToggleRow
@@ -404,7 +404,7 @@ export default function OptionsPanel({
       </div>
 
       {/* ── Schedule ─────────────────────────────────────────────────────── */}
-      <div className={styles.group} data-panel-group="hours">
+      <div className={styles.group} data-pages="hours">
         <div className={styles.groupLabelRow}>
           <div className={styles.groupLabel}>Hours</div>
           {settings.scheduleLoaded && (
@@ -486,7 +486,7 @@ export default function OptionsPanel({
       </div>
 
       {/* ── Summary ──────────────────────────────────────────────────────── */}
-      <div className={styles.group} data-panel-group="summary">
+      <div className={styles.group} data-pages="summary">
         <div className={styles.groupLabel}>Summary</div>
         <ToggleRow
           label="Include job summary"

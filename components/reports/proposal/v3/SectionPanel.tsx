@@ -4,12 +4,10 @@
 // page brings its field here into view and puts the cursor in it.
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
 import MapCaptureModal from "@/components/reports/shared/MapCaptureModal";
 import styles from "./Builder.module.css";
 import type { BuilderCtx } from "./ctx";
 import { GroupHead, InfoTip, List, Money, Note, Photo, Rich, Segmented, Select, Text } from "./fields";
-import { CARD_W, FINDING_PHOTO_H, REPORT_PHOTO_H } from "@/lib/reports/proposal/v3/layout";
 import { methodHtml } from "@/lib/reports/proposal/v3/methods";
 import { isHidden, money, parseAmt } from "@/lib/reports/proposal/v3/derive";
 import { applySurvey, enabledPhotos, findingFor, recodeFromTags, standardFromPhotos, taggedPhotos } from "@/lib/reports/proposal/v3/survey";
@@ -28,7 +26,6 @@ import {
   withCodes,
   type Brand,
   type FindingsStyle,
-  type PhotoPos,
   type PageId,
   type Proposal,
   type RunStage,
@@ -222,7 +219,6 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
   const f = ctx.focusFinding != null && ctx.focusFinding < items.length ? ctx.focusFinding : null;
   const path = (k: string) => ["findings", "items", f!, k];
   const blank = (photo = "") => ({ photo, code: "", title: "", desc: "" });
-  const [adjusting, setAdjusting] = useState(false);
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
   const reorder = (from: number, to: number) => {
     if (from === to) return;
@@ -260,30 +256,7 @@ function FindingsPanel({ ctx }: { ctx: BuilderCtx }) {
             </button>
           </span>
         </div>
-        <Photo
-          ctx={ctx}
-          label="Photo"
-          path={path("photo")}
-          extra={
-            it.photo && (
-              <button className={styles.smallBtn} onClick={() => setAdjusting(true)} title="Drag to move the photo in its frame; zoom in to crop">
-                Adjust
-              </button>
-            )
-          }
-        />
-        {adjusting && it.photo && (
-          <CropModal
-            src={ctx.img(it.photo)}
-            aspect={CARD_W / (report ? REPORT_PHOTO_H : FINDING_PHOTO_H)}
-            pos={it.pos}
-            onDone={(pos) => {
-              ctx.set(path("pos"), pos);
-              setAdjusting(false);
-            }}
-            onClose={() => setAdjusting(false)}
-          />
-        )}
+        <Photo ctx={ctx} label="Photo" path={path("photo")} />
         {report && (
           <CodePicker ctx={ctx} index={f} />
         )}
@@ -551,30 +524,49 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
           />
           <Photo ctx={ctx} label="Project photo" path={["project", "photo"]} />
           <GroupHead title={TRADES[ctx.p.trade].specTitle} sub="Choose the product. The table, logo and wording switch with it." />
-          <Segmented
-            label="Product"
-            value={b}
-            options={TRADES[ctx.p.trade].brands.map((k) => ({ v: k, label: BRANDS[k].name }))}
-            onPick={(v) => ctx.update((prev) => setBrand(prev, v as Brand))}
-            info="Each product keeps its own table. Switching also swaps the brand name in the wording and the introduction."
-          />
-          <Rich ctx={ctx} label="Specification intro" path={["project", "specIntro"]} />
-          <List<SpecRow>
-            ctx={ctx}
-            path={["project", "rows", b]}
-            max={LIMITS.specRows}
-            blank={() => ({ surface: "", system: "", coats: "2 full coats" })}
-            title={(_, i) => `Row ${i + 1}`}
-            meta={(x) => x.surface}
-            render={(i) => (
-              <>
-                <Text ctx={ctx} label="Surface" path={["project", "rows", b, i, "surface"]} />
-                <Text ctx={ctx} label="System" path={["project", "rows", b, i, "system"]} />
-                <Text ctx={ctx} label={TRADES[ctx.p.trade].coatsLabel} path={["project", "rows", b, i, "coats"]} />
-              </>
-            )}
-          />
-          <Text ctx={ctx} label="Note beside the logo" path={["project", "note"]} />
+          <div className={styles.switchRow}>
+            <span className={styles.fieldLabel}>
+              Include specification
+              <InfoTip>Switch off if the team hasn’t received a spec yet. The table, logo and note come off the page, and “Higher standards” keeps a short paragraph.</InfoTip>
+            </span>
+            <button
+              className={`${styles.switch} ${d.project.hideSpec ? "" : styles.switchOn}`}
+              role="switch"
+              aria-checked={!d.project.hideSpec}
+              title={d.project.hideSpec ? "Show the specification" : "Remove the specification"}
+              onClick={() => ctx.set(["project", "hideSpec"], !d.project.hideSpec)}
+            />
+          </div>
+          {d.project.hideSpec ? (
+            <Rich ctx={ctx} label="Text under Higher standards" path={["project", "noSpecIntro"]} />
+          ) : (
+            <>
+              <Segmented
+                label="Product"
+                value={b}
+                options={TRADES[ctx.p.trade].brands.map((k) => ({ v: k, label: BRANDS[k].name }))}
+                onPick={(v) => ctx.update((prev) => setBrand(prev, v as Brand))}
+                info="Each product keeps its own table. Switching also swaps the brand name in the wording and the introduction."
+              />
+              <Rich ctx={ctx} label="Specification intro" path={["project", "specIntro"]} />
+              <List<SpecRow>
+                ctx={ctx}
+                path={["project", "rows", b]}
+                max={LIMITS.specRows}
+                blank={() => ({ surface: "", system: "", coats: "2 full coats" })}
+                title={(_, i) => `Row ${i + 1}`}
+                meta={(x) => x.surface}
+                render={(i) => (
+                  <>
+                    <Text ctx={ctx} label="Surface" path={["project", "rows", b, i, "surface"]} />
+                    <Text ctx={ctx} label="System" path={["project", "rows", b, i, "system"]} />
+                    <Text ctx={ctx} label={TRADES[ctx.p.trade].coatsLabel} path={["project", "rows", b, i, "coats"]} />
+                  </>
+                )}
+              />
+              <Text ctx={ctx} label="Note beside the logo" path={["project", "note"]} />
+            </>
+          )}
         </>
       );
     }
@@ -796,123 +788,5 @@ export default function SectionPanel({ ctx, width }: { ctx: BuilderCtx; width: n
         )}
       </div>
     </aside>
-  );
-}
-
-
-/** Frame a photo: drag to move it, slide to zoom. The frame has the card's
- *  proportions and is rendered the way the page renders it (focal point +
- *  scale), so what's framed here is what prints. */
-function CropModal({ src, aspect, pos, onDone, onClose }: { src: string; aspect: number; pos?: PhotoPos; onDone: (pos: PhotoPos | undefined) => void; onClose: () => void }) {
-  const [p, setP] = useState<PhotoPos>(pos ?? { x: 50, y: 50, zoom: 1 });
-  const [nat, setNat] = useState<{ w: number; h: number } | null>(null);
-  const frame = useRef<HTMLDivElement>(null);
-  const start = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  useEffect(() => {
-    const im = new Image();
-    im.onload = () => setNat({ w: im.naturalWidth, h: im.naturalHeight });
-    im.src = src;
-  }, [src]);
-
-  // How far the photo overflows the frame at this zoom, in frame pixels,
-  // so a drag moves the photo with the pointer.
-  const overflow = () => {
-    const el = frame.current;
-    if (!el || !nat) return { w: 0, h: 0, fw: 1, fh: 1 };
-    const fw = el.clientWidth;
-    const fh = el.clientHeight;
-    const s = Math.max(fw / nat.w, fh / nat.h);
-    return { w: nat.w * s - fw, h: nat.h * s - fh, fw, fh };
-  };
-  const clamp = (v: number) => Math.max(0, Math.min(100, v));
-
-  const onDown = (e: React.PointerEvent) => {
-    e.preventDefault();
-    (e.target as Element).setPointerCapture(e.pointerId);
-    start.current = { px: e.clientX, py: e.clientY, x: p.x, y: p.y };
-  };
-  const onMove = (e: React.PointerEvent) => {
-    const s0 = start.current;
-    if (!s0) return;
-    const o = overflow();
-    const dx = e.clientX - s0.px;
-    const dy = e.clientY - s0.py;
-    // Distance (frame px) the focal point travels from 0 to 100 %: the
-    // cover overflow, scaled by zoom, plus what the zoom itself pushes out.
-    // Moving the photo right reveals its left, so the focal point falls.
-    const z = p.zoom;
-    const rx = o.fw * (z - 1) + o.w * z;
-    const ry = o.fh * (z - 1) + o.h * z;
-    setP((q) => ({
-      ...q,
-      x: rx > 0.5 ? clamp(s0.x - (dx / rx) * 100) : q.x,
-      y: ry > 0.5 ? clamp(s0.y - (dy / ry) * 100) : q.y,
-    }));
-  };
-  const onUp = () => (start.current = null);
-
-  return createPortal(
-    <div className={`${styles.vars} ${styles.modalBack}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`${styles.modal} ${styles.cropModal}`} role="dialog" aria-label="Adjust photo">
-        <div className={styles.modalHead}>
-          <div>
-            <b>Adjust photo</b>
-            <small>Drag to move it in the frame. Zoom in to crop tighter.</small>
-          </div>
-          <button className={styles.modalClose} onClick={onClose} aria-label="Close">
-            ×
-          </button>
-        </div>
-        <div
-          ref={frame}
-          className={styles.cropFrame}
-          style={{ aspectRatio: String(aspect) }}
-          onPointerDown={onDown}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onPointerCancel={onUp}
-          onWheel={(e) => setP((q) => ({ ...q, zoom: Math.max(1, Math.min(3, q.zoom - e.deltaY * 0.002)) }))}
-        >
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              backgroundImage: `url("${src}")`,
-              backgroundSize: "cover",
-              backgroundRepeat: "no-repeat",
-              backgroundPosition: `${p.x}% ${p.y}%`,
-              transform: p.zoom > 1 ? `scale(${p.zoom})` : undefined,
-              transformOrigin: `${p.x}% ${p.y}%`,
-              pointerEvents: "none",
-            }}
-          />
-        </div>
-        <div className={styles.cropBar}>
-          <span>Zoom</span>
-          <input type="range" min={1} max={3} step={0.01} value={p.zoom} onChange={(e) => setP({ ...p, zoom: Number(e.target.value) })} />
-          <button className={styles.linkBtn} onClick={() => setP({ x: 50, y: 50, zoom: 1 })}>
-            Reset
-          </button>
-        </div>
-        <div className={styles.modalFoot}>
-          <button className={styles.ghostPill} onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className={styles.darkPill}
-            onClick={() => onDone(p.x === 50 && p.y === 50 && p.zoom === 1 ? undefined : { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, zoom: Math.round(p.zoom * 100) / 100 })}
-          >
-            Done
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }

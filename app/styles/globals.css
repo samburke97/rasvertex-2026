@@ -408,7 +408,7 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--blue-500);
+  outline: 2px solid rgba(var(--ink-rgb), 0.35);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -539,4 +539,56 @@ a {
   width: 30px;
   height: 30px;
   border-radius: var(--r-md);
+}
+
+/* ── Sliders (every input[type=range] in the app) ───────────────────────────
+   A thin neutral track that fills with ink up to the value, and a plain
+   round thumb. The fill uses --fill-pct, set by the component where it can;
+   without it the track is just neutral. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--btn-primary);
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--btn-primary) var(--fill-pct, 0%), rgba(var(--ink-rgb), 0.12) var(--fill-pct, 0%));
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(var(--ink-rgb), 0.12);
+}
+input[type="range"]::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--btn-primary);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  border: 1px solid rgba(var(--ink-rgb), 0.18);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  border: 1px solid rgba(var(--ink-rgb), 0.18);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+input[type="range"]:focus-visible {
+  outline: none;
+}
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(var(--ink-rgb), 0.12);
 }

@@ -7,6 +7,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import RichBox from "@/components/reports/shared/builder/RichBox";
+import CropModal from "@/components/reports/shared/builder/CropModal";
+import type { PhotoPos } from "@/lib/reports/photos";
 import styles from "./Builder.module.css";
 import type { BuilderCtx, Confirm, Path } from "./ctx";
 import { money } from "@/lib/reports/proposal/v3/derive";
@@ -274,6 +276,15 @@ export function Photo({ ctx, label, path, extra, info }: { ctx: BuilderCtx; labe
   const ref = str(ctx.get(path));
   const src = ctx.img(ref);
   const [busy, setBusy] = useState(false);
+  // Photos in a frame ("….photo") can be adjusted; the position sits beside
+  // them ("….pos"). The editor takes its shape from the frame on the page.
+  const adjustable = path[path.length - 1] === "photo";
+  const posPath = [...path.slice(0, -1), "pos"];
+  const [aspect, setAspect] = useState<number | null>(null);
+  const startAdjust = () => {
+    const box = document.querySelector(`[data-edit="${k}"]`)?.getBoundingClientRect();
+    setAspect(box && box.height ? box.width / box.height : 4 / 3);
+  };
 
   return (
     <div className={styles.field} data-field={k}>
@@ -306,6 +317,11 @@ export function Photo({ ctx, label, path, extra, info }: { ctx: BuilderCtx; labe
             }}
           />
         </label>
+        {adjustable && ref && (
+          <button className={styles.smallBtn} onClick={startAdjust} title="Drag to move the photo in its frame; zoom in to crop">
+            Adjust
+          </button>
+        )}
         {extra}
         {ref && (
           <button className={`${styles.linkBtn} ${styles.danger}`} title="Take this photo off the page" onClick={() => ctx.set(path, "")}>
@@ -313,6 +329,18 @@ export function Photo({ ctx, label, path, extra, info }: { ctx: BuilderCtx; labe
           </button>
         )}
       </div>
+      {aspect != null && (
+        <CropModal
+          src={src}
+          aspect={aspect}
+          pos={ctx.get(posPath) as PhotoPos | undefined}
+          onDone={(pos) => {
+            ctx.set(posPath, pos);
+            setAspect(null);
+          }}
+          onClose={() => setAspect(null)}
+        />
+      )}
       {open && (
         <PhotoModal
           ctx={ctx}

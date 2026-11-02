@@ -12,6 +12,7 @@
 // resolvePhoto() turns any of them into a URL.
 
 import registryJson from "./data/registry.json";
+import type { PhotoPos } from "@/lib/reports/photos";
 import termsJson from "./data/terms.json";
 
 export const PAGE_IDS = [
@@ -150,12 +151,6 @@ export interface SpecRow {
   coats: string;
 }
 
-export interface PhotoPos {
-  x: number;
-  y: number;
-  zoom: number;
-}
-
 export interface Finding {
   photo: string;
   /** Report style: the most severe of `codes` ("" = none). Kept for older
@@ -191,9 +186,10 @@ export interface SimproPhoto {
 }
 
 export interface ProposalSections {
-  cover: { blurb: string; photo: string };
+  cover: { blurb: string; photo: string; pos?: PhotoPos };
   intro: { open: string; bullets: { t: string; d: string }[]; close: string };
   project: {
+    pos?: PhotoPos;
     p1: string;
     p2: string;
     type: string;
@@ -202,6 +198,10 @@ export interface ProposalSections {
     photo: string;
     brand: Brand;
     specIntro: string;
+    /** No spec received yet: the table, logo and note come off the page, and
+     *  noSpecIntro replaces specIntro under "Higher standards". */
+    hideSpec?: boolean;
+    noSpecIntro: string;
     note: string;
     /** Each product keeps its own rows. */
     rows: Partial<Record<Brand, SpecRow[]>>;
@@ -483,6 +483,7 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
       program: "",
       photo: T.projectPhoto,
       brand: T.brands[0],
+      noSpecIntro: `After 25+ years ${W ? "waterproofing" : "painting"} coastal buildings, we know which systems last here. Your specification will be confirmed with the manufacturer’s representative, who also inspects our work on site, so your warranty is backed by both of us.`,
       specIntro: `After 25+ years ${W ? "waterproofing" : "painting"} coastal buildings, we know which systems last here. Each one below was specified with the manufacturer’s representative, who also inspects our work on site, so your warranty is backed by both of us.`,
       note: W
         ? "Coastal grade membrane system, checked on site by the manufacturer’s representative."

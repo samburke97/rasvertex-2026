@@ -24,6 +24,7 @@ import {
 } from "./condition.types";
 import { fmtDate, pad } from "./anchor.layout";
 import { notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "./richText";
+import type { PhotoPos } from "./photos";
 
 export { pad };
 export const PAGE_W = 1280;
@@ -69,6 +70,7 @@ export interface OverviewPhoto {
   id: string;
   name: string;
   url: string;
+  pos?: PhotoPos;
 }
 
 export type HourItem =
@@ -346,7 +348,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
       const sorted = [...list].sort((a, b) => naturalSort(a.name, b.name));
       const rows: OverviewPhoto[][] = [];
       for (let i = 0; i < sorted.length; i += grid.cols) {
-        rows.push(sorted.slice(i, i + grid.cols).map((p) => ({ id: p.id, name: p.name, url: p.url })));
+        rows.push(sorted.slice(i, i + grid.cols).map((p) => ({ id: p.id, name: p.name, url: p.url, pos: p.pos })));
       }
       const label = !settings.showDates ? null : k === "undated" ? "Undated" : dayLabel(k);
       let day: PhotoDay | null = null;

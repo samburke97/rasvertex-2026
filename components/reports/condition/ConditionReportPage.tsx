@@ -39,7 +39,10 @@ import {
 } from "@/lib/reports/condition.types";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
-import { usePageToPanel } from "@/components/reports/shared/builder/usePageToPanel";
+import { usePagePanel, SidePanel } from "@/components/reports/shared/builder/PagePanel";
+import PageRail from "@/components/reports/shared/builder/PageRail";
+import PanelResizer, { usePanelWidth } from "@/components/reports/shared/builder/PanelResizer";
+import { usePhotoAdjust } from "@/components/reports/shared/builder/CropModal";
 
 const pub = (rel: string) => "/" + rel;
 const ASSETS: OverviewAssets = {
@@ -87,6 +90,15 @@ const DEFAULT_REPORT: ConditionReportData = {
     "Carry out all identified repair works prior to application of the specified coating system. Re-inspect on completion.",
   settings: DEFAULT_SETTINGS,
 };
+
+/** Pages in the rail; each sheet's data-page and each panel group's
+ *  data-pages refer to these ids. */
+const PAGE_ROWS = [
+  { id: "cover", name: "Cover", num: "C" },
+  { id: "summary", name: "Summary" },
+  { id: "hours", name: "Hours" },
+  { id: "photos", name: "Photos" },
+];
 
 export default function ConditionReportPage({
   onBack,
@@ -586,7 +598,11 @@ export default function ConditionReportPage({
 
   // ── Preview zoom (fixed 1280px pages, scaled to the column) ────────────
   const previewRef = useRef<HTMLDivElement>(null);
-  const pageToPanel = usePageToPanel();
+  const pagePanel = usePagePanel("cover");
+  const photoAdjust = usePhotoAdjust(report.photos, (id, pos) =>
+    setReport((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id ? { ...p, pos } : p)) })),
+  );
+  const panelWidth = usePanelWidth("ConditionReportPage-panel-width", 340);
   const [zoom, setZoom] = useState(0.5);
   useLayoutEffect(() => {
     const el = previewRef.current;
@@ -636,7 +652,25 @@ export default function ConditionReportPage({
 
       {/* ── Body ── */}
       <div className={styles.editorBody}>
-        <div ref={pageToPanel.panelRef} style={{ display: "contents" }}>
+        <PageRail rows={PAGE_ROWS} sel={pagePanel.sel} onPick={(id) => pagePanel.pick(id, previewRef.current)} />
+
+        {/* ── Preview: the report itself, scaled to the column ── */}
+        <div ref={previewRef} className={styles.canvas} onClick={pagePanel.onDocClick}>
+          <OverviewStyles />
+          <div style={{ zoom }}>
+            <OverviewDocument
+              model={model}
+              assets={ASSETS}
+              screen
+              onCoverPointerDown={onCoverPointerDown}
+              onPhotoRename={renamePhoto}
+              onPhotoRemove={removePhoto}
+              onPhotoAdjust={photoAdjust.adjust}
+            />
+          </div>
+        </div>
+        <PanelResizer panel={panelWidth} />
+        <SidePanel panel={pagePanel} title={PAGE_ROWS.find((x) => x.id === pagePanel.sel)?.name ?? ""} width={panelWidth.w}>
           <OptionsPanel
             settings={report.settings}
             photos={report.photos}
@@ -668,23 +702,9 @@ export default function ConditionReportPage({
             recommendations={report.recommendations}
             onRecommendations={(v) => setReport((prev) => ({ ...prev, recommendations: v }))}
           />
-        </div>
-
-        {/* ── Preview: the report itself, scaled to the column ── */}
-        <div ref={previewRef} className={styles.canvas} onClick={pageToPanel.onDocClick}>
-          <OverviewStyles />
-          <div style={{ zoom }}>
-            <OverviewDocument
-              model={model}
-              assets={ASSETS}
-              screen
-              onCoverPointerDown={onCoverPointerDown}
-              onPhotoRename={renamePhoto}
-              onPhotoRemove={removePhoto}
-            />
-          </div>
-        </div>
+        </SidePanel>
       </div>
+      {photoAdjust.modal}
 
       {hoursOpen && (
         <HoursEditor

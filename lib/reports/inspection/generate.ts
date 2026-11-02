@@ -40,6 +40,7 @@ import {
   type InspectionReportData,
   type SectionKey,
 } from "./types";
+import type { PhotoPos } from "@/lib/reports/photos";
 
 export const PAGE_W = 1280;
 export const PAGE_H = 1810;
@@ -108,6 +109,7 @@ export interface ParsedPhoto {
   head: string;
   title?: string;
   desc?: string;
+  pos?: PhotoPos;
 }
 
 export interface PhotoView {
@@ -118,6 +120,7 @@ export interface PhotoView {
   /** Every code on the photo; the one it's filed under first. */
   chips: Chip[];
   gname: string;
+  pos?: PhotoPos;
   /** Zone (outside a zone chapter), level and unit. */
   where: string;
   note: string;
@@ -265,6 +268,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
         head: r.head,
         title: photo.title?.trim() || undefined,
         desc: photo.desc && !notesIsEmpty(sanitizeNotesHtml(photo.desc)) ? photo.desc : undefined,
+        pos: photo.pos,
       });
     }
   });
@@ -341,6 +345,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       num: pad(numOf.get(p) ?? 0),
       chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].map(chip),
       gname: p.title ?? autoName,
+      pos: p.pos,
       where: placeOf(p, withZone),
       note: p.desc ?? autoNote,
       autoName,
