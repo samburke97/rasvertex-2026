@@ -59,6 +59,7 @@ export const INSPECTION_CSS = `
 .ir-rt ul{list-style:disc}.ir-rt ol{list-style:decimal}
 .ir-rt li+li{margin-top:.2em}
 .ir-rt em{font-style:italic}
+.ir-rt p:empty::before,.ir-rich p:empty::before{content:"\\200b"}
 .ir strong{font-weight:700}
 .ir--screen{display:flex;flex-direction:column;align-items:center;gap:40px}
 .ir--screen .ir-sheet{box-shadow:0 1px 2px rgba(23,23,26,.06),0 12px 32px -12px rgba(23,23,26,.22)}

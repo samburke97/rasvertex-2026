@@ -13,7 +13,7 @@
 
 import { BAND_ORDER, CODES, bandOf, codeRank, codesOf, zoneOf, type Band, type Finding, type PageId, type Proposal, type RunStage } from "./types";
 import { methodSteps } from "./methods";
-import { richItems, richText } from "./rich";
+import { richHtml, richItems, richText } from "./rich";
 
 /** Item HTML → its text, for estimating. */
 const plain = (html: string) => html.replace(/<[^>]*>/g, "");
@@ -103,7 +103,9 @@ export function richH(v: string, px: number, lineH: number, width: number): numb
   const t = richText(v);
   if (!t.trim()) return 0;
   const blocks = t.split("\n").length;
-  return textLines(t, px, width - (/<li>/.test(v) ? 22 : 0)) * lineH + (blocks - 1) * px * 0.6;
+  // Blank paragraphs (Enter on an empty line) are a line each on the page.
+  const blank = richHtml(v).match(/<p>\s*(?:<br>)?\s*<\/p>/g)?.length ?? 0;
+  return textLines(t, px, width - (/<li>/.test(v) ? 22 : 0)) * lineH + (blocks - 1 + blank) * px * 0.6 + blank * lineH;
 }
 const ledeH = (text: string, width = 900, mt = 20) => (richText(text).trim() ? mt + richH(text, 20, 32, width) : 0);
 /** Section label + H2 + lede + the 56 gap before content. */

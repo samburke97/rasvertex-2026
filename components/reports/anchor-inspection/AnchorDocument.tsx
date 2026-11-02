@@ -108,6 +108,7 @@ input.ar-caption:focus{background:#fff;box-shadow:0 0 0 2px #4a82c9;color:var(--
 .ar-rich :where(ul,ol){margin:0;padding-left:26px;display:flex;flex-direction:column;gap:4px}
 .ar-rich ul{list-style:disc}.ar-rich ol{list-style:decimal}
 .ar-rich li p{margin:0}
+.ar-rich p:empty::before{content:"\\200b"}
 .ar-rich h2,.ar-rich h3{font-size:20px;font-weight:700;letter-spacing:-.02em;color:var(--navy);line-height:1.3;margin-top:8px}
 .ar-rich strong,.ar-rich b{font-weight:700;color:var(--navy)}
 .ar-rich em,.ar-rich i{font-style:italic}

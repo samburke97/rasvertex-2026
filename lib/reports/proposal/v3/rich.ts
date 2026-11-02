@@ -23,8 +23,7 @@ export function richHtml(v: string | null | undefined): string {
       if (!KEEP.has(n)) return "";
       // Task-list attributes etc. aren't needed: bare tags only.
       return `<${close}${n === "b" ? "strong" : n === "i" ? "em" : n}>`;
-    })
-    .replace(/<p>\s*<\/p>/g, "");
+    });
 }
 
 const BLOCK = /<\/?(?:p|li|ul|ol)>/;
@@ -69,5 +68,6 @@ export const RICH_CSS = `
 .pb3-rt ul>li::before{content:"";position:absolute;left:-22px;top:0.72em;width:6px;height:6px;border-radius:50%;background:#011955}
 .pb3-rt li>p{margin:0}
 .pb3-rt li+li{margin-top:0.2em}
+.pb3-rt p:empty::before{content:"\\200b"}
 .pb3-build [data-edit]{cursor:pointer}
 `;

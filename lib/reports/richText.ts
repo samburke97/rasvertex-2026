@@ -39,9 +39,10 @@ export function sanitizeNotesHtml(raw: string | null | undefined): string {
   const v = (raw ?? "").trim();
   if (!v) return "";
   if (!v.startsWith("<")) {
+    // One paragraph per line; a blank line stays a blank line.
     return v
-      .split(/\n{2,}|\n/)
-      .map((l) => `<p>${escapeText(l)}</p>`)
+      .split("\n")
+      .map((l) => `<p>${escapeText(l.trim())}</p>`)
       .join("");
   }
   return v
@@ -57,7 +58,9 @@ export function notesLineCount(html: string): number {
   const blocks = html
     .split(/<\/(?:p|h2|h3|li|blockquote)>|<br>|<hr>/)
     .map((b) => b.replace(/<[^>]*>/g, "").trim());
-  return blocks.reduce((t, b) => t + (b ? Math.ceil(b.length / 100) : 0), 0) + (html.match(/<hr>/g)?.length ?? 0);
+  // Empty paragraphs are blank lines on the page, so they count too.
+  const blank = html.match(/<p>\s*(?:<br>)?\s*<\/p>/g)?.length ?? 0;
+  return blocks.reduce((t, b) => t + (b ? Math.ceil(b.length / 100) : 0), 0) + blank + (html.match(/<hr>/g)?.length ?? 0);
 }
 
 export function notesIsEmpty(html: string): boolean {
