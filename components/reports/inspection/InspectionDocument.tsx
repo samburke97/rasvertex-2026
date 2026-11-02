@@ -62,8 +62,6 @@ export const INSPECTION_CSS = `
 .ir-page--cover{display:flex;flex-direction:column;padding-bottom:96px}
 .ir-page--contents{display:flex;flex-direction:column;padding-bottom:130px}
 .ir-page--works{display:flex;flex-direction:column;padding-bottom:96px}
-.ir-page--closing .ir-extras-title{margin-top:0}
-.ir-page--closing .ir-extra__img{aspect-ratio:1/1}
 .ir-footer{position:absolute;left:96px;right:96px;bottom:52px;display:flex;justify-content:flex-end;font-family:var(--bebas);font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-35);line-height:1;white-space:nowrap}
 .ir-measure{position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none;width:${CONTENT_W}px}
 .ir-blk{display:flow-root}
@@ -169,13 +167,15 @@ export const INSPECTION_CSS = `
 .ir-note p{font-size:17px;line-height:1.6;color:var(--ink-60);text-wrap:pretty}
 
 .ir-works-tbl{margin-top:48px;display:flex;flex-direction:column}
-.ir-extras-title{margin-top:88px}
-.ir-extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:40px}
-.ir-extra{display:flex;flex-direction:column;min-width:0}
-.ir-extra__img{width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:var(--img-empty) center/cover no-repeat}
-.ir-extra .ir-h-sub{margin:24px 0 8px}
+.ir-extras-title{margin-top:64px}
+.ir-extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:32px}
+.ir-extras--img{flex:1 1 auto;min-height:0}
+.ir-extra{display:flex;flex-direction:column;min-width:0;min-height:0}
+.ir-extra__img{width:100%;flex:1 1 0;min-height:120px;max-height:300px;border-radius:16px;overflow:hidden;background:var(--img-empty) center/cover no-repeat}
+.ir-extra .ir-h-sub{margin:20px 0 8px}
+.ir-extra .ir-h-sub:first-child{margin-top:0}
 .ir-extra p{font-size:17px;line-height:1.5;color:var(--ink-60);min-height:3em;text-wrap:pretty}
-.ir-cta{margin-top:64px;display:flex;flex-direction:column;gap:40px}
+.ir-cta{margin-top:56px;display:flex;flex-direction:column;gap:40px}
 .ir-btn{align-self:flex-start;display:inline-flex;align-items:center;gap:16px;height:64px;padding:0 36px;border-radius:14px;font-size:20px;font-weight:700;letter-spacing:-.01em;text-decoration:none}
 .ir-btn--primary{background:var(--navy);color:#fff}
 .ir a.ir-btn--primary{color:#fff}
@@ -547,13 +547,13 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
   const { works, sections } = ctx.model;
   const sec = sections.find((s) => s.key === "works")!;
   const contact = contactFor(job.contact);
-  const extras = works.extras.length > 0 && (
+  const extras = works.fit !== "none" && (
     <>
       <h3 className="ir-h-card ir-extras-title">Also worth adding</h3>
-      <div className="ir-extras">
+      <div className={`ir-extras${works.fit === "images" ? " ir-extras--img" : ""}`}>
         {works.extras.map((x) => (
           <div key={x.t} className="ir-extra">
-            <div className="ir-extra__img" style={{ backgroundImage: bg(ctx.assets.images[x.img]) }} />
+            {works.fit === "images" && <div className="ir-extra__img" style={{ backgroundImage: bg(ctx.assets.images[x.img]) }} />}
             <h3 className="ir-h-sub">{x.t}</h3>
             <p>{x.d}</p>
           </div>
@@ -561,77 +561,57 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
       </div>
     </>
   );
-  const cta = (
-    <div className="ir-cta">
-      <a className="ir-btn ir-btn--primary" href={works.href}>
-        Request a quote
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <path d="M5 12h14M13 6l6 6-6 6" />
-        </svg>
-      </a>
-      <div className="ir-contact">
-        <h3 className="ir-h-sub">Any questions? Reach out.</h3>
-        <p>
-          {contact.name}
-          {contact.title ? `, ${contact.title}` : ""} · <strong>{contact.phone}</strong> · <strong>{contact.email}</strong>
-        </p>
-      </div>
-    </div>
-  );
   return (
-    <>
-      <div className="ir-sheet">
-        <section className="ir-page ir-page--works">
-          <div className="ir-seclabel">
-            <span>{sec.label}</span>
-          </div>
-          <h2 className="ir-h-section">{sec.title}</h2>
-          <p className="ir-intro">What needs to be done, in order of priority, and why.</p>
-
-          <div className="ir-works-tbl">
-            <div className="ir-tbl-head ir-cols-works">
-              <span>Code</span>
-              <span>Work</span>
-              <span>Why</span>
-              <span>Where</span>
-            </div>
-            {works.items.map((w, i) => (
-              <div
-                key={w.chip.code}
-                className={`ir-tbl-row ir-cols-works${i < works.items.length - 1 ? " is-ruled" : ""}`}
-              >
-                <ChipView chip={w.chip} />
-                <span className="ir-cell--strong">{w.name}</span>
-                <span className="ir-cell--small" style={{ textWrap: "pretty" }}>
-                  {w.why}
-                </span>
-                <span className="ir-cell--small">{w.zones}</span>
-              </div>
-            ))}
-          </div>
-
-          {works.split ? (
-            <Footer no={layout.secPage.works ?? layout.total - 1} total={layout.total} />
-          ) : (
-            <>
-              {extras}
-              <div style={{ flex: "1 1 auto" }} />
-              {cta}
-            </>
-          )}
-        </section>
-      </div>
-      {/* Closing page: the extras with room for their photos. No footer. */}
-      {works.split && (
-        <div className="ir-sheet">
-          <section className="ir-page ir-page--works ir-page--closing">
-            {extras}
-            <div style={{ flex: "1 1 auto" }} />
-            {cta}
-          </section>
+    <div className="ir-sheet">
+      <section className="ir-page ir-page--works">
+        <div className="ir-seclabel">
+          <span>{sec.label}</span>
         </div>
-      )}
-    </>
+        <h2 className="ir-h-section">{sec.title}</h2>
+
+        <div className="ir-works-tbl">
+          <div className="ir-tbl-head ir-cols-works">
+            <span>Code</span>
+            <span>Work</span>
+            <span>Why</span>
+            <span>Where</span>
+          </div>
+          {works.items.map((w, i) => (
+            <div
+              key={w.chip.code}
+              className={`ir-tbl-row ir-cols-works${i < works.items.length - 1 ? " is-ruled" : ""}`}
+            >
+              <ChipView chip={w.chip} />
+              <span className="ir-cell--strong">{w.name}</span>
+              <span className="ir-cell--small" style={{ textWrap: "pretty" }}>
+                {w.why}
+              </span>
+              <span className="ir-cell--small">{w.zones}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Photos (if shown) take whatever space is left; the button and
+            contact always close the page. No footer. */}
+        {extras}
+        {works.fit !== "images" && <div style={{ flex: "1 1 auto" }} />}
+        <div className="ir-cta">
+          <a className="ir-btn ir-btn--primary" href={works.href}>
+            Request a quote
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </a>
+          <div className="ir-contact">
+            <h3 className="ir-h-sub">Any questions? Reach out.</h3>
+            <p>
+              {contact.name}
+              {contact.title ? `, ${contact.title}` : ""} · <strong>{contact.phone}</strong> · <strong>{contact.email}</strong>
+            </p>
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }
 

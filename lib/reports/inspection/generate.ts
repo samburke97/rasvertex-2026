@@ -45,8 +45,23 @@ export const FLOW_H = 1620;
 /** Width of the content column the blocks are measured in. */
 export const CONTENT_W = PAGE_W - 96 * 2;
 const PER_ROW = 2;
-/** Works rows that leave room on the page for the extras and the button. */
-const WORKS_FIT = 4;
+/** Lines a string wraps to at a font size and column width (estimate). */
+const wrapLines = (s: string, px: number, w: number, bold = false) =>
+  Math.max(1, Math.ceil((s.length * px * (bold ? 0.55 : 0.5)) / w));
+
+/** The Recommended works page is one sheet, always ending with the quote
+ *  button. What's left under the table decides whether "Also worth adding"
+ *  shows with its photos (which then fill the space), as text only, or not
+ *  at all. Heights follow the page's CSS. */
+function worksFit(items: WorkItem[]): "images" | "text" | "none" {
+  const rows = items.reduce(
+    (h, w) => h + 32 + Math.max(wrapLines(w.name, 20, 340, true) * 28, wrapLines(w.why, 17, 432) * 24, wrapLines(w.zones, 17, 180) * 24),
+    0,
+  );
+  const left = PAGE_H - 80 - 96 - 115 /* label, title */ - 80 /* table head */ - rows - 210 /* button, contact */ - 30;
+  const text = 240; // title, card titles and two lines each
+  return left >= text + 140 ? "images" : left >= text ? "text" : "none";
+}
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -192,9 +207,9 @@ export interface InspectionModel {
   hasOther: boolean;
   /** About this report cards for this report kind. */
   about: CardDef[];
-  /** split: the works table is too long to share its page, so "Also worth
-   *  adding" and the quote button get a closing page of their own. */
-  works: { items: WorkItem[]; extras: ExtraDef[]; href: string; split: boolean };
+  /** fit: how much of "Also worth adding" the space under the works table
+   *  holds: the cards with photos, the cards without, or nothing. */
+  works: { items: WorkItem[]; extras: ExtraDef[]; href: string; fit: "images" | "text" | "none" };
   nDefects: number;
 }
 
@@ -629,7 +644,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     zoneRows,
     hasOther: other.length > 0,
     about: lib.about,
-    works: { items, extras, href, split: extras.length > 0 && items.length > WORKS_FIT },
+    works: { items, extras, href, fit: extras.length ? worksFit(items) : "none" },
     nDefects: nDef,
   };
 }
@@ -657,9 +672,7 @@ const RULED: BlockType[] = ["kRow", "defect", "ixRow"];
 /** First flowed page's number (after Cover and Contents). */
 const FIRST_FLOW_PAGE = 3;
 
-/** tail: sheets after the flow (Recommended works, plus its closing page
- *  when split). */
-export function paginate(blocks: Block[], heights: Record<string, number>, tail = 1): Layout {
+export function paginate(blocks: Block[], heights: Record<string, number>): Layout {
   const hOf = (b: Block) => heights[b.key] ?? b.est;
   const pages: PlacedBlock[][] = [];
   const startPage = new Map<Block, number>();
@@ -704,8 +717,8 @@ export function paginate(blocks: Block[], heights: Record<string, number>, tail 
     if (b.secKey) secPage[b.secKey] = n + FIRST_FLOW_PAGE;
     if (b.chapKey) chapPage[b.chapKey] = n + FIRST_FLOW_PAGE;
   }
-  const total = pages.length + FIRST_FLOW_PAGE + tail - 1;
-  secPage.works = pages.length + FIRST_FLOW_PAGE;
+  const total = pages.length + FIRST_FLOW_PAGE;
+  secPage.works = total;
   return { pages, total, secPage, chapPage };
 }
 

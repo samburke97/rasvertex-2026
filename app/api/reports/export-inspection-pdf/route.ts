@@ -106,7 +106,7 @@ async function buildPDF(report: InspectionReportData): Promise<Buffer> {
     width: CONTENT_W + 200,
     height: PAGE_H,
   });
-  const layout = paginate(model.blocks, heights, model.works.split ? 2 : 1);
+  const layout = paginate(model.blocks, heights);
 
   // Only photos the document shows get fetched and inlined. The cover and
   // site plan render near full width, so they keep their size.
