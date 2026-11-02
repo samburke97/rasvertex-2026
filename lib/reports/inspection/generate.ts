@@ -604,14 +604,13 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   }));
   const extras = lib.extras.filter((x) => !x.whenAny || present.some((c) => x.whenAny!.includes(c)));
   const reportName = lib.label.toLowerCase() + " report";
-  const firstName = contact.name.split(" ")[0] ?? "";
   const body =
-    `Hi ${firstName},\n\nPlease quote the following works from ${reportName} ${job.ref} for ${job.site}, ${job.address}:\n\n` +
+    `Hi RAS-VERTEX team,\n\nPlease quote the following works from ${reportName} ${job.ref} for ${job.site}, ${job.address}:\n\n` +
     items.map((w) => `- ${w.name} (${w.zones})`).join("\n") +
     "\n\nThanks,";
   const href =
-    "mailto:" +
-    contact.email +
+    // Quote requests go to the team inbox; the contact is named on the page.
+    "mailto:team@rasvertex.com.au" +
     "?subject=" +
     encodeURIComponent(`Quote request, ${reportName} ${job.ref}, ${job.site}`) +
     "&body=" +
