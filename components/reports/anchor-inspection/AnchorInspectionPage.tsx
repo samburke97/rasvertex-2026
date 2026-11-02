@@ -760,6 +760,8 @@ export default function AnchorInspectionPage({
             onUploadCover={handleUploadCover}
             onResetCover={handleResetCover}
             onCoverZoom={(z) => setCoverPos({ zoom: z })}
+            job={report.job}
+            onJob={updateJob}
             comments={report.job.certComments}
             onComments={(v) => updateJob("certComments", v)}
             technicianNotes={report.job.technicianNotes ?? ""}

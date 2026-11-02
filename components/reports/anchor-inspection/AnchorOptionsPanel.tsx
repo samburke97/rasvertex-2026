@@ -9,6 +9,7 @@ import DatePicker from "@/components/ui/DatePicker";
 import DocEditor from "@/components/workspace/DocEditor";
 import type {
   AnchorPhotoSettings,
+  AnchorReportJob,
   PhotoFolder,
   ReportPhoto,
   Zone,
@@ -47,11 +48,28 @@ interface AnchorOptionsPanelProps {
   onResetCover: () => void;
   onCoverZoom: (zoom: number) => void;
 
+  /** Cover and certificate details, all editable (filled from SimPRO). */
+  job: AnchorReportJob;
+  onJob: (field: keyof AnchorReportJob, value: string) => void;
+
   comments: string;
   onComments: (v: string) => void;
   technicianNotes: string;
   onTechnicianNotes: (v: string) => void;
 }
+
+/** Cover facts and the certificate's details, in the order they print. */
+const DETAIL_FIELDS: { key: keyof AnchorReportJob; label: string; ph?: string }[] = [
+  { key: "buildingName", label: "Building name" },
+  { key: "address", label: "Building address" },
+  { key: "preparedFor", label: "Attention (prepared for)" },
+  { key: "preparedBy", label: "Prepared by" },
+  { key: "authorisedBy", label: "Authorised by" },
+  { key: "certNumber", label: "Certification number" },
+  { key: "date", label: "Report date", ph: "e.g. 2 November 2026" },
+  { key: "inspectionDate", label: "Inspection date", ph: "e.g. 2 November 2026" },
+  { key: "nextInspectionDate", label: "Next inspection date", ph: "e.g. 2 November 2027" },
+];
 
 // ── Date preset helpers ───────────────────────────────────────────────────────
 
@@ -125,6 +143,8 @@ export default function AnchorOptionsPanel({
   onUploadCover,
   onResetCover,
   onCoverZoom,
+  job,
+  onJob,
   comments,
   onComments,
   technicianNotes,
@@ -174,6 +194,32 @@ export default function AnchorOptionsPanel({
           importStatus={importStatus}
           placeholder="e.g. 10737"
         />
+      </div>
+
+      {/* ── Report details: cover and certificate ────────────────────────── */}
+      <div className={styles.group} data-panel-group="details">
+        <div className={styles.groupLabel}>Report details</div>
+        {DETAIL_FIELDS.map((f) => (
+          <label key={f.key} className={styles.field} data-panel-field={f.key}>
+            <span className={styles.subLabel}>{f.label}</span>
+            <input
+              className={styles.input}
+              value={(job[f.key] as string | undefined) ?? ""}
+              placeholder={f.ph}
+              onChange={(e) => onJob(f.key, e.target.value)}
+            />
+          </label>
+        ))}
+        <label className={styles.field} data-panel-field="description">
+          <span className={styles.subLabel}>Cover introduction</span>
+          <textarea
+            className={styles.textarea}
+            rows={4}
+            value={job.description ?? ""}
+            placeholder="Left blank, a standard line naming the address is used."
+            onChange={(e) => onJob("description", e.target.value)}
+          />
+        </label>
       </div>
 
       {/* ── Zones ────────────────────────────────────────────────────────── */}

@@ -92,6 +92,14 @@ function Heading({ title, lede }: { title: string; lede: string }) {
 
 // ── Fixed pages ───────────────────────────────────────────────────────────────
 
+/** Builder: the Report details field behind each cover fact. */
+const FACT_FIELD: Record<string, string> = {
+  "Prepared for": "preparedFor",
+  Project: "project",
+  Date: "date",
+  "Prepared by": "preparedBy",
+};
+
 function Cover({ ctx }: { ctx: Ctx }) {
   const { model } = ctx;
   const { x, y, zoom } = model.coverPos;
@@ -100,10 +108,10 @@ function Cover({ ctx }: { ctx: Ctx }) {
       <section className="ar-page ar-page--cover">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="ar-logo" src={ctx.assets.images.logo} alt="RAS-VERTEX Maintenance Solutions" />
-        <h1 className="ar-h1" style={{ marginTop: 48 }}>
+        <h1 className="ar-h1" style={{ marginTop: 48 }} data-panel-field="site">
           {model.site}.
         </h1>
-        <p className="ar-lede" style={{ fontSize: 22, marginTop: 24 }}>
+        <p className="ar-lede" style={{ fontSize: 22, marginTop: 24 }} data-panel-field="intro">
           {model.blurb}
         </p>
         <div
@@ -126,7 +134,7 @@ function Cover({ ctx }: { ctx: Ctx }) {
         </div>
         <div className="ar-facts" style={{ marginTop: 64 }}>
           {model.facts.map((f) => (
-            <div key={f.k} className="ar-fact">
+            <div key={f.k} className="ar-fact" data-panel-field={FACT_FIELD[f.k]}>
               <div className="ar-label">{f.k}</div>
               <div className="ar-fact__v">{f.v || "—"}</div>
             </div>

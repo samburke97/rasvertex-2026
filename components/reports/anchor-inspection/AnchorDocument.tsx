@@ -192,10 +192,10 @@ function Cover({ ctx }: { ctx: Ctx }) {
           src={ctx.assets.images.logo}
           alt="RAS-VERTEX Maintenance Solutions"
         />
-        <h1 className="ar-h1" style={{ marginTop: 48 }}>
+        <h1 className="ar-h1" style={{ marginTop: 48 }} data-panel="details" data-panel-field="buildingName">
           {model.site}.
         </h1>
-        <p className="ar-lede" style={{ fontSize: 22, marginTop: 24 }}>
+        <p className="ar-lede" style={{ fontSize: 22, marginTop: 24 }} data-panel="details" data-panel-field="description">
           {model.blurb}
         </p>
         <div
@@ -220,7 +220,7 @@ function Cover({ ctx }: { ctx: Ctx }) {
         </div>
         <div className="ar-facts" style={{ marginTop: 64 }}>
           {model.facts.map((f) => (
-            <div key={f.k} className="ar-fact">
+            <div key={f.k} className="ar-fact" data-panel="details" data-panel-field={FACT_FIELD[f.k]}>
               <div className="ar-label">{f.k}</div>
               <div className="ar-fact__v">{f.v || "—"}</div>
             </div>
@@ -642,12 +642,12 @@ function CertPage({
     <section className="ar-page ar-page--end">
       <SecLabel text={secText(3)} />
       <h2 className="ar-h2">Certification</h2>
-      <p className="ar-lede" style={{ marginTop: 20 }}>
+      <p className="ar-lede" style={{ marginTop: 20 }} data-panel="details" data-panel-field="certNumber">
         Certification of test and examination #{model.certNumber}.
       </p>
       <div className="ar-certfacts">
         {model.certFacts.map((f) => (
-          <div key={f.k}>
+          <div key={f.k} data-panel="details" data-panel-field={FACT_FIELD[f.k]}>
             <span className="ar-label">{f.k}</span>
             <b>{f.v || "—"}</b>
           </div>
@@ -961,6 +961,21 @@ export function Partner({ images, label }: { images: Record<AnchorImageKey, stri
 }
 
 // ── Document ──────────────────────────────────────────────────────────────────
+
+/** Builder: the Report details field behind each fact on the cover and
+ *  certificate. */
+const FACT_FIELD: Record<string, string> = {
+  "Prepared for": "preparedFor",
+  Attention: "preparedFor",
+  "Prepared by": "preparedBy",
+  Report: "certNumber",
+  Date: "date",
+  "Building name": "buildingName",
+  "Building address": "address",
+  "Authorised by": "authorisedBy",
+  "Inspection date": "inspectionDate",
+  "Next inspection date": "nextInspectionDate",
+};
 
 /** Builder: the side-panel group each page's settings live in. */
 const PAGE_PANEL: Record<string, string> = { summary: "zones", register: "zones", photos: "photos", cert: "cert" };

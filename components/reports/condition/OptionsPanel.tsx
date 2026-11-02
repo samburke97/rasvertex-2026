@@ -220,7 +220,7 @@ export default function OptionsPanel({
       <div className={styles.group} data-panel-group="details">
         <div className={styles.groupLabel}>Report details</div>
         {DETAIL_FIELDS.map((f) => (
-          <label key={f.key} className={styles.field}>
+          <label key={f.key} className={styles.field} data-panel-field={f.key}>
             <span className={styles.subLabel}>{f.label}</span>
             <input
               className={styles.input}
@@ -229,7 +229,7 @@ export default function OptionsPanel({
             />
           </label>
         ))}
-        <label className={styles.field}>
+        <label className={styles.field} data-panel-field="intro">
           <span className={styles.subLabel}>Introduction</span>
           <textarea
             className={styles.textarea}
