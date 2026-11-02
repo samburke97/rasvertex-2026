@@ -57,6 +57,7 @@ import {
 } from "@/lib/reports/format-report-date";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
+import { usePageToPanel } from "@/components/reports/shared/builder/usePageToPanel";
 
 interface AnchorInspectionPageProps {
   onBack: () => void;
@@ -669,6 +670,7 @@ export default function AnchorInspectionPage({
 
   // ── Preview zoom (fixed 1280px pages, scaled to the column) ────────────
   const previewRef = useRef<HTMLDivElement>(null);
+  const pageToPanel = usePageToPanel();
   const [zoom, setZoom] = useState(0.5);
   useLayoutEffect(() => {
     const el = previewRef.current;
@@ -731,40 +733,42 @@ export default function AnchorInspectionPage({
 
       {/* ── Body ── */}
       <div className={styles.editorBody}>
-        <AnchorOptionsPanel
-          zones={report.zones}
-          onAddZone={addZone}
-          onOpenZone={openZoneMap}
-          onDeleteZone={deleteZone}
-          totalAnchors={totalAnchors}
-          totalPassed={totalPassed}
-          importStatus={importStatus}
-          onImport={handleImport}
-          hasLoadedJob={!!loadedJobId}
-          photos={report.photos}
-          photoSettings={report.photoSettings}
-          onPhotoSettings={updatePhotoSettings}
-          photoImportStatus={photoImportStatus}
-          photoFolders={photoFolders}
-          selectedPhotoFolderId={selectedPhotoFolderId}
-          onSelectPhotoFolder={handleSelectPhotoFolder}
-          onLoadPhotosFromJob={handleLoadPhotosFromJob}
-          onUploadPhotos={handleUploadPhotos}
-          coverUrl={model.coverUrl ?? DEFAULT_COVER_URL}
-          hasCustomCover={!!report.coverUrl}
-          coverBusy={coverBusy}
-          coverZoom={model.coverPos.zoom}
-          onUploadCover={handleUploadCover}
-          onResetCover={handleResetCover}
-          onCoverZoom={(z) => setCoverPos({ zoom: z })}
-          comments={report.job.certComments}
-          onComments={(v) => updateJob("certComments", v)}
-          technicianNotes={report.job.technicianNotes ?? ""}
-          onTechnicianNotes={(v) => updateJob("technicianNotes", v)}
-        />
+        <div ref={pageToPanel.panelRef} style={{ display: "contents" }}>
+          <AnchorOptionsPanel
+            zones={report.zones}
+            onAddZone={addZone}
+            onOpenZone={openZoneMap}
+            onDeleteZone={deleteZone}
+            totalAnchors={totalAnchors}
+            totalPassed={totalPassed}
+            importStatus={importStatus}
+            onImport={handleImport}
+            hasLoadedJob={!!loadedJobId}
+            photos={report.photos}
+            photoSettings={report.photoSettings}
+            onPhotoSettings={updatePhotoSettings}
+            photoImportStatus={photoImportStatus}
+            photoFolders={photoFolders}
+            selectedPhotoFolderId={selectedPhotoFolderId}
+            onSelectPhotoFolder={handleSelectPhotoFolder}
+            onLoadPhotosFromJob={handleLoadPhotosFromJob}
+            onUploadPhotos={handleUploadPhotos}
+            coverUrl={model.coverUrl ?? DEFAULT_COVER_URL}
+            hasCustomCover={!!report.coverUrl}
+            coverBusy={coverBusy}
+            coverZoom={model.coverPos.zoom}
+            onUploadCover={handleUploadCover}
+            onResetCover={handleResetCover}
+            onCoverZoom={(z) => setCoverPos({ zoom: z })}
+            comments={report.job.certComments}
+            onComments={(v) => updateJob("certComments", v)}
+            technicianNotes={report.job.technicianNotes ?? ""}
+            onTechnicianNotes={(v) => updateJob("technicianNotes", v)}
+          />
+        </div>
 
         {/* ── Preview: the report itself, scaled to the column ── */}
-        <div ref={previewRef} className={styles.canvas}>
+        <div ref={previewRef} className={styles.canvas} onClick={pageToPanel.onDocClick}>
           <AnchorStyles />
           <div style={{ zoom }}>
             <AnchorDocument

@@ -733,6 +733,8 @@ export interface Layout {
   total: number;
   secPage: Partial<Record<SectionKey, number>>;
   chapPage: Record<string, number>;
+  /** The section each flowed page belongs to (the one under way at its top). */
+  pageSec: SectionKey[];
 }
 
 /** Table rows that lose their bottom rule as the last row on a page. */
@@ -786,9 +788,11 @@ export function paginate(blocks: Block[], heights: Record<string, number>): Layo
     if (b.secKey) secPage[b.secKey] = n + FIRST_FLOW_PAGE;
     if (b.chapKey) chapPage[b.chapKey] = n + FIRST_FLOW_PAGE;
   }
+  let sec: SectionKey = "about";
+  const pageSec = pages.map((page) => (sec = page.find((b) => b.secKey)?.secKey ?? sec));
   const total = pages.length + FIRST_FLOW_PAGE;
   secPage.works = total;
-  return { pages, total, secPage, chapPage };
+  return { pages, total, secPage, chapPage, pageSec };
 }
 
 export { pad as padPage };

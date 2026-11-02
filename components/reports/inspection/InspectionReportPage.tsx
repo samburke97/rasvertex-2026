@@ -695,6 +695,8 @@ export default function InspectionReportPage({ onBack }: Props) {
                   pickPhoto(id);
                 }}
                 onEdit={editKey}
+                onPickSection={(k) => pickSection(k as Sel)}
+                selectedSection={sel}
                 editing={editing}
                 model={model}
                 layout={layout}

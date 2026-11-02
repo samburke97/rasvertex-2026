@@ -217,7 +217,7 @@ export default function OptionsPanel({
       </div>
 
       {/* ── Report details ───────────────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="details">
         <div className={styles.groupLabel}>Report details</div>
         {DETAIL_FIELDS.map((f) => (
           <label key={f.key} className={styles.field}>
@@ -242,7 +242,7 @@ export default function OptionsPanel({
       </div>
 
       {/* ── Cover photo ──────────────────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="cover">
         <div className={styles.groupLabel}>Cover photo</div>
         <div className={styles.coverPhotoPreview}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -279,7 +279,7 @@ export default function OptionsPanel({
       </div>
 
       {/* ── Photos ───────────────────────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="photos">
         <div className={styles.groupLabel}>Photos</div>
 
         <ToggleRow
@@ -404,7 +404,7 @@ export default function OptionsPanel({
       </div>
 
       {/* ── Schedule ─────────────────────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="hours">
         <div className={styles.groupLabelRow}>
           <div className={styles.groupLabel}>Hours</div>
           {settings.scheduleLoaded && (
@@ -486,7 +486,7 @@ export default function OptionsPanel({
       </div>
 
       {/* ── Summary ──────────────────────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="summary">
         <div className={styles.groupLabel}>Summary</div>
         <ToggleRow
           label="Include job summary"

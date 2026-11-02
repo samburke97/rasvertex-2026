@@ -145,7 +145,7 @@ export const INSPECTION_CSS = `
 .ir-photo-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}
 .ir-photo{min-width:0}
 .ir-photo--edit{cursor:pointer}
-.ir--edit [data-edit]{cursor:pointer}
+.ir--edit [data-edit],.ir--edit .ir-sheet{cursor:pointer}
 .ir-photo.is-editing{outline:4px solid #3e7fb0;outline-offset:10px;border-radius:20px}
 .ir-photo__img{width:100%;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:var(--card-grey) center/cover no-repeat}
 .ir-photo__head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:20px}
@@ -499,7 +499,7 @@ function Cover({ ctx, job }: { ctx: Ctx; job: InspectionJob }) {
   const coverSrc = ctx.photoUrl(model.coverPhotoId);
   const { x, y, zoom } = model.coverPos;
   return (
-    <div className="ir-sheet" data-pageno={1}>
+    <div className="ir-sheet" data-pageno={1} data-section="cover">
       <section className="ir-page ir-page--cover">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="ir-logo" src={ctx.assets.logo} alt="RAS-VERTEX Maintenance Solutions" />
@@ -603,7 +603,7 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
     </>
   );
   return (
-    <div className="ir-sheet" data-pageno={layout.total}>
+    <div className="ir-sheet" data-pageno={layout.total} data-section="works">
       <section className="ir-page ir-page--works">
         <div className="ir-seclabel">
           <span>{sec.label}</span>
@@ -676,6 +676,10 @@ interface DocProps {
   editing?: string | null;
   /** Builder only: click any editable text to edit it in the panel. */
   onEdit?: (key: string) => void;
+  /** Builder only: click anywhere else on a page to open its section. */
+  onPickSection?: (section: string) => void;
+  /** Builder only: the section open in the panel; its pages are outlined. */
+  selectedSection?: string;
 }
 
 export default function InspectionDocument(props: DocProps) {
@@ -693,19 +697,27 @@ export default function InspectionDocument(props: DocProps) {
   return (
     <div
       className={`ir${props.screen ? " ir--screen" : ""}${props.onEdit ? " ir--edit" : ""}`}
+      data-sel={props.selectedSection}
       onClick={
         props.onEdit
           ? (e) => {
-              const el = (e.target as HTMLElement).closest<HTMLElement>("[data-edit]");
-              if (el) props.onEdit!(el.dataset.edit!);
+              const t = e.target as HTMLElement;
+              if (t.closest("[data-photo]")) return; // the photo's own editor
+              const el = t.closest<HTMLElement>("[data-edit]");
+              if (el) return props.onEdit!(el.dataset.edit!);
+              const sec = t.closest<HTMLElement>("[data-section]")?.dataset.section;
+              if (sec) props.onPickSection?.(sec);
             }
           : undefined
       }
     >
+      {props.selectedSection && (
+        <style>{`.ir[data-sel="${props.selectedSection}"] .ir-sheet[data-section="${props.selectedSection}"]{outline:3px solid #3e7fb0}`}</style>
+      )}
       <Cover ctx={ctx} job={job} />
       <Contents ctx={ctx} layout={layout} />
       {layout.pages.map((blocks, pi) => (
-        <div key={pi} className="ir-sheet" data-pageno={pi + 3}>
+        <div key={pi} className="ir-sheet" data-pageno={pi + 3} data-section={layout.pageSec[pi]}>
           <section className="ir-page">
             {blocks.map((b, i) => (
               <div key={`${i}-${b.key}`} style={{ paddingTop: b.pt }}>

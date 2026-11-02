@@ -177,7 +177,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Zones ────────────────────────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="zones">
         <div className={styles.groupLabelRow}>
           <span className={styles.groupLabel}>Zones</span>
           {totalAnchors > 0 && (
@@ -265,7 +265,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Cover photo ──────────────────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="cover">
         <div className={styles.groupLabel}>Cover photo</div>
         <input
           ref={coverRef}
@@ -312,7 +312,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Technician notes (under the asset register) ─────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="notes">
         <div className={styles.groupLabel}>Technician notes</div>
         <div className={styles.editorBox}>
           <DocEditor value={technicianNotes} onChange={onTechnicianNotes} />
@@ -323,7 +323,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Certification comments ───────────────────────────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="cert">
         <div className={styles.groupLabel}>Certification comments</div>
         <textarea
           value={comments}
@@ -335,7 +335,7 @@ export default function AnchorOptionsPanel({
       </div>
 
       {/* ── Supporting Photos — optional, off by default ────────────────── */}
-      <div className={styles.group}>
+      <div className={styles.group} data-panel-group="photos">
         <div className={styles.groupLabelRow}>
           <span className={styles.groupLabel}>Supporting photos</span>
         </div>

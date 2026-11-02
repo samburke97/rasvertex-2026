@@ -183,7 +183,7 @@ function Cover({ ctx }: { ctx: Ctx }) {
   const { model } = ctx;
   const { x, y, zoom } = model.coverPos;
   return (
-    <div className="ar-sheet">
+    <div className="ar-sheet" data-panel="cover">
       <section className="ar-page ar-page--cover">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -445,6 +445,7 @@ function RegisterPage({
 function Notes({ html, top }: { html: string; top: boolean }) {
   return (
     <div
+      data-panel="notes"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -960,6 +961,9 @@ export function Partner({ images, label }: { images: Record<AnchorImageKey, stri
 
 // ── Document ──────────────────────────────────────────────────────────────────
 
+/** Builder: the side-panel group each page's settings live in. */
+const PAGE_PANEL: Record<string, string> = { summary: "zones", register: "zones", photos: "photos", cert: "cert" };
+
 interface DocProps {
   model: AnchorModel;
   assets: AnchorAssets;
@@ -990,7 +994,7 @@ export default function AnchorDocument({
       <Cover ctx={ctx} />
       <Contents ctx={ctx} />
       {model.pages.map((p) => (
-        <div key={`${p.kind}-${p.no}`} className="ar-sheet">
+        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-panel={PAGE_PANEL[p.kind]}>
           {p.kind === "summary" ? (
             <SummaryPage ctx={ctx} page={p} />
           ) : p.kind === "register" ? (

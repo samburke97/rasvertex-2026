@@ -96,7 +96,7 @@ function Cover({ ctx }: { ctx: Ctx }) {
   const { model } = ctx;
   const { x, y, zoom } = model.coverPos;
   return (
-    <div className="ar-sheet">
+    <div className="ar-sheet" data-panel="details">
       <section className="ar-page ar-page--cover">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="ar-logo" src={ctx.assets.images.logo} alt="RAS-VERTEX Maintenance Solutions" />
@@ -389,7 +389,7 @@ export default function OverviewDocument({ model, assets, screen, onCoverPointer
       <Cover ctx={ctx} />
       <Contents ctx={ctx} />
       {model.pages.map((p) => (
-        <div key={`${p.kind}-${p.no}`} className="ar-sheet">
+        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-panel={p.kind}>
           {p.kind === "summary" ? (
             <SummaryPage ctx={ctx} page={p} />
           ) : p.kind === "hours" ? (

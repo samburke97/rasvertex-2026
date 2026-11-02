@@ -39,6 +39,7 @@ import {
 } from "@/lib/reports/condition.types";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
+import { usePageToPanel } from "@/components/reports/shared/builder/usePageToPanel";
 
 const pub = (rel: string) => "/" + rel;
 const ASSETS: OverviewAssets = {
@@ -585,6 +586,7 @@ export default function ConditionReportPage({
 
   // ── Preview zoom (fixed 1280px pages, scaled to the column) ────────────
   const previewRef = useRef<HTMLDivElement>(null);
+  const pageToPanel = usePageToPanel();
   const [zoom, setZoom] = useState(0.5);
   useLayoutEffect(() => {
     const el = previewRef.current;
@@ -634,40 +636,42 @@ export default function ConditionReportPage({
 
       {/* ── Body ── */}
       <div className={styles.editorBody}>
-        <OptionsPanel
-          settings={report.settings}
-          photos={report.photos}
-          job={report.job}
-          importStatus={importStatus}
-          scheduleStatus={scheduleStatus}
-          onSettings={updateSettings}
-          onImport={(jobNumber) => {
-            setLoadedJobId(jobNumber);
-            handleImport(jobNumber);
-          }}
-          photoFolders={photoFolders}
-          selectedFolderId={selectedFolderId}
-          onSelectFolder={selectFolder}
-          scheduleCostCenters={scheduleCostCenters}
-          selectedCostCenter={selectedCostCenter}
-          onSelectCostCenter={selectCostCenter}
-          onRefreshSchedule={() => fetchSchedule(loadedJobId, selectedCostCenter)}
-          scheduleRows={report.schedule.length}
-          onEditHours={() => setHoursOpen(true)}
-          scope={report.scope ?? null}
-          onCoverPhoto={updateCoverPhoto}
-          coverUrl={model.coverUrl}
-          coverZoom={model.coverPos.zoom}
-          onCoverZoom={(z) => setCoverPos({ zoom: z })}
-          onJob={updateJobField}
-          comments={report.comments}
-          onComments={(v) => setReport((prev) => ({ ...prev, comments: v }))}
-          recommendations={report.recommendations}
-          onRecommendations={(v) => setReport((prev) => ({ ...prev, recommendations: v }))}
-        />
+        <div ref={pageToPanel.panelRef} style={{ display: "contents" }}>
+          <OptionsPanel
+            settings={report.settings}
+            photos={report.photos}
+            job={report.job}
+            importStatus={importStatus}
+            scheduleStatus={scheduleStatus}
+            onSettings={updateSettings}
+            onImport={(jobNumber) => {
+              setLoadedJobId(jobNumber);
+              handleImport(jobNumber);
+            }}
+            photoFolders={photoFolders}
+            selectedFolderId={selectedFolderId}
+            onSelectFolder={selectFolder}
+            scheduleCostCenters={scheduleCostCenters}
+            selectedCostCenter={selectedCostCenter}
+            onSelectCostCenter={selectCostCenter}
+            onRefreshSchedule={() => fetchSchedule(loadedJobId, selectedCostCenter)}
+            scheduleRows={report.schedule.length}
+            onEditHours={() => setHoursOpen(true)}
+            scope={report.scope ?? null}
+            onCoverPhoto={updateCoverPhoto}
+            coverUrl={model.coverUrl}
+            coverZoom={model.coverPos.zoom}
+            onCoverZoom={(z) => setCoverPos({ zoom: z })}
+            onJob={updateJobField}
+            comments={report.comments}
+            onComments={(v) => setReport((prev) => ({ ...prev, comments: v }))}
+            recommendations={report.recommendations}
+            onRecommendations={(v) => setReport((prev) => ({ ...prev, recommendations: v }))}
+          />
+        </div>
 
         {/* ── Preview: the report itself, scaled to the column ── */}
-        <div ref={previewRef} className={styles.canvas}>
+        <div ref={previewRef} className={styles.canvas} onClick={pageToPanel.onDocClick}>
           <OverviewStyles />
           <div style={{ zoom }}>
             <OverviewDocument
