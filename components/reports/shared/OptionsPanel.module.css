@@ -509,3 +509,32 @@
   color: var(--red);
   background: var(--red-tint);
 }
+
+/* Job overview: optional sections (ProjectSections.tsx) */
+.methodThumbs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; max-height: 220px; overflow: auto; }
+.methodThumb { aspect-ratio: 4 / 3; border: 0; border-radius: 8px; background: rgba(var(--ink-rgb), 0.06) center / cover no-repeat; cursor: pointer; }
+.methodThumbOn { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }
+.warrantyRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.scheduleRow { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 6px; padding: 10px 0; border-top: 1px solid rgba(var(--ink-rgb), 0.06); }
+.scheduleRow textarea, .scheduleRow button { grid-column: 1 / -1; }
+.scheduleRow button { justify-self: start; }
+.textBtn { align-self: flex-start; border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; font-weight: 500; color: rgba(var(--ink-rgb), 0.6); text-decoration: underline; cursor: pointer; }
+
+/* Selects: our own chevron, inset from the edge like the text. */
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px;
+  cursor: pointer;
+}
+
+/* One warranty kind (waterproofing, painting) inside the Warranty group. */
+.kindCard { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; border: 1px solid rgba(var(--mix-rgb), 0.1); border-radius: 12px; }
+
+/* A required field still empty. */
+.inputMissing { border-color: rgba(196, 50, 50, 0.55); }
+.inputMissing:focus { border-color: rgba(196, 50, 50, 0.8); box-shadow: 0 0 0 3px rgba(196, 50, 50, 0.12); }

@@ -1,7 +1,7 @@
 // lib/reports/overview.layout.ts
 //
 // Everything the Job Overview document needs, derived once from the report
-// data: cover facts, the summary stats, the hours schedule as table items,
+// data: cover facts, the hours schedule as table items,
 // the photos grouped by day, and which page each block lands on. Pure, so
 // the builder preview and the PDF route paginate identically.
 //
@@ -10,8 +10,9 @@
 // pagination is arithmetic rather than measured; rich-text blocks are
 // estimated from their line count.
 //
-// Pages: 1 Cover · 2 Contents · Job summary · Hours schedule · Photos ·
-// last: RAS-VERTEX (the closing page shared with the Anchor report).
+// Pages: 1 Cover · 2 Contents · Hours schedule · Methodology · Photos ·
+// Maintenance plan · Warranties · last: RAS-VERTEX (the closing page shared
+// with the Anchor report).
 
 import {
   DEFAULT_COVER_POS,
@@ -25,6 +26,9 @@ import {
 import { fmtDate, pad } from "./anchor.layout";
 import { notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "./richText";
 import type { PhotoPos } from "./photos";
+import { htmlItems } from "./richText";
+import { planRows, PLAN_INTRO, type PlanItem } from "./maintenancePlan";
+import { KIND, normWarranties, shortDate, supplierName, WARRANTY_KINDS, type WarrantyInfo, type WarrantyKind, type WarrantyScheduleRow } from "./warranty";
 
 export { pad };
 export const PAGE_W = 1280;
@@ -32,7 +36,7 @@ export const PAGE_H = 1810;
 export const CONTENT_W = 1088;
 
 /** The cover photo used until one is uploaded. */
-export const DEFAULT_OVERVIEW_COVER = "images/backgrounds/condition-bg.jpeg";
+export const DEFAULT_OVERVIEW_COVER = "reports/proposal/assets/rope-access.png";
 
 // Content runs from the page's 80 top padding to just above the page number.
 const FLOW_H = 1620;
@@ -79,8 +83,6 @@ export type HourItem =
   | { kind: "subtotal"; title: string; hours: number }
   | { kind: "total"; hours: number };
 
-export type SummaryBlock = "intro" | "scope" | "items" | "comments" | "recommendations";
-
 export interface PhotoDay {
   /** Null when dates aren't shown. */
   label: string | null;
@@ -89,8 +91,16 @@ export interface PhotoDay {
   rows: OverviewPhoto[][];
 }
 
+export type MethodBlock =
+  | { t: "group"; stage: number; title: string; from: number; to: number; cont: boolean }
+  | { t: "step"; n: number; html: string }
+  | { t: "photo" };
+
 export type Page =
-  | { kind: "summary"; no: number; blocks: SummaryBlock[] }
+  | { kind: "method"; no: number; first: boolean; blocks: MethodBlock[] }
+  | { kind: "plan"; no: number; first: boolean; rows: PlanItem[]; notes: boolean }
+  | { kind: "warranty"; no: number; w: WarrantyKind; first: boolean }
+  | { kind: "care"; no: number; w: WarrantyKind }
   | { kind: "hours"; no: number; first: boolean; items: HourItem[] }
   | {
       kind: "photos";
@@ -99,7 +109,7 @@ export type Page =
       days: PhotoDay[];
     };
 
-export type SectionKey = "summary" | "hours" | "photos";
+export type SectionKey = "hours" | "method" | "photos" | "plan" | "warranty";
 
 export interface OverviewModel {
   reportType: string;
@@ -108,17 +118,8 @@ export interface OverviewModel {
   coverUrl: string;
   coverPos: CoverPos;
   facts: { k: string; v: string }[];
-  summaryLede: string;
   /** Under "Hours schedule": who logged the hours, when, on which job. */
   hoursLede: string;
-  /** The quote's description, sanitised; empty when hidden or missing. */
-  scope: string;
-  /** "Quote #10970" when the scope came from a quote. */
-  scopeSource: string;
-  /** Line items grouped by cost centre; empty when hidden or missing. */
-  items: { group: string; labels: string[] }[];
-  comments: string;
-  recommendations: string;
   showNotes: boolean;
   grid: { cols: number; ratio: number };
   pages: Page[];
@@ -128,6 +129,26 @@ export interface OverviewModel {
   toc: { title: string; items: { name: string; page: string }[] }[];
   photoCount: number;
   totalHours: number;
+  method: { intro: string; photoUrl: string | null; photoPos?: PhotoPos; caption: string } | null;
+  plan: { intro: string; next: boolean; notes: string } | null;
+  warranties: Partial<Record<WarrantyKind, WarrantyModel>>;
+}
+
+export interface WarrantyModel {
+  title: string;
+  intro: string;
+  facts: { k: string; v: string }[];
+  details: { k: string; v: string }[];
+  statement: string;
+  signed: string;
+  careIntro: string;
+  requirements: string[];
+  schedule: WarrantyScheduleRow[];
+  obligations: string;
+  scheduleTitle: string;
+  scheduleIntro: string;
+  contact: { name: string; phone: string; email: string };
+  href: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -194,10 +215,6 @@ export function hourItems(rows: ScheduleRow[], sectioned: boolean): HourItem[] {
 }
 
 const ledeH = (text: string) => Math.max(1, Math.ceil(text.length / LEDE_CHARS)) * LEDE_LINE;
-const ITEM_LINE = 30; // 17 × 1.6 + 2 list gap, rounded up
-const ITEM_GROUP = 50; // group name, its margin and the gap above
-const itemsH = (groups: { labels: string[] }[]) =>
-  NOTE_HEAD + groups.reduce((t, g) => t + ITEM_GROUP + g.labels.length * ITEM_LINE, 0);
 const noteH = (html: string) => {
   const blocks = (html.match(/<\/(p|h2|h3|li|blockquote)>/g) ?? []).length;
   return NOTE_HEAD + notesLineCount(html) * NOTE_LINE + blocks * 10;
@@ -219,24 +236,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   const [from, to] = range(settings.dateFrom, settings.dateTo);
   const photos = settings.showPhotos ? filterPhotosByDateRange(report.photos, from, to) : [];
   const schedule = settings.showSchedule ? filterScheduleByDateRange(report.schedule, from, to) : [];
-  const comments = sanitizeNotesHtml(report.comments);
-  const recommendations = sanitizeNotesHtml(report.recommendations);
-  const hasNotes = settings.showSummary && (!notesIsEmpty(comments) || !notesIsEmpty(recommendations));
-
   const totalHours = schedule.reduce((t, r) => t + (r.actualHours || 0), 0);
-  const days = new Set(schedule.map((r) => r.date)).size;
-  const photoDays = new Set(photos.map((p) => dayKey(p.dateAdded)).filter((k) => k !== "undated")).size;
-
-  // Scope of works, from the quote the job came from.
-  const scope = settings.showSummary && settings.showScope !== false ? sanitizeNotesHtml(report.scope?.description) : "";
-  const items: OverviewModel["items"] = [];
-  if (settings.showSummary && settings.showScopeItems !== false) {
-    for (const it of report.scope?.items ?? []) {
-      const last = items[items.length - 1];
-      if (last && last.group === it.group) last.labels.push(it.label);
-      else items.push({ group: it.group, labels: [it.label] });
-    }
-  }
   const longDate = (iso: string) => {
     const d = new Date(iso + "T00:00:00");
     return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
@@ -248,16 +248,16 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     : dates[0] === dates[dates.length - 1]
       ? `The hours below were logged by our team on ${longDate(dates[0])}${onJob}.`
       : `The hours below were logged by our team between ${longDate(dates[0])} and ${longDate(dates[dates.length - 1])}${onJob}.`;
-  const summaryLede = schedule.length
-    ? `${hrs(totalHours).replace(/\.00$/, "")} hours across ${days} day${days === 1 ? "" : "s"} on site${photos.length ? `, with ${photos.length} photo${photos.length === 1 ? "" : "s"} of the work` : ""}.`
-    : photos.length
-      ? `${photos.length} photo${photos.length === 1 ? "" : "s"} of the work, taken across ${photoDays || 1} day${photoDays === 1 ? "" : "s"}.`
-      : "An overview of the works completed.";
-
+  const method = report.method?.on ? report.method : null;
+  const plan = report.plan?.on && report.plan.items.length ? report.plan : null;
+  const ws = normWarranties(report.warranty, report.job.date);
+  const kinds = ws?.on ? WARRANTY_KINDS.filter((k) => ws[k]?.on) : [];
   const sections: SectionKey[] = [];
-  if (settings.showSummary) sections.push("summary");
   if (schedule.length) sections.push("hours");
+  if (method) sections.push("method");
   if (photos.length) sections.push("photos");
+  if (plan) sections.push("plan");
+  if (kinds.length) sections.push("warranty");
   const nSec = sections.length + 1;
   const secText = {} as OverviewModel["secText"];
   sections.forEach((k, i) => (secText[k] = `Section ${pad(i + 1)} / ${pad(nSec)}`));
@@ -265,28 +265,6 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
 
   const pages: Page[] = [];
   const no = () => pages.length + 3;
-
-  // Summary: the intro (lede + stats), then comments and recommendations,
-  // moving to a new page when the next block won't fit.
-  if (settings.showSummary) {
-    const blocks: { b: SummaryBlock; h: number }[] = [{ b: "intro", h: H2 + 20 + ledeH(summaryLede) }];
-    if (!notesIsEmpty(scope)) blocks.push({ b: "scope", h: noteH(scope) });
-    if (items.length) blocks.push({ b: "items", h: itemsH(items) });
-    if (hasNotes && !notesIsEmpty(comments)) blocks.push({ b: "comments", h: noteH(comments) });
-    if (hasNotes && !notesIsEmpty(recommendations)) blocks.push({ b: "recommendations", h: noteH(recommendations) });
-    let page: Extract<Page, { kind: "summary" }> = { kind: "summary", no: no(), blocks: [] };
-    let used = SEC_LABEL;
-    for (const { b, h } of blocks) {
-      if (page.blocks.length && used + h > FLOW_H) {
-        pages.push(page);
-        page = { kind: "summary", no: no(), blocks: [] };
-        used = SEC_LABEL;
-      }
-      page.blocks.push(b);
-      used += h;
-    }
-    pages.push(page);
-  }
 
   // Hours: the table, its header repeated on every page. A section header
   // never sits alone at a page foot.
@@ -307,6 +285,45 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
       page.items.push(it);
       used += hOf(it);
     });
+    pages.push(page);
+  }
+
+  // Methodology: each stage's head, then its numbered steps; a stage split
+  // across pages repeats its head. The photo, if any, closes the section.
+  if (method) {
+    const stepH = (html: string) => 32 + Math.max(1, Math.ceil(html.replace(/<[^>]*>/g, "").length / METHOD_CHARS)) * 28;
+    let page: Extract<Page, { kind: "method" }> = { kind: "method", no: no(), first: true, blocks: [] };
+    let used = SEC_LABEL + H2 + 20 + ledeH(method.intro) + 56;
+    const newPage = () => {
+      pages.push(page);
+      page = { kind: "method", no: no(), first: false, blocks: [] };
+      used = SEC_LABEL;
+    };
+    let n = 0;
+    let stage = 0;
+    for (const g of method.groups) {
+      const steps = htmlItems(g.steps);
+      if (!steps.length) continue;
+      stage++;
+      const head = (cont: boolean): MethodBlock => ({ t: "group", stage, title: g.title, from: n + 1, to: n + steps.length, cont });
+      const headH = (page.blocks.length ? GROUP_GAP : 0) + GROUP_HEAD;
+      if (page.blocks.length && used + headH + stepH(steps[0]) > FLOW_H) newPage();
+      used += (page.blocks.length ? GROUP_GAP : 0) + GROUP_HEAD;
+      page.blocks.push(head(false));
+      for (const html of steps) {
+        if (used + stepH(html) > FLOW_H) {
+          newPage();
+          page.blocks.push(head(true));
+          used += GROUP_HEAD;
+        }
+        page.blocks.push({ t: "step", n: ++n, html });
+        used += stepH(html);
+      }
+    }
+    if (method.photoId && report.photos.some((p) => p.id === method.photoId)) {
+      if (used + METHOD_PHOTO > FLOW_H) newPage();
+      page.blocks.push({ t: "photo" });
+    }
     pages.push(page);
   }
 
@@ -362,10 +379,41 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     pages.push(page);
   }
 
+  // Maintenance plan: the table (header repeated), then the comments.
+  const planNotes = plan ? sanitizeNotesHtml(plan.notes) : "";
+  if (plan) {
+    const rows = planRows(plan.items);
+    const rowH = (x: PlanItem) => 32 + Math.max(1, Math.ceil(x.service.length / 52)) * 28;
+    let page: Extract<Page, { kind: "plan" }> = { kind: "plan", no: no(), first: true, rows: [], notes: false };
+    let used = SEC_LABEL + H2 + 20 + ledeH(PLAN_INTRO) + 56 + T_HEAD;
+    for (const x of rows) {
+      if (page.rows.length && used + rowH(x) > FLOW_H) {
+        pages.push(page);
+        page = { kind: "plan", no: no(), first: false, rows: [], notes: false };
+        used = SEC_LABEL + T_HEAD;
+      }
+      page.rows.push(x);
+      used += rowH(x);
+    }
+    if (!notesIsEmpty(planNotes)) {
+      if (used + noteH(planNotes) > FLOW_H) {
+        pages.push(page);
+        page = { kind: "plan", no: no(), first: false, rows: [], notes: false };
+      }
+      page.notes = true;
+    }
+    pages.push(page);
+  }
+
+  // Warranties: each the warranty itself, then what keeps it valid.
+  kinds.forEach((w, i) => {
+    pages.push({ kind: "warranty", no: no(), w, first: i === 0 });
+    pages.push({ kind: "care", no: no(), w });
+  });
+
   const total = pages.length + 3;
   const firstOf = (k: Page["kind"]) => pages.find((p) => p.kind === k)?.no;
   const jobItems: { name: string; page: string }[] = [];
-  if (firstOf("summary")) jobItems.push({ name: "Job summary", page: String(firstOf("summary")) });
   if (firstOf("hours")) jobItems.push({ name: "Hours schedule", page: String(firstOf("hours")) });
   const photoItems: { name: string; page: string }[] = [];
   if (settings.showDates) {
@@ -386,7 +434,20 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
 
   const toc: OverviewModel["toc"] = [];
   if (jobItems.length) toc.push({ title: "The job", items: jobItems });
+  if (firstOf("method")) toc.push({ title: "The works", items: [{ name: "Methodology", page: String(firstOf("method")) }] });
   if (shownPhotos.length) toc.push({ title: "Photos", items: shownPhotos });
+  if (firstOf("plan")) toc.push({ title: "Maintenance", items: [{ name: "Maintenance plan", page: String(firstOf("plan")) }] });
+  if (kinds.length)
+    toc.push({
+      title: "Warranty",
+      items: pages.flatMap((p) =>
+        p.kind === "warranty"
+          ? [{ name: KIND[p.w].title, page: String(p.no) }]
+          : p.kind === "care"
+            ? [{ name: "Keeping your warranty", page: String(p.no) }]
+            : [],
+      ),
+    });
   toc.push({ title: "RAS-VERTEX", items: [{ name: "One partner", page: String(total) }] });
 
   return {
@@ -401,13 +462,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
       { k: "Date", v: fmtDate(job.date) },
       { k: "Prepared by", v: job.preparedBy },
     ],
-    summaryLede,
     hoursLede,
-    scope: notesIsEmpty(scope) ? "" : scope,
-    scopeSource: report.scope?.quoteId ? `Quote #${report.scope.quoteId}` : "",
-    items,
-    comments,
-    recommendations,
     showNotes: settings.showScheduleNotes,
     grid,
     pages,
@@ -416,5 +471,71 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     toc,
     photoCount: photos.length,
     totalHours,
+    method: method
+      ? (() => {
+          const p = report.photos.find((x) => x.id === method.photoId);
+          return { intro: method.intro, photoUrl: p?.url ?? null, photoPos: p?.pos, caption: method.caption ?? "" };
+        })()
+      : null,
+    plan: plan ? { intro: PLAN_INTRO, next: plan.items.some((x) => x.next?.trim()), notes: planNotes } : null,
+    warranties: Object.fromEntries(kinds.map((k) => [k, warrantyModel(k, ws![k]!, site, job)])),
+  };
+}
+
+const METHOD_CHARS = 88; // 20px text across the 960 step column
+const GROUP_HEAD = 62; // title row, its rule and padding
+const GROUP_GAP = 56;
+const METHOD_PHOTO = 56 + 760 + 44; // gap, photo, caption
+
+function warrantyModel(kind: WarrantyKind, w: WarrantyInfo, site: string, job: ConditionReportData["job"]): WarrantyModel {
+  const k = KIND[kind];
+  const name = supplierName(w);
+  const area = w.area.trim() || k.area;
+  const from = w.completed ? shortDate(w.completed) : "completion";
+  const intro =
+    w.intro?.trim() ||
+    (kind === "waterproofing"
+      ? `RAS-VERTEX warrants the workmanship of the waterproofing at ${site} for ${w.years} years from ${from}. The works were carried out in accordance with the manufacturer's Technical Data Sheets and installation instructions for the products applied.`
+      : `RAS-VERTEX warrants the coating system at ${site} was applied in a proper and workmanlike manner, to the manufacturer's data sheets, AS/NZS 2311 and our quoted scope. For ${w.years} years from ${from}, it will not peel, flake, blister or delaminate due to faulty surface preparation (cleaning and priming) or application by us.`);
+  const statement =
+    w.statement?.trim() ||
+    (kind === "waterproofing"
+      ? `The undersigned, on behalf of RAS-VERTEX, confirms that the installation of the ${name ? `${name} ` : ""}products listed above was carried out in accordance with the manufacturer's Technical Data Sheets and installation instructions.`
+      : "The undersigned, on behalf of RAS-VERTEX, certifies that the coating system listed above was applied in accordance with the manufacturer's Product Data Sheets and project specification and AS/NZS 2311, and that RAS-VERTEX provides the workmanship warranty set out in this document.");
+  const reference = job.jobNo ? `#${job.jobNo}` : job.project;
+  return {
+    title: k.title,
+    intro,
+    facts: [
+      { k: "Warranty", v: `${w.years} years` },
+      { k: "Manufacturer", v: name || "—" },
+      { k: "Area", v: area },
+      { k: "Commences", v: w.completed ? shortDate(w.completed) : "—" },
+    ],
+    details: [
+      { k: "Project", v: site },
+      { k: "Project address", v: job.address },
+      { k: "Project reference", v: reference },
+      { k: "Installer", v: "Rope Access Services Pty Ltd, trading as RAS-VERTEX" },
+      { k: "Area of works", v: area },
+      { k: "Products applied", v: w.products.trim() || "—" },
+      { k: "Warranty period", v: w.completed ? `${w.years} years from ${shortDate(w.completed)}` : `${w.years} years` },
+    ],
+    statement,
+    signed: shortDate(w.signed || job.date),
+    careIntro:
+      kind === "waterproofing"
+        ? "To keep this warranty valid, the following obligations apply."
+        : "To keep this warranty valid, the owner must look after the painted surfaces as set out below.",
+    requirements: w.requirements.filter((x) => x.trim()),
+    schedule: w.schedule,
+    obligations: k.obligations,
+    scheduleTitle: k.scheduleTitle,
+    scheduleIntro: k.scheduleIntro,
+    contact: { name: "Phil Clark, Director", phone: "07 5371 0201", email: "phil@rasvertex.com.au" },
+    href:
+      "mailto:team@rasvertex.com.au?subject=" +
+      encodeURIComponent(`${kind === "painting" ? "Building wash and inspection" : "Annual inspection"}, ${site}${reference ? ` (${reference})` : ""}`) +
+      "&body=" + encodeURIComponent(`Hi RAS-VERTEX team,\n\nPlease book our ${kind === "painting" ? "annual building wash and inspection" : "annual inspection"}.\n\nThanks,`),
   };
 }

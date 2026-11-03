@@ -43,9 +43,6 @@ interface Ctx {
 export const OVERVIEW_CSS =
   ANCHOR_CSS +
   `
-.jo-items{display:flex;flex-direction:column;gap:18px}
-.jo-items__group{font-size:20px;font-weight:700;letter-spacing:-.02em;line-height:1.3;margin-bottom:6px}
-.jo-items ul{margin:0;padding-left:26px;list-style:disc;display:flex;flex-direction:column;gap:2px;font-size:17px;line-height:1.6;color:var(--ink-65)}
 .jo-cols{grid-template-columns:260px minmax(0,1fr) 140px}
 .jo-cols--notes{grid-template-columns:220px 280px 120px minmax(0,1fr)}
 .jo-tr{height:56px}
@@ -57,6 +54,31 @@ export const OVERVIEW_CSS =
 .jo-grid{display:grid;column-gap:24px;row-gap:32px}
 .jo-day{font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1.2;margin-bottom:20px}
 .jo-day span{font-weight:400;color:var(--ink-45)}
+.jo-h3{font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1.2}
+.jo-num{font-family:var(--bebas);font-size:22px;letter-spacing:.04em;color:var(--ink-35);margin-right:14px;font-weight:400}
+.jo-group{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;height:62px;padding-bottom:14px;border-bottom:var(--rule-head)}
+.jo-step{display:grid;grid-template-columns:64px minmax(0,1fr);padding:16px 0;border-bottom:var(--rule);font-size:20px;line-height:1.4;text-wrap:pretty}
+.jo-step>span:first-child{color:var(--ink-45);font-variant-numeric:tabular-nums}
+.jo-step:last-child{border-bottom:0}
+.jo-mphoto{position:relative;margin-top:56px;height:760px;border-radius:20px;overflow:hidden;background:var(--grey);flex-shrink:0}
+.jo-mphoto img{width:100%;height:100%;display:block}
+.jo-cap{font-size:17px;line-height:1.4;color:var(--ink-55);margin-top:14px}
+.jo-plan{grid-template-columns:minmax(0,1fr) 200px 170px}
+.jo-plan--next{grid-template-columns:minmax(0,1fr) 190px 170px 170px}
+.jo-plan.ar-tr,.jo-plan--next.ar-tr{padding:16px 0}
+.jo-prio{justify-self:start;display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.jo-prio--required{background:#fcf0dc;color:#86561a}
+.jo-prio--recommended{background:#eef1f6;color:rgba(1,25,85,.72)}
+.jo-wfacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:56px}
+.jo-wfacts .ar-fact__v,.jo-wfacts b{font-size:20px;font-weight:700;line-height:1.3}
+.jo-detail{display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px;align-items:baseline;padding:16px 0;border-bottom:var(--rule)}
+.jo-detail b{font-size:20px;font-weight:600;line-height:1.35}
+.jo-sign{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,0.8fr);gap:40px;margin-top:48px}
+.jo-sign>div{display:flex;flex-direction:column;gap:12px}
+.jo-sign i{display:block;border-bottom:var(--rule-head);height:64px;display:flex;align-items:flex-end;font-style:normal;font-size:20px;font-weight:700;padding-bottom:10px}
+.jo-sched{grid-template-columns:200px 280px minmax(0,1fr)}
+.jo-sched.ar-tr{padding:18px 0;align-items:start}
+.jo-small{font-size:17px;line-height:1.5;color:var(--ink-60);text-wrap:pretty}
 `;
 
 export function OverviewStyles() {
@@ -185,57 +207,6 @@ function Notes({ label, html }: { label: string; html: string }) {
   );
 }
 
-/** The quote's line items, under each cost centre — names only, no prices. */
-function LineItems({ groups }: { groups: { group: string; labels: string[] }[] }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 56 }}>
-      <span className="ar-label">Line items</span>
-      <div className="jo-items">
-        {groups.map((g, i) => (
-          <div key={i}>
-            <div className="jo-items__group">{g.group}</div>
-            <ul>
-              {g.labels.map((l, j) => (
-                <li key={j}>{l}</li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SummaryPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "summary" }> }) {
-  const { model } = ctx;
-  return (
-    <section className="ar-page">
-      <SecLabel text={model.secText.summary} />
-      {page.blocks.map((b) =>
-        b === "intro" ? (
-          <div key="intro">
-            <h2 className="ar-h2">Job summary</h2>
-            <p className="ar-lede" style={{ marginTop: 20 }}>
-              {model.summaryLede}
-            </p>
-          </div>
-        ) : b === "scope" ? (
-          <Notes key={b} label={model.scopeSource ? `Scope of works · ${model.scopeSource}` : "Scope of works"} html={model.scope} />
-        ) : b === "items" ? (
-          <LineItems key={b} groups={model.items} />
-        ) : (
-          <Notes
-            key={b}
-            label={b === "comments" ? "Comments" : "Recommendations"}
-            html={b === "comments" ? model.comments : model.recommendations}
-          />
-        ),
-      )}
-      <PageNo no={page.no} total={model.total} />
-    </section>
-  );
-}
-
 function HourRow({ it, notes }: { it: HourItem; notes: boolean }) {
   const cols = notes ? "jo-cols--notes" : "jo-cols";
   switch (it.kind) {
@@ -294,6 +265,225 @@ function HoursPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "hours
         {page.items.map((it, i) => (
           <HourRow key={i} it={it} notes={notes} />
         ))}
+      </div>
+      <PageNo no={page.no} total={model.total} />
+    </section>
+  );
+}
+
+/** Methodology: stages with numbered steps, then the photo. */
+function MethodPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "method" }> }) {
+  const { model } = ctx;
+  const m = model.method!;
+  return (
+    <section className="ar-page">
+      {page.first ? (
+        <>
+          <SecLabel text={model.secText.method} />
+          <h2 className="ar-h2">Methodology</h2>
+          <p className="ar-lede" style={{ margin: "20px 0 56px" }} data-panel-field="methodIntro">
+            {m.intro}
+          </p>
+        </>
+      ) : (
+        <SecLabel text="Methodology, continued" />
+      )}
+      {page.blocks.map((b, i) =>
+        b.t === "group" ? (
+          <div key={i} className="jo-group" style={{ marginTop: i ? 56 : 0 }}>
+            <span className="jo-h3">
+              <span className="jo-num">{pad(b.stage)}</span>
+              {b.cont ? `${b.title}, continued` : b.title}
+            </span>
+            <span className="ar-label">
+              {b.from === b.to ? `Step ${pad(b.from)}` : `Steps ${pad(b.from)} to ${pad(b.to)}`}
+            </span>
+          </div>
+        ) : b.t === "step" ? (
+          <div key={i} className="jo-step">
+            <span>{pad(b.n)}</span>
+            <span dangerouslySetInnerHTML={{ __html: b.html }} />
+          </div>
+        ) : (
+          <div key={i} data-panel-field="methodCaption">
+            <div className="jo-mphoto">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {m.photoUrl && <img src={m.photoUrl} alt="" style={photoPosStyle(m.photoPos)} />}
+            </div>
+            {m.caption && <p className="jo-cap">{m.caption}</p>}
+          </div>
+        ),
+      )}
+      <PageNo no={page.no} total={model.total} />
+    </section>
+  );
+}
+
+/** Maintenance plan: services, how often, and what's required. */
+function PlanPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "plan" }> }) {
+  const { model } = ctx;
+  const p = model.plan!;
+  const cols = p.next ? "jo-plan--next" : "jo-plan";
+  return (
+    <section className="ar-page">
+      {page.first ? (
+        <>
+          <SecLabel text={model.secText.plan} />
+          <Heading title="Maintenance plan" lede={p.intro} />
+        </>
+      ) : (
+        <SecLabel text="Maintenance plan, continued" />
+      )}
+      {page.rows.length > 0 && (
+        <div className="ar-table">
+          <div className={`ar-thead ${cols}`}>
+            <span>Service</span>
+            <span>Frequency</span>
+            <span>Priority</span>
+            {p.next && <span>Next due</span>}
+          </div>
+          {page.rows.map((x, i) => (
+            <div key={i} className={`ar-tr ${cols}`}>
+              <span style={{ fontWeight: 600 }}>{x.service}</span>
+              <span className="ar-dim">{x.interval}</span>
+              <span className={`jo-prio jo-prio--${x.priority}`}>{x.priority === "required" ? "Required" : "Recommended"}</span>
+              {p.next && <span className="ar-dim">{x.next || "—"}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {page.notes && (
+        <div data-panel-field="planNotes">
+          <Notes label="Technician comments" html={p.notes} />
+        </div>
+      )}
+      <PageNo no={page.no} total={model.total} />
+    </section>
+  );
+}
+
+/** Workmanship warranty: the facts, project details and the signed statement. */
+function WarrantyPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "warranty" }> }) {
+  const { model } = ctx;
+  const w = model.warranties[page.w]!;
+  const f = (name: string) => `${page.w}.${name}`;
+  const FIELD: Record<string, string> = { Warranty: "years", Manufacturer: "supplier", Area: "area", Commences: "completed" };
+  return (
+    <section className="ar-page">
+      <SecLabel text={page.first ? model.secText.warranty : "Warranty, continued"} />
+      <h2 className="ar-h2">{w.title}</h2>
+      <p className="ar-lede" style={{ marginTop: 20 }} data-panel-field={f("intro")}>
+        {w.intro}
+      </p>
+      <div className="jo-wfacts">
+        {w.facts.map((x) => (
+          <div key={x.k} className="ar-fact" data-panel-field={f(FIELD[x.k])}>
+            <div className="ar-label">{x.k}</div>
+            <div className="ar-fact__v">{x.v}</div>
+          </div>
+        ))}
+      </div>
+      <h3 className="jo-h3" style={{ marginTop: 72, paddingBottom: 14, borderBottom: "var(--rule-head)" }}>
+        Project details
+      </h3>
+      {w.details.map((d) => (
+        <div key={d.k} className="jo-detail" data-panel-field={d.k === "Products applied" ? f("products") : d.k === "Area of works" ? f("area") : undefined}>
+          <span className="ar-label">{d.k}</span>
+          <b>{d.v}</b>
+        </div>
+      ))}
+      <h3 className="jo-h3" style={{ marginTop: 72, paddingBottom: 14, borderBottom: "var(--rule-head)" }}>
+        Declaration
+      </h3>
+      <p style={{ fontSize: 20, lineHeight: 1.6, marginTop: 20, maxWidth: 960, textWrap: "pretty" }} data-panel-field={f("statement")}>
+        {w.statement}
+      </p>
+      <div className="jo-sign">
+        <div>
+          <span className="ar-label">Signature</span>
+          <i>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={ctx.assets.images.signature} alt="Phil Clark signature" style={{ height: 56, width: "auto", mixBlendMode: "multiply" }} />
+          </i>
+          <span className="jo-small">Phil Clark, Director</span>
+        </div>
+        <div>
+          <span className="ar-label">Contractor</span>
+          <i>RAS-VERTEX</i>
+        </div>
+        <div data-panel-field={f("signed")}>
+          <span className="ar-label">Date</span>
+          <i>{w.signed}</i>
+        </div>
+      </div>
+      <PageNo no={page.no} total={model.total} />
+    </section>
+  );
+}
+
+/** Keeping your warranty: the owner's obligations, then the inspections
+ *  (and, for painting, the washes) that go with it. */
+function CarePage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "care" }> }) {
+  const { model } = ctx;
+  const w = model.warranties[page.w]!;
+  const f = (name: string) => `${page.w}.${name}`;
+  return (
+    <section className="ar-page ar-page--end">
+      <SecLabel text={`${w.title}, continued`} />
+      <h2 className="ar-h2">Keeping your warranty</h2>
+      <p className="ar-lede" style={{ marginTop: 20 }}>
+        {w.careIntro}
+      </p>
+      {w.requirements.length > 0 && (
+        <>
+          <div className="jo-group" style={{ marginTop: 56 }} data-panel-field={f("requirements")}>
+            <span className="jo-h3">{w.obligations}</span>
+          </div>
+          {w.requirements.map((r, i) => (
+            <div key={i} className="jo-step" data-panel-field={f("requirements")}>
+              <span>{pad(i + 1)}</span>
+              <span dangerouslySetInnerHTML={{ __html: r }} />
+            </div>
+          ))}
+        </>
+      )}
+      {w.schedule.length > 0 && (
+        <div data-panel-field={f("schedule")}>
+          <h3 className="jo-h3" style={{ marginTop: 72 }}>
+            {w.scheduleTitle}
+          </h3>
+          <p className="jo-small" style={{ marginTop: 12, maxWidth: 860 }}>
+            {w.scheduleIntro}
+          </p>
+          <div className="ar-table" style={{ marginTop: 32 }}>
+            <div className="ar-thead jo-sched">
+              <span>Interval</span>
+              <span>{page.w === "painting" ? "Service" : "Inspection"}</span>
+              <span>Notes</span>
+            </div>
+            {w.schedule.map((r, i) => (
+              <div key={i} className="ar-tr jo-sched">
+                <span style={{ fontWeight: 700 }}>{r.when}</span>
+                <span style={{ fontWeight: 600 }}>{r.inspection}</span>
+                <span className="jo-small">{r.notes}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div style={{ marginTop: "auto", paddingTop: 56, display: "flex", flexDirection: "column", gap: 40 }}>
+        <a className="ar-btn" href={w.href} style={{ alignSelf: "flex-start" }}>
+          {page.w === "painting" ? "Book a building wash" : "Book an annual inspection"}
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </a>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 24, paddingTop: 32, borderTop: "var(--rule)" }}>
+          <span className="jo-h3">Any questions? Reach out.</span>
+          <span style={{ fontSize: 20 }}>
+            {w.contact.name} · <b>{w.contact.phone}</b> · <b>{w.contact.email}</b>
+          </span>
+        </div>
       </div>
       <PageNo no={page.no} total={model.total} />
     </section>
@@ -406,11 +596,17 @@ export default function OverviewDocument({ model, assets, screen, onCoverPointer
       <Cover ctx={ctx} />
       <Contents ctx={ctx} />
       {model.pages.map((p) => (
-        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-page={p.kind}>
-          {p.kind === "summary" ? (
-            <SummaryPage ctx={ctx} page={p} />
-          ) : p.kind === "hours" ? (
+        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-page={p.kind === "care" ? "warranty" : p.kind}>
+          {p.kind === "hours" ? (
             <HoursPage ctx={ctx} page={p} />
+          ) : p.kind === "method" ? (
+            <MethodPage ctx={ctx} page={p} />
+          ) : p.kind === "plan" ? (
+            <PlanPage ctx={ctx} page={p} />
+          ) : p.kind === "warranty" ? (
+            <WarrantyPage ctx={ctx} page={p} />
+          ) : p.kind === "care" ? (
+            <CarePage ctx={ctx} page={p} />
           ) : (
             <PhotosPage ctx={ctx} page={p} />
           )}

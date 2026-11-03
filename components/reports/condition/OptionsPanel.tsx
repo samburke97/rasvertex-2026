@@ -9,13 +9,11 @@ import styles from "../shared/OptionsPanel.module.css";
 import ToggleRow from "../shared/ToggleRow";
 import JobImportInput from "../shared/JobImportInput";
 import DatePicker from "@/components/ui/DatePicker";
-import DocEditor from "@/components/workspace/DocEditor";
 import type {
   ImportStatus,
   PhotoFolder,
   ReportJobDetails,
   ReportPhoto,
-  ReportScope,
   ReportSettings,
   ScheduleCostCenter,
   ScheduleImportStatus,
@@ -42,18 +40,12 @@ interface OptionsPanelProps {
   /** Rows loaded from SimPRO (before the date filter). */
   scheduleRows: number;
   onEditHours: () => void;
-  /** The quote's description and line items; null until loaded. */
-  scope: ReportScope | null;
   onCoverPhoto: (dataUrl: string | null) => void;
   /** The cover in use: the uploaded photo, else the default. */
   coverUrl: string;
   coverZoom: number;
   onCoverZoom: (zoom: number) => void;
   onJob: (field: keyof ReportJobDetails, value: string) => void;
-  comments: string;
-  onComments: (v: string) => void;
-  recommendations: string;
-  onRecommendations: (v: string) => void;
 }
 
 // ── Date preset helpers ───────────────────────────────────────────────────────
@@ -142,16 +134,11 @@ export default function OptionsPanel({
   onRefreshSchedule,
   scheduleRows,
   onEditHours,
-  scope,
   onCoverPhoto,
   coverUrl,
   coverZoom,
   onCoverZoom,
   onJob,
-  comments,
-  onComments,
-  recommendations,
-  onRecommendations,
 }: OptionsPanelProps) {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const hasPhotos = photos.length > 0;
@@ -470,58 +457,6 @@ export default function OptionsPanel({
         )}
       </div>
 
-      {/* ── Summary ──────────────────────────────────────────────────────── */}
-      <div className={styles.group} data-pages="summary">
-        <div className={styles.groupLabel}>Summary</div>
-        <ToggleRow
-          label="Include job summary"
-          sub="Scope of works, with comments and recommendations"
-          checked={settings.showSummary}
-          onChange={(v) => set({ showSummary: v })}
-        />
-        {settings.showSummary && (
-          <>
-            <ToggleRow
-              label="Quote description"
-              sub={
-                !scope
-                  ? "Load a job to fetch its quote"
-                  : !scope.description
-                    ? "No description on the quote or job"
-                    : scope.quoteId
-                      ? `From quote #${scope.quoteId}`
-                      : "No quote found — using the job’s description"
-              }
-              checked={settings.showScope !== false}
-              onChange={(v) => set({ showScope: v })}
-              disabled={!scope?.description}
-            />
-            <ToggleRow
-              label="Line items"
-              sub={
-                !scope
-                  ? "Load a job to fetch its quote"
-                  : scope.items.length
-                    ? `${scope.items.length} item${scope.items.length === 1 ? "" : "s"} from the quote, without prices`
-                    : "No line items on the quote"
-              }
-              checked={settings.showScopeItems !== false}
-              onChange={(v) => set({ showScopeItems: v })}
-              disabled={!scope?.items.length}
-            />
-            <div className={styles.subLabel}>
-              Comments <InfoTip>Type / for headings, lists and checklists. Leave one empty to leave it off the report.</InfoTip>
-            </div>
-            <div className={styles.editorBox}>
-              <DocEditor value={comments} onChange={onComments} />
-            </div>
-            <div className={styles.subLabel}>Recommendations</div>
-            <div className={styles.editorBox}>
-              <DocEditor value={recommendations} onChange={onRecommendations} />
-            </div>
-          </>
-        )}
-      </div>
     </aside>
   );
 }

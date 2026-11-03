@@ -645,7 +645,8 @@ function CertPage({
 }) {
   const { model } = ctx;
   return (
-    <section className="ar-page ar-page--end">
+    // Bottom padding matches .ar-pageno so the signatory line sits level with the page number.
+    <section className="ar-page" style={{ paddingBottom: 52 }}>
       <SecLabel text={secText(3)} />
       <h2 className="ar-h2">Certification</h2>
       <p className="ar-lede" style={{ marginTop: 20 }} data-panel-field="certNumber">
@@ -743,6 +744,7 @@ function CertPage({
       <div
         style={{
           marginTop: "auto",
+          paddingTop: 72,
           display: "flex",
           flexDirection: "column",
           alignItems: "flex-start",
@@ -760,12 +762,20 @@ function CertPage({
             mixBlendMode: "multiply",
           }}
         />
-        <span className="ar-h3" style={{ marginTop: 16 }}>
-          Phil Clark
-        </span>
-        <span className="ar-label" style={{ marginTop: 8 }}>
-          Director
-        </span>
+        <div
+          style={{
+            marginTop: 16,
+            display: "flex",
+            alignItems: "baseline",
+            gap: 16,
+            lineHeight: 1,
+          }}
+        >
+          <span className="ar-h3" style={{ lineHeight: 1 }}>
+            Phil Clark
+          </span>
+          <span className="ar-label">Director</span>
+        </div>
       </div>
       <PageNo no={page.no} total={model.total} />
     </section>

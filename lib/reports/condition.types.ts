@@ -2,6 +2,9 @@
 
 import type { EnrichedJob } from "@/lib/simpro/types";
 import type { ReportPhoto, PhotoLayout } from "./photos";
+import type { Methodology } from "./methodology";
+import type { MaintenancePlan } from "./maintenancePlan";
+import type { Warranties } from "./warranty";
 
 // Photo data model + date-range filter now live in lib/reports/photos.ts
 // (shared with the Anchor Inspection report's photo section) — re-exported
@@ -109,6 +112,11 @@ export interface ConditionReportData {
   /** Loaded from SimPRO on every import; null until then. */
   scope?: ReportScope | null;
   settings: ReportSettings;
+  /** Optional sections, each off until switched on. */
+  method?: Methodology & { on: boolean };
+  plan?: MaintenancePlan & { on: boolean };
+  /** Waterproofing and/or painting. */
+  warranty?: Warranties;
 }
 
 // ── Import status ─────────────────────────────────────────────────────────────

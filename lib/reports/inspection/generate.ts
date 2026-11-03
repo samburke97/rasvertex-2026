@@ -722,12 +722,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     "&body=" +
     encodeURIComponent(body);
 
-  const ordered = [...parsed].sort((a, b) => (numOf.get(a) ?? 0) - (numOf.get(b) ?? 0));
-  const coverPhotoId =
-    choiceId(data, data.cover, COVER_ID) ??
-    ordered.find((p) => p.codes.includes("OV"))?.id ??
-    ordered[0]?.id ??
-    null;
+  // Until one is chosen, the cover is the standard photo (assets.defaultCover).
+  const coverPhotoId = choiceId(data, data.cover, COVER_ID);
 
   return {
     parsed,

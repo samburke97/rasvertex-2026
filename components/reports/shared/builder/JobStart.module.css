@@ -1,0 +1,16 @@
+/* JobStart.module.css: the first step of a report builder, entering the
+   SimPRO job number. */
+
+.start { width: 100%; max-width: 560px; margin: 0 auto; padding: 96px 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+.h1 { font-size: 28px !important; font-weight: 600 !important; letter-spacing: -0.03em; line-height: 1.2 !important; color: var(--ink) !important; margin: 0; }
+.sub { font-size: 14.5px !important; line-height: 1.55 !important; color: rgba(var(--ink-rgb), 0.6) !important; margin: 0; }
+.sub code { font-size: 13px; background: rgba(var(--ink-rgb), 0.045); padding: 1px 6px; border-radius: 6px; }
+.row { display: flex; gap: 10px; margin-top: 8px; }
+.box { flex: 1; display: flex; align-items: center; height: 44px; border: 1px solid rgba(var(--ink-rgb), 0.14); border-radius: 12px; padding: 0 14px; gap: 8px; background: var(--surface); }
+.box:focus-within { border-color: rgba(var(--ink-rgb), 0.4); }
+.prefix { font-size: 14px; color: rgba(var(--ink-rgb), 0.45); }
+.input { flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 16px; font-weight: 600; background: transparent; color: var(--ink); }
+.go { height: 44px; padding: 0 22px; border: 0; border-radius: 12px; background: var(--btn-primary); color: var(--btn-primary-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.go:hover:not(:disabled) { background: var(--btn-primary-hover); }
+.go:disabled { opacity: 0.45; cursor: not-allowed; }
+.error { font-size: 13px; line-height: 1.45; color: var(--red); background: var(--red-tint); border-radius: 10px; padding: 10px 12px; }

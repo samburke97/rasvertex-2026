@@ -3,10 +3,10 @@
 //
 // Job Overview builder. Enter a job number: the job details, photos and
 // schedule load from SimPRO (photos stream in; a job with several
-// attachment folders waits for one to be picked). Left: what to include,
-// the cover, the report details and the summary text. Right: the report
-// itself (OverviewDocument), scaled to the column — drag the cover photo to
-// reposition it, click a caption to rename a photo. Hours are edited in a
+// attachment folders waits for one to be picked). Left: the pages. Middle:
+// the report itself (OverviewDocument), scaled to the column — drag the
+// cover photo to reposition it, click a caption to rename a photo. Right:
+// the selected page's editor. Hours are edited in a
 // sheet over the preview. The draft autosaves against the job number.
 
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
@@ -43,6 +43,9 @@ import { usePagePanel, SidePanel } from "@/components/reports/shared/builder/Pag
 import PageRail from "@/components/reports/shared/builder/PageRail";
 import PanelResizer, { usePanelWidth } from "@/components/reports/shared/builder/PanelResizer";
 import { usePhotoAdjust } from "@/components/reports/shared/builder/CropModal";
+import JobStart from "@/components/reports/shared/builder/JobStart";
+import ProjectSections, { sectionOn, setSection, type ProjectSection } from "./ProjectSections";
+import { warrantyGaps } from "@/lib/reports/warranty";
 
 const pub = (rel: string) => "/" + rel;
 const ASSETS: OverviewAssets = {
@@ -95,10 +98,14 @@ const DEFAULT_REPORT: ConditionReportData = {
  *  data-pages refer to these ids. */
 const PAGE_ROWS = [
   { id: "cover", name: "Cover", num: "C" },
-  { id: "summary", name: "Summary" },
   { id: "hours", name: "Hours" },
+  { id: "method", name: "Methodology" },
   { id: "photos", name: "Photos" },
+  { id: "plan", name: "Maintenance plan" },
+  { id: "warranty", name: "Warranty" },
 ];
+/** Optional sections: an eye in the rail, off until switched on. */
+const OPTIONAL: ProjectSection[] = ["method", "plan", "warranty"];
 
 export default function ConditionReportPage({
   onBack,
@@ -270,7 +277,7 @@ export default function ConditionReportPage({
             settings: {
               ...prev.settings,
               scheduleLoaded: true,
-              showSchedule: rows.length > 0,
+              // Hours stay off until switched on.
             },
           }));
           setScheduleStatus({ phase: "done" });
@@ -340,7 +347,7 @@ export default function ConditionReportPage({
         return;
       }
 
-      // The quote's description and line items, for the job summary. Loaded
+      // The quote's description, for the methodology. Loaded
       // on every import (a draft resumes with the quote as it is now) and in
       // the background — the report is usable without it.
       const loadScope = () =>
@@ -599,6 +606,16 @@ export default function ConditionReportPage({
   // ── Preview zoom (fixed 1280px pages, scaled to the column) ────────────
   const previewRef = useRef<HTMLDivElement>(null);
   const pagePanel = usePagePanel("cover");
+
+  // A switched-on warranty must have its area, products and completion date
+  // before the report is saved or downloaded; trying opens its editor.
+  const warrantyGapList = useMemo(() => warrantyGaps(report.warranty, report.job.date), [report.warranty, report.job.date]);
+  const [triedIncomplete, setTriedIncomplete] = useState(false);
+  const guardWarranty = (fn: () => void) => () => {
+    if (!warrantyGapList.length) return fn();
+    setTriedIncomplete(true);
+    pagePanel.pick("warranty", previewRef.current);
+  };
   const photoAdjust = usePhotoAdjust(report.photos, (id, pos) =>
     setReport((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id ? { ...p, pos } : p)) })),
   );
@@ -637,22 +654,57 @@ export default function ConditionReportPage({
           report.settings.showSchedule && filteredSchedule.length > 0 && `${model.totalHours.toFixed(2).replace(/\.00$/, "")} hours`,
           savedFilename && "Saved to SimPRO",
         ]}
-        status={photoStatus ? { text: photoStatus, busy: true } : loadedJobId ? saveStatus : undefined}
+        status={
+          photoStatus
+            ? { text: photoStatus, busy: true }
+            : triedIncomplete && warrantyGapList.length
+              ? { text: `Complete the warranty first. ${warrantyGapList.join(". ")}`, busy: true }
+              : loadedJobId
+                ? saveStatus
+                : undefined
+        }
       >
         <HeaderButton onClick={handleResetDraft} disabled={!loadedJobId}>
           Reload from SimPRO
         </HeaderButton>
-        <HeaderButton onClick={handleExportPDF} disabled={!hasReport || isExporting}>
+        <HeaderButton onClick={guardWarranty(handleExportPDF)} disabled={!hasReport || isExporting}>
           {isExporting ? "Exporting…" : "Download PDF"}
         </HeaderButton>
-        <HeaderButton primary onClick={() => setShowSaveModal(true)} disabled={!hasReport || !loadedJobId}>
+        <HeaderButton primary onClick={guardWarranty(() => setShowSaveModal(true))} disabled={!hasReport || !loadedJobId}>
           Save to SimPRO
         </HeaderButton>
       </BuilderHeader>
 
-      {/* ── Body ── */}
+      {/* ── Step 1: the job number ── */}
+      {!loadedJobId ? (
+        <JobStart
+          title="New job overview"
+          sub="Enter the job number. The job's photos, hours and scope are loaded from SimPRO, and a saved draft carries on where it left off."
+          loading={importStatus.phase === "fetching-job"}
+          error={importStatus.phase === "error" ? importStatus.message : null}
+          onLoad={(n) => {
+            setLoadedJobId(n);
+            handleImport(n);
+          }}
+        />
+      ) : (
       <div className={styles.editorBody}>
-        <PageRail rows={PAGE_ROWS} sel={pagePanel.sel} onPick={(id) => pagePanel.pick(id, previewRef.current)} />
+        <PageRail
+          rows={PAGE_ROWS.map((r) =>
+            r.id === "hours"
+              ? { ...r, hideable: true, hidden: !report.settings.showSchedule }
+              : OPTIONAL.includes(r.id as ProjectSection)
+                ? { ...r, hideable: true, hidden: !sectionOn(report, r.id as ProjectSection) }
+                : r,
+          )}
+          sel={pagePanel.sel}
+          onPick={(id) => pagePanel.pick(id, previewRef.current)}
+          onToggle={(id) =>
+            id === "hours"
+              ? setReport((r) => ({ ...r, settings: { ...r.settings, showSchedule: !r.settings.showSchedule } }))
+              : setReport((r) => setSection(r, id as ProjectSection, !sectionOn(r, id as ProjectSection)))
+          }
+        />
 
         {/* ── Preview: the report itself, scaled to the column ── */}
         <div ref={previewRef} className={styles.canvas} onClick={pagePanel.onDocClick}>
@@ -691,19 +743,16 @@ export default function ConditionReportPage({
             onRefreshSchedule={() => fetchSchedule(loadedJobId, selectedCostCenter)}
             scheduleRows={report.schedule.length}
             onEditHours={() => setHoursOpen(true)}
-            scope={report.scope ?? null}
             onCoverPhoto={updateCoverPhoto}
             coverUrl={model.coverUrl}
             coverZoom={model.coverPos.zoom}
             onCoverZoom={(z) => setCoverPos({ zoom: z })}
             onJob={updateJobField}
-            comments={report.comments}
-            onComments={(v) => setReport((prev) => ({ ...prev, comments: v }))}
-            recommendations={report.recommendations}
-            onRecommendations={(v) => setReport((prev) => ({ ...prev, recommendations: v }))}
           />
+          <ProjectSections report={report} update={setReport} />
         </SidePanel>
       </div>
+      )}
       {photoAdjust.modal}
 
       {hoursOpen && (

@@ -10,6 +10,7 @@
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { libraryFor, type Library, type ReportKind } from "./codes";
 import type { PhotoPos } from "@/lib/reports/photos";
+import type { MaintenancePlan } from "@/lib/reports/maintenancePlan";
 
 export type { ReportKind };
 
@@ -99,22 +100,12 @@ export interface InspectionReportData {
   hidden?: Partial<Record<SectionKey, boolean>>;
   /** Maintenance plan (optional section): the services picked and the
    *  technician's comments. */
-  plan?: { items: PlanItem[]; notes?: string };
+  plan?: MaintenancePlan;
 }
 
 export type SectionKey = "about" | "map" | "defects" | "findings" | "index" | "summary" | "plan" | "works";
 
-export type PlanPriority = "required" | "recommended";
-
-export interface PlanItem {
-  service: string;
-  interval: string;
-  priority: PlanPriority;
-  /** "March 2027", "With the next repaint" … optional. */
-  next?: string;
-  /** A line under the service, e.g. what's included. Optional. */
-  note?: string;
-}
+export type { PlanItem, PlanPriority } from "@/lib/reports/maintenancePlan";
 
 /** Sections that are off until switched on (the maintenance plan); the rest
  *  show until hidden. */

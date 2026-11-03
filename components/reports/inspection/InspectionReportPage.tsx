@@ -29,10 +29,12 @@ import MapCaptureModal, { type MapView } from "@/components/reports/shared/MapCa
 import SaveReportModal from "@/components/reports/shared/SaveReportModal";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import DocEditor from "@/components/workspace/DocEditor";
+import JobStart from "@/components/reports/shared/builder/JobStart";
 import PageRail, { type RailRow } from "@/components/reports/shared/builder/PageRail";
 import RichBox from "@/components/reports/shared/builder/RichBox";
 import { CodeChips, PhotoGrid, PhotoTray } from "@/components/reports/shared/builder/PhotoGrid";
 import ToggleRow from "@/components/reports/shared/ToggleRow";
+import PlanServices, { seedPlan } from "@/components/reports/shared/builder/PlanServices";
 import { notesIsEmpty } from "@/lib/reports/richText";
 import PanelResizer, { usePanelWidth } from "@/components/reports/shared/builder/PanelResizer";
 import InspectionDocument, {
@@ -51,7 +53,6 @@ import {
   libraryFor,
   type ImageKey,
   BANDS,
-  PLAN_INTERVALS,
   type Library,
   type ReportKind,
 } from "@/lib/reports/inspection/codes";
@@ -70,7 +71,6 @@ import {
   type ImageChoice,
   type InspectionJob,
   type InspectionPhoto,
-  type PlanItem,
   sectionHidden,
   type InspectionReportData,
 } from "@/lib/reports/inspection/types";
@@ -151,7 +151,6 @@ function sectionOfKey(key: string): Sel {
 
 export default function InspectionReportPage({ onBack }: Props) {
   const [r, setR] = useState<InspectionReportData | null>(null);
-  const [jobInput, setJobInput] = useState("");
   const [kind, setKind] = useState<ReportKind>("building");
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -234,8 +233,8 @@ export default function InspectionReportPage({ onBack }: Props) {
   };
 
   // ── Load (or resume) a job ────────────────────────────────────────────────
-  const loadJob = useCallback(async () => {
-    const jobId = jobInput.trim().replace(/^#/, "");
+  const loadJob = useCallback(async (input: string) => {
+    const jobId = input.trim().replace(/^#/, "");
     if (!jobId || loading) return;
     setLoading(true);
     setLoadError(null);
@@ -280,7 +279,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [jobInput, kind, loading, importPhotos]);
+  }, [kind, loading, importPhotos]);
 
   // ── Autosave (never mid-import: photos sit on data: URLs until uploaded) ──
   const { status: saveStatus, setStatus: setSaveStatus } = useDraftAutosave(
@@ -634,49 +633,37 @@ export default function InspectionReportPage({ onBack }: Props) {
       </BuilderHeader>
 
       {!r && (
-        <div className={styles.start}>
-          <h1 className={styles.h1}>New inspection report</h1>
-          <p className={styles.sub}>
-            Enter the job number. The report is generated from the job&rsquo;s photo labels, e.g.{" "}
-            <code>D10 L2 SH LF - awning screws backing out</code>.
-          </p>
-          <div className={styles.kinds} role="radiogroup" aria-label="Report type">
-            {(Object.values(LIBRARIES) as Library[]).map((l) => (
-              <button
-                key={l.kind}
-                role="radio"
-                aria-checked={kind === l.kind}
-                className={`${styles.kind} ${kind === l.kind ? styles.kindOn : ""}`}
-                onClick={() => setKind(l.kind)}
-              >
-                <span className={styles.kindRadio} />
-                <span className={styles.kindText}>
-                  <span className={styles.kindLabel}>{l.label}</span>
-                  <span className={styles.kindHint}>{KIND_HINTS[l.kind]}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className={styles.jobRow}>
-            <div className={styles.jobBox}>
-              <span className={styles.jobPrefix}>Job #</span>
-              <input
-                className={styles.jobInput}
-                value={jobInput}
-                inputMode="numeric"
-                autoFocus
-                onChange={(e) => setJobInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") loadJob();
-                }}
-              />
+        <JobStart
+          title="New inspection report"
+          sub={
+            <>
+              Enter the job number. The report is generated from the job&rsquo;s photo labels, e.g.{" "}
+              <code>D10 L2 SH LF - awning screws backing out</code>.
+            </>
+          }
+          action="Generate"
+          loading={loading}
+          error={loadError}
+          onLoad={(n) => loadJob(n)}
+        >
+            <div className={styles.kinds} role="radiogroup" aria-label="Report type">
+              {(Object.values(LIBRARIES) as Library[]).map((l) => (
+                <button
+                  key={l.kind}
+                  role="radio"
+                  aria-checked={kind === l.kind}
+                  className={`${styles.kind} ${kind === l.kind ? styles.kindOn : ""}`}
+                  onClick={() => setKind(l.kind)}
+                >
+                  <span className={styles.kindRadio} />
+                  <span className={styles.kindText}>
+                    <span className={styles.kindLabel}>{l.label}</span>
+                    <span className={styles.kindHint}>{KIND_HINTS[l.kind]}</span>
+                  </span>
+                </button>
+              ))}
             </div>
-            <button className={styles.darkPill} onClick={loadJob} disabled={loading || !jobInput.trim()}>
-              {loading ? "Loading…" : "Generate"}
-            </button>
-          </div>
-          {loadError && <div className={styles.error}>{loadError}</div>}
-        </div>
+        </JobStart>
       )}
 
       {r && model && layout && (
@@ -746,7 +733,7 @@ export default function InspectionReportPage({ onBack }: Props) {
                 <h2 className={styles.groupTitle}>Cover photo</h2>
                 {r.cover && (
                   <button className={styles.linkBtn} onClick={() => setChoice("cover", null)}>
-                    Use first overview
+                    Use the default photo
                   </button>
                 )}
               </div>
@@ -1398,41 +1385,10 @@ function PlanEditor({
   onOn: (v: boolean) => void;
   onPlan: (plan: NonNullable<InspectionReportData["plan"]>) => void;
 }) {
-  const items = plan?.items ?? [];
-  const set = (next: PlanItem[]) => onPlan({ ...plan, items: next });
-  const patch = (i: number, p: Partial<PlanItem>) => set(items.map((x, j) => (j === i ? { ...x, ...p } : x)));
-  const custom = items.filter((x) => !lib.plan.some((s) => s.service === x.service));
   const switchOn = (v: boolean) => {
-    if (v && !items.length)
-      onPlan({
-        ...plan,
-        items: lib.plan
-          .filter((s) => s.priority === "required" || s.whenAny?.some((c) => present.includes(c)))
-          .map(({ service, interval, priority }) => ({ service, interval, priority })),
-      });
+    if (v && !plan?.items.length) onPlan({ ...plan, items: seedPlan(lib.plan, present) });
     onOn(v);
   };
-  /** Required / Recommended, as on the page; click to switch. */
-  const prio = (x: PlanItem, i: number) => (
-    <button
-      className={`${styles.planPrio} ${x.priority === "required" ? styles.planPrioReq : ""}`}
-      title="Click to switch between Required and Recommended"
-      onClick={() => patch(i, { priority: x.priority === "required" ? "recommended" : "required" })}
-    >
-      {x.priority === "required" ? "Required" : "Recommended"}
-    </button>
-  );
-  /** How often and when next, side by side under the service. */
-  const timing = (x: PlanItem, i: number) => (
-    <div className={styles.planTiming}>
-      <select className={`${styles.input} ${styles.planSelect}`} value={x.interval} onChange={(e) => patch(i, { interval: e.target.value })}>
-        {[...new Set([x.interval, ...PLAN_INTERVALS])].map((v) => (
-          <option key={v}>{v}</option>
-        ))}
-      </select>
-      <input className={styles.input} value={x.next ?? ""} placeholder="Next due" onChange={(e) => patch(i, { next: e.target.value || undefined })} />
-    </div>
-  );
   return (
     <>
       <section className={styles.group}>
@@ -1445,60 +1401,7 @@ function PlanEditor({
             <Field {...intro} label="Intro" multiline />
           </section>
           <section className={styles.group}>
-            <h2 className={styles.groupTitle}>
-              Services <InfoTip>Tick each service the plan includes. Required ones print first.</InfoTip>
-            </h2>
-            {lib.plan.map((s) => {
-              const i = items.findIndex((x) => x.service === s.service);
-              return (
-                <div key={s.service} className={styles.planService}>
-                  <div className={styles.planHead}>
-                    <label className={styles.planTick}>
-                      <input
-                        type="checkbox"
-                        checked={i >= 0}
-                        onChange={(e) =>
-                          set(
-                            e.target.checked
-                              ? [...items, { service: s.service, interval: s.interval, priority: s.priority }]
-                              : items.filter((x) => x.service !== s.service),
-                          )
-                        }
-                      />
-                      <span>{s.service}</span>
-                    </label>
-                    {i >= 0 && prio(items[i], i)}
-                  </div>
-                  {i >= 0 && timing(items[i], i)}
-                </div>
-              );
-            })}
-            {custom.map((x) => {
-              const i = items.indexOf(x);
-              return (
-                <div key={`own-${i}`} className={styles.planService}>
-                  <div className={styles.planHead}>
-                    <input className={styles.input} value={x.service} placeholder="Service" onChange={(e) => patch(i, { service: e.target.value })} />
-                    {prio(x, i)}
-                  </div>
-                  {timing(x, i)}
-                  <button className={styles.linkBtn} onClick={() => set(items.filter((_, j) => j !== i))}>
-                    Remove
-                  </button>
-                </div>
-              );
-            })}
-            <div className={styles.btnRow}>
-              <button className={styles.smallBtn} onClick={() => set([...items, { service: "", interval: "Annually", priority: "recommended" }])}>
-                Add a service
-              </button>
-            </div>
-          </section>
-          <section className={styles.group} data-field="plan.notes">
-            <h2 className={styles.groupTitle}>
-              Technician comments <InfoTip>What this plan looks like in practice: priorities, budgeting, anything to watch. Printed under the table.</InfoTip>
-            </h2>
-            <RichBox value={plan?.notes ?? ""} onChange={(notes) => onPlan({ items, ...plan, notes })} />
+            <PlanServices presets={lib.plan} plan={plan} onPlan={onPlan} />
           </section>
         </>
       )}

@@ -276,6 +276,8 @@ export const CARD_IMAGES = {
   cleaning: "reports/proposal/assets/nav-cleaning.png",
   exampleBuilding: "reports/inspection/example-building.jpg",
   exampleRoof: "reports/inspection/example-roof.jpg",
+  /** The cover until one is chosen: the team on a tower beside the van. */
+  defaultCover: "reports/proposal/assets/rope-access.png",
 } as const;
 export type ImageKey = keyof typeof CARD_IMAGES;
 
@@ -432,15 +434,4 @@ export function libraryFor(kind: ReportKind | undefined): Library {
   return LIBRARIES[kind ?? "building"];
 }
 
-/** Frequencies offered for maintenance plan services (any text works too). */
-export const PLAN_INTERVALS = [
-  "Every 3 months",
-  "Every 6 months",
-  "Annually",
-  "Every 2 years",
-  "Every 3 years",
-  "Every 5 years",
-  "Every 8–10 years",
-  "Every 15–20 years",
-  "As needed",
-];
+export { PLAN_INTERVALS } from "@/lib/reports/maintenancePlan";

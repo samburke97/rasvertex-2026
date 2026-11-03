@@ -60,7 +60,8 @@ function loadAssets() {
     const [logo, images] = await Promise.all([
       shrink(LOGO_IMAGE, 800, "png"),
       Promise.all(
-        Object.entries(CARD_IMAGES).map(async ([k, rel]) => [k, await shrink(rel, 900, "jpeg")] as const),
+        // The default cover fills the page width; the cards are smaller.
+        Object.entries(CARD_IMAGES).map(async ([k, rel]) => [k, await shrink(rel, k === "defaultCover" ? 1600 : 900, "jpeg")] as const),
       ).then((e) => Object.fromEntries(e) as Record<ImageKey, string>),
     ]);
     const inter = readPublicAsBase64("fonts/inter.woff2");

@@ -554,7 +554,7 @@ const FACT_EDIT: Record<string, string> = {
 
 function Cover({ ctx, job }: { ctx: Ctx; job: InspectionJob }) {
   const { model } = ctx;
-  const coverSrc = ctx.photoUrl(model.coverPhotoId);
+  const coverSrc = ctx.photoUrl(model.coverPhotoId) ?? ctx.assets.images.defaultCover;
   const { x, y, zoom } = model.coverPos;
   return (
     <div className="ir-sheet" data-pageno={1} data-section="cover">

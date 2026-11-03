@@ -66,3 +66,12 @@ export function notesLineCount(html: string): number {
 export function notesIsEmpty(html: string): boolean {
   return !html.replace(/<[^>]*>/g, "").trim() && !/<hr>/.test(html);
 }
+
+/** The items of a one-per-line field (list or paragraphs) as inline HTML,
+ *  empty ones dropped. */
+export function htmlItems(raw: string | null | undefined): string[] {
+  return sanitizeNotesHtml(raw)
+    .split(/<\/?(?:p|li|ul|ol)>/)
+    .map((x) => x.replace(/<br>/g, " ").trim())
+    .filter((x) => x.replace(/<[^>]*>/g, "").trim());
+}
