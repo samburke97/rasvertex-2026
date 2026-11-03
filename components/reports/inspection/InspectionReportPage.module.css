@@ -463,12 +463,13 @@ html :where(.root) :is(h1, h2, p, span) {
 .panelTitle { font-size: 15px; font-weight: 600; }
 
 /* Maintenance plan editor */
-.planService { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border-top: 1px solid rgba(var(--ink-rgb), 0.06); }
-.planTick { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.4; cursor: pointer; }
-.planTick input { margin-top: 2px; accent-color: var(--btn-primary); }
-.planItem { display: flex; flex-direction: column; gap: 8px; padding-left: 24px; }
-.planControls { display: flex; gap: 8px; }
-.planControls select { flex: 1; min-width: 0; }
-.planPrio { display: flex; flex-shrink: 0; border: 1px solid rgba(var(--ink-rgb), 0.12); border-radius: 9px; overflow: hidden; }
-.planPrio button { border: 0; background: none; padding: 0 10px; font-size: 12px; font-weight: 500; color: rgba(var(--ink-rgb), 0.6); cursor: pointer; }
-.planPrio .planPrioOn { background: var(--btn-primary); color: var(--btn-primary-ink); }
+.planService { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; border-top: 1px solid rgba(var(--ink-rgb), 0.06); }
+.planService .linkBtn { align-self: flex-start; }
+.planHead { display: flex; align-items: flex-start; gap: 10px; }
+.planTick { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.4; cursor: pointer; }
+.planTick input { margin-top: 2px; flex-shrink: 0; accent-color: var(--btn-primary); }
+/* Same colours as the Priority chips on the page. */
+.planPrio { flex-shrink: 0; height: 22px; padding: 0 8px; border: 0; border-radius: 6px; background: #eef1f6; color: rgba(1, 25, 85, 0.72); font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+.planPrioReq { background: #fcf0dc; color: #86561a; }
+.planTiming { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 8px; padding-left: 23px; }
+.planSelect { appearance: none; padding-right: 28px; background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2317171a' stroke-opacity='.5' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; cursor: pointer; }

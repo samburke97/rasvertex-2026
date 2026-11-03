@@ -52,11 +52,27 @@ function approxDataUrlBytes(dataUrl: string): number {
   return Math.floor(b64Len * 0.75);
 }
 
+/** iPhone HEIC photos: most browsers can't decode them, so the server
+ *  converts them to JPEG first (app/api/reports/heic-to-jpeg). */
+async function heicToJpeg(dataUrl: string): Promise<string> {
+  try {
+    const res = await fetch("/api/reports/heic-to-jpeg", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl }),
+    });
+    return res.ok ? (await res.json()).dataUrl : dataUrl;
+  } catch {
+    return dataUrl;
+  }
+}
+
 async function compress(
   dataUrl: string,
   maxDimension: number,
   quality: number,
 ): Promise<string> {
+  if (/^data:image\/hei[cf]/i.test(dataUrl ?? "")) dataUrl = await heicToJpeg(dataUrl);
   if (!dataUrl || !dataUrl.startsWith("data:image/")) return dataUrl;
   if (approxDataUrlBytes(dataUrl) < SKIP_BELOW_BYTES) return dataUrl;
 

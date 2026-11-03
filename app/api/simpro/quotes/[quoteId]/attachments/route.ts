@@ -5,6 +5,7 @@
 // see that file for the concurrency/retry/backoff rationale. This is the
 // quote-scoped equivalent, used by the Proposal report's photo picker.
 
+import { jpegDataUrl } from "@/lib/server/heic";
 import { NextRequest, NextResponse } from "next/server";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
@@ -232,7 +233,8 @@ export async function GET(
                 send("photo", {
                   id: `simpro_${detail.ID}`,
                   name: detail.Filename,
-                  url: `data:${detail.MimeType};base64,${detail.Base64Data}`,
+                  // HEIC (iPhone) photos become JPEG: browsers and the PDF can't show HEIC.
+                  url: await jpegDataUrl(`data:${detail.MimeType};base64,${detail.Base64Data}`),
                   size: detail.FileSizeBytes ?? 0,
                   dateAdded: detail.DateAdded ?? null,
                   index: i,

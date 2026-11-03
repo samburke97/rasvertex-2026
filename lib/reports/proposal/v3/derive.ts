@@ -76,7 +76,8 @@ export interface Derived {
 }
 
 export function derive(p: Proposal): Derived {
-  const visible = p.order.filter((id) => !isHidden(p, id));
+  // Pages a newer builder dropped (e.g. "access") may linger in older drafts.
+  const visible = p.order.filter((id) => PAGE[id] && !isHidden(p, id));
   const sheets = visible.flatMap((id) => layoutPage(p, id));
   const body = visible.filter((id) => id !== "cover" && id !== "contents");
   const pageNo: Derived["pageNo"] = {};

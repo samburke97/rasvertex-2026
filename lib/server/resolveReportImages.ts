@@ -16,6 +16,8 @@
 // Grid photos also get resized down here — see GRID_PHOTO_RESIZE below.
 
 import sharp from "sharp";
+import { simproFetch } from "@/lib/server/simpro";
+import { heicToJpeg, isHeic } from "@/lib/server/heic";
 import { createUploadQueue } from "@/lib/reports/uploadQueue";
 
 const CONCURRENCY = 16;
@@ -55,10 +57,26 @@ async function resolveOne(
 ): Promise<string> {
   if (!url || !url.startsWith("http")) return url ?? "";
   try {
-    const res = await fetch(url);
-    if (!res.ok) return url;
-    let buffer = Buffer.from(await res.arrayBuffer());
-    let contentType = res.headers.get("content-type") || "image/jpeg";
+    let buffer: Buffer;
+    let contentType: string;
+    const res = await fetch(url).catch(() => null);
+    if (res?.ok) {
+      buffer = Buffer.from(await res.arrayBuffer());
+      contentType = res.headers.get("content-type") || "image/jpeg";
+    } else {
+      // Storage unreachable (e.g. the Blob store blocked): a SimPRO photo
+      // can still come straight from SimPRO.
+      const fromSimpro = await simproOriginal(url);
+      if (!fromSimpro) {
+        console.warn(`[resolveReportImages] ${res?.status ?? "fetch failed"}: ${url}`);
+        return url;
+      }
+      ({ buffer, contentType } = fromSimpro);
+    }
+    if (isHeic(buffer)) {
+      buffer = await heicToJpeg(buffer);
+      contentType = "image/jpeg";
+    }
 
     if (resize) {
       buffer = await sharp(buffer)
@@ -79,6 +97,31 @@ async function resolveOne(
     // directly, just without the speed/size benefit of resolving it here.
     return url;
   }
+}
+
+/** Photos imported from SimPRO are stored as
+ *  "<report>-reports/<job or quote>[-roof]/simpro_<attachment id>-<random>.jpg";
+ *  that's enough to fetch the original again. */
+async function simproOriginal(url: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const m = new URL(url).pathname.match(/\/(proposal|inspection|condition|anchor-inspection)-reports\/(\d+)[^/]*\/simpro_(.+)-[A-Za-z0-9]{20,40}\.\w+$/);
+  const base = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
+  if (!m || !base) return null;
+  const [, kind, owner, id] = m;
+  const what = kind === "proposal" ? "quotes" : "jobs";
+  // A long report asks for many at once; SimPRO rate-limits, so back off.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const d = await simproFetch<{ MimeType?: string; Base64Data?: string }>(
+        `${base}/api/v1.0/companies/0/${what}/${owner}/attachments/files/${id}?display=Base64`,
+      );
+      if (!d.Base64Data) return null;
+      return { buffer: Buffer.from(d.Base64Data, "base64"), contentType: d.MimeType || "image/jpeg" };
+    } catch (err) {
+      if (/\b404\b/.test(String(err))) return null;
+      await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
+    }
+  }
+  return null;
 }
 
 /**

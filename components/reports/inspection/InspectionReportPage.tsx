@@ -1412,29 +1412,25 @@ function PlanEditor({
       });
     onOn(v);
   };
-  const row = (x: PlanItem, i: number, own: boolean) => (
-    <div key={own ? `own-${i}` : x.service} className={styles.planItem}>
-      {own && <input className={styles.input} value={x.service} placeholder="Service" onChange={(e) => patch(i, { service: e.target.value })} />}
-      <div className={styles.planControls}>
-        <select className={styles.input} value={x.interval} onChange={(e) => patch(i, { interval: e.target.value })}>
-          {[...new Set([x.interval, ...PLAN_INTERVALS])].map((v) => (
-            <option key={v}>{v}</option>
-          ))}
-        </select>
-        <div className={styles.planPrio}>
-          {(["required", "recommended"] as const).map((p) => (
-            <button key={p} className={x.priority === p ? styles.planPrioOn : ""} onClick={() => patch(i, { priority: p })}>
-              {p === "required" ? "Required" : "Recommended"}
-            </button>
-          ))}
-        </div>
-      </div>
-      <input className={styles.input} value={x.next ?? ""} placeholder="Next due (optional), e.g. March 2027" onChange={(e) => patch(i, { next: e.target.value || undefined })} />
-      {own && (
-        <button className={styles.linkBtn} onClick={() => set(items.filter((_, j) => j !== i))}>
-          Remove
-        </button>
-      )}
+  /** Required / Recommended, as on the page; click to switch. */
+  const prio = (x: PlanItem, i: number) => (
+    <button
+      className={`${styles.planPrio} ${x.priority === "required" ? styles.planPrioReq : ""}`}
+      title="Click to switch between Required and Recommended"
+      onClick={() => patch(i, { priority: x.priority === "required" ? "recommended" : "required" })}
+    >
+      {x.priority === "required" ? "Required" : "Recommended"}
+    </button>
+  );
+  /** How often and when next, side by side under the service. */
+  const timing = (x: PlanItem, i: number) => (
+    <div className={styles.planTiming}>
+      <select className={`${styles.input} ${styles.planSelect}`} value={x.interval} onChange={(e) => patch(i, { interval: e.target.value })}>
+        {[...new Set([x.interval, ...PLAN_INTERVALS])].map((v) => (
+          <option key={v}>{v}</option>
+        ))}
+      </select>
+      <input className={styles.input} value={x.next ?? ""} placeholder="Next due" onChange={(e) => patch(i, { next: e.target.value || undefined })} />
     </div>
   );
   return (
@@ -1456,25 +1452,42 @@ function PlanEditor({
               const i = items.findIndex((x) => x.service === s.service);
               return (
                 <div key={s.service} className={styles.planService}>
-                  <label className={styles.planTick}>
-                    <input
-                      type="checkbox"
-                      checked={i >= 0}
-                      onChange={(e) =>
-                        set(
-                          e.target.checked
-                            ? [...items, { service: s.service, interval: s.interval, priority: s.priority }]
-                            : items.filter((x) => x.service !== s.service),
-                        )
-                      }
-                    />
-                    <span>{s.service}</span>
-                  </label>
-                  {i >= 0 && row(items[i], i, false)}
+                  <div className={styles.planHead}>
+                    <label className={styles.planTick}>
+                      <input
+                        type="checkbox"
+                        checked={i >= 0}
+                        onChange={(e) =>
+                          set(
+                            e.target.checked
+                              ? [...items, { service: s.service, interval: s.interval, priority: s.priority }]
+                              : items.filter((x) => x.service !== s.service),
+                          )
+                        }
+                      />
+                      <span>{s.service}</span>
+                    </label>
+                    {i >= 0 && prio(items[i], i)}
+                  </div>
+                  {i >= 0 && timing(items[i], i)}
                 </div>
               );
             })}
-            {custom.map((x) => row(x, items.indexOf(x), true))}
+            {custom.map((x) => {
+              const i = items.indexOf(x);
+              return (
+                <div key={`own-${i}`} className={styles.planService}>
+                  <div className={styles.planHead}>
+                    <input className={styles.input} value={x.service} placeholder="Service" onChange={(e) => patch(i, { service: e.target.value })} />
+                    {prio(x, i)}
+                  </div>
+                  {timing(x, i)}
+                  <button className={styles.linkBtn} onClick={() => set(items.filter((_, j) => j !== i))}>
+                    Remove
+                  </button>
+                </div>
+              );
+            })}
             <div className={styles.btnRow}>
               <button className={styles.smallBtn} onClick={() => set([...items, { service: "", interval: "Annually", priority: "recommended" }])}>
                 Add a service
