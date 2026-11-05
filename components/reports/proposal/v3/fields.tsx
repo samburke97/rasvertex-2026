@@ -162,6 +162,7 @@ export function List<T>({
   title,
   meta,
   render,
+  sortable,
 }: {
   ctx: BuilderCtx;
   path: Path;
@@ -171,10 +172,30 @@ export function List<T>({
   /** Muted text on the right of the row, e.g. a price. */
   meta?: (x: T, i: number) => string;
   render: (i: number) => ReactNode;
+  /** Rows can be dragged into a new order by their grip. */
+  sortable?: boolean;
 }) {
   const arr = (ctx.get(path) as T[]) ?? [];
   const base = key(path) + ".";
   const [open, setOpen] = useState<number | null>(null);
+  // Dragging: the row being moved, and where it would land (before row i).
+  const [drag, setDrag] = useState<number | null>(null);
+  const [drop, setDrop] = useState<number | null>(null);
+  const move = (from: number, before: number) => {
+    const to = before > from ? before - 1 : before;
+    if (to === from) return;
+    const next = [...arr];
+    const [x] = next.splice(from, 1);
+    next.splice(to, 0, x);
+    ctx.set(path, next);
+    // The open row stays open wherever it ends up.
+    if (open != null) {
+      const ids = arr.map((_, j) => j);
+      const [o] = ids.splice(from, 1);
+      ids.splice(to, 0, o);
+      setOpen(ids.indexOf(open));
+    }
+  };
 
   // A click on the page opens the matching row.
   const focus = ctx.focusField?.path;
@@ -187,8 +208,63 @@ export function List<T>({
   return (
     <>
       {arr.map((x, i) => (
-        <div key={i} className={`${styles.item} ${open === i ? styles.itemOpen : ""}`} data-field={base + i}>
+        <div
+          key={i}
+          className={`${styles.item} ${open === i ? styles.itemOpen : ""} ${drag === i ? styles.itemDragging : ""} ${
+            drag != null && drop === i ? styles.dropBefore : ""
+          } ${drag != null && drop === arr.length && i === arr.length - 1 ? styles.dropAfter : ""}`}
+          data-field={base + i}
+          onDragOver={
+            sortable && drag != null
+              ? (e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setDrop(e.clientY < r.top + r.height / 2 ? i : i + 1);
+                }
+              : undefined
+          }
+          onDrop={
+            sortable && drag != null
+              ? (e) => {
+                  e.preventDefault();
+                  if (drop != null) move(drag, drop);
+                  setDrag(null);
+                  setDrop(null);
+                }
+              : undefined
+          }
+        >
           <div className={styles.itemHead}>
+            {sortable && arr.length > 1 && (
+              <span
+                className={styles.grip}
+                draggable
+                title="Drag to reorder"
+                aria-label="Drag to reorder"
+                onDragStart={(e) => {
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", String(i));
+                  // Drag the whole row, not just the grip.
+                  const row = e.currentTarget.closest(`.${styles.item}`) as HTMLElement | null;
+                  if (row) e.dataTransfer.setDragImage(row, 16, 18);
+                  setDrag(i);
+                }}
+                onDragEnd={() => {
+                  setDrag(null);
+                  setDrop(null);
+                }}
+              >
+                <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor" aria-hidden="true">
+                  <circle cx="2.5" cy="3" r="1.4" />
+                  <circle cx="7.5" cy="3" r="1.4" />
+                  <circle cx="2.5" cy="8" r="1.4" />
+                  <circle cx="7.5" cy="8" r="1.4" />
+                  <circle cx="2.5" cy="13" r="1.4" />
+                  <circle cx="7.5" cy="13" r="1.4" />
+                </svg>
+              </span>
+            )}
             <button className={styles.itemToggle} onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
               <svg className={styles.chev} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                 <path d="m9 6 6 6-6 6" />

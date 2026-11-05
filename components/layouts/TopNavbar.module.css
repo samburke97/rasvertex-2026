@@ -113,3 +113,23 @@
     display: none;
   }
 }
+
+/* A page's status, before search (e.g. "All changes saved"). */
+.status {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+/* Steps before the current one go back to their page. */
+.crumbLink {
+  text-decoration: none;
+  border-radius: 6px;
+  padding: 2px 4px;
+  margin: 0 -4px;
+}
+.crumbLink:hover {
+  color: var(--ink);
+  background: var(--fill-hover);
+  text-decoration: none;
+}

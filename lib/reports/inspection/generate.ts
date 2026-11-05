@@ -26,7 +26,7 @@ import {
   type ExtraDef,
   type ImageKey,
 } from "./codes";
-import { notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "@/lib/reports/richText";
+import { capFirst, notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "@/lib/reports/richText";
 import {
   COVER_ID,
   DEFAULT_COVER_POS,
@@ -363,10 +363,10 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       id: p.id,
       num: pad(numOf.get(p) ?? 0),
       chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].filter((c) => p.codes.includes(c)).map(chip),
-      gname: p.title ?? autoName,
+      gname: capFirst(p.title ?? autoName),
       pos: p.pos,
       where: placeOf(p, withZone),
-      note: p.desc ?? autoNote,
+      note: capFirst(p.desc ?? autoNote),
       autoName,
       autoNote,
     };

@@ -3,6 +3,7 @@
 // is the selected page's fields; in Review it's the checklist (children),
 // highlights are off and clicking a page does nothing.
 
+import { PHOTO_TOOLS_CSS } from "@/components/reports/shared/builder/PhotoTools";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import styles from "./Builder.module.css";
 import PageRail, { type RailRow } from "@/components/reports/shared/builder/PageRail";
@@ -108,6 +109,7 @@ function Preview({ ctx, review, scrollReq }: { ctx: BuilderCtx; review: boolean;
 
   return (
     <main ref={mainRef} className={styles.preview}>
+      <style dangerouslySetInnerHTML={{ __html: PHOTO_TOOLS_CSS }} />
       <div className={styles.stack} style={{ zoom: z }}>
         <ProposalPages
           p={ctx.p}
@@ -117,6 +119,16 @@ function Preview({ ctx, review, scrollReq }: { ctx: BuilderCtx; review: boolean;
           selected={ctx.sel}
           onPick={(id) => ctx.select(id, false)}
           onPickFinding={(i) => ctx.pickFinding(i, false)}
+          onRemoveFinding={(i) => {
+            ctx.set(["findings", "items"], ctx.p.d.findings.items.filter((_, j) => j !== i));
+            ctx.pickFinding(null, false);
+          }}
+          onMoveFinding={(from, to) => {
+            const next = [...ctx.p.d.findings.items];
+            const [x] = next.splice(from, 1);
+            next.splice(to, 0, x);
+            ctx.set(["findings", "items"], next);
+          }}
           onPickField={(id, path) => ctx.pickField(id, path)}
           onPinPointerDown={(zone, e) => {
             // Drag a site-map pin; stored as % of the map, so zoom doesn't matter.

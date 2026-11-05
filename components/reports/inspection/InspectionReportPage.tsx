@@ -48,7 +48,8 @@ import { compressImageDataUrl, compressMapImageDataUrl } from "@/lib/reports/com
 import { deleteReportPhoto, uploadReportPhoto } from "@/lib/reports/uploadPhoto";
 import { createUploadQueue } from "@/lib/reports/uploadQueue";
 import { CARD_IMAGES, LOGO_IMAGE, type ImageKey, type Library } from "@/lib/reports/inspection/codes";
-import { draftKeyFor, leaves, libraryFrom, readTag } from "@/lib/reports/settings/library";
+import { draftKeyFor, libraryFrom, readTag } from "@/lib/reports/settings/library";
+import type { Preset, ReportSettings } from "@/lib/reports/settings/types";
 import { useReportSettings } from "@/lib/reports/settings/useReportSettings";
 import { buildModel, paginate, PAGE_W, type Block, type PhotoView, type SectionKey } from "@/lib/reports/inspection/generate";
 import {
@@ -71,6 +72,8 @@ import {
 } from "@/lib/reports/inspection/types";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { simproBase, simproRecordUrl, type SimproSource } from "@/components/reports/shared/builder/JobStart";
+import ConfirmDetails from "@/components/reports/shared/builder/ConfirmDetails";
+import { PHOTO_TOOLS_CSS } from "@/components/reports/shared/builder/PhotoTools";
 
 /** Where a report's drafts and photos are kept: the job number, or Q + the
  *  quote number, so a quote and a job with the same number don't collide. */
@@ -147,6 +150,8 @@ function sectionOfKey(key: string): Sel {
 
 export default function InspectionReportPage({ onBack }: Props) {
   const [r, setR] = useState<InspectionReportData | null>(null);
+  // After loading, the details are confirmed before the report opens.
+  const [confirmed, setConfirmed] = useState(false);
   const settings = useReportSettings();
   // The report and type picked to start with ("roof" + "membrane").
   const [pick, setPick] = useState<{ report: string; type?: string }>({ report: "building" });
@@ -277,6 +282,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       setFolders(folderList);
       setSaveStatus("idle");
       setExp({ phase: "idle" });
+      setConfirmed(false);
       setR(next);
       if (!next.photos.some((p) => !p.uploaded)) importPhotos(jobId, next.folder, new Map(), next.source);
     } catch (err) {
@@ -318,7 +324,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     });
     if (changed) setHeights(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [r?.photos, r?.job, r?.text, r?.hidden, !!model?.mapPhotoId, fontsReady, !!model]);
+  }, [r?.photos, r?.job, r?.text, r?.hidden, !!model?.mapPhotoId, fontsReady, !!model, confirmed]);
   const layout = useMemo(() => (model ? paginate(model.blocks, heights) : null), [model, heights]);
 
   const urlById = useMemo(() => new Map((r ? reportImages(r) : []).map((p) => [p.id, p.url])), [r]);
@@ -338,7 +344,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [!!r]);
+  }, [!!r, confirmed]);
 
   // ── Map pins ──────────────────────────────────────────────────────────────
   const onPinPointerDown = useCallback(
@@ -619,13 +625,14 @@ export default function InspectionReportPage({ onBack }: Props) {
   return (
     <div className={styles.root}>
       <InspectionStyles />
+      <style dangerouslySetInnerHTML={{ __html: PHOTO_TOOLS_CSS }} />
       <BuilderHeader
         onBack={onBack}
         title={r ? `${r.job.site} · ${lib.label}` : "New inspection report"}
         subtitle={r ? `${r.source === "quote" ? "Quote" : "Job"} ${r.jobId} · ${r.job.forName}` : "Not started"}
         status={r ? (importing ? { text: "Loading photos…", busy: true } : saveStatus) : undefined}
       >
-        {r && (
+        {r && confirmed && (
           <>
             <HeaderButton onClick={exportPdf} disabled={!canExport || exp.phase === "exporting"}>
               {exp.phase === "exporting" ? "Exporting…" : "Download PDF"}
@@ -652,32 +659,50 @@ export default function InspectionReportPage({ onBack }: Props) {
           quotes
           onLoad={(n, src) => loadJob(n, src)}
         >
-            <div className={styles.kinds} role="radiogroup" aria-label="Report type">
-              {leaves(settings).map((l) => {
-                const on = pick.report === l.report && (pick.type ?? "") === (l.type ?? "");
-                return (
-                  <button
-                    key={l.report + ":" + (l.type ?? "")}
-                    role="radio"
-                    aria-checked={on}
-                    disabled={l.empty}
-                    title={l.empty ? "Not set up yet: add its wording in Reports › Report types" : undefined}
-                    className={`${styles.kind} ${on ? styles.kindOn : ""}`}
-                    onClick={() => setPick({ report: l.report, type: l.type })}
-                  >
-                    <span className={styles.kindRadio} />
-                    <span className={styles.kindText}>
-                      <span className={styles.kindLabel}>{l.label}</span>
-                      <span className={styles.kindHint}>{l.empty ? "Not set up yet" : l.preset.scope}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <ReportPicker settings={settings} pick={pick} onPick={setPick} />
         </JobStart>
       )}
 
-      {r && model && layout && (
+      {r && !confirmed && (
+        <ConfirmDetails
+          title="Confirm the details"
+          sub={
+            <>
+              {r.source === "quote" ? "Quote" : "Job"} {r.jobId} · {lib.label}
+              {lib.type ? ` · ${settingsOf(r).reports.find((x) => x.key === r.kind)?.types.find((t) => t.key === lib.type)?.name ?? ""}` : ""}. Check
+              what goes on the cover, then open the report. Everything can still be changed in the report.
+            </>
+          }
+          fields={[
+            { key: "site", label: "Site", value: r.job.site },
+            { key: "address", label: "Address", value: r.job.address },
+            { key: "forName", label: "Prepared for", value: r.job.forName },
+            { key: "by", label: "Prepared by", value: r.job.by },
+            { key: "byTitle", label: "Title", value: r.job.byTitle },
+            { key: "date", label: "Date", value: r.job.date },
+            { key: "contact", label: "Quote contact", value: r.job.contact, kind: "select", options: CONTACT_OPTIONS },
+            { key: "scope", label: "Scope", value: r.job.scope, kind: "long" },
+          ]}
+          onField={(k, v) => setJob({ [k]: v } as Partial<InspectionJob>)}
+          photos={{
+            folders: folders.map((f) => ({ id: String(f.id), name: f.name })),
+            current: r.folder,
+            onFolder: (f) => reimport(f),
+            busy: importing,
+            status: importing
+              ? `Loading photos from SimPRO${progress.total ? `… ${progress.loaded} of ${progress.total}` : "…"}`
+              : `${r.photos.length} photo${r.photos.length === 1 ? "" : "s"} loaded. Labels like “D10 L2 SH” are read when the report opens.`,
+          }}
+          onBack={() => {
+            importGen.current++; // stop any photo import for this job
+            setImporting(false);
+            setR(null);
+          }}
+          onOpen={() => setConfirmed(true)}
+        />
+      )}
+
+      {r && confirmed && model && layout && (
         <div className={styles.body}>
           <PageRail
             rows={railRows}
@@ -695,6 +720,20 @@ export default function InspectionReportPage({ onBack }: Props) {
                 onPhotoClick={(id) => {
                   setSel("findings");
                   pickPhoto(id);
+                }}
+                onPhotoRemove={(id) => {
+                  // Off the page; a SimPRO photo can be brought back from the
+                  // tray under the photo grid, an upload is deleted.
+                  const ph = r.photos.find((x) => x.id === id);
+                  if (!ph) return;
+                  if (ph.uploaded) removePhoto(ph);
+                  else setPhoto(id, { off: true });
+                  if (editing === id) pickPhoto(null);
+                }}
+                onPhotoMove={(from, to) => {
+                  const a = photoViews.findIndex((v) => v.id === from);
+                  const b = photoViews.findIndex((v) => v.id === to);
+                  if (a >= 0 && b >= 0) movePhoto(a, b);
                 }}
                 onEdit={editKey}
                 onPickSection={(k) => pickSection(k as Sel)}
@@ -1455,5 +1494,80 @@ function PullTechNotes({ base, hasText, onPull }: { base: string; hasText: boole
       {state === "none" && <span className={styles.pullNote}>No technician notes on this job yet.</span>}
       {state === "error" && <span className={styles.pullNote}>Couldn&apos;t reach SimPRO. Try again.</span>}
     </div>
+  );
+}
+
+// ── Report picker ─────────────────────────────────────────────────────────────
+// The reports first; a report with types (roof: membrane, tiled…) shows them
+// once it's picked. Types not set up yet in Reports › Report types can't be
+// picked.
+
+const presetEmpty = (p: Preset) => !p.scope.trim() && !p.intro.trim() && !p.about.length && !p.plan.length;
+
+function ReportPicker({
+  settings,
+  pick,
+  onPick,
+}: {
+  settings: ReportSettings;
+  pick: { report: string; type?: string };
+  onPick: (p: { report: string; type?: string }) => void;
+}) {
+  const current = settings.reports.find((r) => r.key === pick.report);
+  return (
+    <>
+      <div className={styles.kinds} role="radiogroup" aria-label="Report">
+        {settings.reports.map((r) => {
+          const on = r.key === pick.report;
+          const ready = r.types.length ? r.types.filter((t) => !presetEmpty(t)) : presetEmpty(r) ? [] : [r];
+          const hint = !ready.length
+            ? "Not set up yet"
+            : r.types.length
+              ? r.types.map((t) => t.name).join(", ")
+              : r.scope;
+          return (
+            <button
+              key={r.key}
+              role="radio"
+              aria-checked={on}
+              disabled={!ready.length}
+              title={!ready.length ? "Not set up yet: add its wording in Reports › Report types" : undefined}
+              className={`${styles.kind} ${on ? styles.kindOn : ""}`}
+              onClick={() => onPick({ report: r.key, type: r.types.length ? (ready[0] as Preset).key : undefined })}
+            >
+              <span className={styles.kindRadio} />
+              <span className={styles.kindText}>
+                <span className={styles.kindLabel}>{r.name}</span>
+                <span className={styles.kindHint}>{hint}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {current && current.types.length > 0 && (
+        <div className={styles.subKinds}>
+          <span className={styles.subKindsLabel}>Type</span>
+          <div className={styles.subKindRow} role="radiogroup" aria-label={`${current.name} type`}>
+            {current.types.map((t) => {
+              const empty = presetEmpty(t);
+              return (
+                <button
+                  key={t.key}
+                  role="radio"
+                  aria-checked={pick.type === t.key}
+                  disabled={empty}
+                  title={empty ? "Not set up yet: add its wording in Reports › Report types" : t.scope}
+                  className={`${styles.subKind} ${pick.type === t.key ? styles.subKindOn : ""}`}
+                  onClick={() => onPick({ report: current.key, type: t.key })}
+                >
+                  {t.name}
+                  {empty && <span className={styles.subKindSoon}>Not set up</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -75,3 +75,9 @@ export function htmlItems(raw: string | null | undefined): string[] {
     .map((x) => x.replace(/<br>/g, " ").trim())
     .filter((x) => x.replace(/<[^>]*>/g, "").trim());
 }
+
+/** The first letter capitalised ("awning screws backing out" → "Awning…"),
+ *  past any leading tags in rich text. Photo titles and descriptions read
+ *  as sentences however they were typed. */
+export const capFirst = (s: string): string =>
+  s ? s.replace(/^((?:\s|<[^>]*>)*)(\p{Ll})/u, (_m, lead: string, c: string) => lead + c.toUpperCase()) : s;

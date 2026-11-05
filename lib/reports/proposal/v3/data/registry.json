@@ -180,15 +180,15 @@
   "flaggedGroups": {
     "red": [
       "Priority",
-      "Safety risks and active damage. Act now."
+      "Safety risks and active damage. Made safe first."
     ],
     "amber": [
-      "Repair",
-      "Defects that will get worse. Plan repairs."
+      "Extensive repairs",
+      "Larger repairs, completed before any coating goes on."
     ],
     "grey": [
-      "Monitor",
-      "Minor items, handled during the repaint."
+      "Repairs",
+      "Minor repairs, all fixed as part of the works."
     ]
   },
   "prestartGroups": {

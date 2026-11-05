@@ -6,6 +6,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { setTopNav } from "@/components/layouts/topNavSlot";
 import "./settings.css";
 import { leaves } from "@/lib/reports/settings/library";
 import AnchorTypesScreen from "./AnchorTypesScreen";
@@ -122,21 +123,29 @@ function SaveStatus({ save, unlock }: { save: SaveState; unlock: (code: string) 
 
 export default function SettingsPage({ view, path }: { view: View; path: string[] }) {
   const { s, save, unlock, loaded } = useSettings();
-  let crumb = CRUMB[view];
+  // Where you are and whether it's saved go in the app's top bar.
+  const crumbs = [{ label: CRUMB[view], href: `#${view}` }];
   if (view === "types" && path[0]) {
     const r = s.reports.find((x) => x.key === path[0]);
     const t = r?.types.find((x) => x.key === path[1]);
-    if (r) crumb += ` / ${r.name}${t ? ` · ${t.name}` : ""}`;
+    if (r) crumbs.push({ label: r.name, href: `#types/${r.key}` });
+    if (t) crumbs.push({ label: t.name, href: `#types/${r!.key}/${t.key}` });
   }
+  const crumbKey = JSON.stringify(crumbs);
+  useEffect(() => {
+    setTopNav({
+      crumbs: JSON.parse(crumbKey),
+      status: (
+        <div className="rs">
+          <SaveStatus save={save} unlock={unlock} />
+        </div>
+      ),
+    });
+  }, [crumbKey, save, unlock]);
+  useEffect(() => () => setTopNav({}), []);
+
   return (
     <div className="rs rs-root">
-      <div className="topbar">
-        <span className="crumb">
-          Reports<i>/</i>
-          <b>{crumb}</b>
-        </span>
-        <SaveStatus save={save} unlock={unlock} />
-      </div>
       {save.phase === "error" && save.problems && save.problems.length > 1 && (
         <div className="page" style={{ paddingBottom: 0 }}>
           <div className="problems">

@@ -237,7 +237,7 @@ export interface ProposalSections {
   accept: { intro: string };
 }
 
-export type StageKind = "prep" | "clean" | "works" | "handover";
+export type StageKind = "prep" | "repairs" | "clean" | "works" | "handover";
 
 export interface RunStage {
   kind: StageKind;
@@ -251,6 +251,7 @@ export interface RunStage {
 /** Stage kinds: the colour of the number and the weeks chip. */
 export const STAGE_KINDS: Record<StageKind, { label: string; bg: string; fg: string }> = {
   prep: { label: "Setup / prep", bg: "#eef1f6", fg: "rgba(1,25,85,0.72)" },
+  repairs: { label: "Repairs", bg: "#f1ebf8", fg: "#5f4391" },
   clean: { label: "Wash / clean", bg: "#deeeff", fg: "#2563a8" },
   works: { label: "Main works", bg: "#dff2e6", fg: "#2f7a55" },
   handover: { label: "Handover", bg: "#fcf0dc", fg: "#86561a" },
@@ -578,28 +579,30 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
     runs: W
       ? {
           intro:
-            "We clean and prepare every area first, then lay the membrane one section at a time. Each section is checked and signed off before we move on.",
+            "We run your project differently from most. It starts with a proper site setup, and your project manager guides every stage from the first resident notice to the final handover, reporting back to you as each stage is completed.",
           stages: [
-            { kind: "prep", name: "Site setup & resident notices", when: "Week 1", where: "Whole site", desc: "We walk the site with the committee, set up secure storage and exclusion zones, and give residents the dates for their areas." },
+            { kind: "prep", name: "Site setup & access plan", when: "Week 1", where: "Whole site", desc: "Your project manager prepares the site documentation, sends resident notices and confirms the access plan, including exclusion zones, with the committee. Every stakeholder knows what is happening, and when, before work begins." },
             { kind: "clean", name: "Clean & preparation", when: "Weeks 1–2", where: "All membrane areas", desc: "Every surface is cleaned, old coatings and loose material removed, and cracks repaired so the membrane bonds to a sound substrate." },
-            { kind: "works", name: "Membrane · section A", when: "Weeks 2–4", where: "", desc: "Primer, reinforcement at joints and penetrations, then the full membrane system, checked and photographed before we move on." },
+            { kind: "works", name: "Membrane · section A", when: "Weeks 2–4", where: "", desc: "Primer, reinforcement at joints and penetrations, then the full membrane system. We report back with photos as each section is completed." },
             { kind: "works", name: "Membrane · section B", when: "Weeks 4–6", where: "", desc: "The same system on the next area, with upstands, outlets and penetrations detailed and flood tested where it applies." },
-            { kind: "handover", name: "Final walkthrough & handover", when: "Week 7", where: "Whole site, with the committee", desc: "We walk the site with the committee, list anything that needs attention, fix it, and hand over your warranty and completion report." },
+            { kind: "handover", name: "Site walkthrough", when: "Week 7", where: "Whole site, with the committee", desc: "We walk the site with the committee, list anything that needs attention and fix it before we leave." },
+            { kind: "handover", name: "Document handover", when: "Week 7", where: "", desc: "You receive the project reports, product records and your written warranty, so the work is documented in one place for the life of the membrane." },
           ],
-          note: "Timeframes are based on normal working weeks and exclude wet weather. If rain stops work, we let the committee know the same day and update the programme.",
+          note: "On larger sites we carry out the works in separate sections. Once you accept, we confirm a formal access plan for each one as timelines are locked in, and if plans change, we work around your schedule. Timeframes exclude wet weather; if rain stops work, we let the committee know the same day.",
         }
       : {
           intro:
-            "We wash the building first, then repaint it one section at a time. Each section is signed off before we move on.",
+            "We run your project differently from most. It starts with a proper site setup, not a pressure washer, and your project manager guides every stage from the first resident notice to the final handover, reporting back to you as each stage is completed.",
           stages: [
-            { kind: "prep", name: "Site setup & resident notices", when: "Week 1", where: "Whole site", desc: "We walk the site with the committee, set up secure storage and exclusion zones, and give every resident the dates for their floor." },
-            { kind: "clean", name: "Building wash", when: "Weeks 1–2", where: "All painted and rendered surfaces, roof down", desc: "Every surface is pressure cleaned from the roof down to strip salt, mould and chalking, then left to dry fully before any repair or paint." },
-            { kind: "works", name: "Repaint · section A", when: "Weeks 2–4", where: "", desc: "Repairs, prep, sealer and two full coats, drop by drop from the roof down. Each drop is checked and photographed before we move across." },
-            { kind: "works", name: "Repaint · section B", when: "Weeks 4–6", where: "", desc: "The same system on the next faces, worked from rope access or a knuckle boom so there’s no scaffold in the way." },
-            { kind: "works", name: "Repaint · section C", when: "Weeks 6–8", where: "", desc: "The entry and lower faces are done last, once the rest of the building is finished, so the main walkway is only affected for a short time." },
-            { kind: "handover", name: "Final walkthrough & handover", when: "Week 9", where: "Whole building, with the committee", desc: "We walk the whole building with the committee, list anything that needs attention, fix it, and hand over your warranty and completion report." },
+            { kind: "prep", name: "Site setup & access plan", when: "Week 1", where: "Whole site", desc: "Your project manager prepares the site documentation, sends resident notices and confirms the access plan, including exclusion zones, with the committee. Every stakeholder knows what is happening, and when, before work begins." },
+            { kind: "repairs", name: "Repairs", when: "Weeks 1–3", where: "Every defect flagged in the site survey", desc: "Our remedial team completes every repair before the building is washed. Repair work is dirty work, so doing it first means one wash leaves every surface clean and ready for paint." },
+            { kind: "clean", name: "Building wash", when: "Weeks 3–4", where: "All painted and rendered surfaces, roof down", desc: "A single, thorough pressure clean from the roof down removes salt, mould, chalking and repair dust. Surfaces are left to dry fully before priming." },
+            { kind: "works", name: "Prime & paint · section A", when: "Weeks 4–6", where: "", desc: "Primer or sealer, then two full coats, drop by drop from the roof down. We report back with photos as each section is completed." },
+            { kind: "works", name: "Prime & paint · section B", when: "Weeks 6–8", where: "", desc: "The same system on the next faces, worked from rope access or a knuckle boom so there’s no scaffold in the way." },
+            { kind: "handover", name: "Site walkthrough", when: "Week 9", where: "Whole building, with the committee", desc: "We walk the whole building with the committee, list anything that needs attention and fix it before we leave." },
+            { kind: "handover", name: "Document handover", when: "Week 9", where: "", desc: "You receive the project reports, product and colour records and your written warranty, so your building’s history is documented in one place." },
           ],
-          note: "Timeframes are based on normal working weeks and exclude wet weather. If rain stops work, we let the committee know the same day and update the programme.",
+          note: "On larger buildings we carry out the works in separate sections. Once you accept, we confirm a formal access plan for each one as timelines are locked in, and if plans change, we work around your schedule. Timeframes exclude wet weather; if rain stops work, we let the committee know the same day.",
         },
     pricing: {
       intro:

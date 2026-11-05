@@ -14,6 +14,8 @@ import type { CSSProperties, ReactNode } from "react";
 import { codeName, money, parseAmt, type Derived } from "@/lib/reports/proposal/v3/derive";
 import { FINDING_PHOTO_H, MAX_POINTS, REPORT_PHOTO_H, RUN_STATS_H, SITE_MAP_H, refsText, shownWhere, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
 import { RICH_CSS, richHtml, richItems } from "@/lib/reports/proposal/v3/rich";
+import { capFirst } from "@/lib/reports/richText";
+import { RemoveX, dragProps } from "@/components/reports/shared/builder/PhotoTools";
 import { placeLabel } from "@/lib/reports/proposal/v3/survey";
 import {
   BANDS,
@@ -71,6 +73,9 @@ export interface DocProps {
   /** Build only: an editable element was clicked — its path inside p.d. */
   onPickField?: (id: PageId, path: string) => void;
   focusFinding?: number | null;
+  /** Build only: the × on a finding's photo, and dragging one onto another. */
+  onRemoveFinding?: (index: number) => void;
+  onMoveFinding?: (from: number, to: number) => void;
 }
 
 const bg = (url: string) => (url ? `url("${url}")` : "none");
@@ -793,7 +798,7 @@ function FramedPhoto({ src, pos, edit, style }: { src: string; pos?: PhotoPos; e
   return (
     <div data-edit={edit} style={{ position: "relative", overflow: "hidden", background: CARD, ...style }}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {src && <img src={src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", ...photoPosStyle(pos) }} />}
+      {src && <img draggable={false} src={src} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block", ...photoPosStyle(pos) }} />}
     </div>
   );
 }
@@ -807,10 +812,14 @@ function FindingCard({ r, it, report, zoned = false }: { r: DocProps; it: CardIt
   const w = report ? shownWhere(f, zoned) : "";
   const build = r.mode === "build";
   const codes = report ? codesOf(f) : [];
+  const move = build && r.onMoveFinding;
   return (
     <div
       data-finding={i}
+      className={move ? "pt-card" : undefined}
+      {...(move ? dragProps(String(i), (a, b) => r.onMoveFinding!(Number(a), Number(b))) : {})}
       style={{
+        position: "relative",
         display: "flex",
         flexDirection: "column",
         gap: textH ? 20 : 0,
@@ -819,6 +828,7 @@ function FindingCard({ r, it, report, zoned = false }: { r: DocProps; it: CardIt
         ...(build && r.focusFinding === i ? { outline: "4px solid #3e7fb0", outlineOffset: 10 } : {}),
       }}
     >
+      {build && r.onRemoveFinding && <RemoveX title="Take this photo off the page" onRemove={() => r.onRemoveFinding!(i)} />}
       <FramedPhoto
         edit={`findings.items.${i}.photo`}
         src={r.img(f.photo)}
@@ -836,7 +846,7 @@ function FindingCard({ r, it, report, zoned = false }: { r: DocProps; it: CardIt
                 </span>
               ))}
               <h3 data-edit={`findings.items.${i}.title`} style={{ ...sub, flex: 1, minWidth: 0, marginLeft: codes.length ? 4 : 0, paddingTop: 1 }}>
-                {f.title}
+                {capFirst(f.title)}
               </h3>
               {n && <span style={{ ...label, lineHeight: "28px", fontVariantNumeric: "tabular-nums" }}>{n}</span>}
             </div>
@@ -847,7 +857,7 @@ function FindingCard({ r, it, report, zoned = false }: { r: DocProps; it: CardIt
             )}
             {richItems(f.desc).length > 0 && (
               <div data-edit={`findings.items.${i}.desc`} style={{ marginTop: 4 }}>
-                <Rich v={f.desc} style={secondary} />
+                <Rich v={capFirst(f.desc)} style={secondary} />
               </div>
             )}
           </div>
@@ -855,12 +865,12 @@ function FindingCard({ r, it, report, zoned = false }: { r: DocProps; it: CardIt
           <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start", height: textH, flexShrink: 0, overflow: "hidden" }}>
             {f.title.trim() && (
               <h3 data-edit={`findings.items.${i}.title`} style={{ ...sub, margin: 0 }}>
-                {f.title}
+                {capFirst(f.title)}
               </h3>
             )}
             {richItems(f.desc).length > 0 && (
               <div data-edit={`findings.items.${i}.desc`} style={{ alignSelf: "stretch" }}>
-                <Points text={f.desc} />
+                <Points text={capFirst(f.desc)} />
               </div>
             )}
           </div>

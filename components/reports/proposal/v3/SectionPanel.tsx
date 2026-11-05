@@ -445,6 +445,7 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
           <List
             ctx={ctx}
             path={["intro", "bullets"]}
+            sortable
             max={LIMITS.bullets}
             blank={() => ({ t: "", d: "" })}
             title={(_, i) => `Point ${i + 1}`}
@@ -503,6 +504,7 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
               <List<SpecRow>
                 ctx={ctx}
                 path={["project", "rows", b]}
+                sortable
                 max={LIMITS.specRows}
                 blank={() => ({ surface: "", system: "", coats: "2 full coats" })}
                 title={(_, i) => `Row ${i + 1}`}
@@ -599,6 +601,7 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
           <List<RunStage>
             ctx={ctx}
             path={["runs", "stages"]}
+            sortable
             max={LIMITS.runStages}
             blank={() => ({ kind: "works", name: "", when: "", where: "", desc: "" })}
             title={(x, i) => x.name || `Stage ${i + 1}`}
@@ -629,6 +632,7 @@ function Fields({ ctx, id }: { ctx: BuilderCtx; id: PageId }) {
           <List<{ label: string; amt: string }>
             ctx={ctx}
             path={["pricing", "stages"]}
+            sortable
             max={LIMITS.priceStages}
             blank={() => ({ label: "", note: "", amt: "0" })}
             title={(_, i) => `Stage ${i + 1}`}

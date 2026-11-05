@@ -7,6 +7,7 @@
 
 import {
   BAND_ORDER,
+  FLAG_GROUPS,
   CODES,
   JOB_FIELDS,
   PAGE,
@@ -145,9 +146,9 @@ export function derive(p: Proposal): Derived {
     },
     flagStats: [
       { v: fr.reduce((a, r) => a + n(r), 0), k: "Defects flagged" },
-      { v: band("red"), k: "Priority" },
-      { v: band("amber"), k: "Repair" },
-      { v: band("grey"), k: "Monitor" },
+      { v: band("red"), k: FLAG_GROUPS.red[0] },
+      { v: band("amber"), k: FLAG_GROUPS.amber[0] },
+      { v: band("grey"), k: FLAG_GROUPS.grey[0] },
     ],
     printCount: sheets.length,
   };

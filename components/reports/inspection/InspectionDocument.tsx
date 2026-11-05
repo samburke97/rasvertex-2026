@@ -16,6 +16,7 @@
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { sanitizeNotesHtml } from "@/lib/reports/richText";
 import type { ImageKey } from "@/lib/reports/inspection/codes";
+import { RemoveX, dragProps } from "@/components/reports/shared/builder/PhotoTools";
 import {
   CONTENT_W,
   padPage,
@@ -44,6 +45,9 @@ interface Ctx {
   /** Builder only: click a photo to edit it; the one being edited. */
   onPhotoClick?: (id: string) => void;
   editing?: string | null;
+  /** Builder only: the × on a photo, and dragging one onto another. */
+  onPhotoRemove?: (id: string) => void;
+  onPhotoMove?: (from: string, to: string) => void;
 }
 
 const bg = (src: string | null | undefined) => (src ? `url("${src}")` : undefined);
@@ -234,15 +238,18 @@ function Footer({ no, total }: { no: number; total: number }) {
 }
 
 function Photo({ p, ctx }: { p: PhotoView; ctx: Ctx }) {
+  const own = !p.img; // a job photo, not the "Reading a photo" example
   return (
     <div
-      className={`ir-photo${ctx.onPhotoClick && !p.img ? " ir-photo--edit" : ""}${ctx.editing === p.id ? " is-editing" : ""}`}
-      data-photo={p.img ? undefined : p.id}
-      onClick={ctx.onPhotoClick && !p.img ? () => ctx.onPhotoClick!(p.id) : undefined}
+      className={`ir-photo${ctx.onPhotoClick && own ? " ir-photo--edit" : ""}${ctx.editing === p.id ? " is-editing" : ""}${own && ctx.onPhotoMove ? " pt-card" : ""}`}
+      data-photo={own ? p.id : undefined}
+      onClick={ctx.onPhotoClick && own ? () => ctx.onPhotoClick!(p.id) : undefined}
+      {...(own && ctx.onPhotoMove ? dragProps(p.id, ctx.onPhotoMove) : {})}
     >
-      <div className="ir-photo__img">
+      <div className="ir-photo__img" style={{ position: "relative" }}>
+        {own && ctx.onPhotoRemove && <RemoveX onRemove={() => ctx.onPhotoRemove!(p.id)} />}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={(p.img ? ctx.assets.images[p.img] : ctx.photoUrl(p.id)) ?? undefined} alt="" style={{ width: "100%", height: "100%", display: "block", ...photoPosStyle(p.pos) }} />
+        <img draggable={false} src={(p.img ? ctx.assets.images[p.img] : ctx.photoUrl(p.id)) ?? undefined} alt="" style={{ width: "100%", height: "100%", display: "block", ...photoPosStyle(p.pos) }} />
       </div>
       {/* Stacked: codes left with location and number right, then the
           defect name, then the technician's note. */}
@@ -728,6 +735,8 @@ interface DocProps {
   onCoverPointerDown?: (e: PointerEvent<HTMLElement>) => void;
   onPhotoClick?: (id: string) => void;
   editing?: string | null;
+  onPhotoRemove?: (id: string) => void;
+  onPhotoMove?: (from: string, to: string) => void;
   /** Builder only: click any editable text to edit it in the panel. */
   onEdit?: (key: string) => void;
   /** Builder only: click anywhere else on a page to open its section. */
@@ -747,6 +756,8 @@ export default function InspectionDocument(props: DocProps) {
     onCoverPointerDown: props.onCoverPointerDown,
     onPhotoClick: props.onPhotoClick,
     editing: props.editing,
+    onPhotoRemove: props.onPhotoRemove,
+    onPhotoMove: props.onPhotoMove,
   };
   return (
     <div

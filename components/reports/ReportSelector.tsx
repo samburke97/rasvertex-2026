@@ -244,6 +244,13 @@ export default function ReportSelector() {
   // left out while a builder is open so the builder has the width.
   const [menuEl, setMenuEl] = useState<HTMLElement | null>(null);
   useEffect(() => setMenuEl(document.getElementById("reports-section-menu")), []);
+  // Following a breadcrumb or the menu leaves an open builder (its draft is
+  // already saved).
+  useEffect(() => {
+    const close = () => setActive(null);
+    window.addEventListener("hashchange", close);
+    return () => window.removeEventListener("hashchange", close);
+  }, []);
 
   if (!active) {
     return (

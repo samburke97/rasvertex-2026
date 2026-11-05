@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { NAV_ITEMS } from "./Sidebar";
 import { LINE, isLineKey } from "@/lib/caro/data";
 import styles from "./TopNavbar.module.css";
+import { useTopNav, type Crumb } from "./topNavSlot";
 
 interface TopNavbarProps {
   theme: "light" | "dark";
@@ -22,20 +23,36 @@ const CARO_VIEWS: Record<string, string> = {
   templates: "Email templates",
   timing: "Reminder timing",
 };
-function caroCrumbs(hash: string): string[] {
+function caroCrumbs(hash: string): Crumb[] {
   const [view, sub] = (hash.slice(1) || "overview").split("/");
-  const c = ["Caro", CARO_VIEWS[view] ?? "Overview"];
-  if (view === "sites" && isLineKey(sub)) c[1] = LINE[sub].name;
-  if (view === "automations" && sub) c.push(sub === "library" ? "Library" : sub === "new" ? "New automation" : "Edit automation");
+  const c: Crumb[] = [
+    { label: "Caro", href: "/caro#overview" },
+    { label: CARO_VIEWS[view] ?? "Overview", href: `/caro#${view || "overview"}` },
+  ];
+  if (view === "sites" && isLineKey(sub)) c[1] = { label: LINE[sub].name, href: `/caro#sites/${sub}` };
+  if (view === "automations" && sub) c.push({ label: sub === "library" ? "Library" : sub === "new" ? "New automation" : "Edit automation" });
   return c;
 }
 
-function crumbsFor(pathname: string | null, hash: string): string[] {
-  if (!pathname || pathname === "/") return ["Today"];
+/** The section's own steps; every one links back to its page. */
+function crumbsFor(pathname: string | null, hash: string): Crumb[] {
+  if (!pathname || pathname === "/") return [{ label: "Today", href: "/" }];
   if (pathname.startsWith("/caro")) return caroCrumbs(hash);
+  if (pathname.startsWith("/workspace")) return [{ label: "CRM", href: "/crm" }, { label: "Workspace" }];
   const item = NAV_ITEMS.find((n) => pathname.startsWith(n.href));
-  if (pathname.startsWith("/workspace")) return ["CRM", "Workspace"];
-  return item ? [item.label] : [];
+  // Reports: the section's start is its report picker (#new).
+  if (item?.href === "/reports") return [{ label: item.label, href: "/reports#new" }];
+  return item ? [{ label: item.label, href: item.href }] : [];
+}
+
+/** Following a link to the hash already showing still takes you back to
+ *  that page's start (e.g. Reports from inside a builder). */
+function go(e: React.MouseEvent<HTMLAnchorElement>, href: string) {
+  const url = new URL(href, window.location.href);
+  if (url.pathname === window.location.pathname && url.hash === window.location.hash) {
+    e.preventDefault();
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  }
 }
 
 export default function TopNavbar({ theme, onToggleTheme }: TopNavbarProps) {
@@ -47,24 +64,35 @@ export default function TopNavbar({ theme, onToggleTheme }: TopNavbarProps) {
     window.addEventListener("hashchange", read);
     return () => window.removeEventListener("hashchange", read);
   }, [pathname]);
-  const crumbs = crumbsFor(pathname, hash);
+  // A page can add its own steps and a status (see topNavSlot).
+  const extra = useTopNav();
+  const crumbs = [...crumbsFor(pathname, hash), ...(extra.crumbs ?? [])];
 
   return (
     <header className={styles.topNav}>
       <nav className={styles.crumbs} aria-label="Breadcrumb">
         {crumbs.map((c, i) => (
-          <span key={`${i}-${c}`} className={styles.crumbWrap}>
+          <span key={`${i}-${c.label}`} className={styles.crumbWrap}>
             {i > 0 && (
               <svg className={styles.crumbSep} viewBox="0 0 24 24" fill="none">
                 <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
             )}
-            <span className={styles.crumb}>{c}</span>
+            {c.href && i < crumbs.length - 1 ? (
+              <a className={`${styles.crumb} ${styles.crumbLink}`} href={c.href} onClick={(e) => go(e, c.href!)}>
+                {c.label}
+              </a>
+            ) : (
+              <span className={styles.crumb} aria-current={i === crumbs.length - 1 ? "page" : undefined}>
+                {c.label}
+              </span>
+            )}
           </span>
         ))}
       </nav>
 
       <div className={styles.right}>
+        {extra.status && <div className={styles.status}>{extra.status}</div>}
         <button
           type="button"
           className={styles.searchTrigger}
