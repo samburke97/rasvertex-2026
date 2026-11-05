@@ -95,7 +95,7 @@ async function buildPDF(report: InspectionReportData): Promise<Buffer> {
   const { doc, fontCSS } = await loadAssets();
   const model = buildModel(report);
   const { renderToStaticMarkup } = await import("react-dom/server");
-  const title = `Inspection Report - ${report.job.site} - J${report.jobId}`.replace(/[<>&"]/g, "");
+  const title = `Inspection Report - ${report.job.site} - ${report.source === "quote" ? "Q" : "J"}${report.jobId}`.replace(/[<>&"]/g, "");
 
   const measureHTML = page(
     fontCSS,
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
   }
 
   const filename =
-    safeName(body.filename?.trim() || `Inspection Report - ${report.job.site || "Building"} - J${report.jobId}`).replace(/\.pdf$/i, "") + ".pdf";
+    safeName(body.filename?.trim() || `Inspection Report - ${report.job.site || "Building"} - ${report.source === "quote" ? "Q" : "J"}${report.jobId}`).replace(/\.pdf$/i, "") + ".pdf";
 
   let buffer: Buffer;
   try {
@@ -189,6 +189,7 @@ export async function POST(request: NextRequest) {
       filename,
       buffer,
       "[ExportInspectionPDF]",
+      report.source === "quote" ? "quote" : "job",
     );
     if (want.job) saved.job = r.job?.success ? "yes" : "error";
     if (want.site) saved.site = r.site?.success ? "yes" : "error";

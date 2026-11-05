@@ -45,6 +45,8 @@ export const OVERVIEW_CSS =
   `
 .jo-cols{grid-template-columns:260px minmax(0,1fr) 140px}
 .jo-cols--notes{grid-template-columns:220px 280px 120px minmax(0,1fr)}
+.jo-cols--times{grid-template-columns:220px minmax(0,1fr) 130px 130px 120px}
+.jo-cols--times-notes{grid-template-columns:180px 230px 105px 105px 100px minmax(0,1fr)}
 .jo-tr{height:56px}
 .jo-tr--notes{height:76px}
 .jo-note{font-size:17px;line-height:1.4;color:var(--ink-65);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:pretty}
@@ -96,7 +98,7 @@ function SecLabel({ text }: { text: string }) {
   );
 }
 
-function PageNo({ no, total }: { no: number; total: number }) {
+export function PageNo({ no, total }: { no: number; total: number }) {
   return (
     <div className="ar-pageno">
       Page {pad(no)} / {pad(total)}
@@ -207,8 +209,25 @@ function Notes({ label, html }: { label: string; html: string }) {
   );
 }
 
-function HourRow({ it, notes }: { it: HourItem; notes: boolean }) {
-  const cols = notes ? "jo-cols--notes" : "jo-cols";
+/** "07:00" → "7:00 am", "15:30" → "3:30 pm". */
+export function clock(t: string): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(t);
+  if (!m) return "—";
+  const h = +m[1];
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? "am" : "pm"}`;
+}
+
+export const hourCols = (notes: boolean, times: boolean) =>
+  times ? (notes ? "jo-cols--times-notes" : "jo-cols--times") : notes ? "jo-cols--notes" : "jo-cols";
+
+export function HourRow({ it, notes, times }: { it: HourItem; notes: boolean; times: boolean }) {
+  const cols = hourCols(notes, times);
+  const gap = times && (
+    <>
+      <span />
+      <span />
+    </>
+  );
   switch (it.kind) {
     case "section":
       return <div className="jo-sec">{it.title}</div>;
@@ -217,6 +236,12 @@ function HourRow({ it, notes }: { it: HourItem; notes: boolean }) {
         <div className={`ar-tr jo-tr ${notes ? "jo-tr--notes" : ""} ${cols}`}>
           <span>{scheduleDate(it.date)}</span>
           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</span>
+          {times && (
+            <>
+              <span>{clock(it.start)}</span>
+              <span>{clock(it.finish)}</span>
+            </>
+          )}
           <span className="ar-r">{it.hours > 0 ? formatHours(it.hours) : "—"}</span>
           {notes && <span className="jo-note">{it.note}</span>}
         </div>
@@ -226,6 +251,7 @@ function HourRow({ it, notes }: { it: HourItem; notes: boolean }) {
         <div className={`ar-tr jo-sub ${cols}`}>
           <span>{it.title} subtotal</span>
           <span />
+          {gap}
           <span className="ar-r">{formatHours(it.hours)}</span>
           {notes && <span />}
         </div>
@@ -235,6 +261,7 @@ function HourRow({ it, notes }: { it: HourItem; notes: boolean }) {
         <div className={`ar-tr jo-total ${cols}`}>
           <span>Total hours</span>
           <span />
+          {gap}
           <span className="ar-r">{formatHours(it.hours)}</span>
           {notes && <span />}
         </div>
@@ -245,6 +272,7 @@ function HourRow({ it, notes }: { it: HourItem; notes: boolean }) {
 function HoursPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "hours" }> }) {
   const { model } = ctx;
   const notes = model.showNotes;
+  const times = model.showTimes;
   return (
     <section className="ar-page">
       {page.first ? (
@@ -256,14 +284,20 @@ function HoursPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "hours
         <SecLabel text="Hours schedule, continued" />
       )}
       <div className="ar-table">
-        <div className={`ar-thead ${notes ? "jo-cols--notes" : "jo-cols"}`}>
+        <div className={`ar-thead ${hourCols(notes, times)}`}>
           <span>Date</span>
           <span>Team member</span>
+          {times && (
+            <>
+              <span>Start</span>
+              <span>Finish</span>
+            </>
+          )}
           <span className="ar-r">Hours</span>
           {notes && <span>Notes</span>}
         </div>
         {page.items.map((it, i) => (
-          <HourRow key={i} it={it} notes={notes} />
+          <HourRow key={i} it={it} notes={notes} times={times} />
         ))}
       </div>
       <PageNo no={page.no} total={model.total} />

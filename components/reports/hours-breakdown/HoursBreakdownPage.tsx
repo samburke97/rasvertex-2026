@@ -1,9 +1,12 @@
 "use client";
 // components/reports/hours-breakdown/HoursBreakdownPage.tsx
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useLayoutEffect } from "react";
 import styles from "../shared/ReportPage.module.css";
-import ScheduleSection from "../condition/sections/ScheduleSection";
+import { OverviewStyles } from "../condition/OverviewDocument";
+import HoursDocument, { HOURS_CSS, type HoursEdit } from "./HoursDocument";
+import { buildHoursModel } from "@/lib/reports/hours.layout";
+import { PAGE_W } from "@/lib/reports/overview.layout";
 import HoursBreakdownOptionsPanel from "./HoursBreakdownOptionsPanel";
 import SaveReportModal, { postSave } from "../shared/SaveReportModal";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
@@ -49,6 +52,22 @@ export default function HoursBreakdownPage({ onBack }: Props) {
   const [isExporting, setIsExporting] = useState(false);
   const currentLoadId = useRef(0);
 
+  // The pages are 1280 wide, scaled to the column.
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(0.5);
+  useLayoutEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const fit = () => {
+      const z = Math.max(0.15, Math.min(0.75, (el.clientWidth - 64) / PAGE_W));
+      setZoom((prev) => (Math.abs(prev - z) > 0.003 ? z : prev));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // ── Field updates ─────────────────────────────────────────────────────────
 
   const updateSettings = useCallback(
@@ -61,9 +80,6 @@ export default function HoursBreakdownPage({ onBack }: Props) {
     [],
   );
 
-  const updateSchedule = useCallback((rows: ScheduleRow[]) => {
-    setReport((prev) => ({ ...prev, schedule: rows }));
-  }, []);
 
   // ── Import ────────────────────────────────────────────────────────────────
 
@@ -183,28 +199,31 @@ export default function HoursBreakdownPage({ onBack }: Props) {
     : report.schedule;
 
   const hasReport = report.schedule.length > 0 || !!report.job.jobNo;
+  const model = buildHoursModel(report);
 
-  const dateRangeLabel = (() => {
-    if (
-      !report.settings.filterByDate ||
-      (!report.settings.dateFrom && !report.settings.dateTo)
-    ) {
-      return "All Dates";
-    }
-    const from = report.settings.dateFrom ?? "";
-    const to = report.settings.dateTo ?? "";
-    if (from && to) return `${from} – ${to}`;
-    if (from) return `From ${from}`;
-    return `To ${to}`;
-  })();
+  // Rows are edited in place on the preview.
+  const edit: HoursEdit = {
+    onRow: (id, patch) =>
+      setReport((prev) => ({ ...prev, schedule: prev.schedule.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
+    onRemove: (id) => setReport((prev) => ({ ...prev, schedule: prev.schedule.filter((r) => r.id !== id) })),
+    onAdd: () =>
+      setReport((prev) => {
+        const last = filteredSchedule[filteredSchedule.length - 1];
+        const row: ScheduleRow = {
+          id: `manual_${Date.now()}`,
+          employeeId: 0,
+          employeeName: "",
+          date: last?.date ?? new Date().toISOString().slice(0, 10),
+          scheduledHours: 0,
+          actualHours: 0,
+          note: "",
+          start: "",
+          finish: "",
+        };
+        return { ...prev, schedule: [...prev.schedule, row] };
+      }),
+  };
 
-  const scheduleHeading = [
-    report.job.jobNo || null,
-    report.job.customerName || null,
-    dateRangeLabel,
-  ]
-    .filter(Boolean)
-    .join("  |  ");
 
   return (
     <div className={styles.page}>
@@ -236,17 +255,18 @@ export default function HoursBreakdownPage({ onBack }: Props) {
           }}
         />
 
-        <div className={styles.canvas}>
-          <div className={styles.pageLabel}>
-            Hours Breakdown &middot; {filteredSchedule.length} row
-            {filteredSchedule.length !== 1 ? "s" : ""}
-          </div>
-          <ScheduleSection
-            rows={filteredSchedule}
-            isLoading={scheduleLoading}
-            onChange={updateSchedule}
-            heading={scheduleHeading}
-          />
+        <div ref={previewRef} className={styles.canvas}>
+          <OverviewStyles />
+          <style dangerouslySetInnerHTML={{ __html: HOURS_CSS }} />
+          {scheduleLoading ? (
+            <div className={styles.pageLabel}>Loading hours from SimPRO…</div>
+          ) : loadedJobId ? (
+            <div style={{ zoom }}>
+              <HoursDocument model={model} screen edit={edit} />
+            </div>
+          ) : (
+            <div className={styles.pageLabel}>Load a job to see its hours.</div>
+          )}
         </div>
       </div>
 

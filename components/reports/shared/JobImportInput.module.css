@@ -102,3 +102,8 @@
     transform: rotate(360deg);
   }
 }
+
+/* Job / Quote switch */
+.source { display: inline-flex; gap: 2px; padding: 3px; border-radius: 9px; background: rgba(var(--ink-rgb), 0.045); margin-bottom: 8px; }
+.source button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; font: inherit; font-size: 12.5px; font-weight: 500; color: rgba(var(--ink-rgb), 0.62); cursor: pointer; }
+.source button.sourceOn { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }

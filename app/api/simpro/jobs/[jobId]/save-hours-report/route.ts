@@ -4,8 +4,7 @@
 // that step exists for the other report types).
 
 import { NextRequest, NextResponse } from "next/server";
-import { buildHoursPrintHTML } from "@/lib/reports/hours.print";
-import { loadReportAssets, renderPDF } from "@/lib/server/pdf-utils";
+import { buildHoursPDF } from "@/lib/server/hoursPdf";
 import { saveReportToDestinations, getSimproConfig } from "@/lib/server/simpro";
 import type { HoursBreakdownData } from "@/lib/reports/hours.types";
 
@@ -71,8 +70,7 @@ export async function POST(
 
   let buffer: Buffer;
   try {
-    const html = buildHoursPrintHTML(report, loadReportAssets());
-    buffer = await renderPDF(html);
+    buffer = await buildHoursPDF(report);
   } catch (err) {
     console.error("[SaveHoursReport] PDF failed:", err);
     return NextResponse.json(

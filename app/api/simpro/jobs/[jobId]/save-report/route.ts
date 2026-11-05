@@ -34,6 +34,8 @@ export async function POST(
     companyId?: number;
     siteId?: string;
     destinations?: { job?: boolean; site?: boolean };
+    /** "quote": the id is a quote's, and the PDF attaches to the quote. */
+    owner?: "job" | "quote";
   };
   try {
     body = await request.json();
@@ -98,6 +100,7 @@ export async function POST(
     cleanFilename,
     buffer,
     "[SaveReport]",
+    body.owner === "quote" ? "quote" : "job",
   );
 
   return NextResponse.json({ filename: cleanFilename, job, site }, { status: 200 });

@@ -84,6 +84,8 @@ export interface InspectionReportData {
   kind?: ReportKind;
   /** The report's type in the settings (roof: "membrane", "tiled"…). */
   type?: string;
+  /** Made from a SimPRO quote: jobId is the quote number. Unset: a job. */
+  source?: "quote";
   /** The report settings when this report was started. Later edits to the
    *  settings don't change it; drafts from before settings use the defaults. */
   settings?: ReportSettings;

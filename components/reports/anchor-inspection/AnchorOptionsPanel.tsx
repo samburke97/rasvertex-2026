@@ -191,8 +191,9 @@ export default function AnchorOptionsPanel({
     <aside className={styles.panel}>
       {/* ── Job Number ───────────────────────────────────────────────────── */}
       <div className={styles.group} data-pages="cover">
-        <div className={styles.groupLabel}>Job number</div>
+        <div className={styles.groupLabel}>Job or quote</div>
         <JobImportInput
+          quotes
           onImport={onImport}
           importStatus={importStatus}
           placeholder="e.g. 10737"

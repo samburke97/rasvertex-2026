@@ -79,7 +79,7 @@ export interface OverviewPhoto {
 
 export type HourItem =
   | { kind: "section"; title: string }
-  | { kind: "row"; id: string; date: string; name: string; hours: number; note: string }
+  | { kind: "row"; id: string; date: string; name: string; hours: number; note: string; start: string; finish: string }
   | { kind: "subtotal"; title: string; hours: number }
   | { kind: "total"; hours: number };
 
@@ -121,6 +121,8 @@ export interface OverviewModel {
   /** Under "Hours schedule": who logged the hours, when, on which job. */
   hoursLede: string;
   showNotes: boolean;
+  /** Start and finish columns. */
+  showTimes: boolean;
   grid: { cols: number; ratio: number };
   pages: Page[];
   total: number;
@@ -206,12 +208,54 @@ export function hourItems(rows: ScheduleRow[], sectioned: boolean): HourItem[] {
       sub = 0;
       items.push({ kind: "section", title });
     }
-    items.push({ kind: "row", id: r.id, date: r.date, name: r.employeeName, hours: r.actualHours || 0, note: r.note });
+    items.push({ kind: "row", id: r.id, date: r.date, name: r.employeeName, hours: r.actualHours || 0, note: r.note, start: r.start ?? "", finish: r.finish ?? "" });
     sub += r.actualHours || 0;
   });
   flush();
   if (rows.length) items.push({ kind: "total", hours: total });
   return items;
+}
+
+const longDate = (iso: string) => {
+  const d = new Date(iso + "T00:00:00");
+  return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
+};
+
+/** "The hours below were logged by our team between … and … on job #11360." */
+export function hoursLedeText(rows: ScheduleRow[], jobNo: string): string {
+  const dates = rows.map((r) => r.date).filter(Boolean).sort();
+  const onJob = jobNo ? ` on job ${jobNo}` : "";
+  if (!dates.length) return "";
+  return dates[0] === dates[dates.length - 1]
+    ? `The hours below were logged by our team on ${longDate(dates[0])}${onJob}.`
+    : `The hours below were logged by our team between ${longDate(dates[0])} and ${longDate(dates[dates.length - 1])}${onJob}.`;
+}
+
+/** Height of a page title and its lede (Heading in the documents). */
+export const headingHeight = (lede: string) => H2 + T_INTRO - LEDE_LINE + ledeH(lede);
+
+/** The hours table split into pages: the header repeats on each, and a
+ *  section header never sits alone at a page foot. `firstTop` / `nextTop`:
+ *  height used above the table on the first and later pages. */
+export function paginateHours(items: HourItem[], notes: boolean, firstTop: number, nextTop: number): HourItem[][] {
+  const rowH = notes ? T_ROW_NOTES : T_ROW;
+  const hOf = (it: HourItem) => (it.kind === "section" ? T_SEC : it.kind === "row" ? rowH : it.kind === "subtotal" ? T_SUB : T_TOTAL);
+  const pages: HourItem[][] = [];
+  let page: HourItem[] = [];
+  let used = firstTop + T_HEAD;
+  items.forEach((it, i) => {
+    const next = items[i + 1];
+    const need = hOf(it) + (it.kind === "section" && next ? hOf(next) : 0);
+    if (page.length && used + need > FLOW_H) {
+      pages.push(page);
+      page = [];
+      used = nextTop + T_HEAD;
+    }
+    page.push(it);
+    used += hOf(it);
+  });
+  pages.push(page);
+  return pages;
 }
 
 const ledeH = (text: string) => Math.max(1, Math.ceil(text.length / LEDE_CHARS)) * LEDE_LINE;
@@ -237,17 +281,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   const photos = settings.showPhotos ? filterPhotosByDateRange(report.photos, from, to) : [];
   const schedule = settings.showSchedule ? filterScheduleByDateRange(report.schedule, from, to) : [];
   const totalHours = schedule.reduce((t, r) => t + (r.actualHours || 0), 0);
-  const longDate = (iso: string) => {
-    const d = new Date(iso + "T00:00:00");
-    return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
-  };
-  const dates = schedule.map((r) => r.date).filter(Boolean).sort();
-  const onJob = job.jobNo ? ` on job ${job.jobNo}` : "";
-  const hoursLede = !dates.length
-    ? ""
-    : dates[0] === dates[dates.length - 1]
-      ? `The hours below were logged by our team on ${longDate(dates[0])}${onJob}.`
-      : `The hours below were logged by our team between ${longDate(dates[0])} and ${longDate(dates[dates.length - 1])}${onJob}.`;
+  const hoursLede = hoursLedeText(schedule, job.jobNo ?? "");
   const method = report.method?.on ? report.method : null;
   const plan = report.plan?.on && report.plan.items.length ? report.plan : null;
   const ws = normWarranties(report.warranty, report.job.date);
@@ -270,22 +304,8 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   // never sits alone at a page foot.
   if (schedule.length) {
     const items = hourItems(schedule, settings.scheduleSections);
-    const rowH = settings.showScheduleNotes ? T_ROW_NOTES : T_ROW;
-    const hOf = (it: HourItem) => (it.kind === "section" ? T_SEC : it.kind === "row" ? rowH : it.kind === "subtotal" ? T_SUB : T_TOTAL);
-    let page: Extract<Page, { kind: "hours" }> = { kind: "hours", no: no(), first: true, items: [] };
-    let used = SEC_LABEL + H2 + T_INTRO - LEDE_LINE + ledeH(hoursLede) + T_HEAD;
-    items.forEach((it, i) => {
-      const next = items[i + 1];
-      const need = hOf(it) + (it.kind === "section" && next ? hOf(next) : 0);
-      if (page.items.length && used + need > FLOW_H) {
-        pages.push(page);
-        page = { kind: "hours", no: no(), first: false, items: [] };
-        used = SEC_LABEL + T_HEAD;
-      }
-      page.items.push(it);
-      used += hOf(it);
-    });
-    pages.push(page);
+    const split = paginateHours(items, settings.showScheduleNotes, SEC_LABEL + H2 + T_INTRO - LEDE_LINE + ledeH(hoursLede), SEC_LABEL);
+    split.forEach((items, i) => pages.push({ kind: "hours", no: no(), first: i === 0, items }));
   }
 
   // Methodology: each stage's head, then its numbered steps; a stage split
@@ -464,6 +484,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     ],
     hoursLede,
     showNotes: settings.showScheduleNotes,
+    showTimes: !!settings.showScheduleTimes,
     grid,
     pages,
     total,

@@ -9,6 +9,8 @@
 // the selected page's editor. Hours are edited in a
 // sheet over the preview. The draft autosaves against the job number.
 
+import { readSource } from "@/components/reports/shared/JobImportInput";
+import { simproBase, simproRecordUrl } from "@/components/reports/shared/builder/JobStart";
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import styles from "../shared/ReportPage.module.css";
 import OptionsPanel from "./OptionsPanel";
@@ -106,6 +108,9 @@ const PAGE_ROWS = [
 ];
 /** Optional sections: an eye in the rail, off until switched on. */
 const OPTIONAL: ProjectSection[] = ["method", "plan", "warranty"];
+
+/** The SimPRO route for a loaded number ("Q11234" is a quote). */
+const base = (n: string) => simproBase(readSource(n).source, readSource(n).id);
 
 export default function ConditionReportPage({
   onBack,
@@ -219,7 +224,7 @@ export default function ConditionReportPage({
       setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
       const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
       return streamPhotoImport(
-        `/api/simpro/jobs/${jobNumber}/attachments?companyId=0${folderQuery}`,
+        `${base(jobNumber)}/attachments?companyId=0${folderQuery}`,
         (photoId) => `condition-reports/${jobNumber}/${photoId}.jpg`,
         {
           isStale,
@@ -242,6 +247,33 @@ export default function ConditionReportPage({
     [],
   );
 
+  // Drafts saved before times were kept have hours but no start or finish.
+  // Showing times fetches them and fills them in by schedule entry, leaving
+  // any hours edited here as they are.
+  const timesWanted =
+    !!report.settings.showScheduleTimes &&
+    !!loadedJobId &&
+    readSource(loadedJobId).source === "job" &&
+    report.schedule.some((r) => r.start == null);
+  useEffect(() => {
+    if (!timesWanted) return;
+    let live = true;
+    fetch(`/api/simpro/jobs/${loadedJobId}/schedule?companyId=0`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!live || !d?.rows) return;
+        const byId = new Map<string, ScheduleRow>((d.rows as ScheduleRow[]).map((x) => [x.id, x]));
+        setReport((prev) => ({
+          ...prev,
+          schedule: prev.schedule.map((r) => (r.start != null ? r : { ...r, start: byId.get(r.id)?.start ?? "", finish: byId.get(r.id)?.finish ?? "" })),
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [timesWanted, loadedJobId]);
+
   const fetchSchedule = useCallback(
     (jobNumber: string, costCenter: ScheduleCostCenter | null) => {
       const myGen = ++scheduleLoadId.current;
@@ -254,6 +286,8 @@ export default function ConditionReportPage({
           const scopeQuery = costCenter
             ? `&sectionId=${costCenter.sectionId}&costCentreId=${costCenter.id}`
             : "";
+          // Quotes have no timesheets: no hours to load.
+          if (readSource(jobNumber).source === "quote") throw new Error("quote");
           const res = await fetch(
             `/api/simpro/jobs/${jobNumber}/schedule?companyId=0${scopeQuery}`,
           );
@@ -321,9 +355,10 @@ export default function ConditionReportPage({
       // `jobNumber` — fire all three immediately rather than serially.
       // (.catch on folders/draft is just to avoid an unhandled-rejection
       // warning if we return early before ever awaiting them below.)
-      const jobPromise = fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`);
+      // A quote loads as "Q" + its number, which also keys its draft.
+      const jobPromise = fetch(simproRecordUrl(readSource(jobNumber).source, readSource(jobNumber).id));
       const foldersPromise = fetch(
-        `/api/simpro/jobs/${jobNumber}/attachments/folders?companyId=0`,
+        `${base(jobNumber)}/attachments/folders?companyId=0`,
       ).catch(() => null);
       const draftPromise = fetch(
         `/api/condition-reports/${jobNumber}`,
@@ -351,7 +386,7 @@ export default function ConditionReportPage({
       // on every import (a draft resumes with the quote as it is now) and in
       // the background — the report is usable without it.
       const loadScope = () =>
-        fetch(`/api/simpro/jobs/${jobNumber}/scope`)
+        fetch(`${base(jobNumber)}/scope`)
           .then((r) => (r.ok ? r.json() : null))
           .then((scope: ReportScope | null) => {
             if (scope && !isStale()) setReport((prev) => ({ ...prev, scope }));
@@ -418,6 +453,7 @@ export default function ConditionReportPage({
       // parallel purely to offer as a filter afterwards.
       (async () => {
         try {
+          if (readSource(jobNumber).source === "quote") return;
           const res = await fetch(
             `/api/simpro/jobs/${jobNumber}/schedule/cost-centers?companyId=0`,
           );
@@ -648,7 +684,7 @@ export default function ConditionReportPage({
       <BuilderHeader
         onBack={onBack}
         title="Job overview"
-        subtitle={loadedJobId ? `Job ${loadedJobId}` : undefined}
+        subtitle={loadedJobId ? `${readSource(loadedJobId).source === "quote" ? "Quote" : "Job"} ${readSource(loadedJobId).id}` : undefined}
         badges={[
           `${report.photos.length} photo${report.photos.length !== 1 ? "s" : ""}`,
           report.settings.showSchedule && filteredSchedule.length > 0 && `${model.totalHours.toFixed(2).replace(/\.00$/, "")} hours`,
@@ -679,12 +715,14 @@ export default function ConditionReportPage({
       {!loadedJobId ? (
         <JobStart
           title="New job overview"
-          sub="Enter the job number. The job's photos, hours and scope are loaded from SimPRO, and a saved draft carries on where it left off."
+          sub="Enter a job or quote number. Its photos, scope and (for a job) hours are loaded from SimPRO, and a saved draft carries on where it left off."
           loading={importStatus.phase === "fetching-job"}
           error={importStatus.phase === "error" ? importStatus.message : null}
-          onLoad={(n) => {
-            setLoadedJobId(n);
-            handleImport(n);
+          quotes
+          onLoad={(n, src) => {
+            const key = src === "quote" ? `Q${n}` : n;
+            setLoadedJobId(key);
+            handleImport(key);
           }}
         />
       ) : (
@@ -761,6 +799,7 @@ export default function ConditionReportPage({
           loading={scheduleLoading || scheduleStatus.phase === "loading"}
           showNotes={report.settings.showScheduleNotes}
           sectioned={report.settings.scheduleSections}
+          showTimes={!!report.settings.showScheduleTimes}
           onChange={updateSchedule}
           onClose={() => setHoursOpen(false)}
         />
@@ -769,11 +808,12 @@ export default function ConditionReportPage({
       {/* Save Report Modal */}
       {showSaveModal && (
         <SaveReportModal
-          owner={{ kind: "Job", no: `#${loadedJobId}` }}
+          owner={{ kind: readSource(loadedJobId).source === "quote" ? "Quote" : "Job", no: `#${readSource(loadedJobId).id}` }}
           siteId={report.job.siteId}
           defaultFilename={`Job Overview - ${new Date().getFullYear()}`}
           save={async (filename, d) =>
-            postSave(`/api/simpro/jobs/${loadedJobId}/save-report`, {
+            postSave(`/api/simpro/jobs/${readSource(loadedJobId).id}/save-report`, {
+              owner: readSource(loadedJobId).source,
               filename,
               companyId: 0,
               jobId: loadedJobId,

@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildHoursPrintHTML } from "@/lib/reports/hours.print";
-import {
-  loadReportAssets,
-  renderPDF,
-  pdfDownloadResponse,
-} from "@/lib/server/pdf-utils";
+import { buildHoursPDF } from "@/lib/server/hoursPdf";
+import { pdfDownloadResponse } from "@/lib/server/pdf-utils";
 import type { HoursBreakdownData } from "@/lib/reports/hours.types";
 
 export async function POST(request: NextRequest) {
@@ -26,8 +22,7 @@ export async function POST(request: NextRequest) {
     );
 
   try {
-    const html = buildHoursPrintHTML(report, loadReportAssets());
-    const buffer = await renderPDF(html);
+    const buffer = await buildHoursPDF(report);
     return pdfDownloadResponse(buffer, filename);
   } catch (err) {
     console.error("[ExportHoursPDF]", err);

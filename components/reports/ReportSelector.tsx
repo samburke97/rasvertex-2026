@@ -65,7 +65,7 @@ const REPORT_TYPES: ReportType[] = [
     id: "job-overview",
     label: "Job overview",
     description:
-      "The job's photos, hours schedule and summary in one report, with a cover page.",
+      "A job's or quote's photos, scope and hours in one report, with a cover page.",
     available: true,
     category: "inspection",
     icon: (
@@ -91,7 +91,7 @@ const REPORT_TYPES: ReportType[] = [
     id: "inspection",
     label: "Inspection report",
     description:
-      "Building or roof inspection report generated from the job's coded photo labels (e.g. D10 L2 SH).",
+      "Building or roof inspection report, from a job's or quote's coded photo labels (e.g. D10 L2 SH).",
     available: true,
     category: "inspection",
     icon: (
@@ -116,7 +116,7 @@ const REPORT_TYPES: ReportType[] = [
     id: "anchor-inspection",
     label: "Anchor inspection",
     description:
-      "Roof access & fall prevention systems inspection with aerial map zones and asset register.",
+      "Roof access & fall prevention systems inspection with aerial map zones and asset register, from a job or quote.",
     available: true,
     category: "inspection",
     icon: (

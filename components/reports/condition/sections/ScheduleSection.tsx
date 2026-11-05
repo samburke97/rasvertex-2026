@@ -6,6 +6,7 @@ import styles from "./ScheduleSection.module.css";
 import type { ScheduleRow } from "@/lib/reports/condition.types";
 import { formatScheduleDate } from "@/lib/reports/condition.types";
 import { ASSOCIATIONS } from "@/lib/reports/constants";
+import { normTime } from "@/lib/reports/hours.layout";
 
 interface ScheduleSectionProps {
   rows: ScheduleRow[];
@@ -18,6 +19,18 @@ interface ScheduleSectionProps {
   showNotes?: boolean;
   /** Break the table into named sections (per-row toggle) with per-section subtotals. */
   sectioned?: boolean;
+  /** Start and finish time columns. */
+  showTimes?: boolean;
+  /** Just the table: no "Schedule" title bar or heading (Hours breakdown). */
+  plain?: boolean;
+}
+
+/** "07:00" → "7:00 am"; blank stays blank. */
+function clock(t: string | undefined): string {
+  const m = /^(\d{1,2}):(\d{2})/.exec(t ?? "");
+  if (!m) return "";
+  const h = +m[1];
+  return `${h % 12 || 12}:${m[2]} ${h < 12 ? "am" : "pm"}`;
 }
 
 // Pagination of the on-screen table (the report itself paginates in
@@ -252,6 +265,7 @@ function ScheduleTable({
   showTotals,
   showNotes,
   sectioned,
+  showTimes,
   totalHours,
   onUpdate,
   onDelete,
@@ -263,6 +277,7 @@ function ScheduleTable({
   showTotals: boolean;
   showNotes: boolean;
   sectioned: boolean;
+  showTimes: boolean;
   totalHours: number;
   onUpdate: (id: string, patch: Partial<ScheduleRow>) => void;
   onDelete: (id: string) => void;
@@ -270,15 +285,21 @@ function ScheduleTable({
   onToggleSection: (id: string, current: string | undefined) => void;
   onRenameSection: (id: string, title: string) => void;
 }) {
-  const colCount = showNotes ? 5 : 4;
+  const colCount = (showNotes ? 5 : 4) + (showTimes ? 2 : 0);
   const actionThClass = sectioned ? styles.thActionWide : styles.thAction;
   const actionTdClass = sectioned ? styles.tdActionWide : styles.tdAction;
   // Without a Notes column to soak up the remaining width, Date/Employee/Hours
   // get wider shares so Hours doesn't get stranded far from Employee.
-  const thEvenClass = showNotes ? styles.thEven : styles.thEvenWide;
-  const tdEvenClass = showNotes ? styles.tdEven : styles.tdEvenWide;
-  const thNumClass = showNotes ? styles.thNum : styles.thNumWide;
-  const tdNumClass = showNotes ? styles.tdNum : styles.tdNumWide;
+  const thEvenClass = showNotes ? styles.thEven : showTimes ? styles.thMid : styles.thEvenWide;
+  const tdEvenClass = showNotes ? styles.tdEven : showTimes ? styles.tdMid : styles.tdEvenWide;
+  const thNumClass = showNotes || showTimes ? styles.thNum : styles.thNumWide;
+  const tdNumClass = showNotes || showTimes ? styles.tdNum : styles.tdNumWide;
+  const timeGap = showTimes && (
+    <>
+      <td className={styles.td} />
+      <td className={styles.td} />
+    </>
+  );
 
   // Rows that currently start a section — including the synthetic leading
   // one, which can only be renamed (not removed) while it's implicit.
@@ -295,7 +316,13 @@ function ScheduleTable({
         <thead>
           <tr>
             <th className={thEvenClass}>Date</th>
-            <th className={thEvenClass}>Employee</th>
+            <th className={thEvenClass}>Team member</th>
+            {showTimes && (
+              <>
+                <th className={styles.thTime}>Start</th>
+                <th className={styles.thTime}>Finish</th>
+              </>
+            )}
             <th className={thNumClass}>Hours</th>
             {showNotes && <th className={styles.thNote}>Notes</th>}
             <th className={actionThClass} />
@@ -330,6 +357,7 @@ function ScheduleTable({
                     {(item.title || "Section") + " subtotal"}
                   </td>
                   <td className={styles.td} />
+                  {timeGap}
                   <td className={styles.totalsCell}>
                     {item.hours > 0 ? item.hours.toFixed(2) : "—"}
                   </td>
@@ -358,6 +386,16 @@ function ScheduleTable({
                     onChange={(v) => onUpdate(row.id, { employeeName: v })}
                   />
                 </td>
+                {showTimes &&
+                  (["start", "finish"] as const).map((k) => (
+                    <td key={k} className={styles.tdTime}>
+                      <EditableCell
+                        value={row[k] ?? ""}
+                        displayValue={clock(row[k]) || "—"}
+                        onChange={(v) => onUpdate(row.id, { [k]: normTime(v) })}
+                      />
+                    </td>
+                  ))}
                 <td className={tdNumClass}>
                   <EditableCell
                     value={row.actualHours}
@@ -442,6 +480,7 @@ function ScheduleTable({
             <tr className={styles.totalsRow}>
               <td className={styles.totalsLabel}>Total</td>
               <td className={styles.td} />
+              {timeGap}
               <td className={styles.totalsCell}>
                 {totalHours > 0 ? totalHours.toFixed(2) : "—"}
               </td>
@@ -477,6 +516,8 @@ export default function ScheduleSection({
   heading,
   showNotes = false,
   sectioned = false,
+  showTimes = false,
+  plain = false,
 }: ScheduleSectionProps) {
   const updateRow = useCallback(
     (id: string, patch: Partial<ScheduleRow>) => {
@@ -526,7 +567,7 @@ export default function ScheduleSection({
   if (isLoading) {
     return (
       <div className={styles.page}>
-        <div className={styles.topBar}>
+        <div className={styles.topBar} hidden={plain}>
           <h1 className={styles.title}>Schedule</h1>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -571,7 +612,7 @@ export default function ScheduleSection({
 
         return (
           <div key={pageIdx} className={styles.page}>
-            {isFirst && (
+            {isFirst && !plain && (
               <div className={styles.topBar}>
                 <h1 className={styles.title}>Schedule</h1>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -584,7 +625,7 @@ export default function ScheduleSection({
             )}
 
             <div className={styles.body}>
-              {isFirst && (
+              {isFirst && !plain && (
                 <div className={styles.heading}>
                   <div className={styles.headingTitle}>
                     {heading ?? "Hours Schedule"}
@@ -599,6 +640,7 @@ export default function ScheduleSection({
                 showTotals={isLast}
                 showNotes={showNotes}
                 sectioned={sectioned}
+                showTimes={showTimes}
                 totalHours={totalHours}
                 onUpdate={updateRow}
                 onDelete={deleteRow}

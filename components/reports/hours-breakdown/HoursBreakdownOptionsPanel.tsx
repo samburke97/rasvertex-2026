@@ -91,6 +91,18 @@ export default function HoursBreakdownOptionsPanel({
         <JobImportInput onImport={onImport} importStatus={importStatus} />
       </div>
 
+      {/* ── Table ── */}
+      <div className={styles.group}>
+        <div className={styles.groupLabel}>Table</div>
+        <ToggleRow
+          label="Show start and finish times"
+          sub="When each person started and finished, from SimPRO"
+          checked={!!settings.showTimes}
+          onChange={(v) => set({ showTimes: v })}
+        />
+        <p className={styles.filterCount}>Click any date, name, time or hours on the page to change it.</p>
+      </div>
+
       {/* ── Date filter ── */}
       <div className={styles.group}>
         <div className={styles.groupLabel}>Date filter</div>

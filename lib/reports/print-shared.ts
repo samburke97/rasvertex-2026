@@ -1,7 +1,7 @@
 // lib/reports/print-shared.ts
 //
 // Common building blocks shared by every *.print.ts HTML/PDF builder
-// (hours.print.ts). All three render
+//. All three render
 // via the same Puppeteer pipeline (lib/server/pdf-utils.ts) and share a lot
 // of the same visual language — this is the single source of truth for the
 // parts that are genuinely identical across them (brand colour, fonts, the
@@ -121,7 +121,7 @@ function esc(str: string | number | null | undefined): string {
  * The RAS Vertex / association-partner logo row shown in every page footer.
  * Pass `className` if the caller styles each logo via a class selector
  * (anchor.print.ts's `.assoc-logo`) rather than a `.footer img` descendant
- * selector (condition.print.ts / hours.print.ts).
+ * selector (condition.print.ts).
  */
 export function buildAssocLogosHTML(
   assets: ReportAssets,

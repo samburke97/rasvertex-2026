@@ -13,6 +13,8 @@ export interface HoursBreakdownSettings {
   filterByDate: boolean;
   dateFrom: string | null;
   dateTo: string | null;
+  /** Start and finish time columns. */
+  showTimes?: boolean;
 }
 
 export interface HoursBreakdownData {

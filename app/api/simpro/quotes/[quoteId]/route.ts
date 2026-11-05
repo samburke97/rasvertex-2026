@@ -5,10 +5,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { fetchEnrichedQuote } from "@/lib/simpro/client";
+import { fetchEnrichedQuote, fetchQuoteAsJob } from "@/lib/simpro/client";
 
+// ?as=job returns the EnrichedJob shape, for the report builders that load
+// either a job or a quote.
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> },
 ) {
   const { quoteId } = await params;
@@ -19,7 +21,8 @@ export async function GET(
   }
 
   try {
-    const quote = await fetchEnrichedQuote(parsed);
+    const quote =
+      request.nextUrl.searchParams.get("as") === "job" ? await fetchQuoteAsJob(parsed) : await fetchEnrichedQuote(parsed);
     return NextResponse.json(quote);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

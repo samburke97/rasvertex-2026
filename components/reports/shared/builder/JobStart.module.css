@@ -14,3 +14,8 @@
 .go:hover:not(:disabled) { background: var(--btn-primary-hover); }
 .go:disabled { opacity: 0.45; cursor: not-allowed; }
 .error { font-size: 13px; line-height: 1.45; color: var(--red); background: var(--red-tint); border-radius: 10px; padding: 10px 12px; }
+
+/* Job / Quote switch */
+.source { display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(var(--ink-rgb), 0.045); margin-top: 4px; }
+.source button { height: 32px; padding: 0 16px; border: 0; border-radius: 8px; background: transparent; font: inherit; font-size: 13px; font-weight: 500; color: rgba(var(--ink-rgb), 0.62); cursor: pointer; }
+.source button.sourceOn { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }

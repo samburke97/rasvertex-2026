@@ -568,6 +568,23 @@ export async function fetchJobScope(jobId: number, companyId = 0): Promise<JobSc
   return { quoteId: null, description: jobDescription, items: [] };
 }
 
+/** A quote's own scope: its description and line items. */
+export async function fetchQuoteScope(quoteId: number, companyId = 0): Promise<JobScope> {
+  const quote = await fetchRawQuote(quoteId, companyId);
+  const pricing = await fetchQuotePricingItems(quoteId, companyId).catch(() => [] as QuotePricingItem[]);
+  const seen = new Set<string>();
+  const items = pricing
+    .map((p) => ({ group: p.groupLabel, label: p.label }))
+    .filter((i) => {
+      const k = `${i.group}|${i.label}`;
+      if (seen.has(k) || !i.label) return false;
+      seen.add(k);
+      return true;
+    });
+  const description = typeof quote.Description === "string" ? quote.Description.trim() : "";
+  return { quoteId: String(quoteId), description, items };
+}
+
 // ── Technician notes ──────────────────────────────────────────────────────────
 // Notes the team types into the job on the mobile app. SimPRO keeps them on
 // the job's timeline as "Work Order Technician Notes" entries (HTML).
@@ -578,12 +595,31 @@ export interface TechnicianNote {
   html: string;
 }
 
-export async function fetchTechnicianNotes(jobId: number, companyId = 0): Promise<TechnicianNote[]> {
+export async function fetchTechnicianNotes(jobId: number, companyId = 0, owner: "jobs" | "quotes" = "jobs"): Promise<TechnicianNote[]> {
   const timeline = await simproGet<{ Type?: string; Message?: string; Staff?: { Name?: string } | null; Date?: string }[]>(
-    `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${jobId}/timelines/`,
+    `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/${owner}/${jobId}/timelines/`,
   );
   return timeline
     .filter((t) => /technician note/i.test(t.Type ?? "") && t.Message?.trim())
     .map((t) => ({ staff: t.Staff?.Name ?? "", date: t.Date ?? "", html: t.Message! }))
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** A quote in the shape the report builders load a job in, so building,
+ *  roof and anchor reports can be made from a quote (e.g. a pre-works
+ *  inspection). The reference is the quote number. */
+export async function fetchQuoteAsJob(quoteId: number, companyId = 0): Promise<EnrichedJob> {
+  const q = await fetchEnrichedQuote(quoteId, companyId);
+  return {
+    id: q.id,
+    jobNo: `#${quoteId}`,
+    name: q.name,
+    clientName: q.clientName,
+    siteId: q.siteId,
+    siteName: q.siteName,
+    siteAddress: q.siteAddress,
+    preparedFor: q.contactName || q.clientName,
+    date: q.date,
+    totalIncGst: q.totalIncGst,
+  };
 }

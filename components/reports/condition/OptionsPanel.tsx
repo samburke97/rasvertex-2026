@@ -184,7 +184,7 @@ export default function OptionsPanel({
       {/* ── Import ───────────────────────────────────────────────────────── */}
       <div className={styles.group} data-pages="cover">
         <div className={styles.groupLabel}>Import</div>
-        <JobImportInput onImport={onImport} importStatus={importStatus} />
+        <JobImportInput quotes onImport={onImport} importStatus={importStatus} />
         {importStatus.phase === "fetching-photos" && progressPct !== null && (
           <div className={styles.progressWrap}>
             <div
@@ -437,6 +437,13 @@ export default function OptionsPanel({
               sub="Reference a photo or note where hours were worked"
               checked={settings.showScheduleNotes}
               onChange={(v) => set({ showScheduleNotes: v })}
+            />
+
+            <ToggleRow
+              label="Show start and finish times"
+              sub="When each person started and finished, from SimPRO"
+              checked={!!settings.showScheduleTimes}
+              onChange={(v) => set({ showScheduleTimes: v })}
             />
 
             <ToggleRow

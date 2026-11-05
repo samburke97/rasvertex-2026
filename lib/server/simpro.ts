@@ -240,13 +240,17 @@ export async function saveReportToDestinations(
   filename: string,
   pdfBuffer: Buffer,
   logPrefix: string,
+  /** Reports made from a quote attach to the quote ("job" is its id). */
+  owner: "job" | "quote" = "job",
 ): Promise<SaveDestinationsResult> {
   const jobPromise = destinations.job
-    ? saveJobAttachment(companyId, jobId, filename, pdfBuffer)
+    ? (owner === "quote"
+        ? saveQuoteAttachment(companyId, jobId, filename, pdfBuffer)
+        : saveJobAttachment(companyId, jobId, filename, pdfBuffer))
         .then((): SaveDestinationResult => ({ success: true }))
         .catch((err): SaveDestinationResult => {
           console.error(`${logPrefix} Job upload failed:`, err);
-          return { success: false, error: "Failed to upload PDF to job." };
+          return { success: false, error: `Failed to upload PDF to ${owner}.` };
         })
     : Promise.resolve(undefined);
 

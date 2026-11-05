@@ -70,6 +70,11 @@ import {
   type InspectionReportData,
 } from "@/lib/reports/inspection/types";
 import type { EnrichedJob } from "@/lib/simpro/types";
+import { simproBase, simproRecordUrl, type SimproSource } from "@/components/reports/shared/builder/JobStart";
+
+/** Where a report's drafts and photos are kept: the job number, or Q + the
+ *  quote number, so a quote and a job with the same number don't collide. */
+const ownerKey = (source: SimproSource | undefined, id: string) => (source === "quote" ? `Q${id}` : id);
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
 import Slider from "@/components/ui/Slider";
 import CropModal from "@/components/reports/shared/builder/CropModal";
@@ -165,7 +170,7 @@ export default function InspectionReportPage({ onBack }: Props) {
   // ── Photo import ──────────────────────────────────────────────────────────
   // Replaces the draft's SimPRO photos with the job's current attachments,
   // keeping photos uploaded in the builder and any label already fixed.
-  const importPhotos = useCallback((jobId: string, folder: string, keepLabels: Map<string, Kept>) => {
+  const importPhotos = useCallback((jobId: string, folder: string, keepLabels: Map<string, Kept>, source?: SimproSource) => {
     const gen = ++importGen.current;
     setImporting(true);
     setImportError(null);
@@ -176,8 +181,8 @@ export default function InspectionReportPage({ onBack }: Props) {
       if (importGen.current === gen) setImporting(false);
     };
     streamPhotoImport(
-      `/api/simpro/jobs/${jobId}/attachments?companyId=0${folderQ}`,
-      (photoId) => `inspection-reports/${jobId}/${photoId}.jpg`,
+      `${simproBase(source, jobId)}/attachments?companyId=0${folderQ}`,
+      (photoId) => `inspection-reports/${ownerKey(source, jobId)}/${photoId}.jpg`,
       {
         isStale: () => importGen.current !== gen,
         onPhoto: (photo) =>
@@ -222,26 +227,27 @@ export default function InspectionReportPage({ onBack }: Props) {
         .map((p) => [p.id, { label: p.label, title: p.title, desc: p.desc, pos: p.pos, off: p.off, order: p.order }]),
     );
     if (folder != null) update((p) => ({ ...p, folder: f }));
-    importPhotos(r.jobId, f, keep);
+    importPhotos(r.jobId, f, keep, r.source);
   };
 
   // ── Load (or resume) a job ────────────────────────────────────────────────
-  const loadJob = useCallback(async (input: string) => {
+  const loadJob = useCallback(async (input: string, source: SimproSource = "job") => {
     const jobId = input.trim().replace(/^#/, "");
+    const what = source === "quote" ? "quote" : "job";
     if (!jobId || loading) return;
     setLoading(true);
     setLoadError(null);
     const safe = (url: string) => fetch(url).catch(() => null);
     const [jRes, dRes, fRes, tRes] = await Promise.all([
-      safe(`/api/simpro/jobs/${jobId}`),
-      safe(`/api/inspection-reports/${draftKeyFor(settings, jobId, pick.report, pick.type)}`),
-      safe(`/api/simpro/jobs/${jobId}/attachments/folders?companyId=0`),
-      safe(`/api/simpro/jobs/${jobId}/technician-notes`),
+      safe(simproRecordUrl(source, jobId)),
+      safe(`/api/inspection-reports/${draftKeyFor(settings, ownerKey(source, jobId), pick.report, pick.type)}`),
+      safe(`${simproBase(source, jobId)}/attachments/folders?companyId=0`),
+      safe(`${simproBase(source, jobId)}/technician-notes`),
     ]);
     try {
       if (!jRes?.ok) {
         const data = await jRes?.json().catch(() => ({}));
-        throw new Error(data?.error ?? `Couldn't find job ${jobId} in SimPRO.`);
+        throw new Error(data?.error ?? `Couldn't find ${what} ${jobId} in SimPRO.`);
       }
       const job: EnrichedJob = await jRes.json();
       const draftJson = dRes?.ok ? await dRes.json().catch(() => null) : null;
@@ -261,6 +267,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       } else {
         next = createInspectionReport(jobId, job, settings, pick.report, pick.type);
       }
+      if (source === "quote") next = { ...next, source: "quote" };
       // The technicians' notes from SimPRO fill an empty comments box.
       const techNotes = tRes?.ok ? formatTechNotes((await tRes.json().catch(() => ({}))).notes ?? []) : "";
       if (techNotes && notesIsEmpty(next.job.technicianNotes ?? "")) next = { ...next, job: { ...next.job, technicianNotes: techNotes } };
@@ -271,7 +278,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       setSaveStatus("idle");
       setExp({ phase: "idle" });
       setR(next);
-      if (!next.photos.some((p) => !p.uploaded)) importPhotos(jobId, next.folder, new Map());
+      if (!next.photos.some((p) => !p.uploaded)) importPhotos(jobId, next.folder, new Map(), next.source);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load job");
     } finally {
@@ -281,7 +288,7 @@ export default function InspectionReportPage({ onBack }: Props) {
 
   // ── Autosave (never mid-import: photos sit on data: URLs until uploaded) ──
   const { status: saveStatus, setStatus: setSaveStatus } = useDraftAutosave(
-    r ? `/api/inspection-reports/${draftKeyFor(settingsOf(r), r.jobId, r.kind ?? "building", r.type)}` : null,
+    r ? `/api/inspection-reports/${draftKeyFor(settingsOf(r), ownerKey(r.source, r.jobId), r.kind ?? "building", r.type)}` : null,
     r,
     { ready: !importing && !uploading },
   );
@@ -383,7 +390,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     try {
       const url = await uploadReportPhoto(
         await compressMapImageDataUrl(dataUrl),
-        `inspection-reports/${r.jobId}/${which}_${Date.now()}.jpg`,
+        `inspection-reports/${ownerKey(r.source, r.jobId)}/${which}_${Date.now()}.jpg`,
       );
       setChoice(which, { source, url, ...(view ?? {}) });
       setPicker(null);
@@ -450,7 +457,7 @@ export default function InspectionReportPage({ onBack }: Props) {
           // The trailing number keeps upload order (see uploadOrd in generate.ts).
           const id = `upload_${stamp}${String(n).padStart(3, "0")}`;
           const dataUrl = await compressImageDataUrl(await readBlobAsDataUrl(file));
-          const url = await uploadReportPhoto(dataUrl, `inspection-reports/${jobId}/${id}.jpg`);
+          const url = await uploadReportPhoto(dataUrl, `inspection-reports/${ownerKey(r.source, jobId)}/${id}.jpg`);
           const photo: InspectionPhoto = { id, name: file.name, url, uploaded: true };
           setR((prev) => (prev ? { ...prev, photos: [...prev.photos, photo] } : prev));
           setUploading({ done: ++done, total: files.length });
@@ -591,7 +598,7 @@ export default function InspectionReportPage({ onBack }: Props) {
         throw new Error(data.error ?? "Export failed");
       }
       const filename =
-        decodeURIComponent(res.headers.get("X-Filename") ?? "") || `Inspection Report J${r.jobId}.pdf`;
+        decodeURIComponent(res.headers.get("X-Filename") ?? "") || `Inspection Report ${r.source === "quote" ? "Q" : "J"}${r.jobId}.pdf`;
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = url;
@@ -615,7 +622,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       <BuilderHeader
         onBack={onBack}
         title={r ? `${r.job.site} · ${lib.label}` : "New inspection report"}
-        subtitle={r ? `Job ${r.jobId} · ${r.job.forName}` : "Not started"}
+        subtitle={r ? `${r.source === "quote" ? "Quote" : "Job"} ${r.jobId} · ${r.job.forName}` : "Not started"}
         status={r ? (importing ? { text: "Loading photos…", busy: true } : saveStatus) : undefined}
       >
         {r && (
@@ -635,14 +642,15 @@ export default function InspectionReportPage({ onBack }: Props) {
           title="New inspection report"
           sub={
             <>
-              Enter the job number. The report is generated from the job&rsquo;s photo labels, e.g.{" "}
+              Enter a job or quote number. The report is generated from its photo labels, e.g.{" "}
               <code>D10 L2 SH LF - awning screws backing out</code>.
             </>
           }
           action="Generate"
           loading={loading}
           error={loadError}
-          onLoad={(n) => loadJob(n)}
+          quotes
+          onLoad={(n, src) => loadJob(n, src)}
         >
             <div className={styles.kinds} role="radiogroup" aria-label="Report type">
               {leaves(settings).map((l) => {
@@ -1060,7 +1068,7 @@ export default function InspectionReportPage({ onBack }: Props) {
                 <DocEditor value={r.job.technicianNotes ?? ""} onChange={(technicianNotes) => setJob({ technicianNotes })} />
               </div>
               <PullTechNotes
-                jobId={r.jobId}
+                base={simproBase(r.source, r.jobId)}
                 hasText={!notesIsEmpty(r.job.technicianNotes ?? "")}
                 onPull={(technicianNotes) => setJob({ technicianNotes })}
               />
@@ -1147,9 +1155,9 @@ export default function InspectionReportPage({ onBack }: Props) {
 
       {saving && r && (
         <SaveReportModal
-          owner={{ kind: "Job", no: `#${r.jobId}` }}
+          owner={{ kind: r.source === "quote" ? "Quote" : "Job", no: `#${r.jobId}` }}
           siteId={r.job.siteId}
-          defaultFilename={`${lib.label} Report - ${r.job.site || "Building"} - J${r.jobId}`}
+          defaultFilename={`${lib.label} Report - ${r.job.site || "Building"} - ${r.source === "quote" ? "Q" : "J"}${r.jobId}`}
           save={async (filename, d) => {
             const res = await fetch("/api/reports/export-inspection-pdf", {
               method: "POST",
@@ -1423,13 +1431,13 @@ function PlanEditor({
 
 /** Fetches the job's technician notes from SimPRO into the comments box.
  *  Over existing text it asks first: one click arms it, the next replaces. */
-function PullTechNotes({ jobId, hasText, onPull }: { jobId: string; hasText: boolean; onPull: (html: string) => void }) {
+function PullTechNotes({ base, hasText, onPull }: { base: string; hasText: boolean; onPull: (html: string) => void }) {
   const [state, setState] = useState<"idle" | "confirm" | "loading" | "none" | "error">("idle");
   const pull = async () => {
     if (hasText && state !== "confirm") return setState("confirm");
     setState("loading");
     try {
-      const res = await fetch(`/api/simpro/jobs/${jobId}/technician-notes`);
+      const res = await fetch(`${base}/technician-notes`);
       if (!res.ok) throw new Error();
       const html = formatTechNotes((await res.json()).notes ?? []);
       if (!html) return setState("none");

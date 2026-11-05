@@ -25,6 +25,9 @@ import {
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
 import { useReportSettings } from "@/lib/reports/settings/useReportSettings";
+import { defaultSettings } from "@/lib/reports/settings/defaults";
+import { readSource } from "@/components/reports/shared/JobImportInput";
+import { simproBase, simproRecordUrl } from "@/components/reports/shared/builder/JobStart";
 import AnchorDocument, {
   AnchorStyles,
   type AnchorAssets,
@@ -126,6 +129,18 @@ export default function AnchorInspectionPage({
     phase: "idle",
   });
   const [loadedJobId, setLoadedJobId] = useState<string>("");
+
+  // Anchor types added in Reports › Settings reach reports already open or
+  // resumed. Types the report already has keep the wording it started with,
+  // so a renamed or re-rated type never changes a report already sent.
+  useEffect(() => {
+    if (!loadedJobId) return;
+    setReport((prev) => {
+      const have = prev.anchorTypes ?? defaultSettings().anchors;
+      const added = settings.anchors.filter((a) => !have.some((h) => h.key === a.key));
+      return added.length ? { ...prev, anchorTypes: [...have, ...added] } : prev;
+    });
+  }, [settings, loadedJobId]);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [savedFilename, setSavedFilename] = useState<string | null>(null);
   const currentLoadId = useRef(0);
@@ -289,7 +304,8 @@ export default function AnchorInspectionPage({
         // parallel — typing the same job number a tech already started is
         // the entire "resume" UX, no extra list/search UI needed.
         const [jobRes, draftRes] = await Promise.all([
-          fetch(`/api/simpro/jobs/${jobNumber}?companyId=0`),
+          // A quote loads as "Q" + its number, which also keys its draft.
+          fetch(simproRecordUrl(readSource(jobNumber).source, readSource(jobNumber).id)),
           fetch(`/api/anchor-inspection-reports/${jobNumber}`),
         ]);
         if (isStale()) return;
@@ -513,7 +529,7 @@ export default function AnchorInspectionPage({
       setPhotoImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
       const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
       return streamPhotoImport(
-        `/api/simpro/jobs/${jobNumber}/attachments?companyId=0${folderQuery}`,
+        `${simproBase(readSource(jobNumber).source, readSource(jobNumber).id)}/attachments?companyId=0${folderQuery}`,
         (photoId) => `anchor-reports/${jobNumber}/${photoId}.jpg`,
         {
           isStale,
@@ -577,7 +593,7 @@ export default function AnchorInspectionPage({
     }
     try {
       const res = await fetch(
-        `/api/simpro/jobs/${loadedJobId}/attachments/folders?companyId=0`,
+        `${simproBase(readSource(loadedJobId).source, readSource(loadedJobId).id)}/attachments/folders?companyId=0`,
       );
       const data = res.ok ? await res.json() : {};
       const folders: PhotoFolder[] = data.folders ?? [];
@@ -736,7 +752,7 @@ export default function AnchorInspectionPage({
       <BuilderHeader
         onBack={onBack}
         title="Anchor inspection"
-        subtitle={loadedJobId ? `Job ${loadedJobId}` : undefined}
+        subtitle={loadedJobId ? `${readSource(loadedJobId).source === "quote" ? "Quote" : "Job"} ${readSource(loadedJobId).id}` : undefined}
         badges={[
           `${report.zones.length} zone${report.zones.length !== 1 ? "s" : ""}`,
           totalAnchors > 0 && `${totalAnchors} anchor${totalAnchors !== 1 ? "s" : ""}`,
@@ -816,11 +832,12 @@ export default function AnchorInspectionPage({
       {/* Save Report Modal */}
       {showSaveModal && (
         <SaveReportModal
-          owner={{ kind: "Job", no: `#${loadedJobId}` }}
+          owner={{ kind: readSource(loadedJobId).source === "quote" ? "Quote" : "Job", no: `#${readSource(loadedJobId).id}` }}
           siteId={report.job.siteId}
           defaultFilename={`Anchor Inspection Report - ${new Date().getFullYear()}`}
           save={async (filename, d) =>
-            postSave(`/api/simpro/jobs/${loadedJobId}/save-anchor-report`, {
+            postSave(`/api/simpro/jobs/${readSource(loadedJobId).id}/save-anchor-report`, {
+              owner: readSource(loadedJobId).source,
               filename,
               companyId: 0,
               siteId: report.job.siteId,

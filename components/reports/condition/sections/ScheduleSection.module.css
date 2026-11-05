@@ -521,3 +521,23 @@
   display: block;
   opacity: 0.85;
 }
+
+/* Start / Finish columns (Hours breakdown, Job overview "Edit hours"). */
+.thTime {
+  composes: th;
+  width: 11%;
+}
+.tdTime {
+  composes: td;
+  width: 11%;
+  font-variant-numeric: tabular-nums;
+}
+/* Date and Employee alongside the time columns, without Notes. */
+.thMid {
+  composes: th;
+  width: 27%;
+}
+.tdMid {
+  composes: td;
+  width: 27%;
+}

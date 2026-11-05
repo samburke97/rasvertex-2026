@@ -15,11 +15,12 @@ interface Props {
   loading: boolean;
   showNotes: boolean;
   sectioned: boolean;
+  showTimes?: boolean;
   onChange: (rows: ScheduleRow[]) => void;
   onClose: () => void;
 }
 
-export default function HoursEditor({ rows, loading, showNotes, sectioned, onChange, onClose }: Props) {
+export default function HoursEditor({ rows, loading, showNotes, sectioned, showTimes, onChange, onClose }: Props) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", key);
@@ -43,7 +44,7 @@ export default function HoursEditor({ rows, loading, showNotes, sectioned, onCha
           </button>
         </div>
         <div className={styles.body}>
-          <ScheduleSection rows={rows} isLoading={loading} onChange={onChange} heading="Hours" showNotes={showNotes} sectioned={sectioned} />
+          <ScheduleSection rows={rows} isLoading={loading} onChange={onChange} heading="Hours" showNotes={showNotes} sectioned={sectioned} showTimes={showTimes} />
         </div>
       </div>
     </div>

@@ -33,6 +33,8 @@ interface SimproScheduleEntry {
   Staff?: { ID: number; Name: string; Type?: string; TypeId?: number };
   Date?: string;
   Notes?: string;
+  /** The times worked: "07:00" to "15:30", one block per stretch. */
+  Blocks?: { Hrs?: number; StartTime?: string; EndTime?: string }[];
 }
 
 async function simproFetch<T>(url: string): Promise<T> {
@@ -147,7 +149,7 @@ export async function GET(
       pairs.map(async ({ sectionId, costCentreId }) => {
         try {
           const schedules = await simproFetch<SimproScheduleEntry[]>(
-            `${base}/sections/${sectionId}/costCenters/${costCentreId}/schedules/?pageSize=250`,
+            `${base}/sections/${sectionId}/costCenters/${costCentreId}/schedules/?pageSize=250&columns=ID,TotalHours,Staff,Date,Notes,Blocks`,
           );
           return schedules;
         } catch (err) {
@@ -177,6 +179,9 @@ export async function GET(
         scheduledHours: Number(e.TotalHours ?? 0),
         actualHours: Number(e.TotalHours ?? 0),
         note: e.Notes ?? "",
+        // Earliest start and latest finish across the entry's blocks.
+        start: (e.Blocks ?? []).map((b) => b.StartTime ?? "").filter(Boolean).sort()[0] ?? "",
+        finish: (e.Blocks ?? []).map((b) => b.EndTime ?? "").filter(Boolean).sort().pop() ?? "",
       }));
 
     // ── Date filtering ────────────────────────────────────────────────────────

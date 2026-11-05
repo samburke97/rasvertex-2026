@@ -22,6 +22,9 @@ export interface ScheduleRow {
   scheduledHours: number;
   actualHours: number;
   note: string;
+  /** "07:00" / "15:30" from SimPRO (24-hour). Absent on older drafts. */
+  start?: string;
+  finish?: string;
   /** When set, this row begins a new named section (see ReportSettings.scheduleSections). */
   sectionTitle?: string;
 }
@@ -72,6 +75,8 @@ export interface ReportSettings {
   showSchedule: boolean;
   scheduleLoaded: boolean;
   showScheduleNotes: boolean;
+  /** Start and finish time columns in the hours schedule. Older drafts: off. */
+  showScheduleTimes?: boolean;
   /** Break the schedule table into named sections with per-section subtotals. */
   scheduleSections: boolean;
   /** Comments/Recommendations summary page — on by default, optional per report. */
