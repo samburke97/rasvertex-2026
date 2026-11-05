@@ -400,6 +400,26 @@ export function buildLegendGroups(
   return groups;
 }
 
+/** The report with one Report details field changed. Pins copy the report's
+ *  dates when placed, so anchors still on the old report date (or blank)
+ *  follow a date change; ones edited by hand keep theirs. */
+export function withJobField(
+  r: AnchorReportData,
+  field: keyof AnchorReportJob,
+  value: string | null,
+): AnchorReportData {
+  const job = { ...r.job, [field]: value };
+  const key =
+    field === "inspectionDate" ? "inspectionDate" : field === "nextInspectionDate" ? "nextInspection" : null;
+  if (!key) return { ...r, job };
+  const old = r.job[field] ?? "";
+  const zones = r.zones.map((z) => ({
+    ...z,
+    anchors: z.anchors.map((a) => (!a[key] || a[key] === old ? { ...a, [key]: value ?? "" } : a)),
+  }));
+  return { ...r, job, zones };
+}
+
 export const DEFAULT_ANCHOR_REPORT: AnchorReportData = {
   job: {
     preparedFor: "",

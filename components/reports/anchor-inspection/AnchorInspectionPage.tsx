@@ -42,6 +42,7 @@ import {
   DEFAULT_COVER_POS,
   anchorGroupOrder,
   generateId,
+  withJobField,
   type CoverPos,
   type AnchorReportData,
   type AnchorReportJob,
@@ -230,7 +231,7 @@ export default function AnchorInspectionPage({
   // ── Job detail handlers ────────────────────────────────────────────────
   const updateJob = useCallback(
     (field: keyof AnchorReportJob, value: string | null) => {
-      setReport((prev) => ({ ...prev, job: { ...prev.job, [field]: value } }));
+      setReport((prev) => withJobField(prev, field, value));
     },
     [],
   );
