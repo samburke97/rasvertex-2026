@@ -63,7 +63,6 @@ interface Registry {
   pages: PageDef[];
   lockedPageNotes: Partial<Record<PageId, string>>;
   jobFields: JobField[];
-  defectCodes: Record<string, DefectCodeDef>;
   bands: Record<Band, { bg: string; fg: string }>;
   flaggedGroups: Record<Band, [string, string]>;
   prestartGroups: Record<Band, [string, string]>;
@@ -79,7 +78,11 @@ export const PAGE: Record<PageId, PageDef> = Object.fromEntries(PAGES.map((p) =>
 >;
 export const LOCK_NOTES = registry.lockedPageNotes;
 export const JOB_FIELDS = registry.jobFields;
-export const CODES = registry.defectCodes;
+/** The defect codes: the inspection reports' table (lib/reports/inspection/
+ *  codes.ts), so a photo coded on site maps the same in every report. */
+export const CODES: Record<string, DefectCodeDef> = Object.fromEntries(
+  ALL_CODES.map((d) => [d.code, { name: d.name, band: d.band, defaultWork: d.work }]),
+);
 export const BANDS = registry.bands;
 export const FLAG_GROUPS = registry.flaggedGroups;
 export const PRESTART_GROUPS = registry.prestartGroups;
@@ -93,6 +96,7 @@ export const asset = (file: string) => ASSET_DIR + file;
 
 export { BRANDS, TRADES, tradeOf, type Brand, type Trade } from "./trades";
 import { TRADES, type Brand, type Trade } from "./trades";
+import { ALL_CODES } from "@/lib/reports/inspection/codes";
 
 /** Standard photo folders, available on every proposal alongside the
  *  quote's own SimPRO folders. */

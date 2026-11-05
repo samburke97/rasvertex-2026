@@ -36,6 +36,7 @@ import { CodeChips, PhotoGrid, PhotoTray } from "@/components/reports/shared/bui
 import ToggleRow from "@/components/reports/shared/ToggleRow";
 import PlanServices, { seedPlan } from "@/components/reports/shared/builder/PlanServices";
 import { notesIsEmpty } from "@/lib/reports/richText";
+import { formatTechNotes } from "@/lib/reports/techNotes";
 import PanelResizer, { usePanelWidth } from "@/components/reports/shared/builder/PanelResizer";
 import InspectionDocument, {
   InspectionMeasure,
@@ -239,10 +240,11 @@ export default function InspectionReportPage({ onBack }: Props) {
     setLoading(true);
     setLoadError(null);
     const safe = (url: string) => fetch(url).catch(() => null);
-    const [jRes, dRes, fRes] = await Promise.all([
+    const [jRes, dRes, fRes, tRes] = await Promise.all([
       safe(`/api/simpro/jobs/${jobId}`),
       safe(`/api/inspection-reports/${draftKey(jobId, kind)}`),
       safe(`/api/simpro/jobs/${jobId}/attachments/folders?companyId=0`),
+      safe(`/api/simpro/jobs/${jobId}/technician-notes`),
     ]);
     try {
       if (!jRes?.ok) {
@@ -266,6 +268,9 @@ export default function InspectionReportPage({ onBack }: Props) {
       } else {
         next = createInspectionReport(jobId, job, kind);
       }
+      // The technicians' notes from SimPRO fill an empty comments box.
+      const techNotes = tRes?.ok ? formatTechNotes((await tRes.json().catch(() => ({}))).notes ?? []) : "";
+      if (techNotes && notesIsEmpty(next.job.technicianNotes ?? "")) next = { ...next, job: { ...next.job, technicianNotes: techNotes } };
 
       importGen.current++; // drop any import still running for another job
       setImporting(false);
@@ -1047,11 +1052,20 @@ export default function InspectionReportPage({ onBack }: Props) {
 
             <section className={styles.group} data-field="job.technicianNotes">
               <h2 className={styles.groupTitle}>
-                Technician comments <InfoTip>Type / for headings and lists. Printed after the findings.</InfoTip>
+                Technician comments{" "}
+                <InfoTip>
+                  Filled from the technician notes on the job in SimPRO when the box is empty. Type / for headings and lists. Printed
+                  after the findings.
+                </InfoTip>
               </h2>
               <div className={styles.editorBox}>
                 <DocEditor value={r.job.technicianNotes ?? ""} onChange={(technicianNotes) => setJob({ technicianNotes })} />
               </div>
+              <PullTechNotes
+                jobId={r.jobId}
+                hasText={!notesIsEmpty(r.job.technicianNotes ?? "")}
+                onPull={(technicianNotes) => setJob({ technicianNotes })}
+              />
             </section>
 
                 </>
@@ -1406,5 +1420,34 @@ function PlanEditor({
         </>
       )}
     </>
+  );
+}
+
+/** Fetches the job's technician notes from SimPRO into the comments box.
+ *  Over existing text it asks first: one click arms it, the next replaces. */
+function PullTechNotes({ jobId, hasText, onPull }: { jobId: string; hasText: boolean; onPull: (html: string) => void }) {
+  const [state, setState] = useState<"idle" | "confirm" | "loading" | "none" | "error">("idle");
+  const pull = async () => {
+    if (hasText && state !== "confirm") return setState("confirm");
+    setState("loading");
+    try {
+      const res = await fetch(`/api/simpro/jobs/${jobId}/technician-notes`);
+      if (!res.ok) throw new Error();
+      const html = formatTechNotes((await res.json()).notes ?? []);
+      if (!html) return setState("none");
+      onPull(html);
+      setState("idle");
+    } catch {
+      setState("error");
+    }
+  };
+  return (
+    <div className={styles.pullRow}>
+      <button className={styles.pullBtn} onClick={pull} disabled={state === "loading"}>
+        {state === "loading" ? "Pulling…" : state === "confirm" ? "Replace your comments? Click again" : "Pull from SimPRO"}
+      </button>
+      {state === "none" && <span className={styles.pullNote}>No technician notes on this job yet.</span>}
+      {state === "error" && <span className={styles.pullNote}>Couldn&apos;t reach SimPRO. Try again.</span>}
+    </div>
   );
 }

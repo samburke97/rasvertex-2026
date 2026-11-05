@@ -389,3 +389,9 @@ html :where(.root) :is(h1, h2, p, span) {
 /* ── Panel head (the rail and resizer are shared: shared/builder) ── */
 .panelHead { padding: 16px 20px; border-bottom: 1px solid rgba(var(--ink-rgb), 0.07); flex-shrink: 0; }
 .panelTitle { font-size: 15px; font-weight: 600; }
+
+/* "Pull from SimPRO" under the technician comments. */
+.pullRow { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.pullBtn { border: 0; background: none; padding: 0; font: inherit; font-size: 12.5px; font-weight: 500; color: rgba(var(--ink-rgb), 0.65); text-decoration: underline; cursor: pointer; }
+.pullBtn:disabled { opacity: 0.5; cursor: default; }
+.pullNote { font-size: 12.5px; color: rgba(var(--ink-rgb), 0.5); }

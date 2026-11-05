@@ -8,7 +8,7 @@
 // from the labels by generate.ts.
 
 import type { EnrichedJob } from "@/lib/simpro/types";
-import { libraryFor, type Library, type ReportKind } from "./codes";
+import { CODE_ALIASES, libraryFor, type Library, type ReportKind } from "./codes";
 import type { PhotoPos } from "@/lib/reports/photos";
 import type { MaintenancePlan } from "@/lib/reports/maintenancePlan";
 
@@ -251,7 +251,8 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
   const toks = head.split(/\s+/).filter(Boolean);
   for (let k = 0; k < toks.length; k++) {
     const tok = toks[k];
-    const x = tok.toUpperCase();
+    const up = tok.toUpperCase().replace(/[,;.]$/, "");
+    const x = CODE_ALIASES[up] ?? up;
     if (/^[DS]\d+$/.test(x)) {
       if (!zone) zone = x;
     } else if (/^L(\d+|G|R)$/.test(x)) {

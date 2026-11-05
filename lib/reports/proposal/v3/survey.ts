@@ -11,6 +11,7 @@
 
 import { photoLabel } from "@/lib/reports/inspection/types";
 import { CODES, LIMITS, codeRank, codesOf, withCodes, zoneOf, type Finding, type Proposal, type SimproPhoto } from "./types";
+import { CODE_ALIASES } from "@/lib/reports/inspection/codes";
 
 export interface Tag {
   zone: string | null; // D10 / S2
@@ -37,12 +38,16 @@ export function parseTag(label: string): Tag {
   const toks = head.trim().split(/\s+/).filter(Boolean);
   let k = 0;
   for (; k < toks.length; k++) {
-    const x = toks[k].toUpperCase().replace(/[,;.]$/, "");
+    const up = toks[k].toUpperCase().replace(/[,;.]$/, "");
+    const x = CODE_ALIASES[up] ?? up;
     if (/^[DS]\d+$/.test(x) && !t.zone) t.zone = x;
     else if (/^L(\d+|G|R)$/.test(x) && !t.level) t.level = x;
     else if (/^U\d+$/.test(x) && !t.unit) t.unit = x;
     else if (CODES[x]) {
       if (!t.codes.includes(x)) t.codes.push(x);
+    } else if (x === "OV" || x === "OT") {
+      // Overview and other-item photos: tags, not defects. They show under
+      // Other site photos.
     } else if (split < 0) break; // the name starts here
   }
   if (split < 0) t.note = toks.slice(k).join(" ");

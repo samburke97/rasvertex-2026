@@ -567,3 +567,23 @@ export async function fetchJobScope(jobId: number, companyId = 0): Promise<JobSc
   }
   return { quoteId: null, description: jobDescription, items: [] };
 }
+
+// ── Technician notes ──────────────────────────────────────────────────────────
+// Notes the team types into the job on the mobile app. SimPRO keeps them on
+// the job's timeline as "Work Order Technician Notes" entries (HTML).
+
+export interface TechnicianNote {
+  staff: string;
+  date: string;
+  html: string;
+}
+
+export async function fetchTechnicianNotes(jobId: number, companyId = 0): Promise<TechnicianNote[]> {
+  const timeline = await simproGet<{ Type?: string; Message?: string; Staff?: { Name?: string } | null; Date?: string }[]>(
+    `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${jobId}/timelines/`,
+  );
+  return timeline
+    .filter((t) => /technician note/i.test(t.Type ?? "") && t.Message?.trim())
+    .map((t) => ({ staff: t.Staff?.Name ?? "", date: t.Date ?? "", html: t.Message! }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
