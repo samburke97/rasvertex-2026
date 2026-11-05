@@ -1,9 +1,18 @@
 // lib/reports/anchor.types.ts
 
 import type { ReportPhoto, PhotoLayout } from "./photos";
+import { ANCHOR_PASTELS, colourOf, type AnchorTypeDef } from "./settings/types";
 export type { ReportPhoto, PhotoFolder, PhotoLayout } from "./photos";
 
-export type AnchorType =
+/** The anchor types a report was started with (Reports › Settings ›
+ *  Anchor types). Undefined on reports from before settings: the built-in
+ *  types below, as they always were. */
+export type AnchorDefs = AnchorTypeDef[] | undefined;
+
+/** A built-in type, or one an admin added in the settings. */
+export type AnchorType = BuiltinAnchorType | (string & {});
+
+export type BuiltinAnchorType =
   | "fall-arrest-anchor"
   | "ladder-bracket"
   | "access-hatch"
@@ -15,7 +24,7 @@ export type AnchorType =
 
 // Anchor types whose pins connect to each other via a drawn line (see
 // AnchorPoint.connectsTo / computeLineEdges) rather than standing alone.
-export const LINE_TYPES: AnchorType[] = ["static-line", "walkway-line"];
+export const LINE_TYPES: string[] = ["static-line", "walkway-line"];
 export function isLineType(type: AnchorType): boolean {
   return LINE_TYPES.includes(type);
 }
@@ -131,9 +140,11 @@ export interface AnchorReportData {
   /** Uploaded cover photo. Absent or null means DEFAULT_COVER_IMAGE. */
   coverUrl?: string | null;
   coverPos?: CoverPos;
+  /** Anchor types as set in Reports › Settings when this report started. */
+  anchorTypes?: AnchorTypeDef[];
 }
 
-export const ANCHOR_TYPE_COLOURS: Record<AnchorType, string> = {
+export const ANCHOR_TYPE_COLOURS: Record<string, string> = {
   "fall-arrest-anchor": "#10b981",
   "ladder-bracket": "#3b82f6",
   "access-hatch": "#ec4899",
@@ -180,26 +191,61 @@ export function anchorGroupOrder(zones: { anchors: AnchorPoint[] }[]): string[] 
   return order;
 }
 
-export function pastelFor(order: string[], key: string): Pastel {
+export function pastelFor(order: string[], key: string, defs?: AnchorDefs): Pastel {
+  // With settings, each type has its own colour; before, groups took the
+  // next colour in placement order.
+  const def = defs?.find((d) => d.key === key.split(":")[0]);
+  if (def) return colourOf(def.colour, ANCHOR_PASTELS);
   const i = order.indexOf(key);
   return PASTEL_CYCLE[(i < 0 ? order.length : i) % PASTEL_CYCLE.length];
 }
 
 /** Icon file (public/reports/anchor/icons) for an anchor: subtype first.
  *  Rafter anchors have one icon per type, fall arrest and rope access. */
-export function anchorIconName(a: Pick<AnchorPoint, "type" | "subtype">): string {
+export function anchorIconName(a: Pick<AnchorPoint, "type" | "subtype">, defs?: AnchorDefs): string {
   if (a.subtype === "rafter") return a.type === "rope-access-anchor" ? "rafter-rope-access" : "rafter-fall-arrest";
-  return a.subtype ?? a.type;
+  return a.subtype ?? defs?.find((d) => d.key === a.type)?.icon ?? a.type;
 }
 
+/** An icon name as an image URL in the app (uploaded SVGs are data URLs). */
+export const anchorIconSrc = (name: string) => (name.startsWith("data:") ? name : `/reports/anchor/icons/${name}.svg`);
+
+/** "Fall Arrest Anchor" */
+export const anchorTypeLabel = (type: AnchorType, defs?: AnchorDefs): string =>
+  defs?.find((d) => d.key === type)?.name ?? ANCHOR_TYPE_LABELS[type] ?? type;
+
+/** The types a technician can place, in order. */
+export const anchorTypeOptions = (defs?: AnchorDefs): { value: AnchorType; label: string }[] =>
+  defs ? defs.map((d) => ({ value: d.key, label: d.name })) : ANCHOR_TYPE_OPTIONS;
+
+/** A type's mounting options, if it has any. */
+export const anchorSubtypes = (type: AnchorType, defs?: AnchorDefs): AnchorSubtype[] | undefined => {
+  if (!defs) return ANCHOR_TYPE_SUBTYPES[type];
+  const subs = defs.find((d) => d.key === type)?.subs;
+  return subs?.length ? subs : undefined;
+};
+
+/** Load-rated: counted as an anchor and given a rating on the certificate. */
+export const anchorRated = (type: AnchorType, defs?: AnchorDefs): boolean => {
+  if (!defs) return !!ANCHOR_TYPE_IS_RATED[type];
+  return !!defs.find((d) => d.key === type)?.kn.trim();
+};
+
+/** "15 kN", or a dash when not rated. */
+export const anchorRating = (type: AnchorType, defs?: AnchorDefs): string => {
+  if (!defs) return ANCHOR_TYPE_IS_RATED[type] ? "15 kN" : "–";
+  const kn = defs.find((d) => d.key === type)?.kn.trim();
+  return kn ? `${kn} kN` : "–";
+};
+
 /** "Rope access anchor, eye bolt" */
-export function anchorTypeSentence(a: Pick<AnchorPoint, "type" | "subtype">): string {
-  const base = ANCHOR_TYPE_LABELS[a.type];
+export function anchorTypeSentence(a: Pick<AnchorPoint, "type" | "subtype">, defs?: AnchorDefs): string {
+  const base = anchorTypeLabel(a.type, defs);
   const t = base.charAt(0) + base.slice(1).toLowerCase();
   return a.subtype ? `${t}, ${ANCHOR_SUBTYPE_LABELS[a.subtype].toLowerCase()}` : t;
 }
 
-export const ANCHOR_TYPE_LABELS: Record<AnchorType, string> = {
+export const ANCHOR_TYPE_LABELS: Record<string, string> = {
   "fall-arrest-anchor": "Fall Arrest Anchor",
   "ladder-bracket": "Ladder Bracket",
   "access-hatch": "Access Hatch",
@@ -222,7 +268,7 @@ export const ANCHOR_TYPE_OPTIONS: { value: AnchorType; label: string }[] =
 // walkway lines, harnesses) is access/connector hardware, not a rated
 // anchor itself, and shows "-" instead of a rating on the certification
 // summary table.
-export const ANCHOR_TYPE_IS_RATED: Record<AnchorType, boolean> = {
+export const ANCHOR_TYPE_IS_RATED: Record<string, boolean> = {
   "fall-arrest-anchor": true,
   "ladder-bracket": false,
   "access-hatch": false,
@@ -245,7 +291,7 @@ export const ANCHOR_SUBTYPE_LABELS: Record<AnchorSubtype, string> = {
 
 // Only these anchor types offer a mounting sub-choice; anything absent
 // here places directly, no sub-picker shown.
-export const ANCHOR_TYPE_SUBTYPES: Partial<Record<AnchorType, AnchorSubtype[]>> = {
+export const ANCHOR_TYPE_SUBTYPES: Partial<Record<string, AnchorSubtype[]>> = {
   "fall-arrest-anchor": ["surface-mount", "eye-bolt", "purlin", "rafter"],
   "rope-access-anchor": [
     "surface-mount",
@@ -281,8 +327,8 @@ export const ANCHOR_SUBTYPE_ICONS: Record<AnchorSubtype, LegendIconShape> = {
   rafter: "hexagon",
 };
 
-export function anchorTypeDisplayLabel(anchor: AnchorPoint): string {
-  const base = ANCHOR_TYPE_LABELS[anchor.type];
+export function anchorTypeDisplayLabel(anchor: AnchorPoint, defs?: AnchorDefs): string {
+  const base = anchorTypeLabel(anchor.type, defs);
   return anchor.subtype
     ? `${base} – ${ANCHOR_SUBTYPE_LABELS[anchor.subtype]}`
     : base;
@@ -356,16 +402,20 @@ export interface LegendGroup {
 export function buildLegendGroups(
   types: AnchorType[],
   anchors: AnchorPoint[],
+  defs?: AnchorDefs,
 ): LegendGroup[] {
   const groups: LegendGroup[] = [];
   for (const type of types) {
-    const subtypes = ANCHOR_TYPE_SUBTYPES[type];
-    const colour = ANCHOR_TYPE_COLOURS[type];
+    // Anchors keep a mount the settings no longer offer, so list the
+    // built-in ones too.
+    const subtypes = [...new Set([...(anchorSubtypes(type, defs) ?? []), ...(ANCHOR_TYPE_SUBTYPES[type] ?? [])])];
+    const label = anchorTypeLabel(type, defs);
+    const colour = ANCHOR_TYPE_COLOURS[type] ?? "#64748b";
     const anchorsOfType = anchors.filter((a) => a.type === type);
-    if (!subtypes) {
+    if (!subtypes.length) {
       groups.push({
         key: type,
-        label: ANCHOR_TYPE_LABELS[type],
+        label,
         count: anchorsOfType.length,
         colour,
         icon: isLineType(type) ? "static-line" : "dot",
@@ -378,8 +428,8 @@ export function buildLegendGroups(
     const noSubtypeCount = anchorsOfType.filter((a) => !a.subtype).length;
     if (noSubtypeCount > 0) {
       groups.push({
-        key: `${type}:none`,
-        label: ANCHOR_TYPE_LABELS[type],
+        key: anchorGroupKey({ type }),
+        label,
         count: noSubtypeCount,
         colour,
         icon: "dot",
@@ -390,7 +440,7 @@ export function buildLegendGroups(
       if (count === 0) continue;
       groups.push({
         key: `${type}:${subtype}`,
-        label: `${ANCHOR_TYPE_LABELS[type]} – ${ANCHOR_SUBTYPE_LABELS[subtype]}`,
+        label: `${label} – ${ANCHOR_SUBTYPE_LABELS[subtype]}`,
         count,
         colour,
         icon: ANCHOR_SUBTYPE_ICONS[subtype],

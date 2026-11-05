@@ -163,7 +163,8 @@ function PageNo({ no, total }: { no: number; total: number }) {
 }
 
 function Icon({ ctx, name, size }: { ctx: Ctx; name: string; size: number }) {
-  const src = ctx.assets.icons[name] ?? ctx.assets.icons["rope-access-anchor"];
+  // Uploaded icons (Reports › Settings) are carried as data URLs.
+  const src = name.startsWith("data:") ? name : (ctx.assets.icons[name] ?? ctx.assets.icons["rope-access-anchor"]);
   return (
     <span
       className="ar-icon"

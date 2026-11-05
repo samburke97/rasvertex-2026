@@ -38,7 +38,8 @@
   height: 100vh;
 }
 
-.sectionMenu[hidden] {
+.sectionMenu[hidden],
+.sectionMenu:empty {
   display: none;
 }
 

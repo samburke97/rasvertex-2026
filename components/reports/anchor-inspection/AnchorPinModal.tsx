@@ -11,9 +11,12 @@ import Modal from "@/components/ui/Modal";
 import TextInput from "@/components/ui/TextInput";
 import {
   ANCHOR_SUBTYPE_LABELS,
-  ANCHOR_TYPE_OPTIONS,
-  ANCHOR_TYPE_SUBTYPES,
   anchorIconName,
+  anchorIconSrc,
+  anchorSubtypes,
+  anchorTypeLabel,
+  anchorTypeOptions,
+  type AnchorDefs,
   type AnchorPoint,
   type AnchorSubtype,
   type AnchorType,
@@ -26,15 +29,17 @@ interface AnchorPinModalProps {
   onSave: (anchor: AnchorPoint) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  defs?: AnchorDefs;
 }
 
 // Every type, and every type + mount, as one flat list for a single select.
-const KIND_OPTIONS = ANCHOR_TYPE_OPTIONS.flatMap(({ value, label }) => {
-  const subs = ANCHOR_TYPE_SUBTYPES[value];
-  return subs
-    ? subs.map((st) => ({ value: `${value}:${st}`, label: `${label} – ${ANCHOR_SUBTYPE_LABELS[st]}` }))
-    : [{ value, label }];
-});
+const kindOptions = (defs: AnchorDefs) =>
+  anchorTypeOptions(defs).flatMap(({ value, label }) => {
+    const subs = anchorSubtypes(value, defs);
+    return subs
+      ? subs.map((st) => ({ value: `${value}:${st}`, label: `${label} – ${ANCHOR_SUBTYPE_LABELS[st]}` }))
+      : [{ value, label }];
+  });
 
 export default function AnchorPinModal({
   anchor,
@@ -42,7 +47,9 @@ export default function AnchorPinModal({
   onSave,
   onDelete,
   onClose,
+  defs,
 }: AnchorPinModalProps) {
+  const KIND_OPTIONS = kindOptions(defs);
   const [form, setForm] = useState<AnchorPoint>({ ...anchor });
   const [showDates, setShowDates] = useState(false);
 
@@ -67,7 +74,7 @@ export default function AnchorPinModal({
       title={isNew ? "Add anchor" : form.label}
       icon={
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={`/reports/anchor/icons/${anchorIconName(form)}.svg`} alt="" width={20} height={20} />
+        <img src={anchorIconSrc(anchorIconName(form, defs))} alt="" width={20} height={20} />
       }
     >
       <div className={styles.grid2}>
@@ -113,7 +120,7 @@ export default function AnchorPinModal({
           onChange={(e) => setKind(e.target.value)}
         >
           {!KIND_OPTIONS.some((o) => o.value === kind) && (
-            <option value={kind}>{ANCHOR_TYPE_OPTIONS.find((o) => o.value === form.type)?.label}</option>
+            <option value={kind}>{anchorTypeLabel(form.type, defs)}</option>
           )}
           {KIND_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>

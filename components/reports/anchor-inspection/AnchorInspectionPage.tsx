@@ -24,6 +24,7 @@ import {
 } from "@/lib/reports/uploadPhoto";
 import AnchorOptionsPanel from "./AnchorOptionsPanel";
 import ZoneMapEditor from "./ZoneMapEditor";
+import { useReportSettings } from "@/lib/reports/settings/useReportSettings";
 import AnchorDocument, {
   AnchorStyles,
   type AnchorAssets,
@@ -116,6 +117,9 @@ export default function AnchorInspectionPage({
   onBack,
 }: AnchorInspectionPageProps) {
   const [report, setReport] = useState<AnchorReportData>(DEFAULT_ANCHOR_REPORT);
+  // Anchor types are copied into each new report, so later edits to the
+  // settings don't change a report already started.
+  const settings = useReportSettings();
   const [view, setView] = useState<View>("editor");
   const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<AnchorImportStatus>({
@@ -327,6 +331,7 @@ export default function AnchorInspectionPage({
         setReport({
           ...DEFAULT_ANCHOR_REPORT,
           job: buildJobFields(jobData, DEFAULT_ANCHOR_REPORT.job),
+          anchorTypes: settings.anchors,
         });
 
         setLoadedJobId(jobNumber);
@@ -339,7 +344,7 @@ export default function AnchorInspectionPage({
         });
       }
     },
-    [buildJobFields],
+    [buildJobFields, settings],
   );
 
   // ── Autosave the draft, debounced, whenever the report changes ───────────
@@ -714,6 +719,7 @@ export default function AnchorInspectionPage({
           defaultInspectionDate={report.job.inspectionDate}
           defaultNextInspection={report.job.nextInspectionDate}
           groupOrder={groupOrder}
+          defs={report.anchorTypes}
           onUpdate={handleZoneUpdate}
           onBack={() => {
             setView("editor");

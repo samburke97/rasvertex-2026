@@ -12,6 +12,8 @@
 // OV and OT are system codes: not defects, not counted, and not listed in
 // Defects explained or Recommended works.
 
+import type { LocationTag } from "@/lib/reports/settings/types";
+
 export type Band = "red" | "amber" | "grey";
 
 export interface BandDef {
@@ -249,7 +251,7 @@ export const CODE_ALIASES: Record<string, string> = { DL: "DLM" };
 
 // Both inspections carry every code; each lists its own trade's first, so
 // a code's rank within its band suits the report.
-const ROOF_FIRST = ["AL", "MT", "SH", "LS", "DLM", "BS", "UF", "PF", "CK", "PW", "BD", "RM", "UV", "SW", "DB"];
+export const ROOF_FIRST = ["AL", "MT", "SH", "LS", "DLM", "BS", "UF", "PF", "CK", "PW", "BD", "RM", "UV", "SW", "DB"];
 const BUILDING_CODES = finish(ALL_CODES);
 const ROOF_CODES = finish([
   ...ROOF_FIRST.map((k) => ALL_CODES.find((d) => d.code === k)!),
@@ -293,9 +295,11 @@ export interface ExtraDef extends CardDef {
   whenAny?: string[];
 }
 
-export type ReportKind = "building" | "roof";
+/** A report's key in the settings: "building", "roof", or one an admin added. */
+export type ReportKind = string;
 
-export interface Library {
+/** The built-in copy (LIBRARIES): the defaults the settings start from. */
+export interface LibraryBase {
   kind: ReportKind;
   /** "Building inspection" — the builder's choice label. */
   label: string;
@@ -316,6 +320,18 @@ export interface Library {
   example: { img: ImageKey; code: string; zone: string; level: string; note: string };
 }
 
+/** What a report reads, built from the settings (settings/library.ts). */
+export interface Library extends LibraryBase {
+  /** The report's type (roof: "membrane", "tiled"…), when it has types. */
+  type?: string;
+  bands: Record<Band, BandDef>;
+  bandOrder: Band[];
+  tags: LocationTag[];
+  /** Old or misspelt codes, and OTP / OTR / OTM, → the code. */
+  aliases: Record<string, string>;
+  exclusions: string[];
+}
+
 const byCode = (codes: DefectCode[]) => Object.fromEntries(codes.map((d) => [d.code, d]));
 
 const HELPS: CardDef = {
@@ -329,7 +345,7 @@ const ANNUAL: ExtraDef = {
   img: "height",
 };
 
-export const LIBRARIES: Record<ReportKind, Library> = {
+export const LIBRARIES: Record<"building" | "roof", LibraryBase> = {
   building: {
     kind: "building",
     plan: [
@@ -430,9 +446,5 @@ export const LIBRARIES: Record<ReportKind, Library> = {
     defaultLevel: "LR",
   },
 };
-
-export function libraryFor(kind: ReportKind | undefined): Library {
-  return LIBRARIES[kind ?? "building"];
-}
 
 export { PLAN_INTERVALS } from "@/lib/reports/maintenancePlan";

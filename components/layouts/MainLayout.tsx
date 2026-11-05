@@ -32,6 +32,8 @@ export default function MainLayout({ children }: MainLayoutProps) {
   // Caro renders its own section menu into this slot (a portal), so the menu
   // can show live counts from the page's state.
   const isCaro = pathname?.startsWith("/caro");
+  // Reports does the same for its settings menu (empty while a builder is open).
+  const isReports = pathname?.startsWith("/reports");
 
   useEffect(() => {
     const stored = localStorage.getItem(THEME_KEY);
@@ -50,12 +52,13 @@ export default function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className={styles.app}>
       <Sidebar
-        showWorkspaceToggle={!!isWorkspaceSection || !!isCaro}
+        showWorkspaceToggle={!!isWorkspaceSection || !!isCaro || !!isReports}
         workspaceCollapsed={workspaceCollapsed}
         onToggleWorkspace={() => setWorkspaceCollapsed((c) => !c)}
       />
       {isWorkspaceSection && <WorkspacePanel collapsed={workspaceCollapsed} />}
       {isCaro && <div id="caro-section-menu" className={styles.sectionMenu} hidden={workspaceCollapsed} />}
+      {isReports && <div id="reports-section-menu" className={styles.sectionMenu} hidden={workspaceCollapsed} />}
       <div className={styles.mainWrap}>
         <div className={styles.panel}>
           <TopNavbar

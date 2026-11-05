@@ -8,7 +8,10 @@
 // from the labels by generate.ts.
 
 import type { EnrichedJob } from "@/lib/simpro/types";
-import { CODE_ALIASES, libraryFor, type Library, type ReportKind } from "./codes";
+import type { Library, ReportKind } from "./codes";
+import { defaultSettings } from "@/lib/reports/settings/defaults";
+import { libraryFrom, readTag } from "@/lib/reports/settings/library";
+import type { ReportSettings } from "@/lib/reports/settings/types";
 import type { PhotoPos } from "@/lib/reports/photos";
 import type { MaintenancePlan } from "@/lib/reports/maintenancePlan";
 
@@ -79,6 +82,11 @@ export interface InspectionReportData {
   /** Building or roof inspection — picks the code library and copy.
    *  Older drafts have none and are building inspections. */
   kind?: ReportKind;
+  /** The report's type in the settings (roof: "membrane", "tiled"…). */
+  type?: string;
+  /** The report settings when this report was started. Later edits to the
+   *  settings don't change it; drafts from before settings use the defaults. */
+  settings?: ReportSettings;
   jobId: string;
   job: InspectionJob;
   /** "all", or a SimPRO attachment folder id to import from. */
@@ -157,18 +165,27 @@ export function todayLong(d = new Date()): string {
   return d.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
 }
 
-/** Drafts are saved per job and kind, so a job can have both reports. */
-export function draftKey(jobId: string, kind: ReportKind): string {
-  return kind === "roof" ? `${jobId}-roof` : jobId;
-}
+export const settingsOf = (d: Pick<InspectionReportData, "settings">): ReportSettings => d.settings ?? defaultSettings();
 
-export function createInspectionReport(jobId: string, job: EnrichedJob, kind: ReportKind): InspectionReportData {
-  const lib = libraryFor(kind);
+/** The codes and copy this report uses: its settings snapshot, its type. */
+export const libraryOf = (d: Pick<InspectionReportData, "settings" | "kind" | "type">): Library =>
+  libraryFrom(settingsOf(d), d.kind, d.type);
+
+export function createInspectionReport(
+  jobId: string,
+  job: EnrichedJob,
+  settings: ReportSettings,
+  kind: ReportKind,
+  type?: string,
+): InspectionReportData {
+  const lib = libraryFrom(settings, kind, type);
   const site = job.siteName || job.name;
   const street = job.siteAddress.split(",")[0]?.trim() || site;
   return {
     version: 1,
     kind,
+    type,
+    settings,
     jobId,
     job: {
       ref: jobId,
@@ -252,13 +269,14 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
   for (let k = 0; k < toks.length; k++) {
     const tok = toks[k];
     const up = tok.toUpperCase().replace(/[,;.]$/, "");
-    const x = CODE_ALIASES[up] ?? up;
-    if (/^[DS]\d+$/.test(x)) {
-      if (!zone) zone = x;
-    } else if (/^L(\d+|G|R)$/.test(x)) {
-      if (!level) level = x;
-    } else if (/^U\d+$/.test(x)) {
-      if (!unit) unit = x;
+    const x = lib.aliases[up] ?? up;
+    const where = readTag(up, lib.tags);
+    if (where?.kind === "zone") {
+      if (!zone) zone = up;
+    } else if (where?.kind === "level") {
+      if (!level) level = up;
+    } else if (where?.kind === "unit") {
+      if (!unit) unit = up;
     } else if (lib.codeMap[x]) {
       if (!codes.includes(x)) codes.push(x);
     } else if (split < 0) {

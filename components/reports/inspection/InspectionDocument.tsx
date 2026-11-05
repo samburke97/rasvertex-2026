@@ -15,7 +15,7 @@
 
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { sanitizeNotesHtml } from "@/lib/reports/richText";
-import { BANDS, type ImageKey } from "@/lib/reports/inspection/codes";
+import type { ImageKey } from "@/lib/reports/inspection/codes";
 import {
   CONTENT_W,
   padPage,
@@ -342,7 +342,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
         </div>
       );
     case "kGroup": {
-      const band = BANDS[b.band];
+      const band = b.def;
       return (
         <div className="ir-band-wrap" style={{ paddingTop: b.first ? 24 : 40 }}>
           <div className="ir-band" style={{ background: band.bg }}>
@@ -520,7 +520,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
           {b.rows.length > 0 && (
             <div className="ir-sum-rows">
               {b.rows.map((r) => {
-                const band = BANDS[r.band];
+                const band = r;
                 return (
                   <div key={r.band} className="ir-sum-row">
                     <div className="ir-sum-row__meta">

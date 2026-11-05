@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
+import SettingsPage, { ReportsMenu, useHashRoute } from "./settings/SettingsPage";
+import { SettingsCtx, useSettingsStore } from "./settings/store";
 import styles from "./ReportSelector.module.css";
 import Card from "@/components/ui/Card";
 import CountBadge from "@/components/ui/CountBadge";
@@ -235,6 +238,21 @@ function CategorySection({
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function ReportSelector() {
   const [active, setActive] = useState<ReportTypeId | null>(null);
+  const store = useSettingsStore();
+  const route = useHashRoute();
+  // The section menu renders into the layout's slot, as Caro's does; it's
+  // left out while a builder is open so the builder has the width.
+  const [menuEl, setMenuEl] = useState<HTMLElement | null>(null);
+  useEffect(() => setMenuEl(document.getElementById("reports-section-menu")), []);
+
+  if (!active) {
+    return (
+      <SettingsCtx.Provider value={store}>
+        {menuEl && createPortal(<ReportsMenu view={route.view} />, menuEl)}
+        {route.view === "new" ? <ReportPicker onSelect={setActive} /> : <SettingsPage view={route.view} path={route.path} />}
+      </SettingsCtx.Provider>
+    );
+  }
 
   if (active === "job-overview") {
     return <JobOverviewPage onBack={() => setActive(null)} />;
@@ -256,6 +274,10 @@ export default function ReportSelector() {
     return <ProposalBuilder onBack={() => setActive(null)} />;
   }
 
+  return null;
+}
+
+function ReportPicker({ onSelect: setActive }: { onSelect: (id: ReportTypeId) => void }) {
   return (
     <div className={styles.page}>
       <div className={styles.header}>

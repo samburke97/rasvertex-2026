@@ -47,21 +47,15 @@ import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import { compressImageDataUrl, compressMapImageDataUrl } from "@/lib/reports/compressImage";
 import { deleteReportPhoto, uploadReportPhoto } from "@/lib/reports/uploadPhoto";
 import { createUploadQueue } from "@/lib/reports/uploadQueue";
-import {
-  CARD_IMAGES,
-  LIBRARIES,
-  LOGO_IMAGE,
-  libraryFor,
-  type ImageKey,
-  BANDS,
-  type Library,
-  type ReportKind,
-} from "@/lib/reports/inspection/codes";
+import { CARD_IMAGES, LOGO_IMAGE, type ImageKey, type Library } from "@/lib/reports/inspection/codes";
+import { draftKeyFor, leaves, libraryFrom, readTag } from "@/lib/reports/settings/library";
+import { useReportSettings } from "@/lib/reports/settings/useReportSettings";
 import { buildModel, paginate, PAGE_W, type Block, type PhotoView, type SectionKey } from "@/lib/reports/inspection/generate";
 import {
   createInspectionReport,
-  draftKey,
   isInspectionData,
+  libraryOf,
+  settingsOf,
   composeLabel,
   photoLabel,
   parseLabel,
@@ -100,10 +94,6 @@ const ASSETS: InspectionAssets = {
   ) as Record<ImageKey, string>,
 };
 
-const KIND_HINTS: Record<ReportKind, string> = {
-  building: "Facade, awnings, joints, fixings and height safety.",
-  roof: "Roof membrane: laps, upturns, penetrations and drainage.",
-};
 
 function readBlobAsDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -152,7 +142,9 @@ function sectionOfKey(key: string): Sel {
 
 export default function InspectionReportPage({ onBack }: Props) {
   const [r, setR] = useState<InspectionReportData | null>(null);
-  const [kind, setKind] = useState<ReportKind>("building");
+  const settings = useReportSettings();
+  // The report and type picked to start with ("roof" + "membrane").
+  const [pick, setPick] = useState<{ report: string; type?: string }>({ report: "building" });
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [folders, setFolders] = useState<{ id: number; name: string }[]>([]);
@@ -242,7 +234,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     const safe = (url: string) => fetch(url).catch(() => null);
     const [jRes, dRes, fRes, tRes] = await Promise.all([
       safe(`/api/simpro/jobs/${jobId}`),
-      safe(`/api/inspection-reports/${draftKey(jobId, kind)}`),
+      safe(`/api/inspection-reports/${draftKeyFor(settings, jobId, pick.report, pick.type)}`),
       safe(`/api/simpro/jobs/${jobId}/attachments/folders?companyId=0`),
       safe(`/api/simpro/jobs/${jobId}/technician-notes`),
     ]);
@@ -259,14 +251,15 @@ export default function InspectionReportPage({ onBack }: Props) {
       let next: InspectionReportData;
       if (draft) {
         // Keep the draft's edits; only fill fields it's missing.
-        const fresh = createInspectionReport(jobId, job, kind);
+        // A resumed draft keeps the settings it was started with.
+        const fresh = createInspectionReport(jobId, job, settingsOf(draft), pick.report, pick.type);
         const j = { ...draft.job };
         (Object.keys(j) as (keyof InspectionJob)[]).forEach((k) => {
           if (!j[k]) j[k] = fresh.job[k];
         });
-        next = { ...draft, kind, jobId, job: j };
+        next = { ...draft, kind: pick.report, type: draft.type ?? pick.type, jobId, job: j };
       } else {
-        next = createInspectionReport(jobId, job, kind);
+        next = createInspectionReport(jobId, job, settings, pick.report, pick.type);
       }
       // The technicians' notes from SimPRO fill an empty comments box.
       const techNotes = tRes?.ok ? formatTechNotes((await tRes.json().catch(() => ({}))).notes ?? []) : "";
@@ -284,11 +277,11 @@ export default function InspectionReportPage({ onBack }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [kind, loading, importPhotos]);
+  }, [pick, settings, loading, importPhotos]);
 
   // ── Autosave (never mid-import: photos sit on data: URLs until uploaded) ──
   const { status: saveStatus, setStatus: setSaveStatus } = useDraftAutosave(
-    r ? `/api/inspection-reports/${draftKey(r.jobId, r.kind ?? "building")}` : null,
+    r ? `/api/inspection-reports/${draftKeyFor(settingsOf(r), r.jobId, r.kind ?? "building", r.type)}` : null,
     r,
     { ready: !importing && !uploading },
   );
@@ -614,7 +607,7 @@ export default function InspectionReportPage({ onBack }: Props) {
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const lib = libraryFor(r?.kind);
+  const lib = r ? libraryOf(r) : libraryFrom(settings, pick.report, pick.type);
 
   return (
     <div className={styles.root}>
@@ -652,21 +645,26 @@ export default function InspectionReportPage({ onBack }: Props) {
           onLoad={(n) => loadJob(n)}
         >
             <div className={styles.kinds} role="radiogroup" aria-label="Report type">
-              {(Object.values(LIBRARIES) as Library[]).map((l) => (
-                <button
-                  key={l.kind}
-                  role="radio"
-                  aria-checked={kind === l.kind}
-                  className={`${styles.kind} ${kind === l.kind ? styles.kindOn : ""}`}
-                  onClick={() => setKind(l.kind)}
-                >
-                  <span className={styles.kindRadio} />
-                  <span className={styles.kindText}>
-                    <span className={styles.kindLabel}>{l.label}</span>
-                    <span className={styles.kindHint}>{KIND_HINTS[l.kind]}</span>
-                  </span>
-                </button>
-              ))}
+              {leaves(settings).map((l) => {
+                const on = pick.report === l.report && (pick.type ?? "") === (l.type ?? "");
+                return (
+                  <button
+                    key={l.report + ":" + (l.type ?? "")}
+                    role="radio"
+                    aria-checked={on}
+                    disabled={l.empty}
+                    title={l.empty ? "Not set up yet: add its wording in Reports › Report types" : undefined}
+                    className={`${styles.kind} ${on ? styles.kindOn : ""}`}
+                    onClick={() => setPick({ report: l.report, type: l.type })}
+                  >
+                    <span className={styles.kindRadio} />
+                    <span className={styles.kindText}>
+                      <span className={styles.kindLabel}>{l.label}</span>
+                      <span className={styles.kindHint}>{l.empty ? "Not set up yet" : l.preset.scope}</span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
         </JobStart>
       )}
@@ -1249,9 +1247,9 @@ function PhotoEditor({
     onChange({
       label: composeLabel({
         ...tags,
-        zone: t.find((x) => /^[DS]\d+$/.test(x)) ?? "",
-        level: t.find((x) => /^L(\d+|G|R)$/.test(x)) ?? "",
-        unit: t.find((x) => /^U\d+$/.test(x)) ?? null,
+        zone: t.find((x) => readTag(x, lib.tags)?.kind === "zone") ?? "",
+        level: t.find((x) => readTag(x, lib.tags)?.kind === "level") ?? "",
+        unit: t.find((x) => readTag(x, lib.tags)?.kind === "unit") ?? null,
       }),
     });
   };
@@ -1295,7 +1293,7 @@ function PhotoEditor({
       <div className={styles.field}>
         <span className={styles.fieldLabel}>Codes</span>
         <CodeChips
-          codes={lib.codes.map((c) => ({ code: c.code, name: c.name, bg: BANDS[c.band].bg, fg: BANDS[c.band].fg }))}
+          codes={lib.codes.map((c) => ({ code: c.code, name: c.name, bg: lib.bands[c.band].bg, fg: lib.bands[c.band].fg }))}
           on={tags.codes}
           onToggle={toggle}
         />

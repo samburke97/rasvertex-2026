@@ -13,15 +13,18 @@ import { compressMapImageDataUrl } from "@/lib/reports/compressImage";
 import { zoomToFitBounds } from "@/lib/reports/staticMapZoom";
 import {
   ANCHOR_SUBTYPE_LABELS,
-  ANCHOR_TYPE_LABELS,
-  ANCHOR_TYPE_OPTIONS,
-  ANCHOR_TYPE_SUBTYPES,
   anchorGroupKey,
+  anchorIconName,
+  anchorIconSrc,
+  anchorSubtypes,
+  anchorTypeLabel,
+  anchorTypeOptions,
   anchorTypeSentence,
   pastelFor,
   computeLineEdges,
   generateId,
   DEFAULT_MAP_RATIO,
+  type AnchorDefs,
   type AnchorPoint,
   type AnchorSubtype,
   type AnchorType,
@@ -36,6 +39,8 @@ interface ZoneMapEditorProps {
   defaultNextInspection: string;
   /** Report-wide legend group order — pin colours match the report. */
   groupOrder: string[];
+  /** The report's anchor types (Reports › Settings); undefined: built-in. */
+  defs?: AnchorDefs;
   onUpdate: (zone: Zone) => void;
   onBack: () => void;
   onDelete: () => void;
@@ -257,10 +262,13 @@ export default function ZoneMapEditor({
   defaultInspectionDate,
   defaultNextInspection,
   groupOrder,
+  defs,
   onUpdate,
   onBack,
   onDelete,
 }: ZoneMapEditorProps) {
+  const typeOptions = anchorTypeOptions(defs);
+  const firstType = typeOptions.some((o) => o.value === DEFAULT_TYPE) ? DEFAULT_TYPE : (typeOptions[0]?.value ?? DEFAULT_TYPE);
   const [localZone, setLocalZone] = useState<Zone>({ ...zone });
   // Mirrors localZone so event handlers (e.g. pointerup after a drag) can
   // read the latest value directly and call `save` (which updates the
@@ -296,17 +304,17 @@ export default function ZoneMapEditor({
   const frozenMapRef = useRef<HTMLDivElement>(null);
   // Stamp mode: whichever type is selected here places instantly on tap —
   // no modal per pin, since techs place many of the same type in a row.
-  const [selectedType, setSelectedType] = useState<AnchorType>(DEFAULT_TYPE);
+  const [selectedType, setSelectedType] = useState<AnchorType>(firstType);
   // Mount sub-option for the selected type (only meaningful when the type
   // has entries in ANCHOR_TYPE_SUBTYPES) — defaults to the first option
   // whenever the selected type changes.
   const [selectedSubtype, setSelectedSubtype] = useState<
     AnchorSubtype | undefined
-  >(ANCHOR_TYPE_SUBTYPES[DEFAULT_TYPE]?.[0]);
+  >(anchorSubtypes(firstType, defs)?.[0]);
   const selectType = useCallback((type: AnchorType) => {
     setSelectedType(type);
-    setSelectedSubtype(ANCHOR_TYPE_SUBTYPES[type]?.[0]);
-  }, []);
+    setSelectedSubtype(anchorSubtypes(type, defs)?.[0]);
+  }, [defs]);
   const [editingAnchor, setEditingAnchor] = useState<AnchorPoint | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // "Close Loop" mode — armed from the last-placed static-line anchor;
@@ -639,7 +647,7 @@ export default function ZoneMapEditor({
         y,
         label: nextLabel(selectedType, localZone.anchors, lastAnchor, isWalkwayEnd),
         type: selectedType,
-        subtype: ANCHOR_TYPE_SUBTYPES[selectedType] ? selectedSubtype : undefined,
+        subtype: anchorSubtypes(selectedType, defs) ? selectedSubtype : undefined,
         commissionDate: "",
         inspectionDate: defaultInspectionDate,
         nextInspection: defaultNextInspection,
@@ -863,7 +871,7 @@ export default function ZoneMapEditor({
   ] as AnchorType[];
 
   const pastel = (a: Pick<AnchorPoint, "type" | "subtype">) =>
-    pastelFor(groupOrder, anchorGroupKey(a));
+    pastelFor(groupOrder, anchorGroupKey(a), defs);
   const lineEdges = computeLineEdges(localZone.anchors);
   const lastAnchor = localZone.anchors[localZone.anchors.length - 1];
   const canCloseLoop =
@@ -871,7 +879,7 @@ export default function ZoneMapEditor({
     !!lastAnchor &&
     lastAnchor.type === "static-line" &&
     localZone.anchors.filter((a) => a.type === "static-line").length > 1;
-  const subtypeOptions = ANCHOR_TYPE_SUBTYPES[selectedType];
+  const subtypeOptions = anchorSubtypes(selectedType, defs);
 
   return (
     <div className={`${styles.page} ${captured ? styles.fullscreen : ""}`}>
@@ -1047,11 +1055,11 @@ export default function ZoneMapEditor({
           with mounting options show them inline at the end of the same bar. */}
       {captured && (
         <div className={styles.stampBar}>
-          {ANCHOR_TYPE_OPTIONS.map((opt) => {
+          {typeOptions.map((opt) => {
             const on = selectedType === opt.value;
             const p = pastel({
               type: opt.value,
-              subtype: on ? selectedSubtype : ANCHOR_TYPE_SUBTYPES[opt.value]?.[0],
+              subtype: on ? selectedSubtype : anchorSubtypes(opt.value, defs)?.[0],
             });
             return (
               <button
@@ -1063,7 +1071,7 @@ export default function ZoneMapEditor({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={`/reports/anchor/icons/${opt.value}.svg`}
+                  src={anchorIconSrc(anchorIconName({ type: opt.value }, defs))}
                   alt=""
                   width={18}
                   height={18}
@@ -1294,7 +1302,7 @@ export default function ZoneMapEditor({
                     onPointerDown={(e) => handlePinPointerDown(e, anchor.id)}
                     onPointerMove={handlePinPointerMove}
                     onPointerUp={(e) => handlePinPointerUp(e, anchor)}
-                    title={`${anchor.label} — ${ANCHOR_TYPE_LABELS[anchor.type]}`}
+                    title={`${anchor.label} — ${anchorTypeLabel(anchor.type, defs)}`}
                   >
                     <span
                       className={styles.pinLabel}
@@ -1311,6 +1319,7 @@ export default function ZoneMapEditor({
                       types={activeTypes}
                       anchors={localZone.anchors}
                       groupOrder={groupOrder}
+                      defs={defs}
                     />
                   </div>
                 )}
@@ -1351,7 +1360,7 @@ export default function ZoneMapEditor({
                       {anchor.label}
                     </span>
                     <span className={styles.anchorRowType}>
-                      {anchorTypeSentence(anchor)}
+                      {anchorTypeSentence(anchor, defs)}
                     </span>
                   </div>
                   <span
@@ -1393,6 +1402,7 @@ export default function ZoneMapEditor({
           onDelete={handlePinDelete}
           onClose={() => setEditingAnchor(null)}
           isNew={false}
+          defs={defs}
         />
       )}
     </div>

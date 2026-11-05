@@ -16,12 +16,12 @@
 //
 // Pages: 1 Cover · 2 Contents · 3…n flowed pages · last Recommended works.
 
+import { DEFAULT_TAGS } from "@/lib/reports/settings/defaults";
+import { levelRank, readTag, tagText, zoneRank } from "@/lib/reports/settings/library";
+import type { LocationTag } from "@/lib/reports/settings/types";
 import {
-  BANDS,
-  BAND_ORDER,
-  EXCLUSIONS,
-  libraryFor,
   type Band,
+  type BandDef,
   type CardDef,
   type ExtraDef,
   type ImageKey,
@@ -33,6 +33,7 @@ import {
   SITE_MAP_ID,
   choiceId,
   contactFor,
+  libraryOf,
   parseLabel,
   photoLabel,
   type CoverPos,
@@ -76,11 +77,12 @@ const andList = (a: string[]) =>
 
 // Zone and level are optional: "" sorts last (zone) / first (level) and
 // prints as nothing.
-export const levelOrd = (l: string) => (!l ? -1 : l === "LG" ? 0 : l === "LR" ? 999 : parseInt(l.slice(1), 10));
-export const levelName = (l: string) => (!l ? "" : l === "LG" ? "Ground" : l === "LR" ? "Roof" : "Level " + l.slice(1));
-export const zoneOrd = (z: string) => (!z ? 1e9 : (z[0] === "D" ? 0 : 10000) + parseInt(z.slice(1), 10));
-export const zoneTitle = (z: string) => (!z ? "" : (z[0] === "D" ? "Drop " : "Section ") + z.slice(1));
-const unitOrd = (u: string | null) => (u ? parseInt(u.slice(1), 10) : -1);
+// What each tag means and prints as comes from the report's location tags.
+export const levelOrd = (l: string, tags: LocationTag[] = DEFAULT_TAGS) => levelRank(l, tags);
+export const levelName = (l: string, tags: LocationTag[] = DEFAULT_TAGS) => tagText(l, tags);
+export const zoneOrd = (z: string, tags: LocationTag[] = DEFAULT_TAGS) => zoneRank(z, tags);
+export const zoneTitle = (z: string, tags: LocationTag[] = DEFAULT_TAGS) => tagText(z, tags);
+const unitOrd = (u: string | null, tags: LocationTag[]) => (u ? (readTag(u, tags)?.n ?? 0) : -1);
 
 // SimPRO attachment ids rise with each upload, so they give upload order.
 const uploadOrd = (p: InspectionPhoto, i: number) => {
@@ -151,6 +153,8 @@ interface BlockBase {
 
 export interface SummaryRow {
   band: Band;
+  bg: string;
+  fg: string;
   name: string;
   count: string;
   text: string;
@@ -164,7 +168,7 @@ export type Block = BlockBase &
     | { type: "ex"; title: string; intro: string; photo: PhotoView; legend: { part: string; ex: string; mean: string }[] }
     | { type: "sub"; title: string }
     | { type: "kHead" }
-    | { type: "kGroup"; band: Band; first: boolean }
+    | { type: "kGroup"; band: Band; def: BandDef; first: boolean }
     | { type: "kRow"; chip: Chip; name: string; count: string }
     | { type: "map"; photoId: string; pins: { zone: string; x: number; y: number }[] }
     | { type: "zones" }
@@ -235,7 +239,14 @@ export interface InspectionModel {
 
 export function buildModel(data: InspectionReportData): InspectionModel {
   const { job } = data;
-  const lib = libraryFor(data.kind);
+  const lib = libraryOf(data);
+  const BANDS = lib.bands;
+  const BAND_ORDER = lib.bandOrder;
+  const TAGS = lib.tags;
+  const levelOrd = (l: string) => levelRank(l, TAGS);
+  const levelName = (l: string) => tagText(l, TAGS);
+  const zoneOrd = (z: string) => zoneRank(z, TAGS);
+  const zoneTitle = (z: string) => tagText(z, TAGS);
   const CODES = lib.codes;
   const CODE_MAP = lib.codeMap;
   const contact = contactFor(job.contact);
@@ -285,7 +296,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
 
   const sortLU = (a: ParsedPhoto, b: ParsedPhoto) =>
     (a.order ?? 1e6) - (b.order ?? 1e6) ||
-    levelOrd(a.level) - levelOrd(b.level) || unitOrd(a.unit) - unitOrd(b.unit) || a.ord - b.ord;
+    levelOrd(a.level) - levelOrd(b.level) || unitOrd(a.unit, TAGS) - unitOrd(b.unit, TAGS) || a.ord - b.ord;
   const levelsTxt = (ps: ParsedPhoto[]) => {
     const lv = [...new Set(ps.map((p) => p.level).filter(Boolean))].sort((a, b) => levelOrd(a) - levelOrd(b));
     if (!lv.length) return "";
@@ -341,7 +352,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       .join(", ");
   };
   const placeOf = (p: ParsedPhoto, withZone: boolean) =>
-    [withZone ? zoneTitle(p.zone) : "", levelName(p.level), p.unit ? "Unit " + p.unit.slice(1) : ""].filter(Boolean).join(", ");
+    [withZone ? zoneTitle(p.zone) : "", levelName(p.level), p.unit ? tagText(p.unit, TAGS) : ""].filter(Boolean).join(", ");
   const view = (p: ParsedPhoto, withZone: boolean, code: string): PhotoView => {
     // As in the proposal: the name in the label is the title, and a photo
     // that's only tags takes its defect names. The description is the
@@ -381,6 +392,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     });
     sumRows.push({
       band,
+      bg: BANDS[band].bg,
+      fg: BANDS[band].fg,
       name: BANDS[band].name,
       count: plural(n, "defect"),
       text: T(`sum.${band}`, parts.join("; ") + ". " + BANDS[band].tail),
@@ -511,7 +524,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   const kHead: Block = { type: "kHead", key: "khead", gap: 0, est: 40 };
   if (keyBands.length) add({ ...kHead, gap: 40, keep: true });
   keyBands.forEach(({ band, codes }, gi) => {
-    add({ type: "kGroup", key: "kg-" + band, band, first: gi === 0, gap: 0, keep: true, est: gi ? 86 : 62, cont: kHead });
+    add({ type: "kGroup", key: "kg-" + band, band, def: BANDS[band], first: gi === 0, gap: 0, keep: true, est: gi ? 86 : 62, cont: kHead });
     for (const c of codes) {
       const n = withCode(c.code).length;
       add({
@@ -681,7 +694,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     add({
       type: "sum",
       key: "sum",
-      note: T("sum.note", EXCLUSIONS.join(" ")),
+      note: T("sum.note", lib.exclusions.join(" ")),
       rows: sumRows,
       stats: [
         { v: nDef, k: "Defects recorded" },

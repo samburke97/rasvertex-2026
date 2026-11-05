@@ -10,8 +10,9 @@
 // rows are a fixed height), so pagination is arithmetic rather than measured.
 
 import {
-  ANCHOR_TYPE_IS_RATED,
-  ANCHOR_TYPE_LABELS,
+  anchorRated,
+  anchorRating,
+  anchorTypeLabel,
   DEFAULT_COVER_POS,
   DEFAULT_MAP_RATIO,
   anchorGroupKey,
@@ -194,6 +195,7 @@ export function buildAnchorModel(
   coverFallback: string | null,
 ): AnchorModel {
   const { job } = report;
+  const defs = report.anchorTypes;
   const site =
     job.buildingName || shortAddress(job.address) || "Anchor inspection";
   const desc = sanitizeNotesHtml(job.description);
@@ -210,7 +212,7 @@ export function buildAnchorModel(
     const types = [...new Set(z.anchors.map((a) => a.type))];
     const firstIdx = (key: string) =>
       z.anchors.findIndex((a) => anchorGroupKey(a) === key);
-    const groups = buildLegendGroups(types, z.anchors).sort(
+    const groups = buildLegendGroups(types, z.anchors, defs).sort(
       (x, y) => firstIdx(x.key) - firstIdx(y.key),
     );
     const rows: TypeRow[] = groups.map((g) => {
@@ -220,8 +222,8 @@ export function buildAnchorModel(
       const first = xs[0];
       return {
         key: g.key,
-        name: anchorTypeSentence(first),
-        icon: anchorIconName(first),
+        name: anchorTypeSentence(first, defs),
+        icon: anchorIconName(first, defs),
         range:
           xs.length > 1
             ? `${xs[0].label}–${xs[xs.length - 1].label}`
@@ -229,7 +231,7 @@ export function buildAnchorModel(
         qty: xs.length,
         passed,
         failed,
-        pastel: pastelFor(order, g.key),
+        pastel: pastelFor(order, g.key, defs),
       };
     });
     const ratio = z.mapImageRatio ?? DEFAULT_MAP_RATIO;
@@ -246,14 +248,14 @@ export function buildAnchorModel(
           label: a.label,
           x: a.x,
           y: a.y,
-          pastel: pastelFor(order, anchorGroupKey(a)),
+          pastel: pastelFor(order, anchorGroupKey(a), defs),
         })),
       lines: computeLineEdges(z.anchors).map((e) => ({
         x1: e.from.x,
         y1: e.from.y,
         x2: e.to.x,
         y2: e.to.y,
-        color: pastelFor(order, anchorGroupKey(e.from)).fg,
+        color: pastelFor(order, anchorGroupKey(e.from), defs).fg,
       })),
       types: rows,
     };
@@ -267,7 +269,7 @@ export function buildAnchorModel(
     .map((a) => a.label);
   const nFail = failedIds.length;
   const nPass = all.filter((a) => a.result === "PASSED").length;
-  const allAnchors = n > 0 && all.every((a) => ANCHOR_TYPE_IS_RATED[a.type]);
+  const allAnchors = n > 0 && all.every((a) => anchorRated(a.type, defs));
   const allRope = n > 0 && all.every((a) => a.type === "rope-access-anchor");
   const noun = allRope
     ? "rope access anchors"
@@ -291,9 +293,9 @@ export function buildAnchorModel(
     if (!row) {
       row = {
         type: a.type,
-        name: ANCHOR_TYPE_LABELS[a.type],
+        name: anchorTypeLabel(a.type, defs),
         qty: 0,
-        rating: ANCHOR_TYPE_IS_RATED[a.type] ? "15 kN" : "–",
+        rating: anchorRating(a.type, defs),
         passed: 0,
         failed: 0,
       };
@@ -309,8 +311,8 @@ export function buildAnchorModel(
   ): RegRow => ({
     id: a.id,
     label: a.label,
-    icon: anchorIconName(a),
-    type: anchorTypeSentence(a),
+    icon: anchorIconName(a, defs),
+    type: anchorTypeSentence(a, defs),
     inspected: fmtDate(a.inspectionDate, true),
     next: fmtDate(a.nextInspection, true),
     result:
