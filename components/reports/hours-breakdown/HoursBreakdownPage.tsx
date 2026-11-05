@@ -5,6 +5,7 @@ import React, { useState, useCallback, useRef, useLayoutEffect } from "react";
 import styles from "../shared/ReportPage.module.css";
 import { OverviewStyles } from "../condition/OverviewDocument";
 import HoursDocument, { HOURS_CSS, type HoursEdit } from "./HoursDocument";
+import HoursCell from "./HoursCell";
 import { buildHoursModel } from "@/lib/reports/hours.layout";
 import { PAGE_W } from "@/lib/reports/overview.layout";
 import HoursBreakdownOptionsPanel from "./HoursBreakdownOptionsPanel";
@@ -203,6 +204,7 @@ export default function HoursBreakdownPage({ onBack }: Props) {
 
   // Rows are edited in place on the preview.
   const edit: HoursEdit = {
+    Cell: HoursCell,
     onRow: (id, patch) =>
       setReport((prev) => ({ ...prev, schedule: prev.schedule.map((r) => (r.id === id ? { ...r, ...patch } : r)) })),
     onRemove: (id) => setReport((prev) => ({ ...prev, schedule: prev.schedule.filter((r) => r.id !== id) })),

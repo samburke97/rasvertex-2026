@@ -5,10 +5,10 @@
 // 1280 × 1810 pages. The builder previews it (with every cell editable in
 // place) and the PDF route prints it.
 
-import { useState } from "react";
 import { clock, hourCols } from "@/components/reports/condition/OverviewDocument";
 import { formatHours, pad, scheduleDate } from "@/lib/reports/overview.layout";
 import { normTime, type HoursModel } from "@/lib/reports/hours.layout";
+import type React from "react";
 import type { ScheduleRow } from "@/lib/reports/condition.types";
 
 /** Preview only: editing the rows in place. */
@@ -16,6 +16,8 @@ export interface HoursEdit {
   onRow: (id: string, patch: Partial<ScheduleRow>) => void;
   onRemove: (id: string) => void;
   onAdd: () => void;
+  /** The click-to-edit cell (HoursCell). */
+  Cell: React.ComponentType<CellProps>;
 }
 
 export const HOURS_CSS = `
@@ -34,34 +36,20 @@ export const HOURS_CSS = `
 .hb-add:hover{border-color:#3e7fb0;color:#2f6a94}
 `;
 
-/** A cell that shows its text and turns into a box when clicked. */
-function Cell({ value, show, type = "text", right, onSave }: { value: string; show: string; type?: "text" | "date" | "number"; right?: boolean; onSave?: (v: string) => void }) {
-  const [editing, setEditing] = useState(false);
-  if (!onSave) return <span className={right ? "ar-r" : undefined}>{show}</span>;
-  if (!editing)
-    return (
-      <span className={`hb-cell${right ? " ar-r" : ""}`} title="Click to edit" onClick={() => setEditing(true)}>
-        {show || "—"}
-      </span>
-    );
-  const done = (v: string) => {
-    setEditing(false);
-    if (v !== value) onSave(v);
-  };
-  return (
-    <input
-      className={`hb-input${right ? " ar-r" : ""}`}
-      type={type}
-      step={type === "number" ? "0.25" : undefined}
-      autoFocus
-      defaultValue={value}
-      onBlur={(e) => done(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-        if (e.key === "Escape") setEditing(false);
-      }}
-    />
-  );
+export interface CellProps {
+  value: string;
+  show: string;
+  type?: "text" | "date" | "number";
+  right?: boolean;
+  onSave?: (v: string) => void;
+}
+
+// No hooks here: the PDF routes render this on the server. The editable
+// cell (HoursCell) comes in through `edit`, from the builder only.
+function Cell(p: CellProps & { edit?: HoursEdit }) {
+  if (!p.edit || !p.onSave) return <span className={p.right ? "ar-r" : undefined}>{p.show}</span>;
+  const C = p.edit.Cell;
+  return <C {...p} />;
 }
 
 export default function HoursDocument({ model, screen, edit }: { model: HoursModel; screen?: boolean; edit?: HoursEdit }) {
@@ -96,15 +84,16 @@ export default function HoursDocument({ model, screen, edit }: { model: HoursMod
               {items.map((it, j) =>
                 it.kind === "row" ? (
                   <div key={it.id} className={`ar-tr jo-tr ${cols}`}>
-                    <Cell value={it.date} show={scheduleDate(it.date)} type="date" onSave={edit && ((v) => v && edit.onRow(it.id, { date: v }))} />
-                    <Cell value={it.name} show={it.name} onSave={edit && ((v) => edit.onRow(it.id, { employeeName: v.trim() }))} />
+                    <Cell edit={edit} value={it.date} show={scheduleDate(it.date)} type="date" onSave={edit && ((v) => v && edit.onRow(it.id, { date: v }))} />
+                    <Cell edit={edit} value={it.name} show={it.name} onSave={edit && ((v) => edit.onRow(it.id, { employeeName: v.trim() }))} />
                     {times && (
                       <>
-                        <Cell value={it.start} show={clock(it.start)} onSave={edit && ((v) => edit.onRow(it.id, { start: normTime(v) }))} />
-                        <Cell value={it.finish} show={clock(it.finish)} onSave={edit && ((v) => edit.onRow(it.id, { finish: normTime(v) }))} />
+                        <Cell edit={edit} value={it.start} show={clock(it.start)} onSave={edit && ((v) => edit.onRow(it.id, { start: normTime(v) }))} />
+                        <Cell edit={edit} value={it.finish} show={clock(it.finish)} onSave={edit && ((v) => edit.onRow(it.id, { finish: normTime(v) }))} />
                       </>
                     )}
                     <Cell
+                      edit={edit}
                       right
                       type="number"
                       value={String(it.hours || "")}
