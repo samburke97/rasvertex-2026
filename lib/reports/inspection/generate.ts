@@ -140,6 +140,8 @@ interface BlockBase {
   gap: number;
   keep?: boolean;
   brk?: boolean;
+  /** Opens a section that starts a new page unless all of it fits on this one. */
+  whole?: boolean;
   est: number;
   /** Placed first when this block opens a page (repeat header / continued). */
   cont?: Block;
@@ -448,7 +450,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     B.push(b);
     return b;
   };
-  const sec = (key: SectionKey, force = false) => {
+  const sec = (key: SectionKey, force = false, whole = false) => {
     const { title, intro } = sections.find((s) => s.key === key)!;
     add({
       type: "sec",
@@ -460,6 +462,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       keep: true,
       est: 260,
       brk: force,
+      whole,
       secKey: key,
     });
   };
@@ -499,12 +502,17 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       est: 720,
     });
   }
-  add({ type: "sub", key: "sub-key", title: "Severity", gap: 0, keep: true, est: 44, brk: true });
+  // Severity: only the codes in this report, under the bands they're in.
+  const keyBands = BAND_ORDER.map((band) => ({
+    band,
+    codes: CODES.filter((x) => x.band === band && !x.system && withCode(x.code).length),
+  })).filter((g) => g.codes.length);
+  if (keyBands.length) add({ type: "sub", key: "sub-key", title: "Severity", gap: 0, keep: true, est: 44, brk: true });
   const kHead: Block = { type: "kHead", key: "khead", gap: 0, est: 40 };
-  add({ ...kHead, gap: 40, keep: true });
-  BAND_ORDER.forEach((band, gi) => {
+  if (keyBands.length) add({ ...kHead, gap: 40, keep: true });
+  keyBands.forEach(({ band, codes }, gi) => {
     add({ type: "kGroup", key: "kg-" + band, band, first: gi === 0, gap: 0, keep: true, est: gi ? 86 : 62, cont: kHead });
-    for (const c of CODES.filter((x) => x.band === band)) {
+    for (const c of codes) {
       const n = withCode(c.code).length;
       add({
         type: "kRow",
@@ -553,7 +561,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
 
   // 03 Defects explained
   if (shown("defects")) {
-    sec("defects");
+    // On its own page, unless all of it fits under Severity.
+    sec("defects", false, true);
     const dHead: Block = { type: "dHead", key: "dhead", gap: 0, est: 40 };
     add({ ...dHead, gap: 56, keep: true });
     for (const code of present) {
@@ -797,6 +806,11 @@ export function paginate(blocks: Block[], heights: Record<string, number>): Layo
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i];
     if (b.brk && cur.length) newPage();
+    if (b.whole && cur.length) {
+      let all = b.gap + hOf(b);
+      for (let j = i + 1; j < blocks.length && !blocks[j].secKey && !blocks[j].brk; j++) all += blocks[j].gap + hOf(blocks[j]);
+      if (used + all > FLOW_H) newPage();
+    }
     let chain = (cur.length ? b.gap : 0) + hOf(b);
     for (let j = i; blocks[j].keep && j + 1 < blocks.length; j++) {
       chain += blocks[j + 1].gap + hOf(blocks[j + 1]);
