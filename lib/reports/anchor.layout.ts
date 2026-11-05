@@ -543,6 +543,8 @@ export const ANCHOR_ICON_NAMES = [
   "screw-in",
   "tensile",
   "purlin",
+  "rafter-fall-arrest",
+  "rafter-rope-access",
 ] as const;
 export const anchorIconPath = (name: string) =>
   `reports/anchor/icons/${name}.svg`;

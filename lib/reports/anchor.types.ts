@@ -32,7 +32,8 @@ export type AnchorSubtype =
   | "through-bolt"
   | "screw-in"
   | "tensile"
-  | "purlin";
+  | "purlin"
+  | "rafter";
 
 export interface AnchorPoint {
   id: string;
@@ -184,8 +185,10 @@ export function pastelFor(order: string[], key: string): Pastel {
   return PASTEL_CYCLE[(i < 0 ? order.length : i) % PASTEL_CYCLE.length];
 }
 
-/** Icon file (public/reports/anchor/icons) for an anchor: subtype first. */
+/** Icon file (public/reports/anchor/icons) for an anchor: subtype first.
+ *  Rafter anchors have one icon per type, fall arrest and rope access. */
 export function anchorIconName(a: Pick<AnchorPoint, "type" | "subtype">): string {
+  if (a.subtype === "rafter") return a.type === "rope-access-anchor" ? "rafter-rope-access" : "rafter-fall-arrest";
   return a.subtype ?? a.type;
 }
 
@@ -237,12 +240,13 @@ export const ANCHOR_SUBTYPE_LABELS: Record<AnchorSubtype, string> = {
   "screw-in": "Screw In",
   tensile: "Tensile",
   purlin: "Purlin",
+  rafter: "Rafter",
 };
 
 // Only these anchor types offer a mounting sub-choice; anything absent
 // here places directly, no sub-picker shown.
 export const ANCHOR_TYPE_SUBTYPES: Partial<Record<AnchorType, AnchorSubtype[]>> = {
-  "fall-arrest-anchor": ["surface-mount", "eye-bolt", "purlin"],
+  "fall-arrest-anchor": ["surface-mount", "eye-bolt", "purlin", "rafter"],
   "rope-access-anchor": [
     "surface-mount",
     "eye-bolt",
@@ -250,6 +254,7 @@ export const ANCHOR_TYPE_SUBTYPES: Partial<Record<AnchorType, AnchorSubtype[]>> 
     "screw-in",
     "tensile",
     "purlin",
+    "rafter",
   ],
 };
 
@@ -263,7 +268,8 @@ export type LegendIconShape =
   | "square"
   | "triangle"
   | "diamond"
-  | "bar";
+  | "bar"
+  | "hexagon";
 
 export const ANCHOR_SUBTYPE_ICONS: Record<AnchorSubtype, LegendIconShape> = {
   "surface-mount": "circle",
@@ -272,6 +278,7 @@ export const ANCHOR_SUBTYPE_ICONS: Record<AnchorSubtype, LegendIconShape> = {
   "screw-in": "triangle",
   tensile: "diamond",
   purlin: "bar",
+  rafter: "hexagon",
 };
 
 export function anchorTypeDisplayLabel(anchor: AnchorPoint): string {
