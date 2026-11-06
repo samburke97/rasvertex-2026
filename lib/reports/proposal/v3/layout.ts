@@ -30,6 +30,8 @@ export const RUN_STATS_H = 156;
 const RUN_NAME_W = 840;
 const RUN_DESC_W = 900;
 const H2 = 53; // 48 × 1.1
+/** Your project: the smallest the photo gets before it moves to the next sheet. */
+export const PROJECT_PHOTO_MIN = 360;
 const TABLE_HEAD = 37; // label line + 14 padding + 1 rule
 
 // Findings cards: photo + gap + text block, two per row.
@@ -122,6 +124,9 @@ export interface GroupSlice<T> {
 
 export type SheetData =
   | { kind: "single" }
+  /** Your project: the head (title, overview, figures), the photo and
+   *  Higher standards, split over two sheets when they don't fit one. */
+  | { kind: "project"; top: boolean; photo: boolean; standards: boolean }
   | { kind: "scope"; inc: string[]; exc: string[] }
   | { kind: "findings"; items: { f: Finding; i: number; textH: number }[] }
   | { kind: "findingsGrouped"; blocks: GroupBlock[] }
@@ -337,6 +342,35 @@ export function layoutPage(p: Proposal, id: PageId): Sheet[] {
           };
         }),
       );
+    }
+    case "project": {
+      const P = d.project;
+      const room = BOTTOM - TOP;
+      const head = SEC_LABEL + H2 + ledeH(P.p1, 860) + ledeH(P.p2, 860, 16);
+      const cardW = (CONTENT_W - 24) / 3 - 56;
+      const figures = 56 + 44 + 17 + 8 + Math.max(...[P.type, P.access, P.program].map((v) => textLines(v, 20, cardW, 700))) * 26;
+      const photo = 56 + PROJECT_PHOTO_MIN;
+      const intro = P.hideSpec ? richH(P.noSpecIntro, 20, 32, 700) : richH(P.specIntro, 20, 32, 860);
+      let standards = 72 + 44 + 16 + (P.hideSpec ? Math.max(intro, 44) : intro);
+      if (!P.hideSpec) {
+        const rows = P.rows[P.brand] ?? [];
+        standards += 48 + TABLE_HEAD + 32 + 60;
+        for (const r of rows)
+          standards += 37 + Math.max(textLines(r.surface, 20, 284, 600), textLines(r.system, 20, 484), textLines(r.coats, 20, 240)) * 30;
+      }
+      const top = head + figures;
+      if (top + photo + standards <= room) return sheetsOf(id, [{ kind: "project", top: true, photo: true, standards: true }]);
+      // Too much for one sheet: Higher standards moves to the next, and the
+      // photo with it if that doesn't fit either.
+      if (top + photo <= room)
+        return sheetsOf(id, [
+          { kind: "project", top: true, photo: true, standards: false },
+          { kind: "project", top: false, photo: false, standards: true },
+        ]);
+      return sheetsOf(id, [
+        { kind: "project", top: true, photo: false, standards: false },
+        { kind: "project", top: false, photo: true, standards: true },
+      ]);
     }
     default:
       return sheetsOf(id, [{ kind: "single" }]);

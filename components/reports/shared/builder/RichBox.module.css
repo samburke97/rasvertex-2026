@@ -1,9 +1,9 @@
 /* RichBox.module.css: the "/" editor box used for every multi-line field in
    the report builders. */
 
-.rich { border: 1px solid var(--app-line, rgba(var(--ink-rgb), 0.12)); border-radius: 9px; background: var(--app-surface, var(--surface, #fff)); padding: 8px 12px; min-height: 64px; cursor: text; }
+.rich { border: 1px solid var(--app-line, rgba(var(--ink-rgb), 0.12)); border-radius: 9px; background: var(--app-surface, var(--surface, #fff)); padding: 8px 12px; min-height: 64px; cursor: text; min-width: 0; max-width: 100%; }
 .rich:focus-within { border-color: var(--app-accent, var(--blue-500)); box-shadow: 0 0 0 3px var(--app-accent-tint, var(--blue-100)); }
-.rich :global(.tiptap) { outline: none; font-size: 13.5px; line-height: 1.5; color: var(--app-ink, var(--ink)); min-height: 46px; cursor: text; }
+.rich :global(.tiptap) { outline: none; font-size: 13.5px; line-height: 1.5; color: var(--app-ink, var(--ink)); min-height: 46px; cursor: text; overflow-wrap: anywhere; word-break: break-word; }
 .rich > div > div:last-child { min-height: 0; }
 .rich:not(.richList) :global(.tiptap p[data-placeholder]:first-child)::before { content: attr(data-placeholder); float: left; height: 0; color: rgba(var(--ink-rgb), 0.35); pointer-events: none; }
 .richList :global(.tiptap p[data-placeholder]:first-child)::after { content: attr(data-placeholder); position: absolute; left: 16px; top: 0; white-space: nowrap; color: rgba(var(--ink-rgb), 0.35); pointer-events: none; }

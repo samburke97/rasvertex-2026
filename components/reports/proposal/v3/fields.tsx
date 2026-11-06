@@ -358,11 +358,6 @@ export function Photo({ ctx, label, path, extra, info }: { ctx: BuilderCtx; labe
           </button>
         )}
         {extra}
-        {ref && (
-          <button className={`${styles.linkBtn} ${styles.danger}`} title="Take this photo off the page" onClick={() => ctx.set(path, "")}>
-            Remove
-          </button>
-        )}
       </div>
       {aspect != null && (
         <CropModal

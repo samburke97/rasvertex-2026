@@ -488,6 +488,8 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
       program: "",
       photo: T.projectPhoto,
       brand: T.brands[0],
+      // No spec until one is identified for the job: the partner logos show instead.
+      hideSpec: true,
       noSpecIntro: `After 25+ years ${W ? "waterproofing" : "painting"} coastal buildings, we know which systems last here. Your specification will be confirmed with the manufacturer’s representative, who also inspects our work on site, so your warranty is backed by both of us.`,
       specIntro: `After 25+ years ${W ? "waterproofing" : "painting"} coastal buildings, we know which systems last here. Each one below was specified with the manufacturer’s representative, who also inspects our work on site, so your warranty is backed by both of us.`,
       note: W

@@ -12,7 +12,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { codeName, money, parseAmt, type Derived } from "@/lib/reports/proposal/v3/derive";
-import { FINDING_PHOTO_H, MAX_POINTS, REPORT_PHOTO_H, RUN_STATS_H, SITE_MAP_H, refsText, shownWhere, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
+import { FINDING_PHOTO_H, MAX_POINTS, PROJECT_PHOTO_MIN, REPORT_PHOTO_H, RUN_STATS_H, SITE_MAP_H, refsText, shownWhere, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
 import { RICH_CSS, richHtml, richItems } from "@/lib/reports/proposal/v3/rich";
 import { capFirst } from "@/lib/reports/richText";
 import { RemoveX, dragProps } from "@/components/reports/shared/builder/PhotoTools";
@@ -293,6 +293,8 @@ function Sheet({ r, s, cover, children }: PageProps & { cover?: boolean; childre
           fontFamily: INTER,
           color: NAVY,
           lineHeight: 1.7,
+          // A long unbroken word wraps rather than running off the sheet.
+          overflowWrap: "anywhere",
           padding: cover ? "80px 96px 96px" : "80px 96px 150px",
           position: "relative",
           boxSizing: "border-box",
@@ -651,57 +653,81 @@ function Project({ r, s }: PageProps) {
   const brand = BRANDS[d.brand] ?? BRANDS.dulux;
   const rows = d.rows[d.brand] ?? [];
   const cols = "minmax(0,1fr) minmax(0,1.7fr) 240px";
+  // Which blocks this sheet holds (layout.ts splits a page too full for one).
+  const part = dataOf(s, "project") ?? { top: true, photo: true, standards: true };
   return (
     <Sheet r={r} s={s}>
       <SecLabel text={r.D.sectionLabel.project} />
-      <h2 style={h2}>Your project</h2>
-      <Rich v={d.p1} edit="project.p1" style={lede(860)} />
-      <Rich v={d.p2} edit="project.p2" style={lede(860, 16)} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12, marginTop: 56 }}>
-        {(
-          [
-            ["Building type", d.type, "type"],
-            ["Access method", d.access, "access"],
-            ["Program", d.program, "program"],
-          ] as const
-        ).map(([k, v, f]) => (
-          <div key={k} data-edit={`project.${f}`} style={card}>
-            <div style={label}>{k}</div>
-            <div style={cardValue}>{v}</div>
+      {part.top && (
+        <>
+          <h2 style={h2}>Your project</h2>
+          <Rich v={d.p1} edit="project.p1" style={lede(860)} />
+          <Rich v={d.p2} edit="project.p2" style={lede(860, 16)} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12, marginTop: 56 }}>
+            {(
+              [
+                ["Building type", d.type, "type"],
+                ["Access method", d.access, "access"],
+                ["Program", d.program, "program"],
+              ] as const
+            ).map(([k, v, f]) => (
+              <div key={k} data-edit={`project.${f}`} style={card}>
+                <div style={label}>{k}</div>
+                <div style={cardValue}>{v}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <FramedPhoto edit="project.photo" src={r.img(d.photo)} pos={d.pos} style={{ width: "100%", flex: "1 1 0", minHeight: 360, borderRadius: 20, marginTop: 56 }} />
-      <div style={{ marginTop: 72 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <h3 style={h3card}>Higher standards.</h3>
+        </>
+      )}
+      {part.photo && (
+        <FramedPhoto
+          edit="project.photo"
+          src={r.img(d.photo)}
+          pos={d.pos}
+          style={{ width: "100%", flex: "1 1 0", minHeight: PROJECT_PHOTO_MIN, borderRadius: 20, marginTop: part.top ? 56 : 0 }}
+        />
+      )}
+      {part.standards && (
+        <div style={{ marginTop: part.top || part.photo ? 72 : 0 }}>
           {d.hideSpec ? (
-            <Rich v={d.noSpecIntro} edit="project.noSpecIntro" style={lede(860, 0)} />
+            // No spec yet: the trade's partner logos sit bottom right.
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 48 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0, maxWidth: 700 }}>
+                <h3 style={h3card}>Higher standards.</h3>
+                <Rich v={d.noSpecIntro} edit="project.noSpecIntro" style={lede(700, 0)} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 32, flexShrink: 0, paddingBottom: 4 }}>
+                {tradeOf(r.p.trade).brands.map((b) => (
+                  <img key={b} src={r.img(BRANDS[b].logo) || undefined} alt={BRANDS[b].name} style={{ height: BRANDS[b].height, width: "auto", display: "block" }} />
+                ))}
+              </div>
+            </div>
           ) : (
-            <Rich v={d.specIntro} edit="project.specIntro" style={lede(860, 0)} />
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <h3 style={h3card}>Higher standards.</h3>
+                <Rich v={d.specIntro} edit="project.specIntro" style={lede(860, 0)} />
+              </div>
+              <div style={{ ...tableHead(cols, 48), gap: 40, lineHeight: 1.3 }}>
+                <span>Surface</span>
+                <span>System</span>
+                <span>{tradeOf(r.p.trade).coatsLabel}</span>
+              </div>
+              {rows.map((sr, i) => (
+                <div key={i} data-edit={`project.rows.${d.brand}.${i}.surface`} style={{ display: "grid", gridTemplateColumns: cols, gap: 40, padding: "18px 0", borderBottom: rule(i, rows.length), fontSize: "1.25rem", lineHeight: 1.5 }}>
+                  <span style={{ fontWeight: 600 }}>{sr.surface}</span>
+                  <span>{sr.system}</span>
+                  <span style={{ color: INK(0.65) }}>{sr.coats}</span>
+                </div>
+              ))}
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 24, marginTop: 32 }}>
+                <img src={r.img(brand.logo) || undefined} alt={brand.name} style={{ height: brand.height, width: "auto", display: "block" }} />
+                <span data-edit="project.note" style={{ fontSize: "1.0625rem", lineHeight: 1, color: INK(0.6), paddingBottom: 2 }}>{d.note}</span>
+              </div>
+            </>
           )}
         </div>
-        {!d.hideSpec && (
-          <>
-          <div style={{ ...tableHead(cols, 48), gap: 40, lineHeight: 1.3 }}>
-            <span>Surface</span>
-            <span>System</span>
-            <span>{tradeOf(r.p.trade).coatsLabel}</span>
-          </div>
-          {rows.map((sr, i) => (
-            <div key={i} data-edit={`project.rows.${d.brand}.${i}.surface`} style={{ display: "grid", gridTemplateColumns: cols, gap: 40, padding: "18px 0", borderBottom: rule(i, rows.length), fontSize: "1.25rem", lineHeight: 1.5 }}>
-              <span style={{ fontWeight: 600 }}>{sr.surface}</span>
-              <span>{sr.system}</span>
-              <span style={{ color: INK(0.65) }}>{sr.coats}</span>
-            </div>
-          ))}
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 24, marginTop: 32 }}>
-            <img src={r.img(brand.logo) || undefined} alt={brand.name} style={{ height: brand.height, width: "auto", display: "block" }} />
-            <span data-edit="project.note" style={{ fontSize: "1.0625rem", lineHeight: 1, color: INK(0.6), paddingBottom: 2 }}>{d.note}</span>
-          </div>
-          </>
-        )}
-      </div>
+      )}
       <Footer r={r} s={s} />
     </Sheet>
   );
@@ -1209,7 +1235,7 @@ function Safety({ r, s }: PageProps) {
       </div>
       <Quote
         gap={72}
-        text="“High standards begin with safety. Through preparation, accountability and strong leadership, we create an environment where people can perform with confidence and deliver quality outcomes consistently.”"
+        text="“High standards begin with safety. Through careful planning, awareness of risks and clear communication, we equip our team to work confidently, maintain quality and ensure everyone gets home safely at the end of each day.”"
         who="Archer Dutch"
         role="Height & Safety Manager"
       />
