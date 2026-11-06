@@ -12,7 +12,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { codeName, money, parseAmt, type Derived } from "@/lib/reports/proposal/v3/derive";
-import { FINDING_PHOTO_H, MAX_POINTS, PROJECT_PHOTO_MIN, REPORT_PHOTO_H, RUN_STATS_H, SITE_MAP_H, refsText, shownWhere, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
+import { FINDING_PHOTO_H, INSURANCE, MAX_POINTS, PROJECT_PHOTO_MIN, REPORT_PHOTO_H, RUN_STATS_H, SITE_MAP_H, contd, refsText, shownWhere, type GroupBlock, type Sheet, type SheetData } from "@/lib/reports/proposal/v3/layout";
 import { RICH_CSS, richHtml, richItems } from "@/lib/reports/proposal/v3/rich";
 import { capFirst } from "@/lib/reports/richText";
 import { RemoveX, dragProps } from "@/components/reports/shared/builder/PhotoTools";
@@ -81,8 +81,9 @@ export interface DocProps {
 const bg = (url: string) => (url ? `url("${url}")` : "none");
 
 /** A rich prose field (paragraphs, lists, bold, italic), styled by `style`. */
-function Rich({ v, style, edit }: { v: string; style: CSSProperties; edit?: string }) {
-  const html = richHtml(v);
+function Rich({ v, style, edit, raw }: { v: string; style: CSSProperties; edit?: string; raw?: boolean }) {
+  // raw: already-clean HTML, a part of a field split over sheets (flow).
+  const html = raw ? v : richHtml(v);
   if (!html) return null;
   return <div className="pb3-rt" data-edit={edit} style={style} dangerouslySetInnerHTML={{ __html: html }} />;
 }
@@ -593,57 +594,67 @@ function Intro({ r, s }: PageProps) {
   const b = r.mode === "build";
   const v = r.D.bound;
   const d = r.p.d.intro;
+  const f = flowOf(s);
   const body: CSSProperties = { margin: 0, color: INK(0.8), textWrap: "pretty" };
+  const bullets = d.bullets.map((it, i) => ({ it, i })).filter(({ i }) => f.has(`b${i}`));
   return (
     <Sheet r={r} s={s}>
       <SecLabel text={r.D.sectionLabel.intro} />
-      <h2 style={h2}>Introduction</h2>
-      <div style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 860, marginTop: 56, fontSize: "1.25rem", lineHeight: 1.65 }}>
-        <p style={{ margin: 0, color: INK(0.65) }}>
-          <strong style={{ color: NAVY, fontWeight: 700 }}>
-            <Bind build={b}>{v.building}</Bind>
-          </strong>
-          <br />
-          Quote #<Bind build={b}>{v.quote}</Bind>
-          <br />
-          <Bind build={b}>{v.site}</Bind>
-          <br />
-          <Bind build={b}>{v.date}</Bind>
-        </p>
-        <p style={{ margin: "32px 0 0" }}>
-          Dear <Bind build={b}>{v.contact}</Bind>,
-        </p>
-        <Rich v={d.open} edit="intro.open" style={body} />
-        <div style={{ display: "flex", flexDirection: "column", marginTop: 8 }}>
-          {d.bullets.map((it, i) => (
-            <div key={i} data-edit={`intro.bullets.${i}.t`} style={{ display: "grid", gridTemplateColumns: "22px minmax(0,1fr)", padding: "16px 0", borderBottom: rule(i, d.bullets.length) }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: NAVY, marginTop: 14 }} />
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ fontSize: "1.25rem", fontWeight: 700, lineHeight: 1.5 }}>{it.t}</span>
-                <Rich v={it.d} edit={`intro.bullets.${i}.d`} style={{ fontSize: "1.0625rem", lineHeight: 1.5, color: INK(0.65), textWrap: "pretty" }} />
-              </div>
-            </div>
-          ))}
-        </div>
-        <Rich v={d.close} edit="intro.close" style={body} />
-        <div style={{ marginTop: 24 }}>
-          <p style={{ margin: 0, color: INK(0.8) }}>Kind regards,</p>
-          {/* Signed by whoever wrote it: the project manager on the job. */}
-          <div style={{ height: 80, margin: "20px 0 8px", display: "flex", alignItems: "flex-end", paddingBottom: 4 }}>
-            <span style={{ fontFamily: "'La Belle Aurore',cursive", fontSize: "2.25rem", lineHeight: 1, color: NAVY }}>
-              <Bind build={b}>{v.pm}</Bind>
-            </span>
-          </div>
-          <p style={{ margin: 0, fontWeight: 700 }}>
-            <Bind build={b}>{v.pm}</Bind>
+      {f.has("h2") && <h2 style={h2}>Introduction</h2>}
+      <div style={{ display: "flex", flexDirection: "column", maxWidth: 860, fontSize: "1.25rem", lineHeight: 1.65 }}>
+        {f.has("address") && (
+          <p style={{ margin: `${f.mt("address", 56)}px 0 0`, color: INK(0.65) }}>
+            <strong style={{ color: NAVY, fontWeight: 700 }}>
+              <Bind build={b}>{v.building}</Bind>
+            </strong>
             <br />
-            <span style={{ fontWeight: 400, color: INK(0.65) }}>
-              <Bind build={b}>{v.pmTitle}</Bind>, RAS-VERTEX Maintenance Solutions
-            </span>
+            Quote #<Bind build={b}>{v.quote}</Bind>
+            <br />
+            <Bind build={b}>{v.site}</Bind>
+            <br />
+            <Bind build={b}>{v.date}</Bind>
           </p>
-        </div>
+        )}
+        {f.has("dear") && (
+          <p style={{ margin: `${f.mt("dear", 56)}px 0 0` }}>
+            Dear <Bind build={b}>{v.contact}</Bind>,
+          </p>
+        )}
+        {f.text("open", d.open, "intro.open", { ...body, marginTop: 24 })}
+        {bullets.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", marginTop: f.mt(`b${bullets[0].i}`, 32) }}>
+            {bullets.map(({ it, i }, k) => (
+              <div key={i} data-edit={`intro.bullets.${i}.t`} style={{ display: "grid", gridTemplateColumns: "22px minmax(0,1fr)", padding: "16px 0", borderBottom: rule(k, bullets.length) }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: NAVY, marginTop: 14 }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: "1.25rem", fontWeight: 700, lineHeight: 1.5 }}>{it.t}</span>
+                  <Rich v={it.d} edit={`intro.bullets.${i}.d`} style={{ fontSize: "1.0625rem", lineHeight: 1.5, color: INK(0.65), textWrap: "pretty" }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {f.text("close", d.close, "intro.close", { ...body, marginTop: 24 })}
+        {f.has("sign") && (
+          <div style={{ marginTop: f.mt("sign", 48) }}>
+            <p style={{ margin: 0, color: INK(0.8) }}>Kind regards,</p>
+            {/* Signed by whoever wrote it: the project manager on the job. */}
+            <div style={{ height: 80, margin: "20px 0 8px", display: "flex", alignItems: "flex-end", paddingBottom: 4 }}>
+              <span style={{ fontFamily: "'La Belle Aurore',cursive", fontSize: "2.25rem", lineHeight: 1, color: NAVY }}>
+                <Bind build={b}>{v.pm}</Bind>
+              </span>
+            </div>
+            <p style={{ margin: 0, fontWeight: 700 }}>
+              <Bind build={b}>{v.pm}</Bind>
+              <br />
+              <span style={{ fontWeight: 400, color: INK(0.65) }}>
+                <Bind build={b}>{v.pmTitle}</Bind>, RAS-VERTEX Maintenance Solutions
+              </span>
+            </p>
+          </div>
+        )}
       </div>
-      <ContactFooter r={r} />
+      {f.last ? <ContactFooter r={r} /> : <Footer r={r} s={s} />}
     </Sheet>
   );
 }
@@ -653,42 +664,39 @@ function Project({ r, s }: PageProps) {
   const brand = BRANDS[d.brand] ?? BRANDS.dulux;
   const rows = d.rows[d.brand] ?? [];
   const cols = "minmax(0,1fr) minmax(0,1.7fr) 240px";
-  // Which blocks this sheet holds (layout.ts splits a page too full for one).
-  const part = dataOf(s, "project") ?? { top: true, photo: true, standards: true };
+  const f = flowOf(s);
   return (
     <Sheet r={r} s={s}>
       <SecLabel text={r.D.sectionLabel.project} />
-      {part.top && (
-        <>
-          <h2 style={h2}>Your project</h2>
-          <Rich v={d.p1} edit="project.p1" style={lede(860)} />
-          <Rich v={d.p2} edit="project.p2" style={lede(860, 16)} />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12, marginTop: 56 }}>
-            {(
-              [
-                ["Building type", d.type, "type"],
-                ["Access method", d.access, "access"],
-                ["Program", d.program, "program"],
-              ] as const
-            ).map(([k, v, f]) => (
-              <div key={k} data-edit={`project.${f}`} style={card}>
-                <div style={label}>{k}</div>
-                <div style={cardValue}>{v}</div>
-              </div>
-            ))}
-          </div>
-        </>
+      {f.has("h2") && <h2 style={h2}>Your project</h2>}
+      {f.text("p1", d.p1, "project.p1", lede(860))}
+      {f.text("p2", d.p2, "project.p2", lede(860, 16))}
+      {f.has("figures") && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 12, marginTop: f.mt("figures", 56) }}>
+          {(
+            [
+              ["Building type", d.type, "type"],
+              ["Access method", d.access, "access"],
+              ["Program", d.program, "program"],
+            ] as const
+          ).map(([k, v, fld]) => (
+            <div key={k} data-edit={`project.${fld}`} style={card}>
+              <div style={label}>{k}</div>
+              <div style={cardValue}>{v}</div>
+            </div>
+          ))}
+        </div>
       )}
-      {part.photo && (
+      {f.has("photo") && (
         <FramedPhoto
           edit="project.photo"
           src={r.img(d.photo)}
           pos={d.pos}
-          style={{ width: "100%", flex: "1 1 0", minHeight: PROJECT_PHOTO_MIN, borderRadius: 20, marginTop: part.top ? 56 : 0 }}
+          style={{ width: "100%", flex: "1 1 0", minHeight: PROJECT_PHOTO_MIN, borderRadius: 20, marginTop: f.mt("photo", 56) }}
         />
       )}
-      {part.standards && (
-        <div style={{ marginTop: part.top || part.photo ? 72 : 0 }}>
+      {f.has("standards") && (
+        <div style={{ marginTop: f.mt("standards", 72) }}>
           {d.hideSpec ? (
             // No spec yet: the trade's partner logos sit bottom right.
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 48 }}>
@@ -739,6 +747,25 @@ function dataOf<K extends SheetData["kind"]>(s: Sheet, kind: K): Extract<SheetDa
   return s.data.kind === kind ? (s.data as Extract<SheetData, { kind: K }>) : null;
 }
 
+/** A flowing page's blocks on this sheet (layout.ts flow): which are here,
+ *  the space above each (none at the top of a sheet), and each text
+ *  field's paragraphs. */
+function flowOf(s: Sheet) {
+  const parts = dataOf(s, "flow")?.parts;
+  const part = (id: string) => parts?.find((x) => x.id === id);
+  return {
+    has: (id: string) => !parts || !!part(id),
+    mt: (id: string, m: number) => (part(id)?.top ? 0 : m),
+    /** A text field: the part on this sheet, or the whole field. */
+    text: (id: string, v: string, edit: string, style: CSSProperties) => {
+      const x = part(id);
+      if (parts && !x) return null;
+      return x?.html != null ? <Rich raw v={x.html} edit={edit} style={{ ...style, marginTop: x.top ? 0 : style.marginTop }} /> : <Rich v={v} edit={edit} style={style} />;
+    },
+    last: dataOf(s, "flow")?.last ?? true,
+  };
+}
+
 /** Section label on every sheet; title and lede only on a page's first. */
 function Head({ r, s, title, intro, width, edit }: PageProps & { title: string; intro: string; width?: number; edit: string }) {
   return (
@@ -750,12 +777,14 @@ function Head({ r, s, title, intro, width, edit }: PageProps & { title: string; 
           <Rich v={intro} edit={edit} style={lede(width)} />
         </>
       )}
+      {/* The end of an intro too long for the first sheet (layout.ts). */}
+      {!!s.tail && <Rich raw v={s.tail} edit={edit} style={lede(width, 0)} />}
     </>
   );
 }
 
 /** Content after the head: 56 below the lede on a first sheet, flush on a continuation. */
-const flowTop = (s: Sheet, first = 56) => (s.part ? 0 : first);
+const flowTop = (s: Sheet, first = 56) => (s.part && !s.tail ? 0 : first);
 
 function Scope({ r, s }: PageProps) {
   const d = r.p.d.scope;
@@ -793,8 +822,8 @@ function Scope({ r, s }: PageProps) {
     <Sheet r={r} s={s}>
       <Head r={r} s={s} title="Scope" intro={d.intro} edit="scope.intro" />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 64, marginTop: flowTop(s) }}>
-        {col(s.part ? "Included, continued" : "Included", data?.inc ?? [], true)}
-        {col(s.part ? "Not included, continued" : "Not included", data?.exc ?? [], false)}
+        {col(contd(s) ? "Included, continued" : "Included", data?.inc ?? [], true)}
+        {col(contd(s) ? "Not included, continued" : "Not included", data?.exc ?? [], false)}
       </div>
       <Footer r={r} s={s} />
     </Sheet>
@@ -1058,7 +1087,7 @@ function Flagged({ r, s }: PageProps) {
   return (
     <Sheet r={r} s={s}>
       <Head r={r} s={s} title="Flagged issues" intro={d.intro} edit="flagged.intro" />
-      {!s.part && (
+      {!contd(s) && (
         <div style={{ background: BLUE_CARD, borderRadius: 24, padding: "40px 48px", display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 24, marginTop: 56 }}>
           {r.D.flagStats.map((st) => (
             <div key={st.k} style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: 12, minWidth: 0 }}>
@@ -1276,7 +1305,7 @@ function Pricing({ r, s }: PageProps) {
         <div style={{ display: "flex", flexDirection: "column", marginTop: flowTop(s) }}>
           {rows.length > 0 && (
             <div style={{ display: "flex", justifyContent: "space-between", gap: 24, paddingBottom: 14, borderBottom: `1px solid ${RULE_STRONG}`, ...label }}>
-              <span>{s.part ? "Stage, continued" : "Stage"}</span>
+              <span>{contd(s) ? "Stage, continued" : "Stage"}</span>
               <span>Price (ex GST)</span>
             </div>
           )}
@@ -1361,6 +1390,7 @@ function Maintenance({ r, s }: PageProps) {
   const mg = Math.round(mp * 10) / 100;
   const greyChip = chip(BANDS.grey);
   const T = tradeOf(r.p.trade);
+  const f = flowOf(s);
   const PLAN = PLAN_ROWS.map((x): (typeof PLAN_ROWS)[number] =>
     x[0] === "03" ? [x[0], T.hoursLabel, x[2], x[3]] : x[0] === "07" ? [x[0], `${T.warrantyYears}-year warranty`, x[2], x[3]] : x,
   );
@@ -1375,14 +1405,18 @@ function Maintenance({ r, s }: PageProps) {
   return (
     <Sheet r={r} s={s}>
       <SecLabel text={r.D.sectionLabel.maintenance} />
+      {f.has("h2") && (
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
         <h2 style={h2}>10-year maintenance plan</h2>
         <span style={{ display: "inline-flex", alignItems: "center", height: 32, padding: "0 12px", borderRadius: 8, background: GREEN.bg, color: GREEN.fg, fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1 }}>
           Optional
         </span>
       </div>
-      <Rich v={d.intro} edit="maintenance.intro" style={lede()} />
-      <div style={tableHead(cols)}>
+      )}
+      {f.text("intro", d.intro, "maintenance.intro", lede())}
+      {f.has("table") && (
+        <>
+      <div style={tableHead(cols, f.mt("table", 56))}>
         <span>Item</span>
         <span>Service</span>
         <span>RAS-VERTEX</span>
@@ -1392,10 +1426,15 @@ function Maintenance({ r, s }: PageProps) {
       {PLAN.slice(0, 4).map((x, i) => row(x, i === 3))}
       <GroupBar name="Plan terms" desc="Billed quarterly. Labour fixed for two years, then CPI." bg={BLUE_CARD} pt={28} />
       {PLAN.slice(4).map((x, i) => row(x, i === 2))}
-      <div data-edit="maintenance.price" style={{ display: "flex", flexDirection: "column", marginTop: 72 }}>
+        </>
+      )}
+      {f.has("price") && (
+      <div data-edit="maintenance.price" style={{ display: "flex", flexDirection: "column", marginTop: f.mt("price", 72) }}>
         <MoneyRows ex={money(mp)} gst={money(mg)} inc={money(mp + mg)} exLabel="Maintenance plan, per year (ex GST)" incLabel="Per year incl. GST" />
       </div>
-      <div style={{ marginTop: "auto", alignSelf: "flex-start", display: "inline-flex", flexDirection: "column", alignItems: "stretch", gap: 24 }}>
+      )}
+      {f.has("contact") && (
+      <div style={{ marginTop: "auto", paddingTop: f.mt("contact", 56), alignSelf: "flex-start", display: "inline-flex", flexDirection: "column", alignItems: "stretch", gap: 24 }}>
         <div style={{ display: "flex", alignItems: "flex-end", gap: 20 }}>
           <img src={r.img(asset("people-caro.jpg")) || undefined} alt="Caroline Park" style={{ width: 96, height: 120, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1414,6 +1453,7 @@ function Maintenance({ r, s }: PageProps) {
           </svg>
         </a>
       </div>
+      )}
       <Footer r={r} s={s} />
     </Sheet>
   );
@@ -1435,18 +1475,20 @@ function Accept({ r, s }: PageProps) {
     </div>
   );
   const rvVal: CSSProperties = { fontSize: "1.25rem", fontWeight: 700, paddingBottom: 8 };
+  const f = flowOf(s);
   const panel: CSSProperties = { background: "#ffffff", padding: "40px 48px", display: "flex", flexDirection: "column", gap: 20 };
   return (
     <Sheet r={r} s={s}>
       <SecLabel text={r.D.sectionLabel.accept} />
-      <h2 style={h2}>Acceptance</h2>
-      <div style={lede(860)}>
-        <Rich v={r.p.d.accept.intro} edit="accept.intro" style={{}} />
-        <p style={{ margin: richHtml(r.p.d.accept.intro) ? "0.6em 0 0" : 0 }}>
+      {f.has("h2") && <h2 style={h2}>Acceptance</h2>}
+      {f.text("intro", r.p.d.accept.intro, "accept.intro", lede(860))}
+      {f.has("valid") && (
+        <p style={{ ...lede(860), marginTop: f.mt("valid", richHtml(r.p.d.accept.intro) ? 12 : 20) }}>
           Valid until <Bind build={b}>{v.validUntil}</Bind>.
         </p>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 1, marginTop: 56, background: RULE, border: `1px solid ${RULE}`, borderRadius: 24, overflow: "hidden" }}>
+      )}
+      {f.has("panels") && (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 1, marginTop: f.mt("panels", 56), background: RULE, border: `1px solid ${RULE}`, borderRadius: 24, overflow: "hidden" }}>
         <div style={panel}>
           <h3 style={sub}>On behalf of the Client</h3>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -1483,10 +1525,14 @@ function Accept({ r, s }: PageProps) {
           </div>
         </div>
       </div>
-      <p style={{ ...lede(1000, 40) }}>
-        <strong style={{ color: NAVY, fontWeight: 700 }}>Insurance:</strong> $20M public liability, $20M products liability, $20M professional liability, workers&apos; compensation, QBCC licensed, IRATA-certified technicians. Certificates of currency on request.
-      </p>
-      <ContactFooter r={r} />
+      )}
+      {f.has("insurance") && (
+        <p style={{ ...lede(1000, f.mt("insurance", 40)) }}>
+          <strong style={{ color: NAVY, fontWeight: 700 }}>Insurance:</strong>
+          {INSURANCE.slice("Insurance:".length)}
+        </p>
+      )}
+      {f.last ? <ContactFooter r={r} /> : <Footer r={r} s={s} />}
     </Sheet>
   );
 }
@@ -1532,11 +1578,36 @@ const RENDER: Record<PageId, (props: PageProps) => ReactNode> = {
 
 /** Every visible sheet, in order. Pages with long content run onto
  *  continuation sheets (lib/reports/proposal/v3/layout.ts). */
+/** Pages whose intro can run to sheets of its own: title and edit path. */
+const LEAD_TITLE: Partial<Record<PageId, [string, string]>> = {
+  scope: ["Scope", "scope.intro"],
+  findings: ["Site survey & findings", "findings.intro"],
+  flagged: ["Flagged issues", "flagged.intro"],
+  prestart: ["Pre-start maintenance", "prestart.intro"],
+  runs: ["How your project runs", "runs.intro"],
+  pricing: ["Pricing & terms", "pricing.intro"],
+};
+
+function LeadSheet({ r, s }: PageProps) {
+  const [title, edit] = LEAD_TITLE[s.id]!;
+  const f = flowOf(s);
+  return (
+    <Sheet r={r} s={s}>
+      <SecLabel text={r.D.sectionLabel[s.id]} />
+      {f.has("h2") && <h2 style={h2}>{title}</h2>}
+      {f.text("intro", "", edit, lede())}
+      <Footer r={r} s={s} />
+    </Sheet>
+  );
+}
+
 export default function ProposalPages(props: DocProps) {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: RICH_CSS }} />
       {props.D.sheets.map((s) => {
+        // A long intro's own sheets, before a page's content (layout.ts).
+        if (s.data.kind === "flow" && s.lead == null && LEAD_TITLE[s.id]) return <LeadSheet key={s.key} r={props} s={s} />;
         const Page = RENDER[s.id];
         return Page ? <Page key={s.key} r={props} s={s} /> : null;
       })}

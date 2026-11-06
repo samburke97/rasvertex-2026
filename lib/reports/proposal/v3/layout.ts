@@ -124,9 +124,9 @@ export interface GroupSlice<T> {
 
 export type SheetData =
   | { kind: "single" }
-  /** Your project: the head (title, overview, figures), the photo and
-   *  Higher standards, split over two sheets when they don't fit one. */
-  | { kind: "project"; top: boolean; photo: boolean; standards: boolean }
+  /** A page of text and fixed blocks, split over sheets like a word
+   *  processor (see flow): the blocks on this sheet, text cut at paragraphs. */
+  | { kind: "flow"; parts: FlowPart[]; last: boolean }
   | { kind: "scope"; inc: string[]; exc: string[] }
   | { kind: "findings"; items: { f: Finding; i: number; textH: number }[] }
   | { kind: "findingsGrouped"; blocks: GroupBlock[] }
@@ -173,7 +173,15 @@ export interface Sheet {
   id: PageId;
   part: number; // 0 = first sheet of the page
   data: SheetData;
+  /** Sheets before this page's content that hold only its title and an
+   *  intro too long to share a sheet ("lead" sheets). */
+  lead?: number;
+  /** First content sheet after lead sheets: the rest of the intro. */
+  tail?: string;
 }
+
+/** A content sheet that carries on from the one before (not the first). */
+export const contd = (s: Sheet) => s.part > (s.lead ?? 0);
 
 /** Packs items into sheets: `first` and `rest` are each sheet's capacity. */
 function pack<T>(items: T[], h: (t: T) => number, first: number, rest: number, gap = 0): T[][] {
@@ -230,7 +238,7 @@ const cap = (head: number) => BOTTOM - TOP - head;
 const sheetsOf = (id: PageId, parts: SheetData[]): Sheet[] =>
   parts.map((data, part) => ({ key: part ? `${id}:${part}` : id, id, part, data }));
 
-export function layoutPage(p: Proposal, id: PageId): Sheet[] {
+function layoutBody(p: Proposal, id: PageId): Sheet[] {
   const d = p.d;
   switch (id) {
     case "scope": {
@@ -343,38 +351,340 @@ export function layoutPage(p: Proposal, id: PageId): Sheet[] {
         }),
       );
     }
-    case "project": {
-      const P = d.project;
-      const room = BOTTOM - TOP;
-      const head = SEC_LABEL + H2 + ledeH(P.p1, 860) + ledeH(P.p2, 860, 16);
-      const cardW = (CONTENT_W - 24) / 3 - 56;
-      const figures = 56 + 44 + 17 + 8 + Math.max(...[P.type, P.access, P.program].map((v) => textLines(v, 20, cardW, 700))) * 26;
-      const photo = 56 + PROJECT_PHOTO_MIN;
-      const intro = P.hideSpec ? richH(P.noSpecIntro, 20, 32, 700) : richH(P.specIntro, 20, 32, 860);
-      let standards = 72 + 44 + 16 + (P.hideSpec ? Math.max(intro, 44) : intro);
-      if (!P.hideSpec) {
-        const rows = P.rows[P.brand] ?? [];
-        standards += 48 + TABLE_HEAD + 32 + 60;
-        for (const r of rows)
-          standards += 37 + Math.max(textLines(r.surface, 20, 284, 600), textLines(r.system, 20, 484), textLines(r.coats, 20, 240)) * 30;
-      }
-      const top = head + figures;
-      if (top + photo + standards <= room) return sheetsOf(id, [{ kind: "project", top: true, photo: true, standards: true }]);
-      // Too much for one sheet: Higher standards moves to the next, and the
-      // photo with it if that doesn't fit either.
-      if (top + photo <= room)
-        return sheetsOf(id, [
-          { kind: "project", top: true, photo: true, standards: false },
-          { kind: "project", top: false, photo: false, standards: true },
-        ]);
-      return sheetsOf(id, [
-        { kind: "project", top: true, photo: false, standards: false },
-        { kind: "project", top: false, photo: true, standards: true },
-      ]);
+    case "project":
+    case "intro":
+    case "maintenance":
+    case "accept": {
+      const parts = flow(FLOW_ITEMS[id](p), cap(SEC_LABEL));
+      return sheetsOf(
+        id,
+        parts.map((x, k) => ({ kind: "flow", parts: x, last: k === parts.length - 1 })),
+      );
     }
     default:
       return sheetsOf(id, [{ kind: "single" }]);
   }
+}
+
+// ── Flow: text and fixed blocks, split over sheets like a word processor ────
+
+/** One block of a text field: a paragraph or a list item, as HTML. */
+interface RBlock {
+  html: string;
+  text: string;
+  list: "" | "ul" | "ol";
+  n: number; // number in its list (ol)
+}
+
+const decode = (t: string) =>
+  t
+    .replace(/<br>/g, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** A text field's paragraphs and list items, in order, each standalone. */
+export function richBlocks(v: string | null | undefined): RBlock[] {
+  const html = richHtml(v);
+  const out: RBlock[] = [];
+  const stack: string[] = [];
+  let start = 0;
+  let n = 0;
+  const re = /<(\/?)(p|ul|ol|li)>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const [tag, close, name] = m;
+    if (!close) {
+      if (!stack.length && name === "p") start = m.index;
+      if (stack.length === 1 && name === "li" && (stack[0] === "ul" || stack[0] === "ol")) start = m.index;
+      if (!stack.length && (name === "ul" || name === "ol")) n = 0;
+      stack.push(name);
+    } else {
+      stack.pop();
+      const end = m.index + tag.length;
+      if (!stack.length && name === "p") {
+        const h = html.slice(start, end);
+        out.push({ html: h, text: decode(h), list: "", n: 0 });
+      } else if (stack.length === 1 && name === "li") {
+        const h = html.slice(start, end);
+        out.push({ html: h, text: decode(h), list: stack[0] as "ul" | "ol", n: ++n });
+      }
+    }
+  }
+  if (!out.length && decode(html).trim()) out.push({ html: `<p>${html}</p>`, text: decode(html), list: "", n: 0 });
+  // Trailing empty paragraphs don't take room on the page worth keeping.
+  while (out.length && !out[out.length - 1].text.trim() && !out[out.length - 1].list) out.pop();
+  return out;
+}
+
+/** Blocks back into HTML: list items regrouped into their lists. */
+export function joinBlocks(bs: RBlock[]): string {
+  let out = "";
+  for (let i = 0; i < bs.length; i++) {
+    const b = bs[i];
+    if (!b.list) {
+      out += b.html;
+      continue;
+    }
+    let j = i;
+    let items = "";
+    while (j < bs.length && bs[j].list === b.list && (j === i || bs[j].n === bs[j - 1].n + 1)) items += bs[j++].html;
+    out += b.list === "ol" && b.n > 1 ? `<ol start="${b.n}">${items}</ol>` : `<${b.list}>${items}</${b.list}>`;
+    i = j - 1;
+  }
+  return out;
+}
+
+/** One block's height: its lines (an empty paragraph is still a line). */
+const blockH = (b: RBlock, px: number, lh: number, w: number) =>
+  (b.text.trim() ? textLines(b.text, px, w - (b.list ? 22 : 0)) : 1) * lh;
+/** The gap above a block: 0.6em between blocks, 0.2em between list items. */
+const blockGap = (a: RBlock, b: RBlock, px: number) => (a.list && a.list === b.list && b.n === a.n + 1 ? 0.2 : 0.6) * px;
+
+/** Cuts a block after the words that fill `lines` lines, keeping bold and
+ *  italic open across the cut. Returns null if it can't be cut there. */
+function cutBlock(b: RBlock, lines: number, px: number, w: number): [RBlock, RBlock] | null {
+  const tag = b.list ? "li" : "p";
+  const inner = b.html.replace(new RegExp(`^<${tag}>|</${tag}>$`, "g"), "");
+  const width = w - (b.list ? 22 : 0);
+  // Words and tags in order; a long unbroken word is cut into line-sized pieces.
+  const perLine = Math.max(8, Math.floor(width / (px * 0.5)));
+  const toks: string[] = [];
+  for (const t of inner.split(/(<[^>]+>|\s+)/).filter(Boolean)) {
+    if (t.startsWith("<") || /^\s+$/.test(t) || t.length <= perLine) toks.push(t);
+    else for (let i = 0; i < t.length; i += perLine) toks.push(t.slice(i, i + perLine), " ");
+  }
+  const open: string[] = [];
+  let text = "";
+  let head = "";
+  let k = 0;
+  for (; k < toks.length; k++) {
+    const t = toks[k];
+    if (t.startsWith("<")) {
+      if (t === "<br>") {
+        if (textLines(text + "\n", px, width) > lines) break;
+        text += "\n";
+      } else if (t.startsWith("</")) open.pop();
+      else open.push(t.slice(1, -1));
+      head += t;
+      continue;
+    }
+    if (!/^\s+$/.test(t) && text.trim() && textLines(decode(text + t), px, width) > lines) break;
+    head += t;
+    text += t;
+  }
+  const rest = toks.slice(k).join("").trim();
+  if (!text.trim() || !rest) return null;
+  const close = [...open].reverse().map((t) => `</${t}>`).join("");
+  const reopen = open.map((t) => `<${t}>`).join("");
+  const A = `<${tag}>${head.trimEnd()}${close}</${tag}>`;
+  const B = `<${tag}>${reopen}${rest}</${tag}>`;
+  return [
+    { ...b, html: A, text: decode(A) },
+    { ...b, html: B, text: decode(B) },
+  ];
+}
+
+/** A block on a flowing page: fixed height, or a text field that splits. */
+export type FlowItem =
+  | {
+      id: string;
+      h: number;
+      /** Space above it, dropped at the top of a sheet. */
+      mt: number;
+      /** Never left at the foot of a sheet without what follows (headings). */
+      keep?: boolean;
+    }
+  | { id: string; rich: string; px: number; lh: number; w: number; mt: number };
+
+export interface FlowPart {
+  id: string;
+  /** First thing on its sheet: no space above it. */
+  top: boolean;
+  /** A text field's paragraphs on this sheet. */
+  html?: string;
+}
+
+/** Height of an item's first unbreakable piece (for keeping a heading
+ *  with it). */
+function firstPieceH(it: FlowItem): number {
+  if (!("rich" in it)) return it.mt + it.h;
+  const b = richBlocks(it.rich)[0];
+  return b ? it.mt + blockH(b, it.px, it.lh, it.w) : 0;
+}
+
+/** Lays blocks down sheet by sheet; a text field breaks between paragraphs
+ *  (or list items) when the next one won't fit. */
+export function flow(items: FlowItem[], room: number): FlowPart[][] {
+  const sheets: FlowPart[][] = [[]];
+  let left = room;
+  const cur = () => sheets[sheets.length - 1];
+  const next = () => {
+    sheets.push([]);
+    left = room;
+  };
+  items.forEach((it, k) => {
+    if ("rich" in it) {
+      const queue = richBlocks(it.rich);
+      if (!queue.length) return;
+      let chunk: RBlock[] = [];
+      let top = false;
+      const flush = () => {
+        if (chunk.length) cur().push({ id: it.id, top, html: joinBlocks(chunk) });
+        chunk = [];
+      };
+      while (queue.length) {
+        const b = queue.shift()!;
+        const h = blockH(b, it.px, it.lh, it.w);
+        const empty = !cur().length && !chunk.length;
+        const gap = chunk.length ? blockGap(chunk[chunk.length - 1], b, it.px) : empty ? 0 : it.mt;
+        if (gap + h > left) {
+          // Split the paragraph at the foot of the sheet, as a word processor
+          // would: at least two lines each side (or any cut, if it's taller
+          // than a whole sheet).
+          const fit = Math.floor((left - gap) / it.lh);
+          const lines = Math.round(h / it.lh);
+          const tall = h > room;
+          const cut = (tall || (fit >= 2 && lines - fit >= 2)) && fit >= 1 ? cutBlock(b, fit, it.px, it.w) : null;
+          if (cut) {
+            if (!chunk.length) top = empty;
+            chunk.push(cut[0]);
+            flush();
+            next();
+            top = true;
+            queue.unshift(cut[1]);
+            continue;
+          }
+          if (!empty) {
+            flush();
+            next();
+            top = true;
+            queue.unshift(b);
+            continue;
+          }
+        }
+        if (!chunk.length) top = empty;
+        chunk.push(b);
+        left -= gap + h;
+      }
+      flush();
+      return;
+    }
+    const after = it.keep && items[k + 1] ? firstPieceH(items[k + 1]) : 0;
+    const empty = !cur().length;
+    if ((empty ? 0 : it.mt) + it.h + after > left && !empty) next();
+    const top = !cur().length;
+    cur().push({ id: it.id, top });
+    left -= (top ? 0 : it.mt) + it.h;
+  });
+  return sheets.filter((x, i) => x.length || i === 0);
+}
+
+/** Acceptance: the insurance line under the signatures. */
+export const INSURANCE =
+  "Insurance: $20M public liability, $20M products liability, $20M professional liability, workers’ compensation, QBCC licensed, IRATA-certified technicians. Certificates of currency on request.";
+
+/** The blocks of each flowing page, top to bottom, with their heights. */
+const FLOW_ITEMS: Record<"project" | "intro" | "maintenance" | "accept", (p: Proposal) => FlowItem[]> = {
+  project: (p) => {
+    const P = p.d.project;
+    const cardW = (CONTENT_W - 24) / 3 - 56;
+    const figures = 44 + 17 + 8 + Math.max(...[P.type, P.access, P.program].map((v) => textLines(v, 20, cardW, 700))) * 26;
+    const intro = P.hideSpec ? richH(P.noSpecIntro, 20, 32, 700) : richH(P.specIntro, 20, 32, 860);
+    let standards = 44 + 16 + (P.hideSpec ? Math.max(intro, 44) : intro);
+    if (!P.hideSpec) {
+      standards += 48 + TABLE_HEAD + 32 + 60;
+      for (const r of P.rows[P.brand] ?? [])
+        standards += 37 + Math.max(textLines(r.surface, 20, 284, 600), textLines(r.system, 20, 484), textLines(r.coats, 20, 240)) * 30;
+    }
+    return [
+      { id: "h2", h: H2, mt: 0, keep: true },
+      { id: "p1", rich: P.p1, px: 20, lh: 32, w: 860, mt: 20 },
+      { id: "p2", rich: P.p2, px: 20, lh: 32, w: 860, mt: 16 },
+      { id: "figures", h: figures, mt: 56 },
+      { id: "photo", h: PROJECT_PHOTO_MIN, mt: 56 },
+      { id: "standards", h: standards, mt: 72 },
+    ];
+  },
+  intro: (p) => {
+    const I = p.d.intro;
+    return [
+      { id: "h2", h: H2, mt: 0, keep: true },
+      { id: "address", h: 4 * 33, mt: 56 },
+      { id: "dear", h: 33, mt: 56 },
+      { id: "open", rich: I.open, px: 20, lh: 33, w: 860, mt: 24 },
+      ...I.bullets.map((b, i) => ({
+        id: `b${i}`,
+        h: 32 + textLines(b.t, 20, 838, 700) * 30 + (richText(b.d).trim() ? 2 + richH(b.d, 17, 25.5, 838) : 0),
+        mt: i ? 0 : 32,
+      })),
+      { id: "close", rich: I.close, px: 20, lh: 33, w: 860, mt: 24 },
+      { id: "sign", h: 33 + 108 + 2 * 33, mt: 48 },
+    ];
+  },
+  maintenance: (p) => [
+    { id: "h2", h: H2, mt: 0, keep: true },
+    { id: "intro", rich: p.d.maintenance.intro, px: 20, lh: 32, w: 900, mt: 20 },
+    // Table head, two group bars and seven rows.
+    { id: "table", h: TABLE_HEAD + (16 + 68) + (28 + 68) + 7 * 51, mt: 56 },
+    { id: "price", h: 250, mt: 72 },
+    { id: "contact", h: 208, mt: 56 },
+  ],
+  accept: (p) => [
+    { id: "h2", h: H2, mt: 0, keep: true },
+    { id: "intro", rich: p.d.accept.intro, px: 20, lh: 32, w: 860, mt: 20 },
+    { id: "valid", h: 32, mt: richText(p.d.accept.intro).trim() ? 12 : 20 },
+    { id: "panels", h: 750, mt: 56 },
+    { id: "insurance", h: textLines(INSURANCE, 20, 1000) * 32, mt: 40 },
+  ],
+};
+
+// ── Pages ────────────────────────────────────────────────────────────────────
+
+/** Pages that open with a title and intro, then flowing content. */
+const HEADED: Partial<Record<PageId, (p: Proposal) => string>> = {
+  scope: (p) => p.d.scope.intro,
+  findings: (p) => p.d.findings.intro,
+  flagged: (p) => p.d.flagged.intro,
+  prestart: (p) => p.d.prestart.intro,
+  runs: (p) => p.d.runs.intro,
+  pricing: (p) => p.d.pricing.intro,
+};
+
+/** A page's sheets. An intro too long to share a sheet with the page's
+ *  content gets sheets of its own first, and its last part opens the
+ *  content's first sheet. */
+export function layoutPage(p: Proposal, id: PageId): Sheet[] {
+  const introOf = HEADED[id];
+  const intro = introOf?.(p) ?? "";
+  if (!introOf || ledeH(intro) <= (BOTTOM - TOP) * 0.45) return layoutBody(p, id);
+  const lead = flow(
+    [
+      { id: "h2", h: H2, mt: 0, keep: true },
+      { id: "intro", rich: intro, px: 20, lh: 32, w: 900, mt: 20 },
+    ],
+    cap(SEC_LABEL),
+  );
+  // The last part of the intro goes with the content, if it's short.
+  const last = lead[lead.length - 1];
+  const lastIntro = last.find((x) => x.id === "intro");
+  let tail = "";
+  if (lead.length > 1 && last.length === 1 && lastIntro?.html && richH(lastIntro.html, 20, 32, 900) <= (BOTTOM - TOP) * 0.3) {
+    tail = lastIntro.html;
+    lead.pop();
+  }
+  const d = { ...p.d, [id]: { ...(p.d as unknown as Record<string, object>)[id], intro: tail } } as unknown as Proposal["d"];
+  const body = layoutBody({ ...p, d }, id);
+  const n = lead.length;
+  return [
+    ...lead.map((parts, k) => ({ key: k ? `${id}:${k}` : id, id, part: k, data: { kind: "flow" as const, parts, last: false } })),
+    ...body.map((sh, k) => ({ ...sh, key: `${id}:${n + k}`, part: n + k, lead: n, ...(k === 0 ? { tail } : {}) })),
+  ];
 }
 
 // ── Report-style findings, grouped by code ───────────────────────────────────

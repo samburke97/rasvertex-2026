@@ -1499,10 +1499,14 @@ function PullTechNotes({ base, hasText, onPull }: { base: string; hasText: boole
 
 // ── Report picker ─────────────────────────────────────────────────────────────
 // The reports first; a report with types (roof: membrane, tiled…) shows them
-// once it's picked. Types not set up yet in Reports › Report types can't be
-// picked.
+// once it's picked. Reports and types not set up yet in Reports › Report
+// types (no wording) aren't offered.
 
 const presetEmpty = (p: Preset) => !p.scope.trim() && !p.intro.trim() && !p.about.length && !p.plan.length;
+
+/** A report's types that can be used ([] = none, so it isn't offered). */
+const readyTypes = (r: ReportSettings["reports"][number]): Preset[] =>
+  r.types.length ? r.types.filter((t) => !presetEmpty(t)) : presetEmpty(r) ? [] : [r];
 
 function ReportPicker({
   settings,
@@ -1513,58 +1517,48 @@ function ReportPicker({
   pick: { report: string; type?: string };
   onPick: (p: { report: string; type?: string }) => void;
 }) {
-  const current = settings.reports.find((r) => r.key === pick.report);
+  const reports = settings.reports.filter((r) => readyTypes(r).length);
+  const current = reports.find((r) => r.key === pick.report);
+  const types = current && current.types.length ? readyTypes(current) : [];
   return (
     <>
       <div className={styles.kinds} role="radiogroup" aria-label="Report">
-        {settings.reports.map((r) => {
+        {reports.map((r) => {
           const on = r.key === pick.report;
-          const ready = r.types.length ? r.types.filter((t) => !presetEmpty(t)) : presetEmpty(r) ? [] : [r];
-          const hint = !ready.length
-            ? "Not set up yet"
-            : r.types.length
-              ? r.types.map((t) => t.name).join(", ")
-              : r.scope;
+          const ready = readyTypes(r);
           return (
             <button
               key={r.key}
               role="radio"
               aria-checked={on}
-              disabled={!ready.length}
-              title={!ready.length ? "Not set up yet: add its wording in Reports › Report types" : undefined}
               className={`${styles.kind} ${on ? styles.kindOn : ""}`}
-              onClick={() => onPick({ report: r.key, type: r.types.length ? (ready[0] as Preset).key : undefined })}
+              onClick={() => onPick({ report: r.key, type: r.types.length ? ready[0].key : undefined })}
             >
               <span className={styles.kindRadio} />
               <span className={styles.kindText}>
                 <span className={styles.kindLabel}>{r.name}</span>
-                <span className={styles.kindHint}>{hint}</span>
+                <span className={styles.kindHint}>{r.types.length ? ready.map((t) => t.name).join(", ") : r.scope}</span>
               </span>
             </button>
           );
         })}
       </div>
-      {current && current.types.length > 0 && (
+      {types.length > 1 && (
         <div className={styles.subKinds}>
           <span className={styles.subKindsLabel}>Type</span>
-          <div className={styles.subKindRow} role="radiogroup" aria-label={`${current.name} type`}>
-            {current.types.map((t) => {
-              const empty = presetEmpty(t);
-              return (
-                <button
-                  key={t.key}
-                  role="radio"
-                  aria-checked={pick.type === t.key}
-                  disabled={empty}
-                  title={empty ? "Not set up yet: add its wording in Reports › Report types" : t.scope}
-                  className={`${styles.subKind} ${pick.type === t.key ? styles.subKindOn : ""}`}
-                  onClick={() => onPick({ report: current.key, type: t.key })}
-                >
-                  {t.name}
-                  {empty && <span className={styles.subKindSoon}>Not set up</span>}
-                </button>
-              );
-            })}
+          <div className={styles.subKindRow} role="radiogroup" aria-label={`${current!.name} type`}>
+            {types.map((t) => (
+              <button
+                key={t.key}
+                role="radio"
+                aria-checked={pick.type === t.key}
+                title={t.scope}
+                className={`${styles.subKind} ${pick.type === t.key ? styles.subKindOn : ""}`}
+                onClick={() => onPick({ report: current!.key, type: t.key })}
+              >
+                {t.name}
+              </button>
+            ))}
           </div>
         </div>
       )}
