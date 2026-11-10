@@ -96,8 +96,11 @@ export interface InspectionReportData {
   photos: InspectionPhoto[];
   /** Zone → [x%, y%] on the site plan. */
   pins: Record<string, [number, number]>;
-  /** Zone → [x%, y%, w%, h%]: a box the tech drew round the zone on the
-   *  site plan. Replaces the zone's pin. Older drafts have none. */
+  /** Zone → its section on the site plan: points [x%, y%] of the map, a
+   *  free-form shape the tech drew (shapes.ts). Replaces the zone's pin. */
+  shapes?: Record<string, [number, number][]>;
+  /** Older drafts: rectangles [x%, y%, w%, h%], read as four-point shapes
+   *  until the zone is redrawn. */
   boxes?: Record<string, ZoneBox>;
   /** Site map chosen in the builder. Without one, a photo labelled
    *  MAP / Aerial is used. */
@@ -118,7 +121,7 @@ export interface InspectionReportData {
 
 export type ZoneBox = [x: number, y: number, w: number, h: number];
 
-/** Pastel tones for zone boxes on the site map, in zone order: a darker
+/** Pastel tones for zone sections on the site map, in zone order: a darker
  *  border, a light see-through fill and a tag between the two. */
 export const ZONE_TONES: { line: string; fill: string; tag: string }[] = [
   { line: "#4f86c6", fill: "rgba(173,206,245,.38)", tag: "#d9e8fa" }, // blue
@@ -132,7 +135,7 @@ export const ZONE_TONES: { line: string; fill: string; tag: string }[] = [
 ];
 export const zoneTone = (i: number) => ZONE_TONES[((i % ZONE_TONES.length) + ZONE_TONES.length) % ZONE_TONES.length];
 
-export type SectionKey = "about"| "map" | "defects" | "findings" | "index" | "summary" | "plan" | "works";
+export type SectionKey = "about" | "map" | "defects" | "findings" | "index" | "summary" | "plan" | "works";
 
 export type { PlanItem, PlanPriority } from "@/lib/reports/maintenancePlan";
 

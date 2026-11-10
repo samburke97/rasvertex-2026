@@ -42,8 +42,10 @@ import InspectionDocument, {
   InspectionMeasure,
   InspectionStyles,
   type InspectionAssets,
-  type BoxHandle,
+  type ZoneEdit,
 } from "./InspectionDocument";
+import ZoneShapeEditor from "./ZoneShapeEditor";
+import { cleanShape, zoneShape, type Shape } from "@/lib/reports/inspection/shapes";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import { compressImageDataUrl, compressMapImageDataUrl } from "@/lib/reports/compressImage";
 import { deleteReportPhoto, uploadReportPhoto } from "@/lib/reports/uploadPhoto";
@@ -71,7 +73,6 @@ import {
   sectionHidden,
   zoneTone,
   type InspectionReportData,
-  type ZoneBox,
 } from "@/lib/reports/inspection/types";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { simproBase, simproRecordUrl, type SimproSource } from "@/components/reports/shared/builder/JobStart";
@@ -373,97 +374,59 @@ export default function InspectionReportPage({ onBack }: Props) {
     [update],
   );
 
-  // ── Zone boxes ────────────────────────────────────────────────────────────
-  // A tech picks a zone in the panel, then drags a rectangle out on the map
-  // in the preview. Once drawn, the box is dragged to move it and from a
-  // corner to resize it. All in % of the map, like the pins.
+  // ── Zone sections ─────────────────────────────────────────────────────────
+  // A tech picks a zone in the panel and draws its section on the map in the
+  // preview (ZoneShapeEditor), then edits it there. The editor hands over a
+  // shape once per edit; each edit can be undone (Ctrl/Cmd+Z).
   const [drawZone, setDrawZone] = useState<string | null>(null);
-  const MIN_BOX = 3;
-  const r1 = (n: number) => Math.round(n * 10) / 10;
-  const setBox = useCallback(
-    (zone: string, box: ZoneBox | null) =>
+  const [selZone, setSelZone] = useState<string | null>(null);
+  const undoShapes = useRef<{ zone: string; prev: Shape | undefined }[]>([]);
+  const writeShape = useCallback(
+    (zone: string, shape: Shape | undefined) =>
       update((p) => {
+        const shapes = { ...p.shapes };
         const boxes = { ...p.boxes };
-        if (box) boxes[zone] = box.map(r1) as ZoneBox;
-        else delete boxes[zone];
-        return { ...p, boxes };
+        // A redrawn zone leaves its old rectangle behind for good.
+        delete boxes[zone];
+        if (shape && shape.length >= 3) shapes[zone] = cleanShape(shape);
+        else delete shapes[zone];
+        return { ...p, shapes, boxes };
       }),
     [update],
   );
-
+  const setShape = useCallback(
+    (zone: string, shape: Shape | null) => {
+      if (r) undoShapes.current = [...undoShapes.current.slice(-49), { zone, prev: zoneShape(r, zone) }];
+      writeShape(zone, shape ?? undefined);
+    },
+    [r, writeShape],
+  );
   useEffect(() => {
-    if (!drawZone) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawZone(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const last = undoShapes.current.pop();
+      if (!last) return;
+      e.preventDefault();
+      writeShape(last.zone, last.prev);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [drawZone]);
-
-  const onMapDrawStart = useCallback(
-    (e: ReactPointerEvent<HTMLElement>) => {
-      if (!drawZone) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const zone = drawZone;
-      const rect = e.currentTarget.getBoundingClientRect();
-      const at = (ev: { clientX: number; clientY: number }): [number, number] => [
-        Math.min(100, Math.max(0, ((ev.clientX - rect.left) / rect.width) * 100)),
-        Math.min(100, Math.max(0, ((ev.clientY - rect.top) / rect.height) * 100)),
-      ];
-      const [x0, y0] = at(e);
-      const prev = r?.boxes?.[zone] ?? null;
-      let drawn = false;
-      const move = (ev: PointerEvent) => {
-        const [x1, y1] = at(ev);
-        drawn = true;
-        setBox(zone, [Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0)]);
-      };
-      const up = (ev: PointerEvent) => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", up);
-        const [x1, y1] = at(ev);
-        // A click or a sliver isn't a box: put back what was there.
-        if (!drawn || Math.abs(x1 - x0) < MIN_BOX || Math.abs(y1 - y0) < MIN_BOX) setBox(zone, prev);
-        setDrawZone(null);
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-    },
-    [drawZone, r?.boxes, setBox],
-  );
-
-  const onBoxPointerDown = useCallback(
-    (zone: string, handle: BoxHandle, e: ReactPointerEvent<HTMLElement>) => {
-      const start = r?.boxes?.[zone];
-      if (!start) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const map = (e.currentTarget.closest(".ir-map") as HTMLElement).getBoundingClientRect();
-      const [bx, by, bw, bh] = start;
-      const sx = e.clientX;
-      const sy = e.clientY;
-      const move = (ev: PointerEvent) => {
-        const dx = ((ev.clientX - sx) / map.width) * 100;
-        const dy = ((ev.clientY - sy) / map.height) * 100;
-        if (handle === "move") {
-          setBox(zone, [Math.min(100 - bw, Math.max(0, bx + dx)), Math.min(100 - bh, Math.max(0, by + dy)), bw, bh]);
-          return;
-        }
-        let l = bx, t = by, rr = bx + bw, b = by + bh;
-        if (handle[1] === "w") l = Math.min(rr - MIN_BOX, Math.max(0, bx + dx));
-        else rr = Math.max(l + MIN_BOX, Math.min(100, bx + bw + dx));
-        if (handle[0] === "n") t = Math.min(b - MIN_BOX, Math.max(0, by + dy));
-        else b = Math.max(t + MIN_BOX, Math.min(100, by + bh + dy));
-        setBox(zone, [l, t, rr - l, b - t]);
-      };
-      const up = () => {
-        window.removeEventListener("pointermove", move);
-        window.removeEventListener("pointerup", up);
-      };
-      window.addEventListener("pointermove", move);
-      window.addEventListener("pointerup", up);
-    },
-    [r?.boxes, setBox],
-  );
+  }, [writeShape]);
+  const pickZone = useCallback((zone: string | null) => {
+    setSelZone(zone);
+    if (zone) setSel("map");
+  }, []);
+  const zoneEdit: ZoneEdit = {
+    Editor: ZoneShapeEditor,
+    drawZone,
+    selected: selZone,
+    zoom,
+    onSelect: pickZone,
+    onCommit: setShape,
+    onDrawEnd: () => setDrawZone(null),
+  };
 
   // ── Site map & cover images ───────────────────────────────────────────────
   const [imgBusy, setImgBusy] = useState<null | "map" | "cover">(null);
@@ -841,9 +804,7 @@ export default function InspectionReportPage({ onBack }: Props) {
                 assets={ASSETS}
                 screen
                 onPinPointerDown={onPinPointerDown}
-                onBoxPointerDown={onBoxPointerDown}
-                drawZone={drawZone}
-                onMapDrawStart={onMapDrawStart}
+                zoneEdit={zoneEdit}
                 onCoverPointerDown={onCoverPointerDown}
               />
             </div>
@@ -1047,7 +1008,7 @@ export default function InspectionReportPage({ onBack }: Props) {
                   {model.zoneRows.length} tag{model.zoneRows.length === 1 ? "" : "s"} from the photo labels (
                   {model.zoneRows.map((z) => z.zone).join(", ")})
                   {model.mapPhotoId
-                    ? ". Drag a tag into place, or draw a box round the area it covers."
+                    ? ". Drag a tag into place, or draw a section round the area it covers."
                     : ". Add a site map to place them."}
                 </p>
               )}
@@ -1055,40 +1016,71 @@ export default function InspectionReportPage({ onBack }: Props) {
                 <div className={styles.zoneList}>
                   {model.zoneRows.map((z) => {
                     const t = zoneTone(z.tone);
-                    const boxed = !!r.boxes?.[z.zone];
+                    const shaped = !!zoneShape(r, z.zone);
                     const drawing = drawZone === z.zone;
                     return (
-                      <div key={z.zone} className={styles.zoneItem}>
+                      <div
+                        key={z.zone}
+                        className={`${styles.zoneItem} ${selZone === z.zone ? styles.zoneItemOn : ""}`}
+                        onClick={() => shaped && !drawZone && pickZone(z.zone)}
+                      >
                         <span
                           className={styles.zoneSwatch}
-                          style={boxed ? { background: t.fill, borderColor: t.line } : undefined}
+                          style={shaped ? { background: t.fill, borderColor: t.line, borderStyle: "solid" } : undefined}
                         />
                         <span className={styles.zoneName}>
                           <b>{z.zone}</b> {z.title !== z.zone && <span>{z.title}</span>}
                         </span>
                         {drawing ? (
-                          <button className={`${styles.smallBtn} ${styles.smallBtnOn}`} onClick={() => setDrawZone(null)}>
+                          <button
+                            className={`${styles.smallBtn} ${styles.smallBtnOn}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDrawZone(null);
+                            }}
+                          >
                             Cancel
                           </button>
                         ) : (
                           <>
-                            {boxed && (
-                              <button className={styles.linkBtn} onClick={() => setBox(z.zone, null)}>
+                            {shaped && (
+                              <button
+                                className={styles.linkBtn}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShape(z.zone, null);
+                                  if (selZone === z.zone) setSelZone(null);
+                                }}
+                              >
                                 Remove
                               </button>
                             )}
-                            <button className={styles.smallBtn} onClick={() => setDrawZone(z.zone)}>
-                              {boxed ? "Redraw" : "Draw box"}
+                            <button
+                              className={styles.smallBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelZone(null);
+                                setDrawZone(z.zone);
+                              }}
+                            >
+                              {shaped ? "Redraw" : "Draw section"}
                             </button>
                           </>
                         )}
                       </div>
                     );
                   })}
-                  {drawZone && (
+                  {drawZone ? (
                     <p className={styles.hint}>
-                      Drag out a rectangle on the map in the preview for {drawZone}. Esc to cancel.
+                      Click to place points. Click the first point to finish. Enter to finish, Backspace to undo a point, Esc to
+                      cancel. Or press and drag for a rectangle.
                     </p>
+                  ) : (
+                    selZone && (
+                      <p className={styles.hint}>
+                        Drag the section to move it, a corner to move a point, or a + to add one. Double-click a point to remove it.
+                      </p>
+                    )
                   )}
                 </div>
               )}

@@ -41,9 +41,9 @@ import {
   type InspectionReportData,
   type SectionKey,
   type PlanItem,
-  type ZoneBox,
   sectionHidden,
 } from "./types";
+import { labelPoint, zoneShape, type Shape } from "./shapes";
 import type { PhotoPos } from "@/lib/reports/photos";
 
 export const PAGE_W = 1280;
@@ -195,13 +195,14 @@ export type Block = BlockBase &
 
 export type BlockType = Block["type"];
 
-/** A zone on the site map: a box the tech drew, else a draggable tag.
- *  tone indexes ZONE_TONES. */
+/** A zone on the site map: a section the tech drew (its title centred in
+ *  it at label), else a draggable tag at x, y. tone indexes ZONE_TONES. */
 export interface MapPin {
   zone: string;
   x: number;
   y: number;
-  box?: ZoneBox;
+  shape?: Shape;
+  label?: [number, number];
   tone: number;
 }
 
@@ -211,8 +212,8 @@ export interface ZoneRow {
   levels: string;
   count: number;
   tone: number;
-  /** Drawn as a box on the map: the table's tag takes the box's colour. */
-  boxed: boolean;
+  /** Drawn as a section on the map: the table's tag takes its colour. */
+  shaped: boolean;
 }
 
 export interface WorkItem {
@@ -572,7 +573,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       photoId: mapPhotoId,
       pins: zoned.map((c, i) => {
         const [x, y] = data.pins[c.zone] ?? defPos(c.zone);
-        return { zone: c.zone, x, y, box: data.boxes?.[c.zone], tone: i };
+        const shape = zoneShape(data, c.zone);
+        return { zone: c.zone, x, y, shape, label: shape && labelPoint(shape), tone: i };
       }),
       gap: 56,
       est: 725,
@@ -584,7 +586,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     levels: levelsTxt(c.ps),
     count: c.ps.length,
     tone: i,
-    boxed: !!(mapPhotoId && data.boxes?.[c.zone]),
+    shaped: !!(mapPhotoId && zoneShape(data, c.zone)),
   }));
   if (shown("map")) add({ type: "zones", key: "zones", gap: 72, est: 40 + zoneRows.length * 51 });
 
