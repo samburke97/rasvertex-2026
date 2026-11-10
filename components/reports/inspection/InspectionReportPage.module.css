@@ -406,3 +406,38 @@ html :where(.root) :is(h1, h2, p, span) {
 .subKindOn { border-color: var(--blue-500); background: var(--blue-wash); color: var(--ink); box-shadow: 0 0 0 1px var(--blue-500); }
 .subKindSoon { font-size: 11px; color: rgba(var(--ink-rgb), 0.45); }
 .kind:disabled { cursor: default; opacity: 0.55; }
+
+/* Zone boxes on the site map */
+.zoneList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zoneItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+
+.zoneSwatch {
+  flex-shrink: 0;
+  width: 18px;
+  height: 14px;
+  border-radius: 4px;
+  border: 2px dashed rgba(var(--ink-rgb), 0.25);
+}
+
+.zoneName {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zoneName span {
+  color: rgba(var(--ink-rgb), 0.5);
+}

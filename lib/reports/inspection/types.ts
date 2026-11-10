@@ -96,6 +96,9 @@ export interface InspectionReportData {
   photos: InspectionPhoto[];
   /** Zone → [x%, y%] on the site plan. */
   pins: Record<string, [number, number]>;
+  /** Zone → [x%, y%, w%, h%]: a box the tech drew round the zone on the
+   *  site plan. Replaces the zone's pin. Older drafts have none. */
+  boxes?: Record<string, ZoneBox>;
   /** Site map chosen in the builder. Without one, a photo labelled
    *  MAP / Aerial is used. */
   siteMap?: ImageChoice | null;
@@ -113,7 +116,23 @@ export interface InspectionReportData {
   plan?: MaintenancePlan;
 }
 
-export type SectionKey = "about" | "map" | "defects" | "findings" | "index" | "summary" | "plan" | "works";
+export type ZoneBox = [x: number, y: number, w: number, h: number];
+
+/** Pastel tones for zone boxes on the site map, in zone order: a darker
+ *  border, a light see-through fill and a tag between the two. */
+export const ZONE_TONES: { line: string; fill: string; tag: string }[] = [
+  { line: "#4f86c6", fill: "rgba(173,206,245,.38)", tag: "#d9e8fa" }, // blue
+  { line: "#3f9e7f", fill: "rgba(170,228,203,.40)", tag: "#d4f2e4" }, // mint
+  { line: "#d9844a", fill: "rgba(250,203,170,.42)", tag: "#fde3d1" }, // peach
+  { line: "#8a6cc8", fill: "rgba(205,190,240,.42)", tag: "#e7defa" }, // lavender
+  { line: "#cc5f7f", fill: "rgba(246,190,206,.42)", tag: "#fadbe4" }, // rose
+  { line: "#b0921a", fill: "rgba(246,228,150,.45)", tag: "#fbf0c4" }, // butter
+  { line: "#2f98a8", fill: "rgba(160,222,230,.42)", tag: "#d2f0f4" }, // aqua
+  { line: "#7a9a4a", fill: "rgba(208,228,170,.45)", tag: "#e6f1d4" }, // sage
+];
+export const zoneTone = (i: number) => ZONE_TONES[((i % ZONE_TONES.length) + ZONE_TONES.length) % ZONE_TONES.length];
+
+export type SectionKey = "about"| "map" | "defects" | "findings" | "index" | "summary" | "plan" | "works";
 
 export type { PlanItem, PlanPriority } from "@/lib/reports/maintenancePlan";
 

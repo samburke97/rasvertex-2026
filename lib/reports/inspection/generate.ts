@@ -41,6 +41,7 @@ import {
   type InspectionReportData,
   type SectionKey,
   type PlanItem,
+  type ZoneBox,
   sectionHidden,
 } from "./types";
 import type { PhotoPos } from "@/lib/reports/photos";
@@ -170,7 +171,7 @@ export type Block = BlockBase &
     | { type: "kHead" }
     | { type: "kGroup"; band: Band; def: BandDef; first: boolean }
     | { type: "kRow"; chip: Chip; name: string; count: string }
-    | { type: "map"; photoId: string; pins: { zone: string; x: number; y: number }[] }
+    | { type: "map"; photoId: string; pins: MapPin[] }
     | { type: "zones" }
     | { type: "dHead" }
     | { type: "defect"; chip: Chip; name: string; what: string; act: string }
@@ -194,11 +195,24 @@ export type Block = BlockBase &
 
 export type BlockType = Block["type"];
 
+/** A zone on the site map: a box the tech drew, else a draggable tag.
+ *  tone indexes ZONE_TONES. */
+export interface MapPin {
+  zone: string;
+  x: number;
+  y: number;
+  box?: ZoneBox;
+  tone: number;
+}
+
 export interface ZoneRow {
   zone: string;
   title: string;
   levels: string;
   count: number;
+  tone: number;
+  /** Drawn as a box on the map: the table's tag takes the box's colour. */
+  boxed: boolean;
 }
 
 export interface WorkItem {
@@ -556,19 +570,21 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       type: "map",
       key: "map",
       photoId: mapPhotoId,
-      pins: zoned.map((c) => {
+      pins: zoned.map((c, i) => {
         const [x, y] = data.pins[c.zone] ?? defPos(c.zone);
-        return { zone: c.zone, x, y };
+        return { zone: c.zone, x, y, box: data.boxes?.[c.zone], tone: i };
       }),
       gap: 56,
       est: 725,
     });
   }
-  const zoneRows: ZoneRow[] = zoned.map((c) => ({
+  const zoneRows: ZoneRow[] = zoned.map((c, i) => ({
     zone: c.zone,
     title: zoneTitle(c.zone),
     levels: levelsTxt(c.ps),
     count: c.ps.length,
+    tone: i,
+    boxed: !!(mapPhotoId && data.boxes?.[c.zone]),
   }));
   if (shown("map")) add({ type: "zones", key: "zones", gap: 72, est: 40 + zoneRows.length * 51 });
 
