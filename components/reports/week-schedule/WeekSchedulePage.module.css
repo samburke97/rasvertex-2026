@@ -1,0 +1,365 @@
+/* components/reports/week-schedule/WeekSchedulePage.module.css */
+
+.page {
+  margin: -1.5rem;
+  height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(var(--ink-rgb), 0.09);
+}
+
+.weekNav,
+.toggles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toggles {
+  gap: 16px;
+}
+
+.navBtn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.navBtn:hover,
+.pill:hover {
+  background: var(--fill-hover);
+}
+
+.weekLabel {
+  min-width: 190px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pill.pillOn {
+  background: var(--blue-50);
+  border-color: rgba(62, 127, 176, 0.35);
+  color: var(--blue-600);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(var(--ink-rgb), 0.75);
+  cursor: pointer;
+  user-select: none;
+}
+
+.check input {
+  accent-color: var(--blue-500);
+  width: 15px;
+  height: 15px;
+}
+
+.checkDisabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.textBtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--blue-600);
+  cursor: pointer;
+}
+
+.textBtn:disabled {
+  color: rgba(var(--ink-rgb), 0.3);
+  cursor: default;
+}
+
+/* ── Canvas ──────────────────────────────────────────────────────────────── */
+.canvas {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--canvas);
+  padding: 24px 20px 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.notice {
+  width: 100%;
+  max-width: 1280px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(214, 140, 40, 0.12);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.empty {
+  padding: 64px 0;
+  font-size: 14px;
+  color: rgba(var(--ink-rgb), 0.55);
+}
+
+/* The sheet stays light in both themes: it's what gets printed and pasted. */
+.sheet {
+  --navy: #1f2a44;
+  --sky: #dce3ee;
+  --line: #c9d0d8;
+  --text: #17171a;
+  width: 100%;
+  max-width: 1280px;
+  background: #fff;
+  color: var(--text);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.sheetLoading {
+  pointer-events: none;
+}
+
+.printTitle {
+  display: none;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13.5px;
+}
+
+.table th,
+.table td {
+  border: 1px solid var(--line);
+  padding: 7px 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.table tr > :first-child {
+  border-left: 0;
+}
+
+.table tr > :last-child {
+  border-right: 0;
+}
+
+.dateRow th {
+  background: var(--navy);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  border-color: var(--navy);
+  border-top: 0;
+  padding: 9px 8px;
+}
+
+.dayRow th {
+  background: var(--sky);
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.numCol {
+  width: 40px;
+  color: rgba(23, 23, 26, 0.45);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.table td.numCol {
+  font-size: 12.5px;
+}
+
+.nameCol {
+  width: 190px;
+}
+
+.table td.nameCol,
+.left {
+  text-align: left !important;
+}
+
+.table td.nameCol {
+  font-weight: 500;
+  position: relative;
+}
+
+.table tbody tr:nth-child(even) td:not([style]) {
+  background: #f6f7f9;
+}
+
+.name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hideBtn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 7px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--line);
+  font-size: 11.5px;
+  color: #2f6a94;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.table tr:hover .hideBtn,
+.hideBtn:focus-visible {
+  opacity: 1;
+}
+
+.rowHidden td {
+  opacity: 0.4;
+}
+
+.rowHidden .hideBtn {
+  opacity: 1;
+}
+
+.item {
+  line-height: 1.3;
+}
+
+.second {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px dashed rgba(23, 23, 26, 0.2);
+}
+
+.off {
+  font-weight: 600;
+  color: rgba(23, 23, 26, 0.55);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.ref {
+  font-size: 11.5px;
+  color: rgba(23, 23, 26, 0.5);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.skel {
+  display: inline-block;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #eceef1, #f6f7f9, #eceef1);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ── Print: the sheet only, one landscape A4 page ───────────────────────── */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  /* Everything else on the page (sidebar, header, toolbar) is hidden. */
+  :global(body):has(.sheet) * {
+    visibility: hidden;
+  }
+
+  :global(body):has(.sheet) .sheet,
+  :global(body):has(.sheet) .sheet * {
+    visibility: visible;
+  }
+
+  .sheet {
+    position: fixed;
+    inset: 0;
+    max-width: none;
+    border-radius: 0;
+    box-shadow: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .printTitle {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 2px 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--navy);
+  }
+
+  .table {
+    font-size: 10.5pt;
+  }
+
+  .table th,
+  .table td {
+    padding: 4px 6px;
+  }
+
+  .hideBtn,
+  .rowHidden {
+    display: none !important;
+  }
+}

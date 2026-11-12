@@ -30,6 +30,10 @@ const HoursBreakdownPage = dynamic(
   () => import("./hours-breakdown/HoursBreakdownPage"),
   { loading: () => <ReportLoading />, ssr: false },
 );
+const WeekSchedulePage = dynamic(
+  () => import("./week-schedule/WeekSchedulePage"),
+  { loading: () => <ReportLoading />, ssr: false },
+);
 const ProposalBuilder = dynamic(() => import("./proposal/v3/ProposalBuilder"), {
   loading: () => <ReportLoading />,
   ssr: false,
@@ -48,6 +52,7 @@ type ReportTypeId =
   | "inspection"
   | "anchor-inspection"
   | "hours-breakdown"
+  | "week-schedule"
   | "proposal";
 
 interface ReportType {
@@ -55,7 +60,7 @@ interface ReportType {
   label: string;
   description: string;
   available: boolean;
-  category: "inspection" | "finance" | "proposal";
+  category: "inspection" | "finance" | "proposal" | "operations";
   icon: React.ReactNode;
 }
 
@@ -159,6 +164,32 @@ const REPORT_TYPES: ReportType[] = [
     ),
   },
   {
+    id: "week-schedule",
+    label: "Weekly schedule",
+    description:
+      "Who is on which site each day this week, from the SimPRO schedule. Copy into Excel or print.",
+    available: true,
+    category: "operations",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <line x1="3" y1="9" x2="21" y2="9" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="9" y1="9" x2="9" y2="21" />
+      </svg>
+    ),
+  },
+  {
     id: "proposal",
     label: "Master proposal",
     description:
@@ -188,6 +219,7 @@ const inspectionReports = REPORT_TYPES.filter(
   (r) => r.category === "inspection",
 );
 const financeReports = REPORT_TYPES.filter((r) => r.category === "finance");
+const operationsReports = REPORT_TYPES.filter((r) => r.category === "operations");
 const proposalReports = REPORT_TYPES.filter((r) => r.category === "proposal");
 
 // ── Category Section ───────────────────────────────────────────────────────
@@ -277,6 +309,10 @@ export default function ReportSelector() {
     return <HoursBreakdownPage onBack={() => setActive(null)} />;
   }
 
+  if (active === "week-schedule") {
+    return <WeekSchedulePage onBack={() => setActive(null)} />;
+  }
+
   if (active === "proposal") {
     return <ProposalBuilder onBack={() => setActive(null)} />;
   }
@@ -300,6 +336,11 @@ function ReportPicker({ onSelect: setActive }: { onSelect: (id: ReportTypeId) =>
       <CategorySection
         label="Proposal"
         reports={proposalReports}
+        onSelect={setActive}
+      />
+      <CategorySection
+        label="Operations"
+        reports={operationsReports}
         onSelect={setActive}
       />
       <CategorySection
