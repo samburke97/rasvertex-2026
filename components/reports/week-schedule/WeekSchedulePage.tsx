@@ -1,30 +1,54 @@
 "use client";
 // components/reports/week-schedule/WeekSchedulePage.tsx
 //
-// Weekly schedule builder: the week and display options on the left, the
-// landscape pages on the right (WeekScheduleDocument, scaled to fit), in
-// the same shell as the other report builders. Read-only: SimPRO is the
-// source of truth. "Copy for Excel" puts the table on the clipboard for the
-// weekly spreadsheet; "Download PDF" renders the same pages on the server.
+// Weekly schedule builder: the dates and display options on the left, the
+// landscape pages on the right (WeekScheduleDocument, scaled to fit), in the
+// same shell as the other report builders.
+//
+// SimPRO is read, never written. Edits (rename, move, remove, fill an empty
+// day, extra people) are a layer over SimPRO's data, saved as a draft per
+// date range (/api/reports/week-schedule/[range]) so Refresh keeps them.
+// Site renames are kept every week (/api/reports/settings/site-aliases).
+// The preview, the PDF and Copy for Excel all use the edited schedule.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import shell from "../shared/ReportPage.module.css";
 import panel from "../shared/OptionsPanel.module.css";
 import styles from "./WeekSchedulePage.module.css";
 import ToggleRow from "../shared/ToggleRow";
+import DatePicker from "@/components/ui/DatePicker";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
-import WeekScheduleDocument, { WEEK_CSS } from "./WeekScheduleDocument";
+import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
+import WeekScheduleDocument, { WEEK_CSS, WEEK_EDIT_CSS, pickKey, type WeekPick } from "./WeekScheduleDocument";
+import WeekEditPopover from "./WeekEditPopover";
 import { ANCHOR_IMAGES } from "@/lib/reports/anchor.layout";
 import {
   addDays,
   buildWeekModel,
+  cellOf,
   DEFAULT_WEEK_OPTIONS,
+  emptyDraft,
+  fillItem,
+  fromIso,
+  indexEntries,
   iso,
+  isWeekDraft,
+  MAX_RANGE_DAYS,
   mondayOf,
+  rangeDays,
+  rangeTitle,
   refText,
-  weekDays,
-  weekTitle,
+  removeItem,
+  renameItem,
+  resetDays,
+  setItemDays,
+  targetItem,
   WEEK_PAGE_W,
+  dayKey,
+  type EditContext,
+  type EditItem,
+  type SiteAliases,
+  type WeekDraft,
   type WeekOptions,
   type WeekScheduleResponse,
 } from "@/lib/reports/weekSchedule";
@@ -37,6 +61,8 @@ type Load =
   | { phase: "loading" }
   | { phase: "error"; message: string }
   | { phase: "done"; data: WeekScheduleResponse };
+
+type Range = { from: string; to: string };
 
 const LOGO = "/" + ANCHOR_IMAGES.logo;
 
@@ -62,8 +88,12 @@ function writeJSON(key: string, v: unknown) {
 
 const EMPTY: WeekScheduleResponse = { from: "", to: "", staff: [], entries: [], skipped: 0 };
 
+const weekOf = (monday: Date): Range => ({ from: iso(monday), to: iso(addDays(monday, 6)) });
+const rangeLen = (r: Range) => rangeDays(r.from, r.to).length;
+
 export default function WeekSchedulePage({ onBack }: Props) {
-  const [monday, setMonday] = useState(() => mondayOf(new Date()));
+  const [range, setRange] = useState<Range>(() => weekOf(mondayOf(new Date())));
+  const [custom, setCustom] = useState(false);
   const [load, setLoad] = useState<Load>({ phase: "loading" });
   const [reloadKey, setReloadKey] = useState(0);
   const [hidden, setHidden] = useState<number[]>([]);
@@ -88,11 +118,11 @@ export default function WeekSchedulePage({ onBack }: Props) {
       return n;
     });
 
-  const days = useMemo(() => weekDays(monday), [monday]);
+  // ── SimPRO's schedule for the range ──────────────────────────────────────
   useEffect(() => {
     let live = true;
     setLoad({ phase: "loading" });
-    fetch(`/api/simpro/schedules/week?from=${days[0]}&to=${days[6]}`)
+    fetch(`/api/simpro/schedules/week?from=${range.from}&to=${range.to}`)
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -103,14 +133,120 @@ export default function WeekSchedulePage({ onBack }: Props) {
     return () => {
       live = false;
     };
-  }, [days, reloadKey]);
+  }, [range, reloadKey]);
+
+  // ── Edits: the draft for this range, and the site names ──────────────────
+  const rangeKey = `${range.from}_${range.to}`;
+  const [draft, setDraftState] = useState<WeekDraft>(emptyDraft);
+  const [draftReady, setDraftReady] = useState(false);
+  const [touched, setTouched] = useState(false);
+  useEffect(() => {
+    let live = true;
+    setDraftReady(false);
+    setTouched(false);
+    fetch(`/api/reports/week-schedule/${rangeKey}`)
+      .then(async (res) => (res.ok ? (await res.json()).report : null))
+      .catch(() => null)
+      .then((report) => {
+        if (!live) return;
+        setDraftState(isWeekDraft(report) ? report : emptyDraft());
+        setDraftReady(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [rangeKey]);
+  const setDraft = useCallback((next: WeekDraft) => {
+    setDraftState(next);
+    setTouched(true);
+  }, []);
+  const { status: saveStatus } = useDraftAutosave(`/api/reports/week-schedule/${rangeKey}`, draft, {
+    ready: draftReady && touched,
+  });
+
+  const [aliases, setAliasesState] = useState<SiteAliases>({});
+  useEffect(() => {
+    fetch("/api/reports/settings/site-aliases")
+      .then((res) => (res.ok ? res.json() : { aliases: {} }))
+      .then((b) => setAliasesState(b.aliases ?? {}))
+      .catch(() => {});
+  }, []);
+  const saveAliases = (next: SiteAliases) => {
+    setAliasesState(next);
+    fetch("/api/reports/settings/site-aliases", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aliases: next }),
+    }).catch(() => {});
+  };
 
   const data = load.phase === "done" ? load.data : null;
-  const model = useMemo(() => buildWeekModel(data ?? EMPTY, monday, opts, hidden), [data, monday, opts, hidden]);
-  const weekendBooked = !!data?.entries.some((e) => e.date === days[5] || e.date === days[6]);
+  const model = useMemo(
+    () => buildWeekModel(data ?? EMPTY, range, opts, hidden, draft, aliases),
+    [data, range, opts, hidden, draft, aliases],
+  );
+  const ctx: EditContext = useMemo(() => ({ byDay: indexEntries(data?.entries ?? []), aliases }), [data, aliases]);
+  const editCount = Object.keys(draft.days).length + draft.people.length;
+  const weekendBooked = useMemo(() => {
+    const ends = rangeDays(range.from, range.to).filter((d) => [0, 6].includes(fromIso(d).getDay()));
+    return !!data?.entries.some((e) => ends.includes(e.date)) || Object.entries(draft.days).some(([k, v]) => v.length && ends.includes(k.split("|")[1]));
+  }, [data, draft, range]);
+  const people = [...(data?.staff ?? []), ...draft.people];
   const ready = !!data && model.staffCount > 0;
 
-  // The pages are 1810 wide, scaled to the column.
+  // ── Picking and editing a bar ────────────────────────────────────────────
+  const [pick, setPick] = useState<{ p: WeekPick; rect: DOMRect } | null>(null);
+  const close = useCallback(() => setPick(null), []);
+  useEffect(() => {
+    const el = previewRef.current;
+    if (!pick || !el) return;
+    el.addEventListener("scroll", close, { passive: true });
+    return () => el.removeEventListener("scroll", close);
+  }, [pick, close]);
+  const apply = (fn: (d: WeekDraft) => WeekDraft, keepOpen = true) => {
+    setDraft(fn(draft));
+    if (!keepOpen) setPick(null);
+  };
+  const removePick = useCallback(
+    (p: WeekPick) => {
+      setDraft(removeItem(ctx, draft, p));
+      setPick(null);
+    },
+    [ctx, draft, setDraft],
+  );
+  // Delete removes the selected bar (not while typing).
+  useEffect(() => {
+    if (!pick || pick.p.item < 0) return;
+    const key = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable) return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        removePick(pick.p);
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [pick, removePick]);
+
+  const picked = pick ? targetItem(ctx, draft, pick.p) : null;
+  const pickedPerson = pick ? (people.find((s) => s.id === pick.p.staffId)?.name ?? "") : "";
+  const pickedEdited = !!pick && pick.p.days.some((d) => draft.days[dayKey(pick.p.staffId, d)]);
+
+  // ── People added here ────────────────────────────────────────────────────
+  const [newPerson, setNewPerson] = useState("");
+  const addPerson = () => {
+    const name = newPerson.trim();
+    if (!name) return;
+    setDraft({ ...draft, people: [...draft.people, { id: -Date.now(), name }] });
+    setNewPerson("");
+  };
+  const removePerson = (id: number) => {
+    const days = Object.fromEntries(Object.entries(draft.days).filter(([k]) => !k.startsWith(`${id}|`)));
+    setDraft({ ...draft, days, people: draft.people.filter((p) => p.id !== id) });
+  };
+
+  // ── The pages are 1810 wide, scaled to the column ────────────────────────
   const previewRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(0.5);
   useLayoutEffect(() => {
@@ -128,7 +264,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
 
   // ── Copy for Excel ───────────────────────────────────────────────────────
   const copyForExcel = useCallback(async () => {
-    const rows = model.pages.flat();
+    const rows = model.rows;
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const text = (it: { label: string; refs: string[] }) =>
       opts.refs && it.refs.length ? `${it.label} (${refText(it.refs)})` : it.label;
@@ -180,12 +316,12 @@ export default function WeekSchedulePage({ onBack }: Props) {
   const downloadPDF = useCallback(async () => {
     if (!data) return;
     setExporting(true);
-    const filename = `Weekly Schedule ${days[0]}`;
+    const filename = `Weekly Schedule ${range.from}${range.to !== range.from ? ` to ${range.to}` : ""}`;
     try {
       const res = await fetch("/api/reports/export-week-schedule-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, monday: iso(monday), data, opts, hidden }),
+        body: JSON.stringify({ filename, from: range.from, to: range.to, data, opts, hidden, draft, aliases }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -205,31 +341,66 @@ export default function WeekSchedulePage({ onBack }: Props) {
     } finally {
       setExporting(false);
     }
-  }, [data, days, monday, opts, hidden]);
+  }, [data, range, opts, hidden, draft, aliases]);
 
-  const thisMonday = mondayOf(new Date());
-  const presets = [
-    { label: "This week", monday: thisMonday },
-    { label: "Next week", monday: addDays(thisMonday, 7) },
-  ];
+  // ── Dates ────────────────────────────────────────────────────────────────
+  const thisWeek = weekOf(mondayOf(new Date()));
+  const nextWeek = weekOf(addDays(mondayOf(new Date()), 7));
+  const same = (a: Range, b: Range) => a.from === b.from && a.to === b.to;
+  const len = rangeLen(range);
+  // Leaving these dates: save any edit still waiting on the autosave.
+  const flush = () => {
+    if (!touched || !draftReady) return;
+    fetch(`/api/reports/week-schedule/${rangeKey}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(draft),
+      keepalive: true,
+    }).catch(() => {});
+  };
+  const step = (dir: 1 | -1) => {
+    flush();
+    setPick(null);
+    setRange((r) => ({ from: iso(addDays(fromIso(r.from), dir * len)), to: iso(addDays(fromIso(r.to), dir * len)) }));
+  };
+  const pickRange = (r: Range, isCustom: boolean) => {
+    if (r.from !== range.from || r.to !== range.to) flush();
+    setPick(null);
+    setCustom(isCustom);
+    setRange(r);
+  };
+  // Custom: To never before From, and at most MAX_RANGE_DAYS days.
+  const setFrom = (v: string | null) => {
+    if (!v) return;
+    const max = iso(addDays(fromIso(v), MAX_RANGE_DAYS - 1));
+    pickRange({ from: v, to: range.to < v ? v : range.to > max ? max : range.to }, true);
+  };
+  const setTo = (v: string | null) => {
+    if (!v) return;
+    const min = iso(addDays(fromIso(v), -(MAX_RANGE_DAYS - 1)));
+    pickRange({ from: range.from > v ? v : range.from < min ? min : range.from, to: v }, true);
+  };
+
+  const status =
+    load.phase === "loading"
+      ? { text: "Reading SimPRO…", busy: true }
+      : copied === "ok"
+        ? { text: "Copied. Paste into Excel" }
+        : copied === "fail"
+          ? { text: "Couldn't copy", busy: true }
+          : touched
+            ? saveStatus
+            : undefined;
 
   return (
     <div className={shell.page}>
-      <style dangerouslySetInnerHTML={{ __html: WEEK_CSS }} />
+      <style dangerouslySetInnerHTML={{ __html: WEEK_CSS + WEEK_EDIT_CSS }} />
       <BuilderHeader
         onBack={onBack}
         title="Weekly schedule"
-        subtitle={weekTitle(monday)}
+        subtitle={rangeTitle(range.from, range.to)}
         badges={data ? [`${model.staffCount} team`, `${model.siteCount} site${model.siteCount === 1 ? "" : "s"}`] : undefined}
-        status={
-          load.phase === "loading"
-            ? { text: "Reading SimPRO…", busy: true }
-            : copied === "ok"
-              ? { text: "Copied. Paste into Excel" }
-              : copied === "fail"
-                ? { text: "Couldn't copy", busy: true }
-                : undefined
-        }
+        status={status}
       >
         <HeaderButton onClick={copyForExcel} disabled={!ready}>
           Copy for Excel
@@ -241,29 +412,53 @@ export default function WeekSchedulePage({ onBack }: Props) {
 
       <div className={shell.editorBody}>
         <aside className={panel.panel}>
-          {/* ── Week ── */}
+          {/* ── Dates ── */}
           <div className={panel.group}>
-            <div className={panel.groupLabel}>Week</div>
+            <div className={panel.groupLabel}>Dates</div>
             <div className={styles.weekNav}>
-              <button className={styles.navBtn} onClick={() => setMonday((m) => addDays(m, -7))} aria-label="Previous week">
+              <button className={styles.navBtn} onClick={() => step(-1)} aria-label={`Previous ${len} days`}>
                 <Chevron left />
               </button>
-              <span className={styles.weekLabel}>{weekTitle(monday)}</span>
-              <button className={styles.navBtn} onClick={() => setMonday((m) => addDays(m, 7))} aria-label="Next week">
+              <span className={styles.weekLabel}>{rangeTitle(range.from, range.to)}</span>
+              <button className={styles.navBtn} onClick={() => step(1)} aria-label={`Next ${len} days`}>
                 <Chevron />
               </button>
             </div>
             <div className={panel.presetRow}>
-              {presets.map((p) => (
-                <button
-                  key={p.label}
-                  className={`${panel.presetBtn} ${iso(p.monday) === iso(monday) ? panel.presetBtnActive : ""}`}
-                  onClick={() => setMonday(p.monday)}
-                >
-                  {p.label}
-                </button>
-              ))}
+              <button
+                className={`${panel.presetBtn} ${!custom && same(range, thisWeek) ? panel.presetBtnActive : ""}`}
+                onClick={() => pickRange(thisWeek, false)}
+              >
+                This week
+              </button>
+              <button
+                className={`${panel.presetBtn} ${!custom && same(range, nextWeek) ? panel.presetBtnActive : ""}`}
+                onClick={() => pickRange(nextWeek, false)}
+              >
+                Next week
+              </button>
+              <button
+                className={`${panel.presetBtn} ${custom || (!same(range, thisWeek) && !same(range, nextWeek)) ? panel.presetBtnActive : ""}`}
+                onClick={() => setCustom(true)}
+              >
+                Custom
+              </button>
             </div>
+            {(custom || (!same(range, thisWeek) && !same(range, nextWeek))) && (
+              <>
+                <div className={styles.rangeFields}>
+                  <div className={panel.dateField}>
+                    <label className={panel.dateFieldLabel}>From</label>
+                    <DatePicker value={range.from} onChange={setFrom} />
+                  </div>
+                  <div className={panel.dateField}>
+                    <label className={panel.dateFieldLabel}>To</label>
+                    <DatePicker value={range.to} onChange={setTo} />
+                  </div>
+                </div>
+                <p className={panel.subLabel}>Up to {MAX_RANGE_DAYS} days. Each week starts a new page.</p>
+              </>
+            )}
             <button className={panel.btn} onClick={() => setReloadKey((k) => k + 1)} disabled={load.phase === "loading"}>
               {load.phase === "loading" ? "Reading SimPRO…" : "Refresh from SimPRO"}
             </button>
@@ -293,19 +488,61 @@ export default function WeekSchedulePage({ onBack }: Props) {
             />
           </div>
 
+          {/* ── Edits ── */}
+          <div className={panel.group}>
+            <div className={panel.groupLabelRow}>
+              <span className={panel.groupLabel}>Edits</span>
+              {editCount > 0 && <span className={panel.subLabel}>{editCount} here</span>}
+            </div>
+            <p className={panel.subLabel}>
+              Click a bar on the page to rename, move or remove it, or an empty day to fill it. Edits stay in this report; SimPRO
+              isn&apos;t changed. Edited bars show a blue dot.
+            </p>
+            {editCount > 0 && (
+              <button
+                className={panel.btn}
+                onClick={() => {
+                  if (!confirm("Reset all edits for these dates back to SimPRO?")) return;
+                  setPick(null);
+                  setDraft(emptyDraft());
+                }}
+              >
+                Reset all edits
+              </button>
+            )}
+          </div>
+
           {/* ── Team ── */}
-          {data && data.staff.length > 0 && (
+          {data && (
             <div className={panel.group}>
               <div className={panel.groupLabelRow}>
                 <span className={panel.groupLabel}>Team</span>
                 <span className={panel.subLabel}>
-                  {model.staffCount} of {data.staff.length}
+                  {model.staffCount} of {people.length}
                 </span>
               </div>
-              <p className={panel.subLabel}>Everyone scheduled in SimPRO this week. Switch off anyone to leave out, such as office staff.</p>
-              {data.staff.map((s) => (
-                <ToggleRow key={s.id} label={s.name} checked={!hidden.includes(s.id)} onChange={(v) => setShown(s.id, v)} />
+              <p className={panel.subLabel}>Everyone scheduled in SimPRO for these dates. Switch off anyone to leave out, such as office staff.</p>
+              {people.map((s) => (
+                <div key={s.id} className={styles.personRow}>
+                  <ToggleRow label={s.name} sub={s.id < 0 ? "Added here" : undefined} checked={!hidden.includes(s.id)} onChange={(v) => setShown(s.id, v)} />
+                  {s.id < 0 && (
+                    <button className={styles.removeBtn} onClick={() => removePerson(s.id)} aria-label={`Remove ${s.name}`} title="Remove">
+                      ×
+                    </button>
+                  )}
+                </div>
               ))}
+              <div className={styles.addRow}>
+                <input
+                  value={newPerson}
+                  placeholder="Add team member"
+                  onChange={(e) => setNewPerson(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addPerson()}
+                />
+                <button className={panel.btn} onClick={addPerson} disabled={!newPerson.trim()}>
+                  Add
+                </button>
+              </div>
             </div>
           )}
         </aside>
@@ -321,22 +558,64 @@ export default function WeekSchedulePage({ onBack }: Props) {
           )}
           {data && data.skipped > 0 && (
             <div className={styles.notice}>
-              {data.skipped} leave or activity schedule{data.skipped === 1 ? "" : "s"} couldn&apos;t be read and{" "}
-              {data.skipped === 1 ? "is" : "are"} shown by its SimPRO reference.
+              {data.skipped} job{data.skipped === 1 ? "" : "s"} couldn&apos;t be read from SimPRO and{" "}
+              {data.skipped === 1 ? "is" : "are"} shown by number.
             </div>
           )}
           {load.phase === "loading" && <div className={shell.pageLabel}>Reading the schedule from SimPRO…</div>}
-          {data && !data.staff.length && <div className={shell.pageLabel}>Nobody is scheduled in SimPRO this week.</div>}
-          {data && data.staff.length > 0 && !model.staffCount && (
-            <div className={shell.pageLabel}>Everyone is switched off in Team.</div>
-          )}
+          {data && !people.length && <div className={shell.pageLabel}>Nobody is scheduled in SimPRO for these dates.</div>}
+          {data && people.length > 0 && !model.staffCount && <div className={shell.pageLabel}>Everyone is switched off in Team.</div>}
           {ready && (
             <div style={{ zoom }}>
-              <WeekScheduleDocument model={model} logo={LOGO} screen />
+              <WeekScheduleDocument
+                model={model}
+                logo={LOGO}
+                screen
+                edit={{
+                  selected: pick ? pickKey(pick.p) : null,
+                  onPick: (p, el) => setPick({ p, rect: el.getBoundingClientRect() }),
+                  onRemove: removePick,
+                }}
+              />
             </div>
           )}
         </div>
       </div>
+
+      {pick && (
+        <WeekEditPopover
+          anchor={pick.rect}
+          allDays={model.days}
+          target={{
+            person: pickedPerson,
+            label: picked?.label ?? null,
+            simproSite: !!picked && !picked.leave && picked.kind !== "activity" && !pickedEdited,
+            edited: pickedEdited,
+            days: pick.p.days,
+          }}
+          onClose={close}
+          onRename={(label) => {
+            const r = renameItem(ctx, draft, pick.p, label);
+            if (r.draft !== draft) setDraft(r.draft);
+            if (r.aliases) saveAliases(r.aliases);
+          }}
+          onDays={(days) => {
+            const next = setItemDays(ctx, draft, pick.p, days);
+            setDraft(next);
+            // Still the same item, wherever it now sits on its first day.
+            const item = cellOf(ctx.byDay, next, aliases, pick.p.staffId, days[0]).items.findIndex((x) => x.label === picked?.label);
+            setPick({ ...pick, p: { ...pick.p, days, item: Math.max(0, item) } });
+          }}
+          onFill={(item: EditItem) => {
+            const next = fillItem(ctx, draft, pick.p, item);
+            setDraft(next);
+            // The filled bar stays picked (it's now that item).
+            setPick({ ...pick, p: { ...pick.p, item: Math.max(0, pick.p.item) } });
+          }}
+          onRemove={() => removePick(pick.p)}
+          onReset={() => apply((d) => resetDays(d, pick.p), false)}
+        />
+      )}
     </div>
   );
 }

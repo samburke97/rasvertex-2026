@@ -45,3 +45,21 @@ export async function resetSettings(): Promise<void> {
   await ensureTable();
   await db()`DELETE FROM report_settings WHERE key = 'current'`;
 }
+
+// ── Site aliases (Weekly schedule) ──────────────────────────────────────────
+// A second row in the same table: site name → what the weekly schedule
+// calls it ("Cosmopolitan" → "Cosmo"), kept every week. Not a client-report
+// setting, so saving it doesn't need the admin passcode.
+
+export async function getSiteAliases(): Promise<Record<string, string>> {
+  await ensureTable();
+  const rows = await db()`SELECT value FROM report_settings WHERE key = 'site-aliases'`;
+  return (rows[0]?.value as Record<string, string>) ?? {};
+}
+
+export async function saveSiteAliases(aliases: Record<string, string>): Promise<void> {
+  await ensureTable();
+  await db()`
+    INSERT INTO report_settings (key, value, updated_at) VALUES ('site-aliases', ${JSON.stringify(aliases)}::jsonb, NOW())
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`;
+}

@@ -54,3 +54,217 @@
   color: var(--blue-600);
   cursor: pointer;
 }
+
+/* The range: presets, then From and To for a custom range. */
+.rangeFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Add team member */
+.addRow {
+  display: flex;
+  gap: 8px;
+}
+
+.addRow input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.removeBtn {
+  border: 0;
+  background: none;
+  padding: 0 4px;
+  font-size: 16px;
+  line-height: 1;
+  color: rgba(var(--ink-rgb), 0.4);
+  cursor: pointer;
+}
+
+.removeBtn:hover {
+  color: #a83a3a;
+}
+
+.personRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.personRow > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The edit popover (builder only) */
+.pop {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.popHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.popHead span {
+  color: rgba(var(--ink-rgb), 0.55);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.popField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.popField label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(var(--ink-rgb), 0.55);
+}
+
+.popField input,
+.popField select {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font: inherit;
+  color: var(--ink);
+}
+
+.popField input:focus,
+.popField select:focus {
+  outline: 2px solid var(--blue-500);
+  outline-offset: -1px;
+}
+
+.popDays {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.popHint {
+  font-size: 12px;
+  color: rgba(var(--ink-rgb), 0.5);
+}
+
+.popList {
+  display: flex;
+  flex-direction: column;
+  max-height: 220px;
+  overflow: auto;
+  margin: -4px 0 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+}
+
+.popList > .popHint {
+  padding: 8px 10px;
+}
+
+.popHit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 10px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.popHit + .popHit {
+  border-top: 1px solid var(--border-strong);
+}
+
+.popHit:hover {
+  background: var(--fill-hover);
+}
+
+.popHit span {
+  font-size: 12px;
+  color: rgba(var(--ink-rgb), 0.55);
+}
+
+.popChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.popChips button,
+.popFoot button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.popChips button:hover,
+.popFoot button:hover {
+  background: var(--fill-hover);
+}
+
+.popFoot {
+  display: flex;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.popFoot .popDanger {
+  margin-right: auto;
+  color: #a83a3a;
+}
+
+.popFoot .popDone {
+  margin-left: auto;
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--surface);
+}
+
+.popFoot .popDone:hover {
+  background: var(--ink);
+  opacity: 0.9;
+}
+
+.popDanger + .popDone,
+.popDanger + button {
+  margin-left: 0;
+}

@@ -8,20 +8,24 @@
 // Flow:
 //   1. GET /schedules/?Date=<day> for each day (in parallel), as the
 //      unlocked-schedules cron does.
-//   2. Job and quote schedules: the job/quote number is the start of the
-//      Reference ("11357-…"); each job/quote is fetched once for its site.
-//   3. Activity schedules (leave, RDO, yard…): the activity's name, read from
-//      the schedule's own record (_href).
+//   2. Job and quote schedules: the Reference is "<job or quote>-<cost
+//      centre>" ("11357-13930"); each job/quote is fetched once for its
+//      Site.Name (cleaned of the CTS scheme number).
+//   3. Activity schedules (leave, RDO, Yardwork…): the Reference is the
+//      activity's ID ("17"), named from /setup/activities/ (one call).
+// The Type is "job", "quote" or "activity" (checked against live data,
+// November 2026). Cleaning to one answer per person per day happens in
+// lib/reports/weekSchedule.ts (dayItems), not here.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
 import { simproGet } from "@/lib/simpro/client";
-import type { WeekEntry, WeekEntryKind, WeekScheduleResponse } from "@/lib/reports/weekSchedule";
+import { cleanSite, MAX_RANGE_DAYS, type WeekEntry, type WeekEntryKind, type WeekScheduleResponse } from "@/lib/reports/weekSchedule";
 
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const API = `${SIMPRO_BASE_URL}/api/v1.0/companies/0`;
 const PAGE_SIZE = 1000;
-const MAX_DAYS = 14;
+const MAX_DAYS = MAX_RANGE_DAYS;
 
 interface ScheduleListItem {
   ID: number;
@@ -37,6 +41,18 @@ interface JobOrQuote {
   Name?: string;
   Site?: { ID?: number; Name?: string };
   Customer?: { CompanyName?: string; GivenName?: string; FamilyName?: string };
+}
+
+/** SimPRO's rate limit answers 429: wait a moment and ask again. */
+async function get<T>(url: string, tries = 5): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await simproGet<T>(url);
+    } catch (err) {
+      if (i >= tries || !/HTTP 429/.test(String(err))) throw err;
+      await new Promise((r) => setTimeout(r, 400 * 2 ** (i - 1) + Math.random() * 200));
+    }
+  }
 }
 
 /** Runs fn over items, at most `limit` at a time. */
@@ -57,7 +73,7 @@ async function pool<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): 
 async function schedulesOn(date: string): Promise<ScheduleListItem[]> {
   const all: ScheduleListItem[] = [];
   for (let page = 1; ; page++) {
-    const batch = await simproGet<ScheduleListItem[]>(
+    const batch = await get<ScheduleListItem[]>(
       `${API}/schedules/?pageSize=${PAGE_SIZE}&page=${page}&columns=ID,Type,Reference,TotalHours,Date,Staff&Date=${date}`,
     );
     all.push(...batch);
@@ -71,7 +87,7 @@ const refNo = (reference: string) => {
 };
 
 function siteOf(r: JobOrQuote | null, fallback: string): string {
-  const site = r?.Site?.Name?.trim();
+  const site = cleanSite(r?.Site?.Name ?? "");
   if (site) return site;
   const c = r?.Customer;
   const customer = c?.CompanyName?.trim() || [c?.GivenName, c?.FamilyName].filter(Boolean).join(" ").trim();
@@ -111,11 +127,11 @@ export async function GET(request: NextRequest) {
       if (kind !== "activity" && no != null) wanted.set(`${kind}:${no}`, { kind, no });
     }
     const records = new Map<string, JobOrQuote | null>();
-    await pool([...wanted.entries()], 8, async ([key, { kind, no }]) => {
+    await pool([...wanted.entries()], 4, async ([key, { kind, no }]) => {
       try {
         records.set(
           key,
-          await simproGet<JobOrQuote>(`${API}/${kind === "job" ? "jobs" : "quotes"}/${no}?columns=ID,Name,Site,Customer`),
+          await get<JobOrQuote>(`${API}/${kind === "job" ? "jobs" : "quotes"}/${no}?columns=ID,Name,Site,Customer`),
         );
       } catch (err) {
         console.warn(`[WeekSchedule] ${kind} ${no} failed:`, err);
@@ -123,28 +139,21 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // 3. Activity names.
-    const activities = list.filter((s) => kindOf(s.Type) === "activity");
-    const activityName = new Map<number, string>();
-    let skipped = 0;
-    await pool(activities, 8, async (s) => {
-      try {
-        const unified = await simproGet<{ _href?: string }>(`${API}/schedules/${s.ID}`);
-        const detail = unified._href
-          ? await simproGet<{ Activity?: { Name?: string }; Name?: string }>(`${SIMPRO_BASE_URL}${unified._href}`)
-          : null;
-        activityName.set(s.ID, detail?.Activity?.Name?.trim() || detail?.Name?.trim() || "");
-      } catch (err) {
-        console.warn(`[WeekSchedule] activity schedule ${s.ID} failed:`, err);
-        skipped++;
-      }
-    });
+    // 3. Activity names, by ID.
+    const activityName = new Map<string, string>();
+    try {
+      const acts = await get<{ ID: number; Name: string }[]>(`${API}/setup/activities/?pageSize=250&columns=ID,Name`);
+      for (const a of acts) activityName.set(String(a.ID), a.Name.trim());
+    } catch (err) {
+      console.warn("[WeekSchedule] activities failed:", err);
+    }
+    const skipped = [...records.values()].filter((r) => r === null).length;
 
     const entries: WeekEntry[] = list.map((s) => {
       const kind = kindOf(s.Type);
       const no = refNo(s.Reference);
       if (kind === "activity") {
-        const label = activityName.get(s.ID) || String(s.Reference || "").trim() || "Activity";
+        const label = activityName.get(String(s.Reference).trim()) || "Activity";
         return { staffId: s.Staff!.ID, date: s.Date.slice(0, 10), kind, label, ref: null, name: label, hours: s.TotalHours ?? 0 };
       }
       const rec = no != null ? (records.get(`${kind}:${no}`) ?? null) : null;

@@ -1,6 +1,8 @@
 // app/api/reports/export-week-schedule-pdf/route.ts
 // The Weekly schedule to PDF, from the same component the builder previews
-// (WeekScheduleDocument), with the schedule the builder already read.
+// (WeekScheduleDocument), with the schedule the builder already read and its
+// edits (overrides and site aliases) laid over it, so the PDF matches the
+// preview.
 
 import { createElement } from "react";
 import { NextRequest, NextResponse } from "next/server";
@@ -8,9 +10,12 @@ import WeekScheduleDocument, { WEEK_CSS } from "@/components/reports/week-schedu
 import {
   buildWeekModel,
   DEFAULT_WEEK_OPTIONS,
-  fromIso,
+  emptyDraft,
+  isWeekDraft,
   WEEK_PAGE_H,
   WEEK_PAGE_W,
+  type SiteAliases,
+  type WeekDraft,
   type WeekOptions,
   type WeekScheduleResponse,
 } from "@/lib/reports/weekSchedule";
@@ -19,8 +24,11 @@ import { loadAssets } from "@/lib/server/anchorPdf";
 
 interface Body {
   filename?: string;
-  monday?: string;
+  from?: string;
+  to?: string;
   data?: WeekScheduleResponse;
+  draft?: WeekDraft;
+  aliases?: SiteAliases;
   opts?: Partial<WeekOptions>;
   hidden?: number[];
 }
@@ -32,14 +40,22 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { filename = "Weekly Schedule", monday, data, opts, hidden = [] } = body;
-  if (!data || !monday || !/^\d{4}-\d{2}-\d{2}$/.test(monday)) {
-    return NextResponse.json({ error: "monday and data are required" }, { status: 400 });
+  const { filename = "Weekly Schedule", from, to, data, opts, hidden = [], draft, aliases = {} } = body;
+  const day = /^\d{4}-\d{2}-\d{2}$/;
+  if (!data || !from || !to || !day.test(from) || !day.test(to)) {
+    return NextResponse.json({ error: "from, to and data are required" }, { status: 400 });
   }
 
   try {
     const { doc, fontCSS } = await loadAssets();
-    const model = buildWeekModel(data, fromIso(monday), { ...DEFAULT_WEEK_OPTIONS, ...opts }, hidden);
+    const model = buildWeekModel(
+      data,
+      { from, to },
+      { ...DEFAULT_WEEK_OPTIONS, ...opts },
+      hidden,
+      isWeekDraft(draft) ? draft : emptyDraft(),
+      aliases,
+    );
     const { renderToStaticMarkup } = await import("react-dom/server");
     const title = `Weekly Schedule - ${model.title}`.replace(/[<>&"]/g, "");
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>

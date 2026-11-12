@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "build-check": "npm run type-check && npm run build"
+    "build-check": "npm run type-check && npm run build",
+    "check:week-schedule": "npx tsx scripts/check-week-schedule.ts"
   },
   "dependencies": {
     "@auth/core": "^0.34.2",

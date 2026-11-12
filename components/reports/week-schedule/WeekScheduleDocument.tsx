@@ -30,24 +30,84 @@ export const WEEK_CSS =
 .ws-bar span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ws-ref{flex-shrink:0;margin-left:auto;font-size:13px;font-weight:400;color:var(--ink-45);font-variant-numeric:tabular-nums}
 .ws-bar--off{background:none;box-shadow:inset 0 0 0 1px rgba(1,25,85,.12);padding:0 12px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-35)}
+.ws--compact .ws-tr{min-height:32px;padding:3px 0}
+.ws--compact .ws-run{gap:2px}
+.ws--compact .ws-bar{height:24px;font-size:15px}
+.ws--compact .ws-empty{height:24px}
 .ws-foot{position:absolute;left:96px;right:96px;bottom:40px;display:flex;justify-content:space-between;gap:24px;font-family:var(--bebas);font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-35);line-height:1}
 `;
 
+/** Builder only: picking, removing and adding bars. Never in the PDF. */
+export const WEEK_EDIT_CSS = `
+.ws-edit .ws-bar{position:relative;cursor:pointer}
+.ws-edit .ws-bar:hover{box-shadow:0 0 0 2px rgba(1,25,85,.18)}
+.ws-edit .ws-bar.is-on{box-shadow:0 0 0 2px #3e7fb0}
+.ws-edit .ws-bar--off.is-on,.ws-edit .ws-bar--off:hover{box-shadow:inset 0 0 0 1px rgba(1,25,85,.12),0 0 0 2px #3e7fb0}
+.ws-x{position:absolute;right:-9px;top:-9px;width:22px;height:22px;border:0;border-radius:50%;background:#fff;color:var(--navy);box-shadow:0 1px 5px rgba(1,25,85,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 100ms}
+.ws-bar:hover .ws-x,.ws-bar.is-on .ws-x{opacity:1}
+.ws-x:hover{color:#a83a3a}
+.ws-dot{flex-shrink:0;width:7px;height:7px;border-radius:50%;background:#3e7fb0}
+.ws-empty{grid-row:1;height:28px;border:0;border-radius:8px;background:none;cursor:pointer;color:transparent;font-size:18px;line-height:1}
+.ws-empty:hover,.ws-empty.is-on{background:rgba(1,25,85,.04);color:var(--ink-35);box-shadow:inset 0 0 0 1px rgba(1,25,85,.12)}
+`;
+
+/** What the builder needs to know about a click. */
+export interface WeekPick {
+  staffId: number;
+  /** The days the bar covers (one, for an empty cell). */
+  days: string[];
+  /** Which item of the day (a split day has two); -1 for an empty cell. */
+  item: number;
+}
+
+export interface WeekEditView {
+  /** WeekPick key of the selected bar or cell (pickKey). */
+  selected: string | null;
+  onPick: (p: WeekPick, el: HTMLElement) => void;
+  onRemove: (p: WeekPick) => void;
+}
+
+export const pickKey = (p: WeekPick) => `${p.staffId}|${p.days[0]}|${p.item}`;
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
-function Run({ run, refs }: { run: WeekRun; refs: boolean }) {
+function Run({ run, refs, staffId, isos, edit }: { run: WeekRun; refs: boolean; staffId: number; isos: string[]; edit?: WeekEditView }) {
+  const days = isos.slice(run.start, run.start + run.span);
   return (
     <div className="ws-run" style={{ gridColumn: `${run.start + 2} / span ${run.span}` }}>
-      {run.items.map((it, i) => (
-        <div
-          key={i}
-          className={`ws-bar${it.kind === "activity" ? " ws-bar--off" : ""}`}
-          style={it.tone ? { background: it.tone } : undefined}
-        >
-          <span>{it.label}</span>
-          {refs && it.refs.length > 0 && <span className="ws-ref">{refText(it.refs)}</span>}
-        </div>
-      ))}
+      {run.items.map((it, i) => {
+        const pick: WeekPick = { staffId, days, item: i };
+        const on = edit?.selected === pickKey(pick);
+        return (
+          <div
+            key={i}
+            className={`ws-bar${it.leave ? " ws-bar--off" : ""}${on ? " is-on" : ""}`}
+            style={it.tone ? { background: it.tone } : undefined}
+            onClick={edit ? (e) => edit.onPick(pick, e.currentTarget) : undefined}
+            title={edit ? "Click to edit" : undefined}
+          >
+            <span>{it.label}</span>
+            {refs && it.refs.length > 0 && <span className="ws-ref">{refText(it.refs)}</span>}
+            {edit && run.edited && <span className="ws-dot" title="Edited here, not in SimPRO" />}
+            {edit && (
+              <button
+                type="button"
+                className="ws-x"
+                aria-label="Remove"
+                title="Remove"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  edit.onRemove(pick);
+                }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -56,57 +116,83 @@ export default function WeekScheduleDocument({
   model,
   logo,
   screen,
+  edit,
 }: {
   model: WeekModel;
   logo: string;
   screen?: boolean;
+  /** Builder only. */
+  edit?: WeekEditView;
 }) {
   const total = model.pages.length;
-  const cols = { "--days": model.days.length } as CSSProperties;
   return (
-    <div className={`ar ws${screen ? " ar--screen" : ""}`}>
-      {model.pages.map((rows, pi) => (
-        <div key={pi} className="ar-sheet">
-          <section className="ar-page">
-            <div className="ws-top">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="ar-logo" src={logo} alt="RAS-VERTEX" />
-              <span className="ws-kicker">Weekly schedule</span>
-            </div>
-            {pi === 0 && (
-              <div className="ws-head">
-                <h2 className="ar-h2">{model.title}</h2>
-                <span className="ar-label">{model.lede}</span>
+    <div className={`ar ws${model.compact ? " ws--compact" : ""}${screen ? " ar--screen" : ""}${edit ? " ws-edit" : ""}`}>
+      {model.pages.map((page, pi) => {
+        const cols = { "--days": page.days.length } as CSSProperties;
+        const isos = page.days.map((d) => d.iso);
+        return (
+          <div key={pi} className="ar-sheet">
+            <section className="ar-page">
+              <div className="ws-top">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="ar-logo" src={logo} alt="RAS-VERTEX" />
+                <span className="ws-kicker">Weekly schedule</span>
               </div>
-            )}
-            <div className="ar-table">
-              <div className="ar-thead ws-thead ws-cols" style={cols}>
-                <span>Team member</span>
-                {model.days.map((d) => (
-                  <span key={d.iso}>
-                    {d.day}
-                    <b>{d.date}</b>
-                  </span>
-                ))}
-              </div>
-              {rows.map((r) => (
-                <div key={r.n} className="ar-tr ws-tr ws-cols" style={cols}>
-                  <span className="ws-name">{r.name}</span>
-                  {r.runs.map((run) => (
-                    <Run key={run.start} run={run} refs={model.opts.refs} />
+              {page.first && (
+                <div className="ws-head">
+                  <h2 className="ar-h2">{model.title}</h2>
+                  <span className="ar-label">{model.lede}</span>
+                </div>
+              )}
+              <div className="ar-table">
+                <div className="ar-thead ws-thead ws-cols" style={cols}>
+                  <span>Team member</span>
+                  {page.days.map((d) => (
+                    <span key={d.iso}>
+                      {d.day}
+                      <b>{d.date}</b>
+                    </span>
                   ))}
                 </div>
-              ))}
-            </div>
-            <div className="ws-foot">
-              <span>RAS-VERTEX</span>
-              <span>
-                Page {pad(pi + 1)} / {pad(total)}
-              </span>
-            </div>
-          </section>
-        </div>
-      ))}
+                {page.rows.map(({ row: r, runs }) => {
+                  const covered = new Set(runs.flatMap((run) => Array.from({ length: run.span }, (_, k) => run.start + k)));
+                  return (
+                    <div key={r.n} className="ar-tr ws-tr ws-cols" style={cols}>
+                      <span className="ws-name">{r.name}</span>
+                      {runs.map((run) => (
+                        <Run key={run.start} run={run} refs={model.opts.refs} staffId={r.staffId} isos={isos} edit={edit} />
+                      ))}
+                      {edit &&
+                        isos.map((d, i) => {
+                          if (covered.has(i)) return null;
+                          const pick: WeekPick = { staffId: r.staffId, days: [d], item: -1 };
+                          return (
+                            <button
+                              key={d}
+                              type="button"
+                              className={`ws-empty${edit.selected === pickKey(pick) ? " is-on" : ""}`}
+                              style={{ gridColumn: i + 2 }}
+                              title="Add an entry"
+                              onClick={(e) => edit.onPick(pick, e.currentTarget)}
+                            >
+                              +
+                            </button>
+                          );
+                        })}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="ws-foot">
+                <span>RAS-VERTEX</span>
+                <span>
+                  Page {pad(pi + 1)} / {pad(total)}
+                </span>
+              </div>
+            </section>
+          </div>
+        );
+      })}
     </div>
   );
 }
