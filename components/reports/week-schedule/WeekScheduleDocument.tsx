@@ -49,6 +49,8 @@ export const WEEK_EDIT_CSS = `
 .ws-dot{flex-shrink:0;width:7px;height:7px;border-radius:50%;background:#3e7fb0}
 .ws-empty{grid-row:1;height:28px;border:0;border-radius:8px;background:none;cursor:pointer;color:transparent;font-size:18px;line-height:1}
 .ws-empty:hover,.ws-empty.is-on{background:rgba(1,25,85,.04);color:var(--ink-35);box-shadow:inset 0 0 0 1px rgba(1,25,85,.12)}
+.ws-empty.is-cleared{display:flex;align-items:center;gap:8px;padding:0 12px;border:1px dashed rgba(1,25,85,.25);color:var(--ink-35);font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+.ws-empty.is-cleared:hover,.ws-empty.is-cleared.is-on{border-color:#3e7fb0;box-shadow:none}
 `;
 
 /** What the builder needs to know about a click. */
@@ -81,7 +83,7 @@ function Run({ run, refs, staffId, isos, edit }: { run: WeekRun; refs: boolean; 
         return (
           <div
             key={i}
-            className={`ws-bar${it.leave ? " ws-bar--off" : ""}${on ? " is-on" : ""}`}
+            className={`ws-bar${it.leave && !it.flag ? " ws-bar--off" : ""}${on ? " is-on" : ""}`}
             style={it.tone ? { background: it.tone } : undefined}
             onClick={edit ? (e) => edit.onPick(pick, e.currentTarget) : undefined}
             title={edit ? "Click to edit" : undefined}
@@ -166,16 +168,25 @@ export default function WeekScheduleDocument({
                         isos.map((d, i) => {
                           if (covered.has(i)) return null;
                           const pick: WeekPick = { staffId: r.staffId, days: [d], item: -1 };
+                          // Emptied here (SimPRO has something that day): say so.
+                          const cleared = r.edited[page.offset + i];
                           return (
                             <button
                               key={d}
                               type="button"
-                              className={`ws-empty${edit.selected === pickKey(pick) ? " is-on" : ""}`}
+                              className={`ws-empty${cleared ? " is-cleared" : ""}${edit.selected === pickKey(pick) ? " is-on" : ""}`}
                               style={{ gridColumn: i + 2 }}
-                              title="Add an entry"
+                              title={cleared ? "Removed in this report. Click to put SimPRO's back, or fill it." : "Add an entry"}
                               onClick={(e) => edit.onPick(pick, e.currentTarget)}
                             >
-                              +
+                              {cleared ? (
+                                <>
+                                  <span className="ws-dot" />
+                                  Removed
+                                </>
+                              ) : (
+                                "+"
+                              )}
                             </button>
                           );
                         })}

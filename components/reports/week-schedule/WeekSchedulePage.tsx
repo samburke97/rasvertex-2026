@@ -7,7 +7,9 @@
 //
 // SimPRO is read, never written. Edits (rename, move, remove, fill an empty
 // day, extra people) are a layer over SimPRO's data, saved as a draft per
-// date range (/api/reports/week-schedule/[range]) so Refresh keeps them.
+// date range (/api/reports/week-schedule/[range]), so they're there when the
+// page is opened again. Refresh from SimPRO replaces the day edits with
+// SimPRO's fresh data (after asking); site renames and added people stay.
 // Site renames are kept every week (/api/reports/settings/site-aliases).
 // The preview, the PDF and Copy for Excel all use the edited schedule.
 
@@ -220,7 +222,8 @@ export default function WeekSchedulePage({ onBack }: Props) {
     const key = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable) return;
-      if (e.key === "Delete" || e.key === "Backspace") {
+      // Delete only: Backspace is too easy to press by accident.
+      if (e.key === "Delete") {
         e.preventDefault();
         removePick(pick.p);
       }
@@ -358,6 +361,15 @@ export default function WeekSchedulePage({ onBack }: Props) {
       keepalive: true,
     }).catch(() => {});
   };
+  // Refresh: SimPRO's schedule fresh, in place of the day edits (site
+  // renames and people added here are kept: they aren't SimPRO's data).
+  const refresh = () => {
+    const n = Object.keys(draft.days).length;
+    if (n && !confirm(`Refresh from SimPRO replaces ${n === 1 ? "the 1 day" : `the ${n} days`} you've edited for these dates with what's in SimPRO now. Site renames and people you've added are kept.`)) return;
+    setPick(null);
+    if (n) setDraft({ ...draft, days: {} });
+    setReloadKey((k) => k + 1);
+  };
   const step = (dir: 1 | -1) => {
     flush();
     setPick(null);
@@ -459,7 +471,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
                 <p className={panel.subLabel}>Up to {MAX_RANGE_DAYS} days. Each week starts a new page.</p>
               </>
             )}
-            <button className={panel.btn} onClick={() => setReloadKey((k) => k + 1)} disabled={load.phase === "loading"}>
+            <button className={panel.btn} onClick={refresh} disabled={load.phase === "loading"}>
               {load.phase === "loading" ? "Reading SimPRO…" : "Refresh from SimPRO"}
             </button>
           </div>
@@ -496,7 +508,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
             </div>
             <p className={panel.subLabel}>
               Click a bar on the page to rename, move or remove it, or an empty day to fill it. Edits stay in this report; SimPRO
-              isn&apos;t changed. Edited bars show a blue dot.
+              isn&apos;t changed. Edited bars show a blue dot. Refresh from SimPRO clears them.
             </p>
             {editCount > 0 && (
               <button
@@ -589,7 +601,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
           target={{
             person: pickedPerson,
             label: picked?.label ?? null,
-            simproSite: !!picked && !picked.leave && picked.kind !== "activity" && !pickedEdited,
+            simproSite: !!picked && !picked.leave && !picked.flag && picked.kind !== "activity" && !pickedEdited,
             edited: pickedEdited,
             days: pick.p.days,
           }}

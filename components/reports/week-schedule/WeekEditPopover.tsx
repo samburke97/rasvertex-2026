@@ -199,6 +199,12 @@ export default function WeekEditPopover({
         </div>
       )}
       <div className={styles.popChips}>
+        <button type="button" onClick={() => onFill({ label: "TBC", kind: "tbc", ref: null })} title="Pencil them in: site to be confirmed">
+          TBC
+        </button>
+        <button type="button" onClick={() => onFill({ label: "Off", kind: "off", ref: null })} title="Not working that day">
+          Off
+        </button>
         {LEAVE.map((l) => (
           <button key={l} type="button" onClick={() => onFill({ label: l, kind: "leave", ref: null })}>
             {l}
@@ -213,8 +219,8 @@ export default function WeekEditPopover({
           </button>
         )}
         {target.edited && (
-          <button type="button" onClick={onReset}>
-            Reset to SimPRO
+          <button type="button" className={empty ? styles.popPrimaryReset : undefined} onClick={onReset}>
+            {empty ? "Put SimPRO's back" : "Reset to SimPRO"}
           </button>
         )}
         <button type="button" className={styles.popDone} onClick={onClose}>

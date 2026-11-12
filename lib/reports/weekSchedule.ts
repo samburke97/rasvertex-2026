@@ -101,6 +101,9 @@ export interface CellItem {
   kind: WeekEntryKind;
   /** Leave, RDO, sick…: drawn as an outline, never next to a site. */
   leave: boolean;
+  /** A flag put in here: "tbc" (pencilled in, site to come) or "off".
+   *  Both are plain grey bars, never a site; "off" counts as time off. */
+  flag?: "tbc" | "off";
   refs: string[];
   names: string[];
   hours: number;
@@ -147,7 +150,10 @@ export const refText = (refs: string[]) => refs.map((r) => `#${r}`).join(", ");
 
 // ── Edits: the builder's layer over SimPRO (never written back) ────────────
 
-export type EditKind = "job" | "leave" | "other";
+/** job: from a SimPRO search; leave; tbc: someone pencilled in, site to
+ *  come; off: not working (a plain flag, not a type of leave); other: free
+ *  text. */
+export type EditKind = "job" | "leave" | "tbc" | "off" | "other";
 
 export interface EditItem {
   label: string;
@@ -178,7 +184,8 @@ export type SiteAliases = Record<string, string>;
 const editCell = (e: EditItem): CellItem => ({
   label: e.label,
   kind: e.kind === "job" ? "job" : "activity",
-  leave: e.kind === "leave",
+  leave: e.kind === "leave" || e.kind === "off",
+  flag: e.kind === "tbc" || e.kind === "off" ? e.kind : undefined,
   refs: e.ref ? [e.ref] : [],
   names: [],
   hours: 0,
@@ -187,7 +194,7 @@ const editCell = (e: EditItem): CellItem => ({
 /** A cell's item as an edit (to change one item of a day, the rest kept). */
 export const toEdit = (it: CellItem): EditItem => ({
   label: it.label,
-  kind: it.leave ? "leave" : it.kind === "activity" ? "other" : "job",
+  kind: it.flag ?? (it.leave ? "leave" : it.kind === "activity" ? "other" : "job"),
   ref: it.refs[0] ?? null,
 });
 
@@ -276,7 +283,7 @@ export interface WeekModel {
 }
 
 const sameDay = (a: WeekCell[], b: WeekCell[]) =>
-  a.length === 1 && b.length === 1 && a[0].leave === b[0].leave && a[0].label === b[0].label;
+  a.length === 1 && b.length === 1 && a[0].leave === b[0].leave && a[0].flag === b[0].flag && a[0].label === b[0].label;
 
 function runsOf(cells: WeekCell[][], edited: boolean[]): WeekRun[] {
   const runs: WeekRun[] = [];
@@ -353,7 +360,7 @@ export function buildWeekModel(
 
   // Colours: the busiest sites first (leave has none).
   const count = new Map<string, number>();
-  for (const r of raw) r.forEach((c, i) => keep[i] && c.items.forEach((it) => !it.leave && count.set(it.label, (count.get(it.label) ?? 0) + 1)));
+  for (const r of raw) r.forEach((c, i) => keep[i] && c.items.forEach((it) => !it.leave && !it.flag && count.set(it.label, (count.get(it.label) ?? 0) + 1)));
   const order = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const tones = new Map(order.map(([label], i) => [label, SITE_TONES[i % SITE_TONES.length]]));
 
@@ -363,7 +370,7 @@ export function buildWeekModel(
       n: si + 1,
       staffId: s.id,
       name: s.name,
-      cells: cells.map((c) => c.items.map((it) => ({ ...it, tone: !it.leave && opts.colour ? (tones.get(it.label) ?? null) : null }))),
+      cells: cells.map((c) => c.items.map((it) => ({ ...it, tone: !it.leave && !it.flag && opts.colour ? (tones.get(it.label) ?? null) : null }))),
       edited: cells.map((c) => c.edited),
     };
   });
@@ -415,7 +422,7 @@ export function buildWeekModel(
     }
   });
 
-  const sites = new Set(rows.flatMap((r) => r.cells.flat().filter((it) => !it.leave).map((it) => it.label))).size;
+  const sites = new Set(rows.flatMap((r) => r.cells.flat().filter((it) => !it.leave && !it.flag).map((it) => it.label))).size;
   return {
     title: isos.length ? rangeTitle(isos[0], isos[isos.length - 1]) : rangeTitle(range.from, range.to),
     lede: `${staff.length} team member${staff.length === 1 ? "" : "s"} · ${sites} site${sites === 1 ? "" : "s"}`,

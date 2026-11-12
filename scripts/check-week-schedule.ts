@@ -103,6 +103,24 @@ function editChecks(): [string, () => void][] {
       },
     ],
     [
+      "TBC pencils someone in: a plain bar, not a site",
+      () => {
+        const d = fillItem(ctx, emptyDraft(), { staffId: 2, days: [days[0]], item: -1 }, { label: "TBC", kind: "tbc", ref: null });
+        const m = buildWeekModel(data, range, DEFAULT_WEEK_OPTIONS, [], d);
+        const cell = m.rows.find((r) => r.staffId === 2)!.cells[0][0];
+        assert.deepEqual([cell.label, cell.tone, cell.leave, m.siteCount], ["TBC", null, false, 1]);
+      },
+    ],
+    [
+      "Off: a plain grey flag, time off, not a site",
+      () => {
+        const d = fillItem(ctx, emptyDraft(), { staffId: 1, days: [days[0]], item: 0 }, { label: "Off", kind: "off", ref: null });
+        const m = buildWeekModel(data, range, DEFAULT_WEEK_OPTIONS, [], d);
+        const cell = m.rows.find((r) => r.staffId === 1)!.cells[0];
+        assert.deepEqual(cell.map((c) => [c.label, c.tone, c.leave, c.flag]), [["Off", null, true, "off"]]);
+      },
+    ],
+    [
       "an added person shows",
       () => assert.ok(buildWeekModel(data, range, DEFAULT_WEEK_OPTIONS, [], { ...emptyDraft(), people: [{ id: -5, name: "Caro" }] }).rows.some((r) => r.name === "Caro")),
     ],

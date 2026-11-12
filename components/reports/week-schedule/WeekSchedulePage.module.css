@@ -268,3 +268,8 @@
 .popDanger + button {
   margin-left: 0;
 }
+
+.popFoot .popPrimaryReset {
+  border-color: var(--blue-500);
+  color: var(--blue-600);
+}
