@@ -136,10 +136,39 @@ export interface WeekCell extends CellItem {
   tone: string | null;
 }
 
+/** A run of days in a row: consecutive days on the same single site (or
+ *  the same leave) become one bar. A day with two sites is its own run. */
+export interface WeekRun {
+  /** Index of the first day. */
+  start: number;
+  span: number;
+  items: WeekCell[];
+}
+
 export interface WeekRow {
   n: number;
   name: string;
   cells: WeekCell[][];
+  runs: WeekRun[];
+}
+
+const sameDay = (a: WeekCell[], b: WeekCell[]) =>
+  a.length === 1 && b.length === 1 && a[0].kind === b[0].kind && a[0].label === b[0].label;
+
+function runsOf(cells: WeekCell[][]): WeekRun[] {
+  const runs: WeekRun[] = [];
+  cells.forEach((items, i) => {
+    if (!items.length) return;
+    const last = runs[runs.length - 1];
+    if (last && last.start + last.span === i && sameDay(last.items, items)) {
+      last.span++;
+      // Job numbers across the run.
+      for (const r of items[0].refs) if (!last.items[0].refs.includes(r)) last.items[0].refs.push(r);
+    } else {
+      runs.push({ start: i, span: 1, items: items.map((it) => ({ ...it, refs: [...it.refs] })) });
+    }
+  });
+  return runs;
 }
 
 export interface WeekModel {
@@ -154,9 +183,9 @@ export interface WeekModel {
 
 // Heights in page units, for splitting rows across pages.
 const ROW_H = 38;
-const ITEM_H = 31;
-const FIRST_BODY = 860;
-const NEXT_BODY = 990;
+const ITEM_H = 32;
+const FIRST_BODY = 890;
+const NEXT_BODY = 1010;
 
 export function buildWeekModel(
   data: WeekScheduleResponse,
@@ -176,16 +205,15 @@ export function buildWeekModel(
   }
 
   const staff = data.staff.filter((s) => !hidden.includes(s.id));
-  const rows: WeekRow[] = staff.map((s, i) => ({
-    n: i + 1,
-    name: s.name,
-    cells: isos.map((d) =>
+  const rows: WeekRow[] = staff.map((s, i) => {
+    const cells = isos.map((d) =>
       cellItems(by.get(`${s.id}|${d}`) ?? []).map((it) => ({
         ...it,
         tone: it.kind !== "activity" && opts.colour ? (tones.get(it.label) ?? null) : null,
       })),
-    ),
-  }));
+    );
+    return { n: i + 1, name: s.name, cells, runs: runsOf(cells) };
+  });
 
   const pages: WeekRow[][] = [[]];
   let room = FIRST_BODY;
@@ -204,7 +232,7 @@ export function buildWeekModel(
   ).size;
   return {
     title: weekTitle(monday),
-    lede: `Who is on which site each day, from the SimPRO schedule. ${staff.length} team member${staff.length === 1 ? "" : "s"} across ${sites} site${sites === 1 ? "" : "s"}.`,
+    lede: `${staff.length} team member${staff.length === 1 ? "" : "s"} · ${sites} site${sites === 1 ? "" : "s"}`,
     days: isos.map((d) => {
       const dt = fromIso(d);
       return {

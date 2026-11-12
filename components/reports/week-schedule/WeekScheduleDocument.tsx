@@ -7,46 +7,41 @@
 
 import type { CSSProperties } from "react";
 import { ANCHOR_CSS } from "@/components/reports/anchor-inspection/AnchorDocument";
-import { refText, WEEK_PAGE_H, WEEK_PAGE_W, type WeekCell, type WeekModel } from "@/lib/reports/weekSchedule";
+import { refText, WEEK_PAGE_H, WEEK_PAGE_W, type WeekModel, type WeekRun } from "@/lib/reports/weekSchedule";
 
 export const WEEK_CSS =
   ANCHOR_CSS +
   `
 .ws .ar-sheet{width:${WEEK_PAGE_W}px;height:${WEEK_PAGE_H}px}
-.ws .ar-page{width:${WEEK_PAGE_W}px;height:${WEEK_PAGE_H}px;padding:56px 96px 0}
-.ws-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
-.ws-top .ar-logo{height:44px}
+.ws .ar-page{width:${WEEK_PAGE_W}px;height:${WEEK_PAGE_H}px;padding:64px 96px 0}
+.ws-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:40px}
+.ws-top .ar-logo{height:40px}
 .ws-kicker{font-family:var(--bebas);font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-35);line-height:1}
-.ws-head{display:flex;align-items:flex-end;justify-content:space-between;gap:48px;margin-bottom:28px}
-.ws-head .ar-lede{margin-top:10px;max-width:none}
-.ws-key{display:flex;gap:40px;flex-shrink:0;padding-bottom:6px}
-.ws-key div{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
-.ws-key b{font-size:44px;font-weight:700;letter-spacing:-.05em;line-height:1}
-.ws-cols{grid-template-columns:44px 240px repeat(var(--days),minmax(0,1fr));gap:16px}
+.ws-head{display:flex;align-items:baseline;justify-content:space-between;gap:48px;margin-bottom:36px}
+.ws-head .ar-h2{font-size:44px}
+.ws-cols{grid-template-columns:230px repeat(var(--days),minmax(0,1fr));column-gap:12px}
 .ws-thead{align-items:end}
-.ws-thead b{display:block;font-size:18px;font-weight:700;letter-spacing:-.02em;text-transform:none;color:var(--navy);margin-top:4px}
-.ws-tr{min-height:37px;padding:5px 0;align-items:center}
-.ws-num{font-family:var(--bebas);font-size:20px;letter-spacing:.04em;color:var(--ink-35);line-height:1}
-.ws-name{font-size:18px;font-weight:600;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ws-cell{display:flex;flex-direction:column;gap:4px;min-width:0}
-.ws-chip{display:flex;align-items:center;gap:8px;min-width:0;height:27px;padding:0 12px;border-radius:7px;background:var(--grey);font-size:16px;font-weight:600;letter-spacing:-.01em;line-height:1}
-.ws-chip span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ws-ref{flex-shrink:0;font-size:13px;font-weight:500;color:var(--ink-45);font-variant-numeric:tabular-nums}
-.ws-chip--off{background:transparent;box-shadow:inset 0 0 0 1px rgba(1,25,85,.16);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-55)}
-.ws-none{font-size:16px;color:var(--ink-35);padding-left:12px}
+.ws-thead b{display:block;font-size:18px;font-weight:600;letter-spacing:-.02em;text-transform:none;color:var(--navy);margin-top:4px}
+.ws-tr{min-height:38px;padding:5px 0;align-items:center}
+.ws-tr>*{grid-row:1}
+.ws-name{grid-column:1;font-size:18px;font-weight:500;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-run{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ws-bar{display:flex;align-items:center;gap:10px;min-width:0;height:28px;padding:0 12px;border-radius:8px;background:var(--grey);font-size:16px;font-weight:500;letter-spacing:-.01em;line-height:1}
+.ws-bar span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-ref{flex-shrink:0;margin-left:auto;font-size:13px;font-weight:400;color:var(--ink-45);font-variant-numeric:tabular-nums}
+.ws-bar--off{background:none;box-shadow:inset 0 0 0 1px rgba(1,25,85,.12);padding:0 12px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-35)}
 .ws-foot{position:absolute;left:96px;right:96px;bottom:40px;display:flex;justify-content:space-between;gap:24px;font-family:var(--bebas);font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-35);line-height:1}
 `;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-function Cell({ items, refs }: { items: WeekCell[]; refs: boolean }) {
-  if (!items.length) return <div className="ws-none">—</div>;
+function Run({ run, refs }: { run: WeekRun; refs: boolean }) {
   return (
-    <div className="ws-cell">
-      {items.map((it, i) => (
+    <div className="ws-run" style={{ gridColumn: `${run.start + 2} / span ${run.span}` }}>
+      {run.items.map((it, i) => (
         <div
           key={i}
-          className={`ws-chip${it.kind === "activity" ? " ws-chip--off" : ""}`}
+          className={`ws-bar${it.kind === "activity" ? " ws-bar--off" : ""}`}
           style={it.tone ? { background: it.tone } : undefined}
         >
           <span>{it.label}</span>
@@ -80,25 +75,12 @@ export default function WeekScheduleDocument({
             </div>
             {pi === 0 && (
               <div className="ws-head">
-                <div>
-                  <h2 className="ar-h2">{model.title}</h2>
-                  <p className="ar-lede">{model.lede}</p>
-                </div>
-                <div className="ws-key">
-                  <div>
-                    <b>{model.staffCount}</b>
-                    <span className="ar-label">Team</span>
-                  </div>
-                  <div>
-                    <b>{model.siteCount}</b>
-                    <span className="ar-label">Sites</span>
-                  </div>
-                </div>
+                <h2 className="ar-h2">{model.title}</h2>
+                <span className="ar-label">{model.lede}</span>
               </div>
             )}
             <div className="ar-table">
               <div className="ar-thead ws-thead ws-cols" style={cols}>
-                <span />
                 <span>Team member</span>
                 {model.days.map((d) => (
                   <span key={d.iso}>
@@ -109,16 +91,15 @@ export default function WeekScheduleDocument({
               </div>
               {rows.map((r) => (
                 <div key={r.n} className="ar-tr ws-tr ws-cols" style={cols}>
-                  <span className="ws-num">{pad(r.n)}</span>
                   <span className="ws-name">{r.name}</span>
-                  {r.cells.map((items, i) => (
-                    <Cell key={i} items={items} refs={model.opts.refs} />
+                  {r.runs.map((run) => (
+                    <Run key={run.start} run={run} refs={model.opts.refs} />
                   ))}
                 </div>
               ))}
             </div>
             <div className="ws-foot">
-              <span>RAS-VERTEX · {model.title}</span>
+              <span>RAS-VERTEX</span>
               <span>
                 Page {pad(pi + 1)} / {pad(total)}
               </span>
