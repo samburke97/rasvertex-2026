@@ -7,7 +7,7 @@
 
 import type { CSSProperties } from "react";
 import { ANCHOR_CSS } from "@/components/reports/anchor-inspection/AnchorDocument";
-import { refText, WEEK_PAGE_H, WEEK_PAGE_W, type OverviewBlock, type WeekModel, type WeekRun } from "@/lib/reports/weekSchedule";
+import { MAX_DAY_JOBS, rangeTitle, refText, WEEK_PAGE_H, WEEK_PAGE_W, type WeekModel, type WeekRun } from "@/lib/reports/weekSchedule";
 
 export const WEEK_CSS =
   ANCHOR_CSS +
@@ -34,16 +34,24 @@ export const WEEK_CSS =
 .ws--compact .ws-run{gap:2px}
 .ws--compact .ws-bar{height:24px;font-size:15px}
 .ws--compact .ws-empty{height:24px}
-.ws-ov{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:48px;align-items:start}
-.ws-ov-col{display:flex;flex-direction:column;min-width:0}
-.ws-ov-day{font-size:20px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;line-height:1.1;color:var(--navy);padding-bottom:10px;border-bottom:var(--rule-head);margin-bottom:18px}
-.ws-ov-day:not(:first-child){margin-top:12px}
-.ws-ov-day span{font-weight:500;color:var(--ink-45);text-transform:none;letter-spacing:0;font-size:16px;margin-left:8px}
-.ws-ov-site{margin-bottom:18px;font-size:18px;line-height:25px}
-.ws-ov-site>b{font-weight:600}
-.ws-ov-site>span{color:var(--ink-55)}
-.ws-ov-job{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;padding-left:28px;font-size:17px;line-height:25px;color:var(--ink-70)}
-.ws-ov-job b{font-weight:600;color:var(--navy);font-variant-numeric:tabular-nums}
+/* Jobs starting (scoped .jb): the overview table after the schedule. */
+.ws .jb .ar-page{padding:80px 96px 0}
+.jb-top{display:flex;align-items:flex-start;justify-content:space-between;gap:40px}
+.jb-top .ar-logo{height:58px;width:auto;display:block;margin-top:6px}
+.jb-lede{font-size:20px;line-height:1.6;color:var(--ink-65);margin:12px 0 40px}
+.jb-gap{height:40px}
+.jb-cols{grid-template-columns:200px 120px 300px 440px minmax(0,1fr);column-gap:24px}
+.jb .ar-tr{font-size:18px;line-height:1.3}
+.jb .ar-tr:last-child{border-bottom:0}
+.jb-tr{height:52px}
+.jb-tr span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jb-tr--day{border-top:var(--rule-head)}
+.jb-day{font-weight:600}
+.jb-day em{font-style:normal;font-weight:400;color:var(--ink-45);margin-left:8px}
+.jb-no{font-family:var(--bebas);font-size:22px;letter-spacing:.04em;color:var(--ink-45)}
+.jb-site{font-weight:600}
+.jb-addr{color:var(--ink-65)}
+.jb-foot{bottom:52px}
 .ws-foot{position:absolute;left:96px;right:96px;bottom:40px;display:flex;justify-content:space-between;gap:24px;font-family:var(--bebas);font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-35);line-height:1}
 `;
 
@@ -60,6 +68,8 @@ export const WEEK_EDIT_CSS = `
 .ws-name span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .ws-name .ws-x{position:static;flex-shrink:0;margin-left:auto}
 .ws-name:hover .ws-x{opacity:1}
+.ws-part{cursor:pointer;border-radius:4px}
+.ws-part:hover{text-decoration:underline;text-underline-offset:3px}
 .ws-dot{flex-shrink:0;width:7px;height:7px;border-radius:50%;background:#3e7fb0}
 .ws-empty{grid-row:1;height:28px;border:0;border-radius:8px;background:none;cursor:pointer;color:transparent;font-size:18px;line-height:1}
 .ws-empty:hover,.ws-empty.is-on{background:rgba(1,25,85,.04);color:var(--ink-35);box-shadow:inset 0 0 0 1px rgba(1,25,85,.12)}
@@ -89,43 +99,64 @@ export const pickKey = (p: WeekPick) => `${p.staffId}|${p.days[0]}|${p.item}`;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+/** A run of days: one bar. A day with two jobs reads "A / B" (more: "+2"),
+ *  coloured as its first; in the builder each name is picked on its own. */
 function Run({ run, refs, staffId, isos, edit }: { run: WeekRun; refs: boolean; staffId: number; isos: string[]; edit?: WeekEditView }) {
   const days = isos.slice(run.start, run.start + run.span);
+  const first = run.items[0];
+  const shown = run.items.slice(0, MAX_DAY_JOBS);
+  const more = run.items.length - shown.length;
+  const picks = run.items.map((_, i): WeekPick => ({ staffId, days, item: i }));
+  const on = picks.some((p) => edit?.selected === pickKey(p));
+  const allRefs = [...new Set(run.items.flatMap((it) => it.refs))];
   return (
     <div className="ws-run" style={{ gridColumn: `${run.start + 2} / span ${run.span}` }}>
-      {run.items.map((it, i) => {
-        const pick: WeekPick = { staffId, days, item: i };
-        const on = edit?.selected === pickKey(pick);
-        return (
-          <div
-            key={i}
-            className={`ws-bar${it.leave && !it.flag ? " ws-bar--off" : ""}${on ? " is-on" : ""}`}
-            style={it.tone ? { background: it.tone } : undefined}
-            onClick={edit ? (e) => edit.onPick(pick, e.currentTarget) : undefined}
-            title={edit ? "Click to edit" : undefined}
+      <div
+        className={`ws-bar${first.leave && !first.flag ? " ws-bar--off" : ""}${on ? " is-on" : ""}`}
+        style={first.tone ? { background: first.tone } : undefined}
+        onClick={edit ? (e) => edit.onPick(picks[0], e.currentTarget) : undefined}
+        title={edit ? "Click to edit" : run.items.length > 1 ? run.items.map((it) => it.label).join(" / ") : undefined}
+      >
+        <span>
+          {shown.map((it, i) => (
+            <span
+              key={i}
+              className={edit && run.items.length > 1 ? "ws-part" : undefined}
+              onClick={
+                edit && run.items.length > 1
+                  ? (e) => {
+                      e.stopPropagation();
+                      edit.onPick(picks[i], e.currentTarget.closest(".ws-bar") as HTMLElement);
+                    }
+                  : undefined
+              }
+            >
+              {i > 0 && " / "}
+              {it.label}
+            </span>
+          ))}
+          {more > 0 && ` +${more}`}
+        </span>
+        {refs && allRefs.length > 0 && <span className="ws-ref">{refText(allRefs)}</span>}
+        {edit && run.edited && <span className="ws-dot" title="Edited here, not in SimPRO" />}
+        {/* × only for a single item: on "A / B", pick a name, then Remove. */}
+        {edit && run.items.length === 1 && (
+          <button
+            type="button"
+            className="ws-x"
+            aria-label="Remove"
+            title="Remove"
+            onClick={(e) => {
+              e.stopPropagation();
+              edit.onRemove(picks[0]);
+            }}
           >
-            <span>{it.label}</span>
-            {refs && it.refs.length > 0 && <span className="ws-ref">{refText(it.refs)}</span>}
-            {edit && run.edited && <span className="ws-dot" title="Edited here, not in SimPRO" />}
-            {edit && (
-              <button
-                type="button"
-                className="ws-x"
-                aria-label="Remove"
-                title="Remove"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  edit.onRemove(pick);
-                }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                  <path d="M6 6l12 12M18 6L6 18" />
-                </svg>
-              </button>
-            )}
-          </div>
-        );
-      })}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -237,62 +268,56 @@ export default function WeekScheduleDocument({
           </div>
         );
       })}
-      {model.overview.map((cols, oi) => (
-        <div key={`ov${oi}`} className="ar-sheet">
+      {model.overview.map((rows, oi) => (
+        <div key={`ov${oi}`} className="ar-sheet jb">
           <section className="ar-page">
-            <div className="ws-top">
+            <div className="jb-top">
+              <h2 className="ar-h2">Jobs starting</h2>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="ar-logo" src={logo} alt="RAS-VERTEX" />
-              <span className="ws-kicker">Jobs overview</span>
+              <img className="ar-logo" src={logo} alt="RAS-VERTEX Maintenance Solutions" />
             </div>
-            {oi === 0 && (
-              <div className="ws-head">
-                <h2 className="ar-h2">Jobs starting</h2>
-                <span className="ar-label">{model.title}</span>
-              </div>
+            {oi === 0 ? (
+              <p className="jb-lede">
+                {model.overviewCount} job{model.overviewCount === 1 ? "" : "s"} starting {model.title}
+              </p>
+            ) : (
+              <div className="jb-gap" />
             )}
-            <div className="ws-ov">
-              {cols.map((blocks, ci) => (
-                <div key={ci} className="ws-ov-col">
-                  {blocks.map((b, bi) => (
-                    <OverviewItem key={bi} b={b} />
-                  ))}
+            <div className="ar-table">
+              <div className="ar-thead jb-cols">
+                <span>Starts</span>
+                <span>Job</span>
+                <span>Site</span>
+                <span>Address</span>
+                <span>Work</span>
+              </div>
+              {rows.map((r, i) => (
+                <div key={`${r.iso}-${r.ref}`} className={`ar-tr jb-tr jb-cols${r.first && i > 0 ? " jb-tr--day" : ""}`}>
+                  <span className="jb-day">
+                    {(r.first || i === 0) && (
+                      <>
+                        {r.day}
+                        <em>{r.date}</em>
+                      </>
+                    )}
+                  </span>
+                  <span className="jb-no">
+                    {r.quote ? "Q" : "#"}
+                    {r.ref}
+                  </span>
+                  <span className="jb-site">{r.site}</span>
+                  <span className="jb-addr">{r.address || "—"}</span>
+                  <span>{r.work || "—"}</span>
                 </div>
               ))}
             </div>
-            <div className="ws-foot">
-              <span>RAS-VERTEX</span>
+            <div className="ws-foot jb-foot">
+              <span>RAS-VERTEX · Jobs starting · {model.days.length ? rangeTitle(model.days[0].iso, model.days[model.days.length - 1].iso, true) : model.title}</span>
               <span>
                 Page {pad(model.pages.length + oi + 1)} / {pad(total)}
               </span>
             </div>
           </section>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** A day's heading, or a site (name: address) and its jobs (#number – name). */
-function OverviewItem({ b }: { b: OverviewBlock }) {
-  if (b.t === "day")
-    return (
-      <div className="ws-ov-day">
-        {b.day.heading}
-        {b.cont && <span>continued</span>}
-      </div>
-    );
-  return (
-    <div className="ws-ov-site">
-      <b>{b.site.label}</b>
-      {b.site.address && <span>: {b.site.address}</span>}
-      {b.site.jobs.map((j) => (
-        <div key={j.ref} className="ws-ov-job">
-          <b>
-            {j.quote ? "Q" : "#"}
-            {j.ref}
-          </b>
-          <span>– {j.name || "Job"}</span>
         </div>
       ))}
     </div>

@@ -75,12 +75,12 @@ export function rangeDays(from: string, to: string): string[] {
 
 const isWeekend = (d: string) => [0, 6].includes(fromIso(d).getDay());
 
-/** "16–20 November 2026", "30 November – 4 December 2026". */
-export function rangeTitle(from: string, to: string): string {
+/** "16–20 November 2026", "30 November – 4 December 2026" (short: "Nov"). */
+export function rangeTitle(from: string, to: string, short = false): string {
   const a = fromIso(from);
   const b = fromIso(to);
   const day = (d: Date) => d.toLocaleDateString("en-AU", { day: "numeric" });
-  const month = (d: Date) => d.toLocaleDateString("en-AU", { month: "long" });
+  const month = (d: Date) => d.toLocaleDateString("en-AU", { month: short ? "short" : "long" });
   if (from === to) return `${day(a)} ${month(a)} ${a.getFullYear()}`;
   if (a.getFullYear() !== b.getFullYear()) return `${day(a)} ${month(a)} ${a.getFullYear()} – ${day(b)} ${month(b)} ${b.getFullYear()}`;
   return a.getMonth() === b.getMonth()
@@ -90,9 +90,13 @@ export function rangeTitle(from: string, to: string): string {
 
 // ── Cleaning: one clear answer per person per day ──────────────────────────
 
-/** A second site shows on a day only when it has at least this many hours
- *  (a genuine split day); shorter stops are left off. */
+/** Every job on a day shows. A working activity (Yardwork, Training…)
+ *  beside a job shows only with at least this many hours; shorter stops
+ *  are left off. */
 export const SPLIT_MIN_HOURS = 3;
+
+/** Jobs named on one day's bar ("A / B"); past this, "+2" etc. */
+export const MAX_DAY_JOBS = 2;
 
 /** Activities that mean the person isn't working (matched by name). Others
  *  (Yardwork, Training, Toolbox, Workshop…) show like a site. */
@@ -120,8 +124,8 @@ const byHours = (a: CellItem, b: CellItem) => b.hours - a.hours || a.label.local
  *  - leave wins the day when it has no hours (a full day) or at least as
  *    many hours as the work; otherwise the work shows and the leave doesn't;
  *  - zero-hour schedules drop out unless they're all there is;
- *  - the site with the most hours shows, and a second only when it has
- *    SPLIT_MIN_HOURS or more. */
+ *  - every job and quote shows, the longest first (the bar reads "A / B");
+ *    a working activity beside them only with SPLIT_MIN_HOURS or more. */
 export function dayItems(entries: WeekEntry[]): CellItem[] {
   const by = new Map<string, CellItem>();
   for (const e of entries) {
@@ -146,7 +150,9 @@ export function dayItems(entries: WeekEntry[]): CellItem[] {
   const timed = work.filter((i) => i.hours > 0);
   if (timed.length) work = timed;
   if (!work.length) return [];
-  return work[1] && work[1].hours >= SPLIT_MIN_HOURS ? [work[0], work[1]] : [work[0]];
+  const jobs = work.filter((i) => i.kind !== "activity");
+  if (!jobs.length) return work[1] && work[1].hours >= SPLIT_MIN_HOURS ? [work[0], work[1]] : [work[0]];
+  return [...jobs, ...work.filter((i) => i.kind === "activity" && i.hours >= SPLIT_MIN_HOURS)].sort(byHours);
 }
 
 /** "#11357" or "#11195, #11295". */
@@ -286,15 +292,18 @@ export interface WeekModel {
   pages: WeekPage[];
   /** Tighter rows, so everyone fits on one sheet per week. */
   compact: boolean;
-  /** Jobs overview sheets (opts.overview): three columns each. */
-  overview: OverviewSheet[];
+  /** Jobs starting sheets (opts.overview): table rows per sheet. */
+  overview: OverviewRow[][];
+  /** Jobs on the Jobs starting pages. */
+  overviewCount: number;
   opts: WeekOptions;
   staffCount: number;
   siteCount: number;
 }
 
+/** Two days read the same: the same items, in the same order. */
 const sameDay = (a: WeekCell[], b: WeekCell[]) =>
-  a.length === 1 && b.length === 1 && a[0].leave === b[0].leave && a[0].flag === b[0].flag && a[0].label === b[0].label;
+  a.length === b.length && a.every((x, i) => x.leave === b[i].leave && x.flag === b[i].flag && x.label === b[i].label);
 
 function runsOf(cells: WeekCell[][], edited: boolean[]): WeekRun[] {
   const runs: WeekRun[] = [];
@@ -305,7 +314,9 @@ function runsOf(cells: WeekCell[][], edited: boolean[]): WeekRun[] {
       last.span++;
       last.edited ||= edited[i];
       // Job numbers across the run.
-      for (const r of items[0].refs) if (!last.items[0].refs.includes(r)) last.items[0].refs.push(r);
+      items.forEach((it, k) => {
+        for (const r of it.refs) if (!last.items[k].refs.includes(r)) last.items[k].refs.push(r);
+      });
     } else {
       runs.push({ start: i, span: 1, items: items.map((it) => ({ ...it, refs: [...it.refs] })), edited: edited[i] });
     }
@@ -406,7 +417,8 @@ export function buildWeekModel(
   if (!chunks.length) chunks.push([]);
 
   // Rows: as many as fit on each sheet; compact when that makes them fit.
-  const extra = (r: WeekRow, cols: number[]) => Math.max(0, Math.max(0, ...cols.map((i) => r.cells[i].length)) - 1);
+  // A day is one bar ("A / B"), so rows don't grow; kept for a stacked day.
+  const extra = (_r: WeekRow, _cols: number[]) => 0;
   const height = (cols: number[], row: number, item: number) => rows.reduce((t, r) => t + row + item * extra(r, cols), 0);
   const compact = chunks.some((cols, k) => {
     const room = k ? NEXT_BODY : FIRST_BODY;
@@ -441,7 +453,10 @@ export function buildWeekModel(
     rows,
     pages,
     compact,
-    overview: opts.overview ? overviewSheets(jobsOverview(data, rows, days)) : [],
+    ...(() => {
+      const ov = opts.overview ? overviewRows(jobsOverview(data, rows, days)) : [];
+      return { overview: overviewPages(ov), overviewCount: ov.length };
+    })(),
     opts,
     staffCount: staff.length,
     siteCount: sites,
@@ -600,10 +615,7 @@ export function jobsOverview(data: WeekScheduleResponse, rows: WeekRow[], days: 
           if (seen.has(ref)) continue;
           seen.add(ref);
           const known = info.get(ref);
-          const addr = known?.address || addressOf.get(it.label) || "";
-          // A site named by its address ("22 Undara Ave, Buddina") needn't repeat it.
-          const key = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
-          const site = sites.get(it.label) ?? { label: it.label, address: key(addr) === key(it.label) ? "" : addr, jobs: [] };
+          const site = sites.get(it.label) ?? { label: it.label, address: known?.address || addressOf.get(it.label) || "", jobs: [] };
           site.jobs.push({ ref, quote: !!known?.quote || it.kind === "quote", name: known?.name || it.names[0] || "" });
           sites.set(it.label, site);
         }
@@ -620,55 +632,49 @@ export function jobsOverview(data: WeekScheduleResponse, rows: WeekRow[], days: 
   return out;
 }
 
-/** A block in an overview column: a day's heading, or a site and its jobs. */
-export type OverviewBlock = { t: "day"; day: OverviewDay; cont: boolean } | { t: "site"; site: OverviewSite };
-export type OverviewSheet = OverviewBlock[][];
+/** One row of the Jobs starting table. */
+export interface OverviewRow {
+  iso: string;
+  /** "Monday" and "16 Nov", on the first row of each day (and of a sheet). */
+  day: string;
+  date: string;
+  /** First row of its day: the day shows, with a heavier rule above. */
+  first: boolean;
+  ref: string;
+  quote: boolean;
+  site: string;
+  address: string;
+  work: string;
+}
 
-export const OVERVIEW_COLS = 3;
-// Page units: column width, and the room under the title (first sheet) or
-// the logo line (the rest).
-const OV_COL_W = (WEEK_PAGE_W - 192 - 48 * (OVERVIEW_COLS - 1)) / OVERVIEW_COLS;
-const OV_FIRST = 900;
-const OV_NEXT = 1000;
-const lines = (text: string, px: number, w = OV_COL_W) => Math.max(1, Math.ceil((text.length * px * 0.52) / w));
-const blockH = (b: OverviewBlock) =>
-  b.t === "day"
-    ? 22 + 40
-    : lines(`${b.site.label}: ${b.site.address}`, 18) * 25 + b.site.jobs.reduce((t, j) => t + lines(`#${j.ref} – ${j.name}`, 17, OV_COL_W - 28) * 25, 0) + 18;
+/** "defect report work - visit 3" → "Defect report work – visit 3". */
+export const tidyWork = (s: string) => {
+  const t = s.trim().replace(/\s+-\s+/g, " – ").replace(/\s+/g, " ");
+  return t ? t[0].toUpperCase() + t.slice(1) : "";
+};
 
-/** Lays the days into columns, three to a sheet. A day's heading never
- *  ends a column, and repeats (continued) at the top of the next. */
-export function overviewSheets(days: OverviewDay[]): OverviewSheet[] {
-  if (!days.length) return [];
-  const sheets: OverviewSheet[] = [[[]]];
-  let room = OV_FIRST;
-  const col = () => sheets[sheets.length - 1][sheets[sheets.length - 1].length - 1];
-  const nextCol = () => {
-    const sheet = sheets[sheets.length - 1];
-    if (sheet.length < OVERVIEW_COLS) sheet.push([]);
-    else sheets.push([[]]);
-    room = sheets.length === 1 ? OV_FIRST : OV_NEXT;
-  };
-  for (const day of days) {
-    const head: OverviewBlock = { t: "day", day, cont: false };
-    day.sites.forEach((site, k) => {
-      const b: OverviewBlock = { t: "site", site };
-      const need = blockH(b) + (k === 0 ? blockH(head) : 0);
-      if (need > room && col().length) {
-        nextCol();
-        if (k > 0) {
-          const cont: OverviewBlock = { t: "day", day, cont: true };
-          col().push(cont);
-          room -= blockH(cont);
-        }
-      }
-      if (k === 0) {
-        col().push(head);
-        room -= blockH(head);
-      }
-      col().push(b);
-      room -= blockH(b);
-    });
+export function overviewRows(days: OverviewDay[]): OverviewRow[] {
+  return days.flatMap((d) => {
+    const dt = fromIso(d.iso);
+    const day = dt.toLocaleDateString("en-AU", { weekday: "long" });
+    const date = dt.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+    return d.sites.flatMap((s) =>
+      s.jobs.map((j) => ({ iso: d.iso, day, date, first: false, ref: j.ref, quote: j.quote, site: s.label, address: s.address, work: tidyWork(j.name) })),
+    ).map((r, i) => ({ ...r, first: i === 0 }));
+  });
+}
+
+// Rows per sheet: 52 each, under the title and lede (first sheet) or the
+// title alone (the rest), above the footer.
+const OV_FIRST_ROWS = 16;
+const OV_NEXT_ROWS = 18;
+
+export function overviewPages(rows: OverviewRow[]): OverviewRow[][] {
+  const out: OverviewRow[][] = [];
+  for (let i = 0; i < rows.length; ) {
+    const n = out.length ? OV_NEXT_ROWS : OV_FIRST_ROWS;
+    out.push(rows.slice(i, i + n));
+    i += n;
   }
-  return sheets;
+  return out;
 }

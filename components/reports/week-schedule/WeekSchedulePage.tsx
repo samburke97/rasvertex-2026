@@ -285,7 +285,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
             r.cells
               .map((items) => {
                 const bg = items[0]?.tone ? `background:${items[0].tone};` : "";
-                return `<td style="${td}${bg}">${items.map((it) => esc(text(it))).join("<br>")}</td>`;
+                return `<td style="${td}${bg}">${items.map((it) => esc(text(it))).join(" / ")}</td>`;
               })
               .join("") +
             `</tr>`,
@@ -504,8 +504,8 @@ export default function WeekSchedulePage({ onBack }: Props) {
           <div className={panel.group}>
             <div className={panel.groupLabel}>Export</div>
             <ToggleRow
-              label="Include jobs overview"
-              sub="Pages after the schedule listing each job as it starts: site and address, job number and name"
+              label="Include jobs starting"
+              sub="A page after the schedule listing each job on the day it starts: job number, site, address and work"
               checked={opts.overview}
               onChange={(v) => setOpt("overview", v)}
             />

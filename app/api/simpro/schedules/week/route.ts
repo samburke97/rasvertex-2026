@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
           `${API}/sites/?ID=in(${siteIds.slice(i, i + 50).join(",")})&columns=ID,Address&pageSize=50`,
         );
         for (const st of sites) {
-          const a = [st.Address?.Address, st.Address?.City].map((x) => x?.trim()).filter(Boolean).join(", ");
+          const a = cleanSite([st.Address?.Address, st.Address?.City].map((x) => x?.trim()).filter(Boolean).join(", "));
           if (a) address.set(st.ID, a);
         }
       } catch (err) {

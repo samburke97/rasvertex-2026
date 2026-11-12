@@ -35,8 +35,8 @@ const show = (entries: WeekEntry[]) => dayItems(entries).map((i) => `${i.label}$
 const checks: [string, () => void][] = [
   ["RDO and a job: the job when it has more hours", () => assert.deepEqual(show([e("RDO", 2, "activity"), e("Cosmo", 6)]), ["Cosmo 6h"])],
   ["RDO and a job: the RDO when it has as many hours", () => assert.deepEqual(show([e("RDO", 8, "activity"), e("Cosmo", 8)]), ["RDO 8h"])],
-  ["two sites 6h/2h: the 6h site only", () => assert.deepEqual(show([e("Beachport", 6), e("Rovera", 2)]), ["Beachport 6h"])],
-  ["two sites 4h/4h: both (a split day)", () => assert.deepEqual(show([e("Emporio", 4), e("Aurora", 4)]), ["Aurora 4h", "Emporio 4h"])],
+  ["two jobs 6h/2h: both, the longer first", () => assert.deepEqual(show([e("Beachport", 6), e("Rovera", 2)]), ["Beachport 6h", "Rovera 2h"])],
+  ["two jobs 4h/4h: both", () => assert.deepEqual(show([e("Emporio", 4), e("Aurora", 4)]), ["Aurora 4h", "Emporio 4h"])],
   [`second site at exactly ${SPLIT_MIN_HOURS}h shows`, () => assert.deepEqual(show([e("Living Choice", 5), e("Yardwork", 3, "activity")]), ["Living Choice 5h", "Yardwork 3h"])],
   ["leave with no hours wins the day", () => assert.deepEqual(show([e("Annual Leave", 0, "activity"), e("Cosmo", 8)]), ["Annual Leave"])],
   [
@@ -119,6 +119,17 @@ function editChecks(): [string, () => void][] {
         const m = buildWeekModel(data, range, DEFAULT_WEEK_OPTIONS, [], d);
         const cell = m.rows.find((r) => r.staffId === 1)!.cells[0];
         assert.deepEqual(cell.map((c) => [c.label, c.tone, c.leave, c.flag]), [["Off", null, true, "off"]]);
+      },
+    ],
+    [
+      "the same two jobs on consecutive days are one bar",
+      () => {
+        const two = { ...data, entries: days.flatMap((date) => [
+          { staffId: 1, date, kind: "job" as const, label: "Emporio", ref: "1", name: "", hours: 4 },
+          { staffId: 1, date, kind: "job" as const, label: "Aurora", ref: "2", name: "", hours: 4 },
+        ]) };
+        const runs = buildWeekModel(two, range, DEFAULT_WEEK_OPTIONS).pages[0].rows[0].runs;
+        assert.deepEqual(runs.map((r) => [r.span, r.items.map((i) => i.label).join(" / ")]), [[5, "Aurora / Emporio"]]);
       },
     ],
     [
