@@ -1,26 +1,31 @@
 "use client";
 // components/reports/week-schedule/WeekSchedulePage.tsx
 //
-// Weekly schedule: one row per staff member, one column per day, each cell
-// the site(s) they're scheduled on in SimPRO, or their leave. Read-only:
-// SimPRO is the source of truth. "Copy for Excel" puts the table on the
-// clipboard (pastes into the weekly spreadsheet with its formatting) and
-// "Print / PDF" prints it on one landscape A4 page.
+// Weekly schedule builder: the week and display options on the left, the
+// landscape pages on the right (WeekScheduleDocument, scaled to fit), in
+// the same shell as the other report builders. Read-only: SimPRO is the
+// source of truth. "Copy for Excel" puts the table on the clipboard for the
+// weekly spreadsheet; "Download PDF" renders the same pages on the server.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import shell from "../shared/ReportPage.module.css";
+import panel from "../shared/OptionsPanel.module.css";
 import styles from "./WeekSchedulePage.module.css";
+import ToggleRow from "../shared/ToggleRow";
+import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
+import WeekScheduleDocument, { WEEK_CSS } from "./WeekScheduleDocument";
+import { ANCHOR_IMAGES } from "@/lib/reports/anchor.layout";
 import {
   addDays,
-  cellItems,
-  fromIso,
+  buildWeekModel,
+  DEFAULT_WEEK_OPTIONS,
   iso,
   mondayOf,
   refText,
-  siteTones,
   weekDays,
   weekTitle,
-  type CellItem,
+  WEEK_PAGE_W,
+  type WeekOptions,
   type WeekScheduleResponse,
 } from "@/lib/reports/weekSchedule";
 
@@ -33,8 +38,10 @@ type Load =
   | { phase: "error"; message: string }
   | { phase: "done"; data: WeekScheduleResponse };
 
-// Per-viewer conveniences (hidden rows, display toggles): browser storage,
-// best effort.
+const LOGO = "/" + ANCHOR_IMAGES.logo;
+
+// Per-viewer conveniences (hidden team members, display options): browser
+// storage, best effort.
 const HIDDEN_KEY = "week-schedule:hidden";
 const OPTS_KEY = "week-schedule:opts";
 function readJSON<T>(key: string, fallback: T): T {
@@ -53,52 +60,39 @@ function writeJSON(key: string, v: unknown) {
   }
 }
 
-interface Opts {
-  refs: boolean;
-  colour: boolean;
-  weekend: boolean;
-}
-const DEFAULT_OPTS: Opts = { refs: false, colour: true, weekend: false };
-
-const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const shortDate = (d: string) =>
-  fromIso(d).toLocaleDateString("en-AU", { month: "short", day: "2-digit" }).replace(" ", "-");
-
-const isOff = (it: CellItem) => it.kind === "activity";
-const hrs = (n: number) => `${Math.round(n * 100) / 100} hr${n === 1 ? "" : "s"}`;
+const EMPTY: WeekScheduleResponse = { from: "", to: "", staff: [], entries: [], skipped: 0 };
 
 export default function WeekSchedulePage({ onBack }: Props) {
   const [monday, setMonday] = useState(() => mondayOf(new Date()));
   const [load, setLoad] = useState<Load>({ phase: "loading" });
   const [reloadKey, setReloadKey] = useState(0);
   const [hidden, setHidden] = useState<number[]>([]);
-  const [showHidden, setShowHidden] = useState(false);
-  const [opts, setOpts] = useState<Opts>(DEFAULT_OPTS);
+  const [opts, setOpts] = useState<WeekOptions>(DEFAULT_WEEK_OPTIONS);
   const [copied, setCopied] = useState<"ok" | "fail" | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     setHidden(readJSON<number[]>(HIDDEN_KEY, []));
-    setOpts({ ...DEFAULT_OPTS, ...readJSON<Partial<Opts>>(OPTS_KEY, {}) });
+    setOpts({ ...DEFAULT_WEEK_OPTIONS, ...readJSON<Partial<WeekOptions>>(OPTS_KEY, {}) });
   }, []);
-  const setOpt = (k: keyof Opts, v: boolean) =>
+  const setOpt = (k: keyof WeekOptions, v: boolean) =>
     setOpts((o) => {
       const n = { ...o, [k]: v };
       writeJSON(OPTS_KEY, n);
       return n;
     });
-  const toggleHidden = (id: number) =>
+  const setShown = (id: number, shown: boolean) =>
     setHidden((h) => {
-      const n = h.includes(id) ? h.filter((x) => x !== id) : [...h, id];
+      const n = shown ? h.filter((x) => x !== id) : [...h.filter((x) => x !== id), id];
       writeJSON(HIDDEN_KEY, n);
       return n;
     });
 
-  const days7 = useMemo(() => weekDays(monday), [monday]);
-
+  const days = useMemo(() => weekDays(monday), [monday]);
   useEffect(() => {
     let live = true;
     setLoad({ phase: "loading" });
-    fetch(`/api/simpro/schedules/week?from=${days7[0]}&to=${days7[6]}`)
+    fetch(`/api/simpro/schedules/week?from=${days[0]}&to=${days[6]}`)
       .then(async (res) => {
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -109,58 +103,50 @@ export default function WeekSchedulePage({ onBack }: Props) {
     return () => {
       live = false;
     };
-  }, [days7, reloadKey]);
+  }, [days, reloadKey]);
 
   const data = load.phase === "done" ? load.data : null;
+  const model = useMemo(() => buildWeekModel(data ?? EMPTY, monday, opts, hidden), [data, monday, opts, hidden]);
+  const weekendBooked = !!data?.entries.some((e) => e.date === days[5] || e.date === days[6]);
+  const ready = !!data && model.staffCount > 0;
 
-  // Weekend columns show when switched on, or when anyone is scheduled then.
-  const weekendBooked = !!data?.entries.some((e) => e.date === days7[5] || e.date === days7[6]);
-  const days = opts.weekend || weekendBooked ? days7 : days7.slice(0, 5);
-
-  const grid = useMemo(() => {
-    const m = new Map<string, CellItem[]>();
-    if (!data) return m;
-    const by = new Map<string, typeof data.entries>();
-    for (const e of data.entries) {
-      const k = `${e.staffId}|${e.date}`;
-      by.set(k, [...(by.get(k) ?? []), e]);
-    }
-    by.forEach((es, k) => m.set(k, cellItems(es)));
-    return m;
-  }, [data]);
-
-  const tones = useMemo(() => siteTones(data?.entries ?? []), [data]);
-  const siteTone = (label: string) => tones.get(label);
-
-  const staff = data?.staff ?? [];
-  const visible = staff.filter((s) => !hidden.includes(s.id));
-  const hiddenStaff = staff.filter((s) => hidden.includes(s.id));
-  const rows = showHidden ? staff : visible;
-  const sites = useMemo(
-    () => new Set((data?.entries ?? []).filter((e) => e.kind !== "activity").map((e) => e.label)).size,
-    [data],
-  );
+  // The pages are 1810 wide, scaled to the column.
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(0.5);
+  useLayoutEffect(() => {
+    const el = previewRef.current;
+    if (!el) return;
+    const fit = () => {
+      const z = Math.max(0.15, Math.min(0.8, (el.clientWidth - 64) / WEEK_PAGE_W));
+      setZoom((prev) => (Math.abs(prev - z) > 0.003 ? z : prev));
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // ── Copy for Excel ───────────────────────────────────────────────────────
-  const cellText = (it: CellItem) => (opts.refs && it.refs.length ? `${it.label} (${refText(it.refs)})` : it.label);
   const copyForExcel = useCallback(async () => {
+    const rows = model.pages.flat();
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const td = "border:1px solid #9aa3ad;padding:3px 8px;text-align:center;font-family:Calibri,Arial;font-size:11pt;";
-    const head = "background:#1f2a44;color:#fff;font-weight:bold;";
-    const sub = "background:#dce3ee;color:#1f2a44;font-weight:bold;";
+    const text = (it: { label: string; refs: string[] }) =>
+      opts.refs && it.refs.length ? `${it.label} (${refText(it.refs)})` : it.label;
+    const td = "border:1px solid #c7cfdc;padding:4px 10px;text-align:center;font-family:Calibri,Arial;font-size:11pt;color:#011955;";
+    const head = "background:#011955;color:#ffffff;font-weight:bold;";
+    const sub = "background:#deeeff;font-weight:bold;";
     const html =
       `<table style="border-collapse:collapse">` +
-      `<tr><td style="${td}${head}"></td><td style="${td}${head}"></td>${days.map((d) => `<td style="${td}${head}">${shortDate(d)}</td>`).join("")}</tr>` +
-      `<tr><td style="${td}${sub}"></td><td style="${td}${sub}text-align:left">Name</td>${days.map((_, i) => `<td style="${td}${sub}">${DAY_NAMES[i]}</td>`).join("")}</tr>` +
-      visible
+      `<tr><td style="${td}${head}"></td><td style="${td}${head}"></td>${model.days.map((d) => `<td style="${td}${head}">${d.date}</td>`).join("")}</tr>` +
+      `<tr><td style="${td}${sub}"></td><td style="${td}${sub}text-align:left">Name</td>${model.days.map((d) => `<td style="${td}${sub}">${d.day}</td>`).join("")}</tr>` +
+      rows
         .map(
-          (s, n) =>
-            `<tr><td style="${td}">${n + 1}</td><td style="${td}text-align:left">${esc(s.name)}</td>` +
-            days
-              .map((d) => {
-                const items = grid.get(`${s.id}|${d}`) ?? [];
-                const bg = opts.colour && items[0] && !isOff(items[0]) ? `background:${siteTone(items[0].label)};` : "";
-                return `<td style="${td}${bg}">${items.map((it) => esc(cellText(it))).join("<br>")}</td>`;
+          (r) =>
+            `<tr><td style="${td}">${r.n}</td><td style="${td}text-align:left">${esc(r.name)}</td>` +
+            r.cells
+              .map((items) => {
+                const bg = items[0]?.tone ? `background:${items[0].tone};` : "";
+                return `<td style="${td}${bg}">${items.map((it) => esc(text(it))).join("<br>")}</td>`;
               })
               .join("") +
             `</tr>`,
@@ -168,11 +154,9 @@ export default function WeekSchedulePage({ onBack }: Props) {
         .join("") +
       `</table>`;
     const tsv = [
-      ["", "", ...days.map(shortDate)].join("\t"),
-      ["", "Name", ...days.map((_, i) => DAY_NAMES[i])].join("\t"),
-      ...visible.map((s, n) =>
-        [String(n + 1), s.name, ...days.map((d) => (grid.get(`${s.id}|${d}`) ?? []).map(cellText).join(" / "))].join("\t"),
-      ),
+      ["", "", ...model.days.map((d) => d.date)].join("\t"),
+      ["", "Name", ...model.days.map((d) => d.day)].join("\t"),
+      ...rows.map((r) => [String(r.n), r.name, ...r.cells.map((items) => items.map(text).join(" / "))].join("\t")),
     ].join("\n");
     try {
       if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
@@ -190,201 +174,170 @@ export default function WeekSchedulePage({ onBack }: Props) {
       setCopied("fail");
     }
     setTimeout(() => setCopied(null), 2500);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [days, visible, grid, opts, tones]);
+  }, [model, opts.refs]);
 
-  const thisWeek = iso(monday) === iso(mondayOf(new Date()));
-  const nextWeek = iso(monday) === iso(addDays(mondayOf(new Date()), 7));
+  // ── Download PDF ─────────────────────────────────────────────────────────
+  const downloadPDF = useCallback(async () => {
+    if (!data) return;
+    setExporting(true);
+    const filename = `Weekly Schedule ${days[0]}`;
+    try {
+      const res = await fetch("/api/reports/export-week-schedule-pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename, monday: iso(monday), data, opts, hidden }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Export failed");
+      }
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename + ".pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[ExportWeekSchedulePDF]", err);
+      alert(err instanceof Error ? err.message : "Export failed. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  }, [data, days, monday, opts, hidden]);
+
+  const thisMonday = mondayOf(new Date());
+  const presets = [
+    { label: "This week", monday: thisMonday },
+    { label: "Next week", monday: addDays(thisMonday, 7) },
+  ];
 
   return (
-    <div className={styles.page}>
+    <div className={shell.page}>
+      <style dangerouslySetInnerHTML={{ __html: WEEK_CSS }} />
       <BuilderHeader
         onBack={onBack}
         title="Weekly schedule"
         subtitle={weekTitle(monday)}
-        badges={data ? [`${visible.length} staff`, `${sites} site${sites === 1 ? "" : "s"}`] : undefined}
+        badges={data ? [`${model.staffCount} team`, `${model.siteCount} site${model.siteCount === 1 ? "" : "s"}`] : undefined}
         status={
           load.phase === "loading"
             ? { text: "Reading SimPRO…", busy: true }
             : copied === "ok"
               ? { text: "Copied. Paste into Excel" }
-              : undefined
+              : copied === "fail"
+                ? { text: "Couldn't copy", busy: true }
+                : undefined
         }
       >
-        <HeaderButton onClick={copyForExcel} disabled={!data || !visible.length}>
-          {copied === "fail" ? "Couldn't copy" : "Copy for Excel"}
+        <HeaderButton onClick={copyForExcel} disabled={!ready}>
+          Copy for Excel
         </HeaderButton>
-        <HeaderButton primary onClick={() => window.print()} disabled={!data || !visible.length}>
-          Print / PDF
+        <HeaderButton primary onClick={downloadPDF} disabled={!ready || exporting}>
+          {exporting ? "Exporting…" : "Download PDF"}
         </HeaderButton>
       </BuilderHeader>
 
-      <div className={styles.toolbar}>
-        <div className={styles.weekNav}>
-          <button className={styles.navBtn} onClick={() => setMonday((m) => addDays(m, -7))} aria-label="Previous week">
-            <Chevron left />
-          </button>
-          <span className={styles.weekLabel}>{weekTitle(monday)}</span>
-          <button className={styles.navBtn} onClick={() => setMonday((m) => addDays(m, 7))} aria-label="Next week">
-            <Chevron />
-          </button>
-          <button
-            className={`${styles.pill} ${thisWeek ? styles.pillOn : ""}`}
-            onClick={() => setMonday(mondayOf(new Date()))}
-          >
-            This week
-          </button>
-          <button
-            className={`${styles.pill} ${nextWeek ? styles.pillOn : ""}`}
-            onClick={() => setMonday(addDays(mondayOf(new Date()), 7))}
-          >
-            Next week
-          </button>
-        </div>
-        <div className={styles.toggles}>
-          <Check label="Job numbers" on={opts.refs} set={(v) => setOpt("refs", v)} />
-          <Check label="Colour by site" on={opts.colour} set={(v) => setOpt("colour", v)} />
-          <Check
-            label="Weekend"
-            on={opts.weekend || weekendBooked}
-            disabled={weekendBooked}
-            title={weekendBooked ? "Shown: someone is scheduled on the weekend" : undefined}
-            set={(v) => setOpt("weekend", v)}
-          />
-          <button className={styles.textBtn} onClick={() => setReloadKey((k) => k + 1)} disabled={load.phase === "loading"}>
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.canvas}>
-        {load.phase === "error" && (
-          <div className={styles.notice}>
-            <b>Couldn&apos;t read the SimPRO schedule.</b> {load.message}{" "}
-            <button className={styles.textBtn} onClick={() => setReloadKey((k) => k + 1)}>
-              Try again
+      <div className={shell.editorBody}>
+        <aside className={panel.panel}>
+          {/* ── Week ── */}
+          <div className={panel.group}>
+            <div className={panel.groupLabel}>Week</div>
+            <div className={styles.weekNav}>
+              <button className={styles.navBtn} onClick={() => setMonday((m) => addDays(m, -7))} aria-label="Previous week">
+                <Chevron left />
+              </button>
+              <span className={styles.weekLabel}>{weekTitle(monday)}</span>
+              <button className={styles.navBtn} onClick={() => setMonday((m) => addDays(m, 7))} aria-label="Next week">
+                <Chevron />
+              </button>
+            </div>
+            <div className={panel.presetRow}>
+              {presets.map((p) => (
+                <button
+                  key={p.label}
+                  className={`${panel.presetBtn} ${iso(p.monday) === iso(monday) ? panel.presetBtnActive : ""}`}
+                  onClick={() => setMonday(p.monday)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <button className={panel.btn} onClick={() => setReloadKey((k) => k + 1)} disabled={load.phase === "loading"}>
+              {load.phase === "loading" ? "Reading SimPRO…" : "Refresh from SimPRO"}
             </button>
           </div>
-        )}
-        {data && data.skipped > 0 && (
-          <div className={styles.notice}>
-            {data.skipped} leave or activity schedule{data.skipped === 1 ? "" : "s"} couldn&apos;t be read and{" "}
-            {data.skipped === 1 ? "is" : "are"} shown by its SimPRO reference.
-          </div>
-        )}
-        {data && !staff.length && <div className={styles.empty}>Nobody is scheduled in SimPRO this week.</div>}
 
-        {(load.phase === "loading" || staff.length > 0) && (
-          <div className={`${styles.sheet} ${load.phase === "loading" ? styles.sheetLoading : ""}`} data-print-area>
-            <div className={styles.printTitle}>
-              <span>RAS-VERTEX weekly schedule</span>
-              <span>{weekTitle(monday)}</span>
+          {/* ── Table ── */}
+          <div className={panel.group}>
+            <div className={panel.groupLabel}>Table</div>
+            <ToggleRow
+              label="Colour by site"
+              sub="Each site its own colour, so crews stand out"
+              checked={opts.colour}
+              onChange={(v) => setOpt("colour", v)}
+            />
+            <ToggleRow
+              label="Job numbers"
+              sub="The SimPRO job number beside each site"
+              checked={opts.refs}
+              onChange={(v) => setOpt("refs", v)}
+            />
+            <ToggleRow
+              label="Weekend"
+              sub={weekendBooked ? "Shown: someone is booked on the weekend" : "Saturday and Sunday columns"}
+              checked={opts.weekend || weekendBooked}
+              disabled={weekendBooked}
+              onChange={(v) => setOpt("weekend", v)}
+            />
+          </div>
+
+          {/* ── Team ── */}
+          {data && data.staff.length > 0 && (
+            <div className={panel.group}>
+              <div className={panel.groupLabelRow}>
+                <span className={panel.groupLabel}>Team</span>
+                <span className={panel.subLabel}>
+                  {model.staffCount} of {data.staff.length}
+                </span>
+              </div>
+              <p className={panel.subLabel}>Everyone scheduled in SimPRO this week. Switch off anyone to leave out, such as office staff.</p>
+              {data.staff.map((s) => (
+                <ToggleRow key={s.id} label={s.name} checked={!hidden.includes(s.id)} onChange={(v) => setShown(s.id, v)} />
+              ))}
             </div>
-            <table className={styles.table}>
-              <thead>
-                <tr className={styles.dateRow}>
-                  <th className={styles.numCol} />
-                  <th className={styles.nameCol} />
-                  {days.map((d) => (
-                    <th key={d}>{shortDate(d)}</th>
-                  ))}
-                </tr>
-                <tr className={styles.dayRow}>
-                  <th className={styles.numCol} />
-                  <th className={`${styles.nameCol} ${styles.left}`}>Name</th>
-                  {days.map((d, i) => (
-                    <th key={d}>{DAY_NAMES[i]}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {load.phase === "loading" &&
-                  Array.from({ length: 12 }, (_, i) => (
-                    <tr key={i}>
-                      <td className={styles.numCol}>{i + 1}</td>
-                      <td className={styles.nameCol}>
-                        <span className={styles.skel} style={{ width: 90 + ((i * 37) % 60) }} />
-                      </td>
-                      {days.map((d) => (
-                        <td key={d}>
-                          <span className={styles.skel} style={{ width: 60 + ((i * 53 + d.length * 7) % 50) }} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                {data &&
-                  rows.map((s) => {
-                    const off = hidden.includes(s.id);
-                    return (
-                      <tr key={s.id} className={off ? styles.rowHidden : ""}>
-                        <td className={styles.numCol}>{off ? "" : visible.indexOf(s) + 1}</td>
-                        <td className={styles.nameCol}>
-                          <span className={styles.name}>{s.name}</span>
-                          <button
-                            className={styles.hideBtn}
-                            onClick={() => toggleHidden(s.id)}
-                            title={off ? "Show in the schedule" : "Leave out of the schedule (e.g. office staff)"}
-                          >
-                            {off ? "Show" : "Hide"}
-                          </button>
-                        </td>
-                        {days.map((d) => {
-                          const items = grid.get(`${s.id}|${d}`) ?? [];
-                          const first = items[0];
-                          const tint = opts.colour && first && !isOff(first) ? siteTone(first.label) : undefined;
-                          return (
-                            <td
-                              key={d}
-                              style={tint ? { background: tint } : undefined}
-                              title={items
-                                .map((it) => [it.label, refText(it.refs), it.names.join(", "), it.hours ? hrs(it.hours) : ""].filter(Boolean).join(" · "))
-                                .join("\n")}
-                            >
-                              {items.map((it, k) => (
-                                <div key={k} className={`${styles.item} ${isOff(it) ? styles.off : ""} ${k > 0 ? styles.second : ""}`}>
-                                  {it.label}
-                                  {opts.refs && it.refs.length > 0 && <span className={styles.ref}> {refText(it.refs)}</span>}
-                                </div>
-                              ))}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        )}
+          )}
+        </aside>
 
-        {hiddenStaff.length > 0 && (
-          <button className={styles.textBtn} onClick={() => setShowHidden((v) => !v)}>
-            {showHidden ? "Done" : `${hiddenStaff.length} hidden: ${hiddenStaff.map((s) => s.name.split(" ")[0]).join(", ")}. Show`}
-          </button>
-        )}
+        <div ref={previewRef} className={shell.canvas}>
+          {load.phase === "error" && (
+            <div className={styles.notice}>
+              <b>Couldn&apos;t read the SimPRO schedule.</b> {load.message}{" "}
+              <button className={styles.textBtn} onClick={() => setReloadKey((k) => k + 1)}>
+                Try again
+              </button>
+            </div>
+          )}
+          {data && data.skipped > 0 && (
+            <div className={styles.notice}>
+              {data.skipped} leave or activity schedule{data.skipped === 1 ? "" : "s"} couldn&apos;t be read and{" "}
+              {data.skipped === 1 ? "is" : "are"} shown by its SimPRO reference.
+            </div>
+          )}
+          {load.phase === "loading" && <div className={shell.pageLabel}>Reading the schedule from SimPRO…</div>}
+          {data && !data.staff.length && <div className={shell.pageLabel}>Nobody is scheduled in SimPRO this week.</div>}
+          {data && data.staff.length > 0 && !model.staffCount && (
+            <div className={shell.pageLabel}>Everyone is switched off in Team.</div>
+          )}
+          {ready && (
+            <div style={{ zoom }}>
+              <WeekScheduleDocument model={model} logo={LOGO} screen />
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  );
-}
-
-function Check({
-  label,
-  on,
-  set,
-  disabled,
-  title,
-}: {
-  label: string;
-  on: boolean;
-  set: (v: boolean) => void;
-  disabled?: boolean;
-  title?: string;
-}) {
-  return (
-    <label className={`${styles.check} ${disabled ? styles.checkDisabled : ""}`} title={title}>
-      <input type="checkbox" checked={on} disabled={disabled} onChange={(e) => set(e.target.checked)} />
-      {label}
-    </label>
   );
 }
 

@@ -17,6 +17,9 @@ const nextConfig = {
     "/api/reports/export-anchor-pdf": [
       "./node_modules/@sparticuz/chromium/**/*",
     ],
+    "/api/reports/export-week-schedule-pdf": [
+      "./node_modules/@sparticuz/chromium/**/*",
+    ],
     "/api/simpro/jobs/[jobId]/save-report": [
       "./node_modules/@sparticuz/chromium/**/*",
     ],

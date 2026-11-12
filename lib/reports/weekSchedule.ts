@@ -114,3 +114,108 @@ export function siteTones(entries: WeekEntry[]): Map<string, string> {
   const order = [...days.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   return new Map(order.map(([label], i) => [label, SITE_TONES[i % SITE_TONES.length]]));
 }
+
+// ── Document model (builder preview and PDF) ───────────────────────────────
+
+/** Landscape A4 in the reports' page units. */
+export const WEEK_PAGE_W = 1810;
+export const WEEK_PAGE_H = 1280;
+
+export interface WeekOptions {
+  /** Job numbers beside each site. */
+  refs: boolean;
+  /** Each site its own pastel. */
+  colour: boolean;
+  /** Saturday and Sunday columns (always shown when anyone is booked). */
+  weekend: boolean;
+}
+
+export const DEFAULT_WEEK_OPTIONS: WeekOptions = { refs: false, colour: true, weekend: false };
+
+export interface WeekCell extends CellItem {
+  tone: string | null;
+}
+
+export interface WeekRow {
+  n: number;
+  name: string;
+  cells: WeekCell[][];
+}
+
+export interface WeekModel {
+  title: string;
+  lede: string;
+  days: { iso: string; day: string; date: string }[];
+  pages: WeekRow[][];
+  opts: WeekOptions;
+  staffCount: number;
+  siteCount: number;
+}
+
+// Heights in page units, for splitting rows across pages.
+const ROW_H = 38;
+const ITEM_H = 31;
+const FIRST_BODY = 860;
+const NEXT_BODY = 990;
+
+export function buildWeekModel(
+  data: WeekScheduleResponse,
+  monday: Date,
+  opts: WeekOptions,
+  hidden: number[] = [],
+): WeekModel {
+  const all = weekDays(monday);
+  const weekendBooked = data.entries.some((e) => e.date === all[5] || e.date === all[6]);
+  const isos = opts.weekend || weekendBooked ? all : all.slice(0, 5);
+  const tones = siteTones(data.entries);
+
+  const by = new Map<string, WeekEntry[]>();
+  for (const e of data.entries) {
+    const k = `${e.staffId}|${e.date}`;
+    by.set(k, [...(by.get(k) ?? []), e]);
+  }
+
+  const staff = data.staff.filter((s) => !hidden.includes(s.id));
+  const rows: WeekRow[] = staff.map((s, i) => ({
+    n: i + 1,
+    name: s.name,
+    cells: isos.map((d) =>
+      cellItems(by.get(`${s.id}|${d}`) ?? []).map((it) => ({
+        ...it,
+        tone: it.kind !== "activity" && opts.colour ? (tones.get(it.label) ?? null) : null,
+      })),
+    ),
+  }));
+
+  const pages: WeekRow[][] = [[]];
+  let room = FIRST_BODY;
+  for (const r of rows) {
+    const h = ROW_H + ITEM_H * Math.max(0, Math.max(...r.cells.map((c) => c.length)) - 1);
+    if (h > room && pages[pages.length - 1].length) {
+      pages.push([]);
+      room = NEXT_BODY;
+    }
+    pages[pages.length - 1].push(r);
+    room -= h;
+  }
+
+  const sites = new Set(
+    data.entries.filter((e) => e.kind !== "activity" && !hidden.includes(e.staffId)).map((e) => e.label),
+  ).size;
+  return {
+    title: weekTitle(monday),
+    lede: `Who is on which site each day, from the SimPRO schedule. ${staff.length} team member${staff.length === 1 ? "" : "s"} across ${sites} site${sites === 1 ? "" : "s"}.`,
+    days: isos.map((d) => {
+      const dt = fromIso(d);
+      return {
+        iso: d,
+        day: dt.toLocaleDateString("en-AU", { weekday: "long" }),
+        date: dt.toLocaleDateString("en-AU", { day: "numeric", month: "short" }),
+      };
+    }),
+    pages,
+    opts,
+    staffCount: staff.length,
+    siteCount: sites,
+  };
+}
