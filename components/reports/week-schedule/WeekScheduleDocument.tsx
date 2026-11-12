@@ -7,7 +7,7 @@
 
 import type { CSSProperties } from "react";
 import { ANCHOR_CSS } from "@/components/reports/anchor-inspection/AnchorDocument";
-import { refText, WEEK_PAGE_H, WEEK_PAGE_W, type WeekModel, type WeekRun } from "@/lib/reports/weekSchedule";
+import { refText, WEEK_PAGE_H, WEEK_PAGE_W, type OverviewBlock, type WeekModel, type WeekRun } from "@/lib/reports/weekSchedule";
 
 export const WEEK_CSS =
   ANCHOR_CSS +
@@ -34,6 +34,16 @@ export const WEEK_CSS =
 .ws--compact .ws-run{gap:2px}
 .ws--compact .ws-bar{height:24px;font-size:15px}
 .ws--compact .ws-empty{height:24px}
+.ws-ov{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:48px;align-items:start}
+.ws-ov-col{display:flex;flex-direction:column;min-width:0}
+.ws-ov-day{font-size:20px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;line-height:1.1;color:var(--navy);padding-bottom:10px;border-bottom:var(--rule-head);margin-bottom:18px}
+.ws-ov-day:not(:first-child){margin-top:12px}
+.ws-ov-day span{font-weight:500;color:var(--ink-45);text-transform:none;letter-spacing:0;font-size:16px;margin-left:8px}
+.ws-ov-site{margin-bottom:18px;font-size:18px;line-height:25px}
+.ws-ov-site>b{font-weight:600}
+.ws-ov-site>span{color:var(--ink-55)}
+.ws-ov-job{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:10px;padding-left:28px;font-size:17px;line-height:25px;color:var(--ink-70)}
+.ws-ov-job b{font-weight:600;color:var(--navy);font-variant-numeric:tabular-nums}
 .ws-foot{position:absolute;left:96px;right:96px;bottom:40px;display:flex;justify-content:space-between;gap:24px;font-family:var(--bebas);font-size:18px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-35);line-height:1}
 `;
 
@@ -46,6 +56,10 @@ export const WEEK_EDIT_CSS = `
 .ws-x{position:absolute;right:-9px;top:-9px;width:22px;height:22px;border:0;border-radius:50%;background:#fff;color:var(--navy);box-shadow:0 1px 5px rgba(1,25,85,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 100ms}
 .ws-bar:hover .ws-x,.ws-bar.is-on .ws-x{opacity:1}
 .ws-x:hover{color:#a83a3a}
+.ws-edit .ws-name{position:relative;display:flex;align-items:center;gap:8px;padding-right:30px}
+.ws-name span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ws-name .ws-x{position:static;flex-shrink:0;margin-left:auto}
+.ws-name:hover .ws-x{opacity:1}
 .ws-dot{flex-shrink:0;width:7px;height:7px;border-radius:50%;background:#3e7fb0}
 .ws-empty{grid-row:1;height:28px;border:0;border-radius:8px;background:none;cursor:pointer;color:transparent;font-size:18px;line-height:1}
 .ws-empty:hover,.ws-empty.is-on{background:rgba(1,25,85,.04);color:var(--ink-35);box-shadow:inset 0 0 0 1px rgba(1,25,85,.12)}
@@ -67,6 +81,8 @@ export interface WeekEditView {
   selected: string | null;
   onPick: (p: WeekPick, el: HTMLElement) => void;
   onRemove: (p: WeekPick) => void;
+  /** Takes a person's row off the schedule. */
+  onRemoveRow: (staffId: number) => void;
 }
 
 export const pickKey = (p: WeekPick) => `${p.staffId}|${p.days[0]}|${p.item}`;
@@ -126,7 +142,7 @@ export default function WeekScheduleDocument({
   /** Builder only. */
   edit?: WeekEditView;
 }) {
-  const total = model.pages.length;
+  const total = model.pages.length + model.overview.length;
   return (
     <div className={`ar ws${model.compact ? " ws--compact" : ""}${screen ? " ar--screen" : ""}${edit ? " ws-edit" : ""}`}>
       {model.pages.map((page, pi) => {
@@ -160,7 +176,24 @@ export default function WeekScheduleDocument({
                   const covered = new Set(runs.flatMap((run) => Array.from({ length: run.span }, (_, k) => run.start + k)));
                   return (
                     <div key={r.n} className="ar-tr ws-tr ws-cols" style={cols}>
-                      <span className="ws-name">{r.name}</span>
+                      {edit ? (
+                        <span className="ws-name">
+                          <span>{r.name}</span>
+                          <button
+                            type="button"
+                            className="ws-x"
+                            aria-label={`Remove ${r.name} from the schedule`}
+                            title="Remove from the schedule (switch back on in Team)"
+                            onClick={() => edit.onRemoveRow(r.staffId)}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                              <path d="M6 6l12 12M18 6L6 18" />
+                            </svg>
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="ws-name">{r.name}</span>
+                      )}
                       {runs.map((run) => (
                         <Run key={run.start} run={run} refs={model.opts.refs} staffId={r.staffId} isos={isos} edit={edit} />
                       ))}
@@ -204,6 +237,64 @@ export default function WeekScheduleDocument({
           </div>
         );
       })}
+      {model.overview.map((cols, oi) => (
+        <div key={`ov${oi}`} className="ar-sheet">
+          <section className="ar-page">
+            <div className="ws-top">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="ar-logo" src={logo} alt="RAS-VERTEX" />
+              <span className="ws-kicker">Jobs overview</span>
+            </div>
+            {oi === 0 && (
+              <div className="ws-head">
+                <h2 className="ar-h2">Jobs starting</h2>
+                <span className="ar-label">{model.title}</span>
+              </div>
+            )}
+            <div className="ws-ov">
+              {cols.map((blocks, ci) => (
+                <div key={ci} className="ws-ov-col">
+                  {blocks.map((b, bi) => (
+                    <OverviewItem key={bi} b={b} />
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="ws-foot">
+              <span>RAS-VERTEX</span>
+              <span>
+                Page {pad(model.pages.length + oi + 1)} / {pad(total)}
+              </span>
+            </div>
+          </section>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A day's heading, or a site (name: address) and its jobs (#number – name). */
+function OverviewItem({ b }: { b: OverviewBlock }) {
+  if (b.t === "day")
+    return (
+      <div className="ws-ov-day">
+        {b.day.heading}
+        {b.cont && <span>continued</span>}
+      </div>
+    );
+  return (
+    <div className="ws-ov-site">
+      <b>{b.site.label}</b>
+      {b.site.address && <span>: {b.site.address}</span>}
+      {b.site.jobs.map((j) => (
+        <div key={j.ref} className="ws-ov-job">
+          <b>
+            {j.quote ? "Q" : "#"}
+            {j.ref}
+          </b>
+          <span>– {j.name || "Job"}</span>
+        </div>
+      ))}
     </div>
   );
 }

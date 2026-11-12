@@ -183,7 +183,7 @@ export default function WeekEditPopover({
           {busy && !hits && <span className={styles.popHint}>Searching SimPRO…</span>}
           {err && <span className={styles.popHint}>Couldn&apos;t search SimPRO.</span>}
           {hits?.map((h) => (
-            <button key={h.id} type="button" className={styles.popHit} onClick={() => onFill({ label: h.site || h.name || `Job #${h.id}`, kind: "job", ref: String(h.id) })}>
+            <button key={h.id} type="button" className={styles.popHit} onClick={() => onFill({ label: h.site || h.name || `Job #${h.id}`, kind: "job", ref: String(h.id), name: h.name })}>
               <b>{h.site || h.name}</b>
               <span>
                 #{h.id}

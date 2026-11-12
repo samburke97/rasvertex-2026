@@ -54,6 +54,7 @@ const checks: [string, () => void][] = [
   ["leave names", () => assert.ok(["Annual Leave", "RDO", "Sick / Personal Leave", "Casual - Public Holiday", "Unpaid Leave", "Work Cover"].every(isLeave))],
   ["working activities aren't leave", () => assert.ok(!["Yardwork", "Training", "Toolbox Meeting", "Workshop", "Tafe"].some(isLeave))],
   ["site names lose the scheme number", () => assert.equal(cleanSite("Platinum Residential CTS 33637 "), "Platinum Residential")],
+  ["and a trailing state and postcode", () => assert.equal(cleanSite("9 Ormonde Terrace Kings Beach QLD 4551"), "9 Ormonde Terrace Kings Beach")],
   ["and double spaces", () => assert.equal(cleanSite("6 lomandra  Coolum Beach"), "6 lomandra Coolum Beach")],
   ...editChecks(),
 ];

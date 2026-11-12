@@ -17,8 +17,10 @@ export interface WeekEntry {
   label: string;
   /** SimPRO job or quote number, if any. */
   ref: string | null;
-  /** Job or quote name, for the tooltip. */
+  /** Job or quote name, for the tooltip and the jobs overview. */
   name: string;
+  /** The site's street address ("131 Coolum Terrace, Coolum Beach"). */
+  address?: string;
   hours: number;
 }
 
@@ -32,10 +34,12 @@ export interface WeekScheduleResponse {
 }
 
 /** "Platinum Residential CTS 33637 " → "Platinum Residential": the body
- *  corporate's scheme number and stray spaces aren't part of the name. */
+ *  corporate's scheme number, a trailing state and postcode, and stray
+ *  spaces aren't part of the name. */
 export const cleanSite = (s: string) =>
   s
     .replace(/\s*\bCTS\s*\d+\b/gi, "")
+    .replace(/,?\s+(QLD|NSW|VIC|SA|WA|TAS|NT|ACT)\s+\d{4}\s*$/i, "")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -160,6 +164,8 @@ export interface EditItem {
   kind: EditKind;
   /** SimPRO job number, when filled from a search. */
   ref?: string | null;
+  /** The job's name, from the search (for the jobs overview). */
+  name?: string;
 }
 
 /** A schedule's edits, saved as a draft per date range. */
@@ -187,7 +193,7 @@ const editCell = (e: EditItem): CellItem => ({
   leave: e.kind === "leave" || e.kind === "off",
   flag: e.kind === "tbc" || e.kind === "off" ? e.kind : undefined,
   refs: e.ref ? [e.ref] : [],
-  names: [],
+  names: e.name ? [e.name] : [],
   hours: 0,
 });
 
@@ -196,6 +202,7 @@ export const toEdit = (it: CellItem): EditItem => ({
   label: it.label,
   kind: it.flag ?? (it.leave ? "leave" : it.kind === "activity" ? "other" : "job"),
   ref: it.refs[0] ?? null,
+  name: it.names[0],
 });
 
 // ── Document model (builder preview, PDF and Copy for Excel) ───────────────
@@ -211,9 +218,11 @@ export interface WeekOptions {
   colour: boolean;
   /** Saturday and Sunday columns (always shown when anyone is booked). */
   weekend: boolean;
+  /** Jobs overview pages after the schedule: each job as it starts. */
+  overview: boolean;
 }
 
-export const DEFAULT_WEEK_OPTIONS: WeekOptions = { refs: false, colour: true, weekend: false };
+export const DEFAULT_WEEK_OPTIONS: WeekOptions = { refs: false, colour: true, weekend: false, overview: false };
 
 /** Pastels for the sites, in order of how many people are on each. */
 const SITE_TONES = [
@@ -277,6 +286,8 @@ export interface WeekModel {
   pages: WeekPage[];
   /** Tighter rows, so everyone fits on one sheet per week. */
   compact: boolean;
+  /** Jobs overview sheets (opts.overview): three columns each. */
+  overview: OverviewSheet[];
   opts: WeekOptions;
   staffCount: number;
   siteCount: number;
@@ -430,6 +441,7 @@ export function buildWeekModel(
     rows,
     pages,
     compact,
+    overview: opts.overview ? overviewSheets(jobsOverview(data, rows, days)) : [],
     opts,
     staffCount: staff.length,
     siteCount: sites,
@@ -544,4 +556,119 @@ export function renameItem(
     } else d = setDay(d, t.staffId, date, itemsOn(ctx, d, t.staffId, date).map((x) => (x.label === it.label ? { ...toEdit(x), label: name } : toEdit(x))));
   }
   return { draft: d, aliases };
+}
+
+// ── Jobs overview: each job under the day it starts ─────────────────────────
+
+export interface OverviewJob {
+  ref: string;
+  quote: boolean;
+  name: string;
+}
+
+export interface OverviewSite {
+  label: string;
+  address: string;
+  jobs: OverviewJob[];
+}
+
+export interface OverviewDay {
+  iso: string;
+  /** "Monday 16 November" */
+  heading: string;
+  sites: OverviewSite[];
+}
+
+/** Every job or quote on the schedule (after edits), listed under the first
+ *  day it appears, grouped by site: the site's name and address, then each
+ *  job's number and name. Leave, flags and free text aren't jobs. */
+export function jobsOverview(data: WeekScheduleResponse, rows: WeekRow[], days: WeekDay[]): OverviewDay[] {
+  const info = new Map<string, { name: string; address: string; quote: boolean }>();
+  for (const e of data.entries)
+    if (e.ref && e.kind !== "activity" && !info.has(e.ref)) info.set(e.ref, { name: e.name, address: e.address ?? "", quote: e.kind === "quote" });
+  const addressOf = new Map<string, string>();
+  for (const e of data.entries) if (e.address && e.kind !== "activity") addressOf.set(e.label, e.address);
+
+  const seen = new Set<string>();
+  const out: OverviewDay[] = [];
+  days.forEach((d, i) => {
+    const sites = new Map<string, OverviewSite>();
+    for (const r of rows)
+      for (const it of r.cells[i] ?? []) {
+        if (it.leave || it.flag || it.kind === "activity") continue;
+        for (const ref of it.refs) {
+          if (seen.has(ref)) continue;
+          seen.add(ref);
+          const known = info.get(ref);
+          const addr = known?.address || addressOf.get(it.label) || "";
+          // A site named by its address ("22 Undara Ave, Buddina") needn't repeat it.
+          const key = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 8);
+          const site = sites.get(it.label) ?? { label: it.label, address: key(addr) === key(it.label) ? "" : addr, jobs: [] };
+          site.jobs.push({ ref, quote: !!known?.quote || it.kind === "quote", name: known?.name || it.names[0] || "" });
+          sites.set(it.label, site);
+        }
+      }
+    if (sites.size) {
+      const dt = fromIso(d.iso);
+      out.push({
+        iso: d.iso,
+        heading: dt.toLocaleDateString("en-AU", { weekday: "long", day: "numeric", month: "long" }),
+        sites: [...sites.values()].map((s) => ({ ...s, jobs: s.jobs.sort((a, b) => a.ref.localeCompare(b.ref)) })),
+      });
+    }
+  });
+  return out;
+}
+
+/** A block in an overview column: a day's heading, or a site and its jobs. */
+export type OverviewBlock = { t: "day"; day: OverviewDay; cont: boolean } | { t: "site"; site: OverviewSite };
+export type OverviewSheet = OverviewBlock[][];
+
+export const OVERVIEW_COLS = 3;
+// Page units: column width, and the room under the title (first sheet) or
+// the logo line (the rest).
+const OV_COL_W = (WEEK_PAGE_W - 192 - 48 * (OVERVIEW_COLS - 1)) / OVERVIEW_COLS;
+const OV_FIRST = 900;
+const OV_NEXT = 1000;
+const lines = (text: string, px: number, w = OV_COL_W) => Math.max(1, Math.ceil((text.length * px * 0.52) / w));
+const blockH = (b: OverviewBlock) =>
+  b.t === "day"
+    ? 22 + 40
+    : lines(`${b.site.label}: ${b.site.address}`, 18) * 25 + b.site.jobs.reduce((t, j) => t + lines(`#${j.ref} – ${j.name}`, 17, OV_COL_W - 28) * 25, 0) + 18;
+
+/** Lays the days into columns, three to a sheet. A day's heading never
+ *  ends a column, and repeats (continued) at the top of the next. */
+export function overviewSheets(days: OverviewDay[]): OverviewSheet[] {
+  if (!days.length) return [];
+  const sheets: OverviewSheet[] = [[[]]];
+  let room = OV_FIRST;
+  const col = () => sheets[sheets.length - 1][sheets[sheets.length - 1].length - 1];
+  const nextCol = () => {
+    const sheet = sheets[sheets.length - 1];
+    if (sheet.length < OVERVIEW_COLS) sheet.push([]);
+    else sheets.push([[]]);
+    room = sheets.length === 1 ? OV_FIRST : OV_NEXT;
+  };
+  for (const day of days) {
+    const head: OverviewBlock = { t: "day", day, cont: false };
+    day.sites.forEach((site, k) => {
+      const b: OverviewBlock = { t: "site", site };
+      const need = blockH(b) + (k === 0 ? blockH(head) : 0);
+      if (need > room && col().length) {
+        nextCol();
+        if (k > 0) {
+          const cont: OverviewBlock = { t: "day", day, cont: true };
+          col().push(cont);
+          room -= blockH(cont);
+        }
+      }
+      if (k === 0) {
+        col().push(head);
+        room -= blockH(head);
+      }
+      col().push(b);
+      room -= blockH(b);
+    });
+  }
+  return sheets;
 }

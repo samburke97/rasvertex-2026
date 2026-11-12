@@ -139,6 +139,23 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Each site's street address, for the jobs overview (one call per 50).
+    const siteIds = [...new Set([...records.values()].map((r) => r?.Site?.ID).filter((id): id is number => !!id))];
+    const address = new Map<number, string>();
+    for (let i = 0; i < siteIds.length; i += 50) {
+      try {
+        const sites = await get<{ ID: number; Address?: { Address?: string; City?: string } }[]>(
+          `${API}/sites/?ID=in(${siteIds.slice(i, i + 50).join(",")})&columns=ID,Address&pageSize=50`,
+        );
+        for (const st of sites) {
+          const a = [st.Address?.Address, st.Address?.City].map((x) => x?.trim()).filter(Boolean).join(", ");
+          if (a) address.set(st.ID, a);
+        }
+      } catch (err) {
+        console.warn("[WeekSchedule] site addresses failed:", err);
+      }
+    }
+
     // 3. Activity names, by ID.
     const activityName = new Map<string, string>();
     try {
@@ -165,6 +182,7 @@ export async function GET(request: NextRequest) {
         label: siteOf(rec, fallback),
         ref: no != null ? String(no) : null,
         name: rec?.Name?.trim() ?? "",
+        address: (rec?.Site?.ID && address.get(rec.Site.ID)) || "",
         hours: s.TotalHours ?? 0,
       };
     });

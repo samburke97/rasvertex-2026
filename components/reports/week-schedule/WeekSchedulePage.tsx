@@ -500,6 +500,17 @@ export default function WeekSchedulePage({ onBack }: Props) {
             />
           </div>
 
+          {/* ── Export ── */}
+          <div className={panel.group}>
+            <div className={panel.groupLabel}>Export</div>
+            <ToggleRow
+              label="Include jobs overview"
+              sub="Pages after the schedule listing each job as it starts: site and address, job number and name"
+              checked={opts.overview}
+              onChange={(v) => setOpt("overview", v)}
+            />
+          </div>
+
           {/* ── Edits ── */}
           <div className={panel.group}>
             <div className={panel.groupLabelRow}>
@@ -587,6 +598,12 @@ export default function WeekSchedulePage({ onBack }: Props) {
                   selected: pick ? pickKey(pick.p) : null,
                   onPick: (p, el) => setPick({ p, rect: el.getBoundingClientRect() }),
                   onRemove: removePick,
+                  // Added here: gone for good. From SimPRO: switched off in Team.
+                  onRemoveRow: (id) => {
+                    setPick(null);
+                    if (id < 0) removePerson(id);
+                    else setShown(id, false);
+                  },
                 }}
               />
             </div>
