@@ -1256,7 +1256,6 @@ function Safety({ r, s }: PageProps) {
       <div style={{ marginTop: 72, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 40 }}>
         <h3 style={h3card}>Certified and accredited.</h3>
         <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
-          <img src={r.img(asset("irata.png")) || undefined} alt="IRATA International" style={{ height: 72, width: "auto", mixBlendMode: "multiply" }} />
           <img src={r.img(asset("qbcc.png")) || undefined} alt="QBCC" style={{ height: 52, width: "auto" }} />
           <img src={r.img(asset("workcover.png")) || undefined} alt="WorkCover Queensland" style={{ height: 36, width: "auto" }} />
           <img src={r.img(asset("smartstrata.png")) || undefined} alt="Smart Strata" style={{ height: 52, width: "auto" }} />
