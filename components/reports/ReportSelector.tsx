@@ -34,6 +34,10 @@ const WeekSchedulePage = dynamic(
   () => import("./week-schedule/WeekSchedulePage"),
   { loading: () => <ReportLoading />, ssr: false },
 );
+const ProjectProgressPage = dynamic(
+  () => import("./project-progress/ProjectProgressPage"),
+  { loading: () => <ReportLoading />, ssr: false },
+);
 const ProposalBuilder = dynamic(() => import("./proposal/v3/ProposalBuilder"), {
   loading: () => <ReportLoading />,
   ssr: false,
@@ -53,6 +57,7 @@ type ReportTypeId =
   | "anchor-inspection"
   | "hours-breakdown"
   | "week-schedule"
+  | "project-progress"
   | "proposal";
 
 interface ReportType {
@@ -190,6 +195,31 @@ const REPORT_TYPES: ReportType[] = [
     ),
   },
   {
+    id: "project-progress",
+    label: "Project progress",
+    description:
+      "A project's jobs and variations: hours used, status and price, with completed works totalled. From SimPRO job numbers.",
+    available: true,
+    category: "finance",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M3 3v18h18" />
+        <rect x="7" y="12" width="3" height="5" rx="0.5" />
+        <rect x="12" y="8" width="3" height="9" rx="0.5" />
+        <rect x="17" y="5" width="3" height="12" rx="0.5" />
+      </svg>
+    ),
+  },
+  {
     id: "proposal",
     label: "Master proposal",
     description:
@@ -309,6 +339,9 @@ export default function ReportSelector() {
     return <HoursBreakdownPage onBack={() => setActive(null)} />;
   }
 
+  if (active === "project-progress") {
+    return <ProjectProgressPage onBack={() => setActive(null)} />;
+  }
   if (active === "week-schedule") {
     return <WeekSchedulePage onBack={() => setActive(null)} />;
   }
