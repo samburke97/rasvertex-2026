@@ -29,6 +29,15 @@ export interface PickerFilter {
   hint?: string;
 }
 
+/** A button beside the title (headAction): Upload, Reload from SimPRO… */
+export function PickerAction({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button type="button" className={styles.action} {...props}>
+      {children}
+    </button>
+  );
+}
+
 export default function PhotoPickerModal({
   title,
   subtitle,
@@ -43,6 +52,8 @@ export default function PhotoPickerModal({
   headAction,
   onRemove,
   empty = "No photos here.",
+  numbered = true,
+  foot,
 }: {
   title: string;
   subtitle?: string;
@@ -60,6 +71,10 @@ export default function PhotoPickerModal({
   headAction?: ReactNode;
   onRemove?: (id: string) => void;
   empty?: string;
+  /** Multi: number the chosen photos in the order chosen. */
+  numbered?: boolean;
+  /** Multi: the footer's note, in place of the count. */
+  foot?: string;
 }) {
   const [query, setQuery] = useState("");
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -124,7 +139,8 @@ export default function PhotoPickerModal({
                     title={p.title}
                     onClick={() => onPick(p.id)}
                   >
-                    {multi && at >= 0 && <span className={styles.no}>{at + 1}</span>}
+                    {multi && numbered && at >= 0 && <span className={styles.no}>{at + 1}</span>}
+                    {multi && !numbered && at >= 0 && <span className={styles.tick}>✓</span>}
                     {p.title && <span className={`${styles.name} ${words.length ? styles.nameOn : ""}`}>{p.title}</span>}
                     {p.removable && onRemove && (
                       <button
@@ -148,7 +164,7 @@ export default function PhotoPickerModal({
         </div>
         {multi && (
           <div className={styles.foot}>
-            <span>{selected.length ? `${selected.length} chosen, in the order shown` : "Click photos to add them"}</span>
+            <span>{foot ?? (selected.length ? `${selected.length} chosen, in the order shown` : "Click photos to add them")}</span>
             <button className={styles.done} onClick={onClose}>
               Done
             </button>

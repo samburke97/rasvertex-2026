@@ -538,3 +538,6 @@ select.input {
 /* A required field still empty. */
 .inputMissing { border-color: rgba(196, 50, 50, 0.55); }
 .inputMissing:focus { border-color: rgba(196, 50, 50, 0.8); box-shadow: 0 0 0 3px rgba(196, 50, 50, 0.12); }
+
+/* Photos: the library and upload buttons, side by side. */
+.libraryRow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

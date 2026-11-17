@@ -12,6 +12,8 @@
 // Client-only — only ever called from "use client" report pages.
 
 import { upload } from "@vercel/blob/client";
+import { compressImageDataUrl } from "./compressImage";
+import type { ReportPhoto } from "./photos";
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header, base64] = dataUrl.split(",");
@@ -66,4 +68,34 @@ export async function deleteReportPhoto(url: string): Promise<void> {
   } catch (err) {
     console.error("[deleteReportPhoto]", err);
   }
+}
+
+const readFile = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+
+/**
+ * Photos chosen from the computer, for any report's photo library: each
+ * compressed and returned to show straight away (on a data: URL), then
+ * uploaded to Blob in the background; onUploaded swaps in the Blob URL.
+ */
+export async function photosFromFiles(
+  files: File[],
+  pathname: (id: string) => string,
+  onUploaded: (id: string, url: string) => void,
+): Promise<ReportPhoto[]> {
+  const stamp = Date.now().toString(36);
+  const images = files.filter((f) => f.type.startsWith("image/"));
+  const photos = await Promise.all(
+    images.map(async (f, i): Promise<ReportPhoto> => {
+      const url = await compressImageDataUrl(await readFile(f));
+      return { id: `up-${stamp}-${i}`, name: f.name, url, size: f.size, dateAdded: new Date(f.lastModified || Date.now()).toISOString(), uploaded: true };
+    }),
+  );
+  for (const p of photos) uploadReportPhoto(p.url, pathname(p.id)).then((url) => url !== p.url && onUploaded(p.id, url));
+  return photos;
 }

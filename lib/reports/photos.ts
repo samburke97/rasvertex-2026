@@ -18,6 +18,8 @@ export interface ReportPhoto {
   /** Taken off the report in the builder. It stays in the job's photo
    *  library (from SimPRO) and can be added back. */
   off?: boolean;
+  /** Uploaded from the computer, not from SimPRO: can be deleted. */
+  uploaded?: boolean;
 }
 
 /** How a photo sits in its frame: focal point (0–100 %) and zoom (1 = just

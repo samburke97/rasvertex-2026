@@ -9,7 +9,7 @@ import { createPortal } from "react-dom";
 import RichBox from "@/components/reports/shared/builder/RichBox";
 import InfoTip from "@/components/reports/shared/builder/InfoTip";
 import CropModal from "@/components/reports/shared/builder/CropModal";
-import PhotoPickerModal from "@/components/reports/shared/builder/PhotoPickerModal";
+import PhotoPickerModal, { PickerAction } from "@/components/reports/shared/builder/PhotoPickerModal";
 import type { PhotoPos } from "@/lib/reports/photos";
 import styles from "./Builder.module.css";
 import type { BuilderCtx, Confirm, Path } from "./ctx";
@@ -418,9 +418,9 @@ function PhotoModal({ ctx, title, current, onPick, onClose }: { ctx: BuilderCtx;
         ctx.setPickFolder(id);
       }}
       headAction={
-        <button className={styles.linkBtn} disabled={ctx.reloading} onClick={() => ctx.reloadSimpro()} title="Fetch the quote's photo folders again">
+        <PickerAction disabled={ctx.reloading} onClick={() => ctx.reloadSimpro()} title="Fetch the quote's photo folders again">
           {ctx.reloading ? "Reloading…" : "↻ Reload from SimPRO"}
-        </button>
+        </PickerAction>
       }
       onRemove={(x) => ctx.removeUpload(x)}
       empty={ctx.loadingFolders.includes(active) ? "Loading photos from SimPRO…" : "No photos here. Pick another folder, reload from SimPRO, or upload one."}

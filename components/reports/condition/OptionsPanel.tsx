@@ -4,7 +4,7 @@
 // Job Overview builder's left panel: import, report details, cover photo,
 // photos, hours and the summary text. Everything here feeds the preview.
 
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useState } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import ToggleRow from "../shared/ToggleRow";
 import DatePicker from "@/components/ui/DatePicker";
@@ -21,7 +21,7 @@ import Slider from "@/components/ui/Slider";
 import InfoTip from "@/components/reports/shared/builder/InfoTip";
 import RichBox from "@/components/reports/shared/builder/RichBox";
 import PhotoSections from "./PhotoSections";
-import { PhotoTray } from "@/components/reports/shared/builder/PhotoGrid";
+import PhotoPickerModal, { PickerAction } from "@/components/reports/shared/builder/PhotoPickerModal";
 import type { PhotoSection } from "@/lib/reports/condition.types";
 
 interface OptionsPanelProps {
@@ -54,6 +54,13 @@ interface OptionsPanelProps {
   onPickingSection: (id: string | null) => void;
   /** Puts a photo taken off the report back on. */
   onRestorePhoto: (id: string) => void;
+  /** Takes a photo off the report (it stays in the library). */
+  onRemovePhoto: (id: string) => void;
+  onUploadPhotos: (files: File[]) => void;
+  /** Deletes an uploaded photo from the library. */
+  onDeletePhoto: (id: string) => void;
+  /** Fetches the job's SimPRO photos again, adding any new ones. */
+  onReloadPhotos?: () => void;
 }
 
 // ── Date preset helpers ───────────────────────────────────────────────────────
@@ -151,10 +158,19 @@ export default function OptionsPanel({
   pickingSection,
   onPickingSection,
   onRestorePhoto,
+  onRemovePhoto,
+  onUploadPhotos,
+  onDeletePhoto,
+  onReloadPhotos,
 }: OptionsPanelProps) {
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
+  // The photo library pop-up, and which photos it shows.
+  const [library, setLibrary] = useState(false);
+  const [libFilter, setLibFilter] = useState("all");
+  const loadingPhotos = importStatus.phase === "fetching-photos";
   const hasPhotos = photos.length > 0;
-  // Taken off the report: still in the job's library, to add back.
+  // Taken off the report: still in the library, to add back.
   const offPhotos = photos.filter((p) => p.off);
   const canFilterByDate = hasPhotos || settings.scheduleLoaded;
 
@@ -265,6 +281,64 @@ export default function OptionsPanel({
       <div className={styles.group} data-pages="photos">
         <div className={styles.groupLabel}>Photos</div>
 
+        {/* The library: every photo from SimPRO and every upload; the ones
+            ticked are on the report. */}
+        <div className={styles.libraryRow}>
+          <button className={styles.btn} onClick={() => setLibrary(true)}>
+            Photo library · {photos.length}
+          </button>
+          <button className={styles.btn} onClick={() => uploadRef.current?.click()}>
+            Upload photos
+          </button>
+        </div>
+        {offPhotos.length > 0 && <div className={styles.subLabel}>{offPhotos.length} not on the report. Open the library to add them back.</div>}
+        <input
+          ref={uploadRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className={styles.hiddenInput}
+          onChange={(e) => {
+            onUploadPhotos([...(e.target.files ?? [])]);
+            e.target.value = "";
+          }}
+        />
+        {library && (
+          <PhotoPickerModal
+            multi
+            numbered={false}
+            title="Photo library"
+            subtitle="Ticked photos are on the report. Click one to add it or take it off."
+            photos={photos
+              .filter((p) => (libFilter === "on" ? !p.off : libFilter === "off" ? p.off : libFilter === "uploads" ? p.uploaded : true))
+              .map((p) => ({ id: p.id, src: p.url, title: p.name, removable: p.uploaded }))}
+            selected={photos.filter((p) => !p.off).map((p) => p.id)}
+            onPick={(id) => (photos.find((p) => p.id === id)?.off ? onRestorePhoto(id) : onRemovePhoto(id))}
+            onRemove={(id) => confirm("Delete this uploaded photo?") && onDeletePhoto(id)}
+            onClose={() => setLibrary(false)}
+            filters={[
+              { id: "all", name: `All · ${photos.length}` },
+              { id: "on", name: `On the report · ${photos.length - offPhotos.length}` },
+              ...(offPhotos.length ? [{ id: "off", name: `Not on the report · ${offPhotos.length}` }] : []),
+              ...(photos.some((p) => p.uploaded) ? [{ id: "uploads", name: "Uploads" }] : []),
+            ]}
+            activeFilter={libFilter}
+            onFilter={setLibFilter}
+            headAction={
+              <>
+                <PickerAction onClick={() => uploadRef.current?.click()}>Upload</PickerAction>
+                {onReloadPhotos && (
+                  <PickerAction disabled={loadingPhotos} onClick={onReloadPhotos} title="Fetch the job's photos from SimPRO again, adding any new ones">
+                    {loadingPhotos ? "Loading…" : "↻ Reload from SimPRO"}
+                  </PickerAction>
+                )}
+              </>
+            }
+            foot={`${photos.length - offPhotos.length} of ${photos.length} on the report`}
+            empty={loadingPhotos ? "Loading photos from SimPRO…" : "No photos here. Reload from SimPRO, or upload some."}
+          />
+        )}
+
         <ToggleRow
           label="Include photos"
           sub={
@@ -335,15 +409,6 @@ export default function OptionsPanel({
               <PhotoSections sections={photoSections} onChange={onPhotoSections} picking={pickingSection} onPicking={onPickingSection} />
             )}
 
-            {offPhotos.length > 0 && (
-              <>
-                <div className={styles.subLabel}>Not in the report · {offPhotos.length}</div>
-                <PhotoTray
-                  items={offPhotos.map((p) => ({ id: p.id, src: p.url, title: `Add “${p.name.replace(/\.[^.]+$/, "")}” back` }))}
-                  onAdd={(i) => onRestorePhoto(offPhotos[i].id)}
-                />
-              </>
-            )}
           </>
         )}
 

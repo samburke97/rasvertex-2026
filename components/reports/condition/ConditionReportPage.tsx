@@ -22,7 +22,7 @@ import SaveReportModal, { postSave } from "../shared/SaveReportModal";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import { compressImageDataUrl } from "@/lib/reports/compressImage";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
-import { uploadReportPhoto, deleteReportPhoto } from "@/lib/reports/uploadPhoto";
+import { uploadReportPhoto, deleteReportPhoto, photosFromFiles } from "@/lib/reports/uploadPhoto";
 import { ANCHOR_IMAGES, type AnchorImageKey } from "@/lib/reports/anchor.layout";
 import { buildOverviewModel, DEFAULT_OVERVIEW_COVER, PAGE_W } from "@/lib/reports/overview.layout";
 import {
@@ -215,6 +215,33 @@ export default function ConditionReportPage({
     setReport((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id ? { ...p, off: undefined } : p)) }));
   }, []);
 
+  // Uploaded from the computer: on the report straight away, then moved to
+  // Blob storage in the background.
+  const uploadPhotos = useCallback(
+    async (files: File[]) => {
+      const added = await photosFromFiles(
+        files,
+        (id) => `condition-reports/${loadedJobId || "manual"}/${id}.jpg`,
+        (id, url) => history.silent((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id ? { ...p, url } : p)) })),
+      );
+      if (added.length) setReport((prev) => ({ ...prev, photos: [...prev.photos, ...added], settings: { ...prev.settings, showPhotos: true } }));
+    },
+    [loadedJobId],
+  );
+  // An upload deleted from the library (SimPRO's photos are only ever taken
+  // off). Its Blob file stays, so Undo can bring it back.
+  const deletePhoto = useCallback((id: string) => {
+    setReport((prev) => {
+      const p = prev.photos.find((x) => x.id === id);
+      if (!p?.uploaded) return prev;
+      return {
+        ...prev,
+        photos: prev.photos.filter((x) => x.id !== id),
+        photoSections: prev.photoSections?.map((sec) => ({ ...sec, photoIds: sec.photoIds.filter((x) => x !== id) })),
+      };
+    });
+  }, []);
+
   const renamePhoto = useCallback((id: string, name: string) => {
     setReport((prev) => ({
       ...prev,
@@ -226,11 +253,14 @@ export default function ConditionReportPage({
     setReport((prev) => ({ ...prev, schedule: rows }));
   }, []);
 
+  /** The job's photos from SimPRO. A new load replaces the library;
+   *  `merge` (Reload in the photo library) only adds photos not in it yet,
+   *  so uploads, photos taken off and adjustments stay as they are. */
   const fetchPhotos = useCallback(
-    (jobNumber: string, folderId: number | null) => {
+    (jobNumber: string, folderId: number | null, merge = false) => {
       const myGen = ++photoLoadId.current;
       const isStale = () => photoLoadId.current !== myGen;
-      history.silent((prev) => ({ ...prev, photos: [] }));
+      if (!merge) history.silent((prev) => ({ ...prev, photos: [] }));
       setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
       const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
       return streamPhotoImport(
@@ -239,12 +269,15 @@ export default function ConditionReportPage({
         {
           isStale,
           onPhoto: (photo) =>
-            history.silent((prev) => ({ ...prev, photos: [...prev.photos, photo] })),
+            history.silent((prev) =>
+              prev.photos.some((p) => p.id === photo.id) ? prev : { ...prev, photos: [...prev.photos, photo] },
+            ),
+          // On a merge the photo already in the library keeps its URL.
           onPhotoUploaded: (id, blobUrl) =>
             history.silent((prev) => ({
               ...prev,
               photos: prev.photos.map((p) =>
-                p.id === id ? { ...p, url: blobUrl } : p,
+                p.id === id && p.url.startsWith("data:") ? { ...p, url: blobUrl } : p,
               ),
             })),
           onProgress: (loaded, total) =>
@@ -862,6 +895,10 @@ export default function ConditionReportPage({
             pickingSection={pickingSection}
             onPickingSection={setPickingSection}
             onRestorePhoto={restorePhoto}
+            onRemovePhoto={removePhoto}
+            onUploadPhotos={uploadPhotos}
+            onDeletePhoto={deletePhoto}
+            onReloadPhotos={loadedJobId ? () => fetchPhotos(loadedJobId, selectedFolderId, true) : undefined}
           />
           <ProjectSections report={report} update={setReport} />
         </SidePanel>
