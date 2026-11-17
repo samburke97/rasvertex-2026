@@ -66,7 +66,7 @@ export const TRADES: Record<Trade, TradeDef> = {
         c: [A + "team-painting.jpg", "35% center"],
         d: [A + "team-tower.jpg", "center 30%"],
       },
-      warrantyLine: "Every exterior repaint is backed by an 8-year written warranty covering workmanship and the paint system.",
+      warrantyLine: "Every exterior repaint is backed by an 8-year workmanship warranty, in writing, covering our work and the paint system.",
     },
     recent: {
       photo: A + "trafalgar.jpg",
@@ -98,7 +98,7 @@ export const TRADES: Record<Trade, TradeDef> = {
         c: [A + "wp/documented-waterproofing.jpg", "35% center"],
         d: [A + "wp/membrane-rooftop.jpg", "center 40%"],
       },
-      warrantyLine: "Every waterproofing system is backed by a 7-year written warranty covering workmanship and the membrane system.",
+      warrantyLine: "Every waterproofing system is backed by a 7-year workmanship warranty, in writing, covering our work and the membrane system.",
     },
     recent: {
       photo: A + "wp/waterproofing-services.jpg",

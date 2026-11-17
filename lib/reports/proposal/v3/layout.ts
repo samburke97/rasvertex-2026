@@ -630,10 +630,10 @@ const FLOW_ITEMS: Record<"project" | "intro" | "maintenance" | "accept", (p: Pro
   maintenance: (p) => [
     { id: "h2", h: H2, mt: 0, keep: true },
     { id: "intro", rich: p.d.maintenance.intro, px: 20, lh: 32, w: 900, mt: 20 },
-    // Table head, two group bars and seven rows.
-    { id: "table", h: TABLE_HEAD + (16 + 68) + (28 + 68) + 7 * 51, mt: 56 },
-    { id: "price", h: 250, mt: 72 },
-    { id: "contact", h: 208, mt: 56 },
+    // Table head, two group bars and eight rows.
+    { id: "table", h: TABLE_HEAD + (16 + 68) + (28 + 68) + 8 * 53, mt: 56 },
+    { id: "price", h: 260, mt: 72 },
+    { id: "contact", h: 146, mt: 40 },
   ],
   accept: (p) => [
     { id: "h2", h: H2, mt: 0, keep: true },
@@ -779,7 +779,8 @@ export function refsText(refs: { code: string; nums: string[] }[]): string {
   return parts.length ? `Also see ${parts.length > 1 ? parts.slice(0, -1).join(", ") + ", and " + parts[parts.length - 1] : parts[0]}.` : "";
 }
 
-const STEP_COL = (CONTENT_W - 40) / 2 - 18;
+/** "How we fix it": two columns, read down then across (1, 2 | 3, 4). */
+const STEP_COL = (CONTENT_W - 40) / 2 - 26;
 /** Heights of a group's head: the bar (+ gap above when not first on the
  *  sheet), the two-column steps, the references line, and the gap above
  *  the photos. */
@@ -787,8 +788,9 @@ const barH = (top: boolean) => (top ? 0 : 56) + 68;
 function stepsH(steps: string[]): number {
   if (!steps.length) return 0;
   let h = 22 + 10; // label, gap
-  for (let k = 0; k < steps.length; k += 2)
-    h += Math.max(...steps.slice(k, k + 2).map((s) => textLines(plain(s), 17, STEP_COL))) * 25.5 + 4;
+  const rows = Math.ceil(steps.length / 2);
+  for (let k = 0; k < rows; k++)
+    h += Math.max(...[steps[k], steps[k + rows]].filter(Boolean).map((s) => textLines(plain(s), 17, STEP_COL))) * 25.5 + 4;
   return h;
 }
 const refsH = (refs: { code: string; nums: string[] }[]) => (refs.length ? 12 + textLines(refsText(refs), 17, CONTENT_W) * 25.5 : 0);

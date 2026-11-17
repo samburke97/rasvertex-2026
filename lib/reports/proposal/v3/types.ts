@@ -78,10 +78,17 @@ export const PAGE: Record<PageId, PageDef> = Object.fromEntries(PAGES.map((p) =>
 >;
 export const LOCK_NOTES = registry.lockedPageNotes;
 export const JOB_FIELDS = registry.jobFields;
+/** Proposals are a scope of works, not an assessment: no code reads as a
+ *  concrete or structural finding (the inspection reports keep theirs). */
+const PROPOSAL_WORDING: Record<string, Partial<DefectCodeDef>> = {
+  SC: { name: "Substantial crack", defaultWork: "Substantial crack repairs" },
+  SP: { defaultWork: "Spalling repairs" },
+};
+
 /** The defect codes: the inspection reports' table (lib/reports/inspection/
  *  codes.ts), so a photo coded on site maps the same in every report. */
 export const CODES: Record<string, DefectCodeDef> = Object.fromEntries(
-  ALL_CODES.map((d) => [d.code, { name: d.name, band: d.band, defaultWork: d.work }]),
+  ALL_CODES.map((d) => [d.code, { name: d.name, band: d.band, defaultWork: d.work, ...PROPOSAL_WORDING[d.code] }]),
 );
 export const BANDS = registry.bands;
 export const FLAG_GROUPS = registry.flaggedGroups;
@@ -460,8 +467,8 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
   return {
     cover: {
       blurb: W
-        ? `Proposal for the waterproofing and remedial works at ${street}. Every defect repaired, a manufacturer-approved membrane system applied by our own team, and a ${y}-year written warranty, with residents in the building throughout.`
-        : `Proposal for the full external repaint and remedial works at ${street}. Every defect repaired, two full coats applied by rope access, and an ${y}-year written warranty, with residents in the building throughout.`,
+        ? `Proposal for the waterproofing and remedial works at ${street}. Every defect repaired, a manufacturer-approved membrane system applied by our own team, and a ${y}-year workmanship warranty, with residents in the building throughout.`
+        : `Proposal for the full external repaint and remedial works at ${street}. Every defect repaired, two full coats applied by rope access, and an ${y}-year workmanship warranty, with residents in the building throughout.`,
       photo: T.coverPhoto,
     },
     intro: {
@@ -476,7 +483,7 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
           : { t: "Two full coats, photographed", d: "A coastal-grade Dulux system applied to spec, with photo evidence at every stage." },
         { t: "Rope access, building stays open", d: "No scaffold blocking the site. Residents keep full use of the building throughout." },
         { t: "One project manager, start to finish", d: "I run your job personally, from first site visit to warranty handover." },
-        { t: `${y}-year written warranty`, d: "As standard, and never tied to a maintenance plan." },
+        { t: `${y}-year workmanship warranty`, d: "In writing as standard, and never tied to a maintenance plan." },
       ],
       close: `Your price is fixed for this scope. If anything new turns up, we stop, show you the evidence and price it in writing before any work goes ahead. Any questions, call or text me directly on ${COMPANY_PHONE}.`,
     },
@@ -587,8 +594,7 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
             { kind: "clean", name: "Clean & preparation", when: "Weeks 1–2", where: "All membrane areas", desc: "Every surface is cleaned, old coatings and loose material removed, and cracks repaired so the membrane bonds to a sound substrate." },
             { kind: "works", name: "Membrane · section A", when: "Weeks 2–4", where: "", desc: "Primer, reinforcement at joints and penetrations, then the full membrane system. We report back with photos as each section is completed." },
             { kind: "works", name: "Membrane · section B", when: "Weeks 4–6", where: "", desc: "The same system on the next area, with upstands, outlets and penetrations detailed and flood tested where it applies." },
-            { kind: "handover", name: "Site walkthrough", when: "Week 7", where: "Whole site, with the committee", desc: "We walk the site with the committee, list anything that needs attention and fix it before we leave." },
-            { kind: "handover", name: "Document handover", when: "Week 7", where: "", desc: "You receive the project reports, product records and your written warranty, so the work is documented in one place for the life of the membrane." },
+            { kind: "handover", name: "Final site walkthrough with project manager, project report handover", when: "Week 7", where: "Whole site, with the committee", desc: `Your project manager walks the site with the committee, fixes anything that needs attention, then hands over your project report and ${y}-year workmanship warranty.` },
           ],
           note: "On larger sites we work in sections, confirming a formal access plan for each once timelines are locked in, and we work around your schedule if plans change. Timeframes exclude wet weather; if rain stops work, we tell the committee the same day.",
         }
@@ -601,8 +607,7 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
             { kind: "clean", name: "Building wash", when: "Weeks 3–4", where: "All painted and rendered surfaces, roof down", desc: "A single, thorough pressure clean from the roof down removes salt, mould, chalking and repair dust. Surfaces are left to dry fully before priming." },
             { kind: "works", name: "Prime & paint · section A", when: "Weeks 4–6", where: "", desc: "Primer or sealer, then two full coats, drop by drop from the roof down. We report back with photos as each section is completed." },
             { kind: "works", name: "Prime & paint · section B", when: "Weeks 6–8", where: "", desc: "The same system on the next faces, worked from rope access or a knuckle boom so there’s no scaffold in the way." },
-            { kind: "handover", name: "Site walkthrough", when: "Week 9", where: "Whole building, with the committee", desc: "We walk the whole building with the committee, list anything that needs attention and fix it before we leave." },
-            { kind: "handover", name: "Document handover", when: "Week 9", where: "", desc: "You receive the project reports, product and colour records and your written warranty, so your building’s history is documented in one place." },
+            { kind: "handover", name: "Final site walkthrough with project manager, project report handover", when: "Week 9", where: "Whole building, with the committee", desc: `Your project manager walks the whole building with the committee, fixes anything that needs attention, then hands over your project report and ${y}-year workmanship warranty.` },
           ],
           note: "On larger buildings we work in sections, confirming a formal access plan for each once timelines are locked in, and we work around your schedule if plans change. Timeframes exclude wet weather; if rain stops work, we tell the committee the same day.",
         },
@@ -614,11 +619,11 @@ export function defaultSections(trade: Trade, job: Job, stages: ProposalSections
         "Deposit: 10% on acceptance of this proposal.",
         "Progress claims: tied to the percentage of the job completed.",
         "Final payment: on completion and sign-off.",
-        `Workmanship warranty: ${y} years, written, as standard.${W ? "" : " The industry norm is 5."}`,
+        `Warranty: ${y}-year workmanship warranty, in writing, as standard.${W ? "" : " The industry norm is 5."}`,
       ].join("\n"),
     },
     maintenance: {
-      intro: `After handover, the plan keeps your building looking as it did on day one, catching wear early so it never becomes a full ${W ? "membrane replacement" : "repaint"}. It’s optional, with nothing to sign until you’re happy with the finished job.`,
+      intro: `Most plans spot clean what can be reached from the ground. Ours covers your whole building: our rope access technicians work where it’s needed most, and within eight years every face has been looked after. No lock-in, and nothing to sign until you’re happy with the finished job.`,
       price: "",
     },
     accept: {

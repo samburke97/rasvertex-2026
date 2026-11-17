@@ -1054,10 +1054,10 @@ function StepsBlock({ b }: { b: Extract<GroupBlock, { t: "steps" }> }) {
   return (
     <div data-edit={`findings.methods.${b.code}`} style={{ marginTop: 28 }}>
       <div style={{ ...label, marginBottom: 10 }}>How we fix it</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: "4px 40px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gridAutoFlow: "column", gridTemplateRows: `repeat(${Math.ceil(b.steps.length / 2)},auto)`, gap: "4px 40px" }}>
         {b.steps.map((t, k) => (
-          <div key={k} style={{ display: "grid", gridTemplateColumns: "18px minmax(0,1fr)", ...secondary }}>
-            <span style={{ width: 5, height: 5, borderRadius: "50%", background: NAVY, marginTop: 11 }} />
+          <div key={k} style={{ display: "grid", gridTemplateColumns: "26px minmax(0,1fr)", ...secondary }}>
+            <span style={{ color: NAVY, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{k + 1}.</span>
             <Inline html={t} />
           </div>
         ))}
@@ -1372,26 +1372,31 @@ function Pricing({ r, s }: PageProps) {
   );
 }
 
+// The maintenance plan, sold against a typical plan: what's covered first,
+// then the terms. Row 03 takes the trade's hours label.
 const PLAN_ROWS: [string, string, string, string][] = [
-  ["01", "Wash-down", "Full façade, by rope", "Up to 3 m"],
-  ["02", "Balconies", "Included", "Excluded"],
-  ["03", "Painting hours", "48 hrs, unused roll over", "Use it or lose it"],
-  ["04", "Defect report", "Tracked with your survey codes", "General report"],
-  ["05", "Contract", "Rolling, 60 days’ notice", "Locked from handover"],
-  ["06", "Price", "In this proposal", "On request"],
-  ["07", "8-year warranty", "Stands either way", "Tied to the plan"],
+  ["01", "Reach", "Whole building, by rope", "Up to 3 m"],
+  ["02", "Scope", "Wash, inspect, repair, paint", "Spot clean only"],
+  ["03", "Hours", "Spent where it’s needed", "Use it or lose it"],
+  ["04", "Coverage", "Every face within 8 years", "Problem areas only"],
+  ["05", "Defect report", "Tracked with your survey codes", "General report"],
+  ["06", "Contract", "No lock-in, 60 days’ notice", "Locked from handover"],
+  ["07", "Pricing", "Tied to CPI", "Set at each renewal"],
+  ["08", "Warranty", "Stands either way", "Tied to the plan"],
 ];
+/** Rows in the first group ("Your whole building"); the rest are terms. */
+const PLAN_COVER_ROWS = 5;
 
 function Maintenance({ r, s }: PageProps) {
   const d = r.p.d.maintenance;
-  const cols = "80px minmax(0,1fr) 270px 210px";
+  const cols = "80px minmax(0,1fr) 300px 210px";
   const mp = parseAmt(d.price);
   const mg = Math.round(mp * 10) / 100;
   const greyChip = chip(BANDS.grey);
   const T = tradeOf(r.p.trade);
   const f = flowOf(s);
   const PLAN = PLAN_ROWS.map((x): (typeof PLAN_ROWS)[number] =>
-    x[0] === "03" ? [x[0], T.hoursLabel, x[2], x[3]] : x[0] === "07" ? [x[0], `${T.warrantyYears}-year warranty`, x[2], x[3]] : x,
+    x[0] === "03" ? [x[0], T.hoursLabel, x[2], x[3]] : x[0] === "08" ? [x[0], `${T.warrantyYears}-year workmanship warranty`, x[2], x[3]] : x,
   );
   const row = ([n, a, b2, c]: (typeof PLAN_ROWS)[number], last: boolean) => (
     <div key={n} style={{ display: "grid", gridTemplateColumns: cols, gap: 24, alignItems: "center", padding: "12px 0", borderBottom: last ? 0 : `1px solid ${RULE}`, lineHeight: 1.3 }}>
@@ -1401,57 +1406,60 @@ function Maintenance({ r, s }: PageProps) {
       <span style={{ fontSize: "1.0625rem", color: INK(0.55) }}>{c}</span>
     </div>
   );
+  const cover = PLAN.slice(0, PLAN_COVER_ROWS);
+  const terms = PLAN.slice(PLAN_COVER_ROWS);
   return (
     <Sheet r={r} s={s}>
       <SecLabel text={r.D.sectionLabel.maintenance} />
       {f.has("h2") && (
-      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-        <h2 style={h2}>10-year maintenance plan</h2>
-        <span style={{ display: "inline-flex", alignItems: "center", height: 32, padding: "0 12px", borderRadius: 8, background: GREEN.bg, color: GREEN.fg, fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1 }}>
-          Optional
-        </span>
-      </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <h2 style={h2}>10-year maintenance plan</h2>
+          <span style={{ display: "inline-flex", alignItems: "center", height: 32, padding: "0 12px", borderRadius: 8, background: GREEN.bg, color: GREEN.fg, fontSize: 13, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1 }}>
+            Optional
+          </span>
+        </div>
       )}
       {f.text("intro", d.intro, "maintenance.intro", lede())}
       {f.has("table") && (
         <>
-      <div style={tableHead(cols, f.mt("table", 56))}>
-        <span>Item</span>
-        <span>Service</span>
-        <span>RAS-VERTEX</span>
-        <span>Typical plan</span>
-      </div>
-      <GroupBar name="Every visit" desc="Wash, inspect and repair, by the same team each year." bg="#eef1f6" pt={16} />
-      {PLAN.slice(0, 4).map((x, i) => row(x, i === 3))}
-      <GroupBar name="Plan terms" desc="Billed quarterly. Labour fixed for two years, then CPI." bg={BLUE_CARD} pt={28} />
-      {PLAN.slice(4).map((x, i) => row(x, i === 2))}
+          <div style={tableHead(cols, f.mt("table", 56))}>
+            <span>Item</span>
+            <span>Service</span>
+            <span>RAS-VERTEX</span>
+            <span>Typical plan</span>
+          </div>
+          <GroupBar name="Your whole building" desc="Rope access technicians, planned around where it’s needed most." bg="#eef1f6" pt={16} />
+          {cover.map((x, i) => row(x, i === cover.length - 1))}
+          <GroupBar name="Plan terms" desc="No lock-in contract. Pricing tied to CPI." bg={BLUE_CARD} pt={28} />
+          {terms.map((x, i) => row(x, i === terms.length - 1))}
         </>
       )}
       {f.has("price") && (
-      <div data-edit="maintenance.price" style={{ display: "flex", flexDirection: "column", marginTop: f.mt("price", 72) }}>
-        <MoneyRows ex={money(mp)} gst={money(mg)} inc={money(mp + mg)} exLabel="Maintenance plan, per year (ex GST)" incLabel="Per year incl. GST" />
-      </div>
+        <div data-edit="maintenance.price" style={{ display: "flex", flexDirection: "column", marginTop: f.mt("price", 72) }}>
+          <MoneyRows ex={money(mp)} gst={money(mg)} inc={money(mp + mg)} exLabel="Maintenance plan, per year (ex GST)" incLabel="Per year incl. GST" />
+        </div>
       )}
       {f.has("contact") && (
-      <div style={{ marginTop: "auto", paddingTop: f.mt("contact", 56), alignSelf: "flex-start", display: "inline-flex", flexDirection: "column", alignItems: "stretch", gap: 24 }}>
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 20 }}>
-          <img src={r.img(asset("people-caro.jpg")) || undefined} alt="Caroline Park" style={{ width: 96, height: 120, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={sub}>Caroline Park</span>
-            <span style={{ fontSize: "1.25rem", lineHeight: 1.3, color: INK(0.6) }}>Client Services Manager</span>
-            <span style={{ fontSize: "1.25rem", lineHeight: 1.3, fontWeight: 700, marginTop: 6 }}>07 5371 0201</span>
+        // Straight after the price: who to talk to, and the button.
+        <div style={{ marginTop: f.mt("contact", 40), display: "flex", alignItems: "center", justifyContent: "space-between", gap: 32, padding: "28px 36px", borderRadius: 16, border: `1px solid ${RULE}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 20, minWidth: 0 }}>
+            <img src={r.img(asset("people-caro.jpg")) || undefined} alt="Caroline Park" style={{ width: 72, height: 88, borderRadius: 12, objectFit: "cover", flexShrink: 0 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+              <span style={{ fontSize: "1.0625rem", lineHeight: 1.3, color: INK(0.6) }}>Built around your building. Talk to</span>
+              <span style={sub}>Caroline Park, Client Services</span>
+              <span style={{ fontSize: "1.25rem", lineHeight: 1.3, fontWeight: 700, marginTop: 4 }}>07 5371 0201</span>
+            </div>
           </div>
+          <a
+            href={`mailto:${r.p.job.email}?subject=${encodeURIComponent(`Maintenance plan enquiry - ${r.p.job.building}`)}`}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, height: 60, padding: "0 28px", borderRadius: 14, background: NAVY, color: "#ffffff", fontSize: "1.25rem", fontWeight: 700, letterSpacing: "-0.01em", textDecoration: "none", flexShrink: 0, whiteSpace: "nowrap" }}
+          >
+            Chat about your plan
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </a>
         </div>
-        <a
-          href={`mailto:${r.p.job.email}?subject=${encodeURIComponent(`Maintenance plan enquiry - ${r.p.job.building}`)}`}
-          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, height: 64, padding: "0 32px", borderRadius: 14, background: NAVY, color: "#ffffff", fontSize: "1.25rem", fontWeight: 700, letterSpacing: "-0.01em", textDecoration: "none" }}
-        >
-          Chat about your plan
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
-        </a>
-      </div>
       )}
       <Footer r={r} s={s} />
     </Sheet>
