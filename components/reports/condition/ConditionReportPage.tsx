@@ -27,6 +27,7 @@ import {
   mapJobToReportDetails,
   filterPhotosByDateRange,
   filterScheduleByDateRange,
+  shownSchedule,
   DEFAULT_COVER_POS,
   type ConditionReportData,
   type CoverPos,
@@ -70,6 +71,7 @@ const DEFAULT_SETTINGS: ReportSettings = {
   showSchedule: false,
   scheduleLoaded: false,
   showScheduleNotes: false,
+  hoursToToday: true,
   scheduleSections: false,
   showSummary: true,
 };
@@ -558,7 +560,7 @@ export default function ConditionReportPage({
       : s.filterByDate
         ? filterPhotosByDateRange(report.photos, s.dateFrom, s.dateTo)
         : report.photos;
-    const schedule = s.filterByDate ? filterScheduleByDateRange(report.schedule, s.dateFrom, s.dateTo) : report.schedule;
+    const schedule = shownSchedule(report.schedule, s);
     const shrink = (url: string) => (url.startsWith("data:") ? compressImageDataUrl(url) : Promise.resolve(url));
     return {
       ...report,
@@ -605,13 +607,32 @@ export default function ConditionReportPage({
   // a folder from more than one option.
   const awaitingFolderChoice = importStatus.phase === "idle" && photoFolders.length > 0;
 
-  const filteredSchedule = report.settings.filterByDate
-    ? filterScheduleByDateRange(report.schedule, report.settings.dateFrom, report.settings.dateTo)
-    : report.schedule;
+  const filteredSchedule = shownSchedule(report.schedule, report.settings);
 
   // ── The document ───────────────────────────────────────────────────────
   const model = useMemo(() => buildOverviewModel(report, DEFAULT_COVER_URL), [report]);
   const [hoursOpen, setHoursOpen] = useState(false);
+
+  // ── Photo sections: picking photos on the page ───────────────────────────
+  const [pickingSection, setPickingSection] = useState<string | null>(null);
+  const picking = (report.photoSections ?? []).find((s) => s.id === pickingSection) ?? null;
+  // A photo is in one section at most: adding it here takes it off another.
+  const togglePick = (id: string) =>
+    setReport((r) => ({
+      ...r,
+      photoSections: (r.photoSections ?? []).map((s) =>
+        s.id === pickingSection
+          ? { ...s, photoIds: s.photoIds.includes(id) ? s.photoIds.filter((x) => x !== id) : [...s.photoIds, id] }
+          : { ...s, photoIds: s.photoIds.filter((x) => x !== id) },
+      ),
+    }));
+  const pickProps = picking ? { selected: picking.photoIds, onToggle: togglePick } : undefined;
+  useEffect(() => {
+    if (!pickingSection) return;
+    const key = (e: KeyboardEvent) => e.key === "Escape" && setPickingSection(null);
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [pickingSection]);
 
   // Drag the cover photo in the preview to move its focal point.
   const onCoverPointerDown = useCallback(
@@ -756,6 +777,7 @@ export default function ConditionReportPage({
               onPhotoRename={renamePhoto}
               onPhotoRemove={removePhoto}
               onPhotoAdjust={photoAdjust.adjust}
+              photoPick={pickProps}
             />
           </div>
         </div>
@@ -786,6 +808,10 @@ export default function ConditionReportPage({
             coverZoom={model.coverPos.zoom}
             onCoverZoom={(z) => setCoverPos({ zoom: z })}
             onJob={updateJobField}
+            photoSections={report.photoSections ?? []}
+            onPhotoSections={(next) => setReport((r) => ({ ...r, photoSections: next }))}
+            pickingSection={pickingSection}
+            onPickingSection={setPickingSection}
           />
           <ProjectSections report={report} update={setReport} />
         </SidePanel>

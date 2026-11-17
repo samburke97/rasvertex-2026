@@ -18,7 +18,9 @@ export const PROGRESS_CSS = `
 .pp-tr{min-height:72px;padding:14px 0;font-size:20px;line-height:1.4}
 .pp-no{font-family:var(--bebas);font-size:24px;letter-spacing:.04em;color:var(--ink-45)}
 .pp-work{min-width:0}
-.pp-work small{display:block;font-size:15px;color:var(--ink-45);margin-top:2px}
+.pp-work small{display:block;font-size:15px;color:var(--ink-45);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pp-var{font-weight:600;color:#86561a}
+.pp-sub{display:block;font-size:14px;font-weight:400;color:var(--ink-45);margin-top:2px}
 .pp-r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .pp-price{font-weight:700}
 .pp-price--due{font-weight:500;color:var(--ink-45)}
@@ -93,17 +95,23 @@ export default function ProgressDocument({ model, screen }: { model: ProgressMod
                 <div className={i === 0 ? "pp-table" : undefined}>{head}</div>
                 {rows.map((r) => (
                   <div key={r.id} className="ar-tr pp-tr pp-cols">
-                    <span className="pp-no">#{r.id}</span>
+                    <span className="pp-no">#{r.jobId}</span>
                     <span className="pp-work">
                       {r.work}
-                      {r.variation && <small>Variation</small>}
+                      <small>
+                        {r.variation ? <b className="pp-var">Variation</b> : "Original scope"}
+                        {r.jobName && r.jobName !== r.work ? ` · ${r.jobName}` : ""}
+                      </small>
                     </span>
                     <State s={r.state} />
                     <span className="pp-r pp-hrs">
                       {hoursText(r.hours)}
                       {model.showEstimate && r.hoursEstimate > 0 && <small> of {hoursText(r.hoursEstimate)}</small>}
                     </span>
-                    <span className={`pp-r ${r.state === "complete" ? "pp-price" : "pp-price--due"}`}>{money(r.price)}</span>
+                    <span className={`pp-r ${r.state === "complete" ? "pp-price" : "pp-price--due"}`}>
+                      {money(r.price)}
+                      {r.priceFromHours && <small className="pp-sub">Hours worked</small>}
+                    </span>
                   </div>
                 ))}
               </div>

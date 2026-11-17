@@ -21,6 +21,8 @@ import type {
 import Slider from "@/components/ui/Slider";
 import InfoTip from "@/components/reports/shared/builder/InfoTip";
 import RichBox from "@/components/reports/shared/builder/RichBox";
+import PhotoSections from "./PhotoSections";
+import type { PhotoSection } from "@/lib/reports/condition.types";
 
 interface OptionsPanelProps {
   settings: ReportSettings;
@@ -46,6 +48,11 @@ interface OptionsPanelProps {
   coverZoom: number;
   onCoverZoom: (zoom: number) => void;
   onJob: (field: keyof ReportJobDetails, value: string) => void;
+  /** Photo sections, and the one being picked on the page. */
+  photoSections: PhotoSection[];
+  onPhotoSections: (next: PhotoSection[]) => void;
+  pickingSection: string | null;
+  onPickingSection: (id: string | null) => void;
 }
 
 // ── Date preset helpers ───────────────────────────────────────────────────────
@@ -139,6 +146,10 @@ export default function OptionsPanel({
   coverZoom,
   onCoverZoom,
   onJob,
+  photoSections,
+  onPhotoSections,
+  pickingSection,
+  onPickingSection,
 }: OptionsPanelProps) {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const hasPhotos = photos.length > 0;
@@ -319,6 +330,10 @@ export default function OptionsPanel({
                 </button>
               ))}
             </div>
+
+            {hasPhotos && (
+              <PhotoSections sections={photoSections} onChange={onPhotoSections} picking={pickingSection} onPicking={onPickingSection} />
+            )}
           </>
         )}
 
@@ -437,6 +452,13 @@ export default function OptionsPanel({
               sub="Reference a photo or note where hours were worked"
               checked={settings.showScheduleNotes}
               onChange={(v) => set({ showScheduleNotes: v })}
+            />
+
+            <ToggleRow
+              label="Hours up to today"
+              sub="Leave out days scheduled after today, so future work isn't counted"
+              checked={settings.hoursToToday !== false}
+              onChange={(v) => set({ hoursToToday: v })}
             />
 
             <ToggleRow

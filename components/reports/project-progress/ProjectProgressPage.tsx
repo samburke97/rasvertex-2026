@@ -38,11 +38,20 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-async function readJob(id: string): Promise<ProgressJob> {
+/** A job's cost centres (original scope, then variations) from SimPRO. */
+async function readJob(id: string): Promise<ProgressJob[]> {
   const res = await fetch(`/api/reports/project-progress/job/${id}`);
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Couldn't read job ${id}`);
-  return body.job as ProgressJob;
+  return body.items as ProgressJob[];
+}
+
+/** SimPRO's latest for rows already on the report, job by job. */
+async function freshen(rows: ProgressRow[]): Promise<ProgressRow[]> {
+  const jobs = [...new Set(rows.map((r) => r.simpro.jobId))];
+  const got = await Promise.all(jobs.map((j) => readJob(j).catch(() => [] as ProgressJob[])));
+  const by = new Map(got.flat().map((it) => [it.id, it]));
+  return rows.map((r) => ({ ...r, simpro: by.get(r.id) ?? r.simpro }));
 }
 
 export default function ProjectProgressPage({ onBack }: { onBack: () => void }) {
@@ -60,7 +69,7 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
     setReportState(fn);
     setTouched(true);
   }, []);
-  const mainId = report.rows[0]?.id ?? null;
+  const mainId = report.rows[0]?.simpro.jobId ?? null;
   const { status: saveStatus } = useDraftAutosave(mainId ? `/api/reports/project-progress/${mainId}` : null, report, {
     ready: touched && !!mainId,
   });
@@ -69,7 +78,7 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
 
   // ── Adding jobs ──────────────────────────────────────────────────────────
   const addJobs = async (ids: string[]) => {
-    const fresh = ids.filter((id) => !report.rows.some((r) => r.id === id));
+    const fresh = ids.filter((id) => !report.rows.some((r) => r.simpro.jobId === id));
     if (!fresh.length) return;
     setBusy(true);
     setError(null);
@@ -79,8 +88,8 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
         const res = await fetch(`/api/reports/project-progress/${fresh[0]}`);
         const draft = res.ok ? (await res.json()).report : null;
         if (isProgressReport(draft) && draft.rows.length) {
-          const jobs = await Promise.all(draft.rows.map((r) => readJob(r.id).catch(() => r.simpro)));
-          setReport(() => ({ ...draft, rows: draft.rows.map((r, i) => ({ ...r, simpro: jobs[i] })) }));
+          const rows = await freshen(draft.rows);
+          setReport(() => ({ ...draft, rows }));
           fresh.shift();
           if (!fresh.length) return;
         }
@@ -89,7 +98,7 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
       const failed: string[] = [];
       for (const id of fresh) {
         try {
-          rows.push({ id, simpro: await readJob(id) });
+          for (const it of await readJob(id)) rows.push({ id: it.id, simpro: it });
         } catch (e) {
           failed.push(e instanceof Error ? e.message : id);
         }
@@ -109,15 +118,13 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
     setEntry("");
     addJobs(ids);
   };
-  // SimPRO's linked variations not on the report yet.
-  const linked = [...new Set(report.rows.flatMap((r) => r.simpro.linked))].filter((id) => !report.rows.some((r) => r.id === id));
 
   const refresh = async () => {
     setBusy(true);
     setError(null);
     try {
-      const jobs = await Promise.all(report.rows.map((r) => readJob(r.id).catch(() => r.simpro)));
-      setReport((r) => ({ ...r, rows: r.rows.map((row) => ({ ...row, simpro: jobs.find((j) => j.id === row.id) ?? row.simpro })) }));
+      const rows = await freshen(report.rows);
+      setReport((r) => ({ ...r, rows: r.rows.map((row) => rows.find((x) => x.id === row.id) ?? row) }));
     } finally {
       setBusy(false);
     }
@@ -202,7 +209,9 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
               <span className={panel.groupLabel}>Jobs</span>
               {report.rows.length > 0 && <span className={panel.subLabel}>{report.rows.length}</span>}
             </div>
-            <p className={panel.subLabel}>The main job first, then each variation. Several at once is fine: 11321, 11389.</p>
+            <p className={panel.subLabel}>
+              Each job comes in with its original scope and every variation on it. Several at once is fine: 11295, 11321.
+            </p>
             <form
               className={styles.addRow}
               onSubmit={(e) => {
@@ -210,17 +219,19 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
                 submit();
               }}
             >
-              <input className={panel.input} value={entry} placeholder="Job numbers" onChange={(e) => setEntry(e.target.value)} inputMode="numeric" />
-              <button className={`${panel.btn} ${panel.btnPrimary}`} disabled={busy || !entry.trim()}>
+              <input
+                className={`${panel.input} ${styles.addInput}`}
+                value={entry}
+                placeholder="Job numbers, e.g. 11295"
+                onChange={(e) => setEntry(e.target.value)}
+                inputMode="numeric"
+                autoFocus
+              />
+              <button className={`${panel.btn} ${panel.btnPrimary} ${styles.addBtn}`} disabled={busy || !entry.trim()}>
                 {busy ? "Adding…" : "Add"}
               </button>
             </form>
             {error && <p className={styles.error}>{error}</p>}
-            {linked.length > 0 && (
-              <button className={panel.btn} onClick={() => addJobs(linked)} disabled={busy}>
-                Add {linked.length} linked variation{linked.length === 1 ? "" : "s"} from SimPRO
-              </button>
-            )}
 
             {report.rows.map((r, i) => {
               const s = shownRow(r);
@@ -228,11 +239,11 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
               return (
                 <div key={r.id} className={`${styles.job} ${r.hidden ? styles.jobOff : ""}`}>
                   <button className={styles.jobHead} onClick={() => setOpen(isOpen ? null : r.id)} aria-expanded={isOpen}>
-                    <span className={styles.jobNo}>#{r.id}</span>
+                    <span className={styles.jobNo}>#{r.simpro.jobId}</span>
                     <span className={styles.jobName}>
                       {s.work}
                       <small>
-                        {i === 0 ? "Main job · " : ""}
+                        {r.simpro.isVariation ? "Variation · " : i === 0 ? "Original scope · " : ""}
                         {STATE_LABEL[s.state]} · {hoursText(s.hours)} h · {money(s.price)}
                       </small>
                     </span>
@@ -269,8 +280,8 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
                         </label>
                       </div>
                       <p className={panel.subLabel}>
-                        SimPRO: {r.simpro.status || r.simpro.stage} · {hoursText(r.simpro.hoursUsed)} of {hoursText(r.simpro.hoursEstimate)} h ·{" "}
-                        {money(r.simpro.priceExTax)} ex GST
+                        SimPRO: cost centre {r.id} · {r.simpro.stage} · {hoursText(r.simpro.hoursUsed)} of {hoursText(r.simpro.hoursEstimate)} h ·{" "}
+                        {money(r.simpro.priceExTax)} ex GST{r.simpro.priceFromHours ? " (hours × rate, no set price)" : ""}
                       </p>
                       <div className={styles.jobActions}>
                         <ToggleRow label="Show on the report" checked={!r.hidden} onChange={(v) => setRow(r.id, { hidden: !v })} />

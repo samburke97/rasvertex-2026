@@ -18,6 +18,7 @@ import {
   DEFAULT_COVER_POS,
   filterPhotosByDateRange,
   filterScheduleByDateRange,
+  shownSchedule,
   type ConditionReportData,
   type CoverPos,
   type PhotoLayout,
@@ -84,8 +85,10 @@ export type HourItem =
   | { kind: "total"; hours: number };
 
 export interface PhotoDay {
-  /** Null when dates aren't shown. */
+  /** A section's title, the day, or null (dates off, no sections). */
   label: string | null;
+  /** A section's note, under its title. */
+  note?: string;
   /** The day started on an earlier page. */
   continued: boolean;
   rows: OverviewPhoto[][];
@@ -130,6 +133,8 @@ export interface OverviewModel {
   secText: Record<SectionKey | "about", string>;
   toc: { title: string; items: { name: string; page: string }[] }[];
   photoCount: number;
+  /** Photo sections with photos in them (the photo pages' lede). */
+  photoSections: number;
   totalHours: number;
   method: { intro: string; photoUrl: string | null; photoPos?: PhotoPos; caption: string } | null;
   plan: { intro: string; next: boolean; notes: string } | null;
@@ -279,7 +284,9 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   const range = (from: string | null, to: string | null) => (settings.filterByDate ? [from, to] : [null, null]) as [string | null, string | null];
   const [from, to] = range(settings.dateFrom, settings.dateTo);
   const photos = settings.showPhotos ? filterPhotosByDateRange(report.photos, from, to) : [];
-  const schedule = settings.showSchedule ? filterScheduleByDateRange(report.schedule, from, to) : [];
+  const schedule = settings.showSchedule
+    ? shownSchedule(report.schedule, { ...settings, filterByDate: !!(from || to), dateFrom: from, dateTo: to })
+    : [];
   const totalHours = schedule.reduce((t, r) => t + (r.actualHours || 0), 0);
   const hoursLede = hoursLedeText(schedule, job.jobNo ?? "");
   const method = report.method?.on ? report.method : null;
@@ -347,19 +354,38 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     pages.push(page);
   }
 
-  // Photos: grouped by day when dates are shown, in rows of the grid's
-  // column count.
+  // Photos: the sections first (each a title, its note and its photos in
+  // the order picked), then the rest grouped by day when dates are shown,
+  // in rows of the grid's column count.
   const grid = GRIDS[settings.photoLayout] ?? GRIDS.medium;
   if (photos.length) {
     const colW = (CONTENT_W - COL_GAP * (grid.cols - 1)) / grid.cols;
     const rowH = Math.ceil(colW * grid.ratio) + CAPTION;
+    const byId = new Map(photos.map((p) => [p.id, p]));
+    const sections = (report.photoSections ?? [])
+      .map((sec) => ({ sec, list: sec.photoIds.map((id) => byId.get(id)).filter((p): p is (typeof photos)[number] => !!p) }))
+      .filter((x) => x.list.length);
+    const inSection = new Set(sections.flatMap((x) => x.list.map((p) => p.id)));
     const groups = new Map<string, typeof photos>();
     for (const p of photos) {
+      if (inSection.has(p.id)) continue;
       const k = settings.showDates ? dayKey(p.dateAdded) : "all";
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k)!.push(p);
     }
-    const ordered = [...groups.entries()].sort(([a], [b]) => (a === "undated" ? 1 : b === "undated" ? -1 : a.localeCompare(b)));
+    type Group = { label: string | null; note?: string; list: typeof photos; picked: boolean };
+    const ordered: Group[] = [
+      ...sections.map(({ sec, list }) => ({ label: sec.title.trim() || "Section", note: sec.note.trim() || undefined, list, picked: true })),
+      ...[...groups.entries()]
+        .sort(([a], [b]) => (a === "undated" ? 1 : b === "undated" ? -1 : a.localeCompare(b)))
+        .map(([k, list]) => ({
+          label: !settings.showDates ? (sections.length ? "Other photos" : null) : k === "undated" ? "Undated" : dayLabel(k),
+          list,
+          picked: false,
+        })),
+    ];
+    // A section's note: a line or two under its title.
+    const noteH = (note?: string) => (note ? 6 + Math.ceil(note.length / 100) * 27 : 0);
     let page: Extract<Page, { kind: "photos" }> = { kind: "photos", no: no(), first: true, days: [] };
     let used = SEC_LABEL + H2 + T_INTRO;
     const newPage = () => {
@@ -367,19 +393,18 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
       page = { kind: "photos", no: no(), first: false, days: [] };
       used = SEC_LABEL;
     };
-    for (const [k, list] of ordered) {
-      const sorted = [...list].sort((a, b) => naturalSort(a.name, b.name));
+    for (const { label, note, list, picked } of ordered) {
+      const sorted = picked ? list : [...list].sort((a, b) => naturalSort(a.name, b.name));
       const rows: OverviewPhoto[][] = [];
       for (let i = 0; i < sorted.length; i += grid.cols) {
         rows.push(sorted.slice(i, i + grid.cols).map((p) => ({ id: p.id, name: p.name, url: p.url, pos: p.pos })));
       }
-      const label = !settings.showDates ? null : k === "undated" ? "Undated" : dayLabel(k);
       let day: PhotoDay | null = null;
       for (const row of rows) {
         // A day's first row brings its heading; a day split across pages
         // starts the next page with "{day}, continued".
         const opening: boolean = day === null;
-        const head = opening ? (page.days.length ? DAY_GAP : 0) + (label ? DAY_HEAD : 0) : 0;
+        const head = opening ? (page.days.length ? DAY_GAP : 0) + (label ? DAY_HEAD + noteH(note) : 0) : 0;
         const gap = day !== null && day.rows.length ? ROW_GAP : 0;
         let continued = false;
         if ((page.days.length > 0 || !opening) && used + head + gap + rowH > FLOW_H) {
@@ -388,8 +413,8 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
           day = null;
         }
         if (!day) {
-          day = { label, continued, rows: [] };
-          used += (page.days.length ? DAY_GAP : 0) + (label ? DAY_HEAD : 0);
+          day = { label, note: continued ? undefined : note, continued, rows: [] };
+          used += (page.days.length ? DAY_GAP : 0) + (label ? DAY_HEAD + noteH(day.note) : 0);
           page.days.push(day);
         }
         used += (day.rows.length ? ROW_GAP : 0) + rowH;
@@ -491,6 +516,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     secText,
     toc,
     photoCount: photos.length,
+    photoSections: (report.photoSections ?? []).filter((sec) => sec.photoIds.some((id) => photos.some((p) => p.id === id))).length,
     totalHours,
     method: method
       ? (() => {

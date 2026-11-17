@@ -1,28 +1,37 @@
 // lib/reports/projectProgress.ts
 //
-// Project progress report: the jobs that make up a project (a main job and
-// its variations, or any job numbers entered), each with the hours used and
-// its price, and what's been completed. Shared by the builder
+// Project progress report: the work in a project, cost centre by cost
+// centre: each job's original scope and its variations (in SimPRO, a
+// variation is a cost centre on the job, in its own section), each with the
+// hours used, its price and whether it's done. Shared by the builder
 // (components/reports/project-progress), the PDF route and the SimPRO save.
 //
 // SimPRO is read for each job (app/api/reports/project-progress/job); the
 // rep's changes (work wording, status, price, which jobs show) sit beside
 // SimPRO's values, so a refresh updates SimPRO's side and keeps theirs.
 
-/** A job as SimPRO has it. */
+/** A cost centre as SimPRO has it: the job's original scope, or a
+ *  variation. */
 export interface ProgressJob {
+  /** "11295-13982": job and cost centre. */
   id: string;
+  jobId: string;
+  ccId: string;
+  /** Cost centre name ("Variation to Tile Removal"). */
   name: string;
+  /** The job's name, for context. */
+  jobName: string;
   site: string;
   siteId: string;
   customer: string;
-  /** SimPRO stage: Pending, Progress, Complete, Invoiced, Archived. */
+  /** SimPRO cost centre stage: Pending, InProgress, Complete, Invoiced… */
   stage: string;
-  status: string;
   isVariation: boolean;
-  /** Variation job numbers linked to this job in SimPRO. */
-  linked: string[];
+  /** Ex GST: the cost centre's total, or (when it has none yet) the hours
+   *  worked at its labour rate. */
   priceExTax: number;
+  /** Priced from hours worked × rate, not a set price. */
+  priceFromHours: boolean;
   hoursUsed: number;
   hoursEstimate: number;
   completedDate: string | null;
@@ -36,12 +45,11 @@ export const STATE_LABEL: Record<JobState, string> = {
   pending: "Not started",
 };
 
-/** Completed once SimPRO says so (a completed date, or the job has moved
- *  past Progress); in progress while it's Progress with hours on it;
- *  otherwise not started (SimPRO puts scheduled jobs in Progress too). */
+/** Completed once hours have been logged against it, or SimPRO marks it
+ *  complete (a completed date, or the job has moved past Progress); not
+ *  started otherwise. "In progress" is the rep's call, set on the job. */
 export function stateOf(j: ProgressJob): JobState {
-  if (j.completedDate || /^(complete|invoiced|archived)$/i.test(j.stage)) return "complete";
-  if (/progress/i.test(j.stage) && j.hoursUsed > 0) return "progress";
+  if (j.hoursUsed > 0 || j.completedDate || /^(complete|invoiced|archived)$/i.test(j.stage)) return "complete";
   return "pending";
 }
 
@@ -63,7 +71,7 @@ export interface ProgressRow {
 }
 
 export interface ProgressReport {
-  version: 1;
+  version: 2;
   /** The project, e.g. "Cosmopolitan". Unset = the first job's site. */
   title?: string;
   /** Short text under the title. */
@@ -78,15 +86,19 @@ export interface ProgressReport {
 export const DEFAULT_INTRO =
   "Variation works on your project, with the hours used and the price of each. Completed works are totalled below; works in progress are priced on completion.";
 
-export const newReport = (asAt: string): ProgressReport => ({ version: 1, intro: DEFAULT_INTRO, asAt, rows: [], showEstimate: false });
+export const newReport = (asAt: string): ProgressReport => ({ version: 2, intro: DEFAULT_INTRO, asAt, rows: [], showEstimate: false });
 
 export const isProgressReport = (x: unknown): x is ProgressReport =>
-  !!x && typeof x === "object" && (x as ProgressReport).version === 1 && Array.isArray((x as ProgressReport).rows);
+  !!x && typeof x === "object" && (x as ProgressReport).version === 2 && Array.isArray((x as ProgressReport).rows);
 
 /** A row as the report shows it, the rep's changes applied. */
 export interface ShownRow {
   id: string;
+  jobId: string;
   work: string;
+  /** Under the work: the job's name. */
+  jobName: string;
+  priceFromHours: boolean;
   state: JobState;
   price: number;
   hours: number;
@@ -96,7 +108,10 @@ export interface ShownRow {
 
 export const shownRow = (r: ProgressRow): ShownRow => ({
   id: r.id,
-  work: r.work ?? (tidyName(r.simpro.name) || `Job #${r.id}`),
+  jobId: r.simpro.jobId,
+  work: r.work ?? (tidyName(r.simpro.name) || `Job #${r.simpro.jobId}`),
+  jobName: tidyName(r.simpro.jobName),
+  priceFromHours: r.price == null && r.simpro.priceFromHours,
   state: r.state ?? stateOf(r.simpro),
   price: r.price ?? r.simpro.priceExTax,
   hours: r.simpro.hoursUsed,

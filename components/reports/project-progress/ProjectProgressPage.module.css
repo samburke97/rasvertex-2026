@@ -7,9 +7,17 @@
   gap: 8px;
 }
 
-.addRow input {
-  flex: 1;
+/* The shared panel button is full width: here the box takes the room. */
+.addRow .addInput {
+  flex: 1 1 auto;
+  width: auto;
   min-width: 0;
+}
+
+.addRow .addBtn {
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0 18px;
 }
 
 .error {

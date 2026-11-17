@@ -77,6 +77,9 @@ export interface ReportSettings {
   showScheduleNotes: boolean;
   /** Start and finish time columns in the hours schedule. Older drafts: off. */
   showScheduleTimes?: boolean;
+  /** Hours up to today only: days scheduled ahead (future work) are left
+   *  out. Unset (older drafts) counts as on. */
+  hoursToToday?: boolean;
   /** Break the schedule table into named sections with per-section subtotals. */
   scheduleSections: boolean;
   /** Comments/Recommendations summary page — on by default, optional per report. */
@@ -122,6 +125,17 @@ export interface ConditionReportData {
   plan?: MaintenancePlan & { on: boolean };
   /** Waterproofing and/or painting. */
   warranty?: Warranties;
+  /** Photos grouped under a title ("Level 3 balcony – crack repairs"),
+   *  shown first, each in the order picked. A photo is in one at most. */
+  photoSections?: PhotoSection[];
+}
+
+export interface PhotoSection {
+  id: string;
+  title: string;
+  /** A line under the title: what was done here. */
+  note: string;
+  photoIds: string[];
 }
 
 // ── Import status ─────────────────────────────────────────────────────────────
@@ -136,6 +150,12 @@ export type ImportStatus =
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Today as "YYYY-MM-DD", in local time. */
+export const todayIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
   return {
     site: job.siteName || job.name,
@@ -148,7 +168,9 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
       "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
     // The job number is what the client and the office refer to.
     project: `Job ${job.jobNo}`,
-    date: job.date,
+    // The report's date is the day it's made, not the job's issue date
+    // (when the quote was accepted). Set on every load, a resumed draft too.
+    date: todayIso(),
     coverPhoto: null,
     siteId: job.siteId,
   };
@@ -181,3 +203,12 @@ export function formatScheduleDate(iso: string): string {
 }
 
 export type { EnrichedJob as SimproJobResponse };
+
+/** The hours the report shows: the date filter when it's on, and nothing
+ *  after today unless "Hours up to today" is switched off. */
+export function shownSchedule(rows: ScheduleRow[], s: ReportSettings): ScheduleRow[] {
+  const ranged = s.filterByDate ? filterScheduleByDateRange(rows, s.dateFrom, s.dateTo) : rows;
+  if (s.hoursToToday === false) return ranged;
+  const today = todayIso();
+  return ranged.filter((r) => !r.date || r.date <= today);
+}

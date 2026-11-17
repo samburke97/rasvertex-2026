@@ -36,6 +36,8 @@ interface Ctx {
   onPhotoRemove?: (id: string) => void;
   /** Preview only: click a photo to adjust it in its frame. */
   onPhotoAdjust?: (id: string, frame: HTMLElement) => void;
+  /** Builder only: picking photos for a section; a click adds or removes. */
+  photoPick?: PhotoPick;
 }
 
 // ── Stylesheet: the Anchor report's, plus the parts only this report has ─────
@@ -56,6 +58,12 @@ export const OVERVIEW_CSS =
 .jo-grid{display:grid;column-gap:24px;row-gap:32px}
 .jo-day{font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1.2;margin-bottom:20px}
 .jo-day span{font-weight:400;color:var(--ink-45)}
+.jo-day-note{font-size:18px;line-height:1.5;color:var(--ink-65);margin:-12px 0 20px;max-width:900px}
+.jo-pick .ar-photo{cursor:pointer;outline:3px solid transparent;outline-offset:3px;transition:outline-color 100ms}
+.jo-pick .ar-photo:hover{outline-color:rgba(62,127,176,.45)}
+.jo-pick .ar-photo.is-picked{outline-color:#3e7fb0}
+.jo-tick{position:absolute;top:12px;left:12px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 1px 6px rgba(1,25,85,.3);display:flex;align-items:center;justify-content:center;color:transparent;pointer-events:none}
+.ar-photo.is-picked .jo-tick{background:#3e7fb0;color:#fff}
 .jo-h3{font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1.2}
 .jo-num{font-family:var(--bebas);font-size:22px;letter-spacing:.04em;color:var(--ink-35);margin-right:14px;font-weight:400}
 .jo-group{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;height:62px;padding-bottom:14px;border-bottom:var(--rule-head)}
@@ -528,6 +536,7 @@ function PhotosPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "phot
   const { model } = ctx;
   const n = model.photoCount;
   const dated = page.days.some((d) => d.label);
+  const pick = ctx.photoPick;
   return (
     <section className="ar-page">
       {page.first ? (
@@ -535,7 +544,7 @@ function PhotosPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "phot
           <SecLabel text={model.secText.photos} />
           <Heading
             title="Photos"
-            lede={`${n} photo${n === 1 ? "" : "s"} of the work${dated ? ", by the day they were taken" : ""}.`}
+            lede={`${n} photo${n === 1 ? "" : "s"} of the work${model.photoSections ? ", grouped by area" : dated ? ", by the day they were taken" : ""}.`}
           />
         </>
       ) : (
@@ -549,10 +558,30 @@ function PhotosPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "phot
               {d.continued && <span>, continued</span>}
             </h3>
           )}
-          <div className="jo-grid" style={{ gridTemplateColumns: `repeat(${model.grid.cols},minmax(0,1fr))` }}>
+          {d.note && <p className="jo-day-note">{d.note}</p>}
+          <div className={`jo-grid${pick ? " jo-pick" : ""}`} style={{ gridTemplateColumns: `repeat(${model.grid.cols},minmax(0,1fr))` }}>
             {d.rows.flat().map((p) => (
               <div key={p.id} style={{ minWidth: 0 }}>
-                <div className="ar-photo">
+                <div
+                  className={`ar-photo${pick?.selected.includes(p.id) ? " is-picked" : ""}`}
+                  onClickCapture={
+                    pick
+                      ? (e) => {
+                          // Picking: a click adds or removes it, nothing else.
+                          e.stopPropagation();
+                          e.preventDefault();
+                          pick.onToggle(p.id);
+                        }
+                      : undefined
+                  }
+                >
+                  {pick && (
+                    <span className="jo-tick">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12.5l4.5 4.5L19 7.5" />
+                      </svg>
+                    </span>
+                  )}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={p.url}
@@ -608,6 +637,11 @@ function PhotosPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "phot
   );
 }
 
+export interface PhotoPick {
+  selected: string[];
+  onToggle: (id: string) => void;
+}
+
 // ── Document ──────────────────────────────────────────────────────────────────
 
 interface DocProps {
@@ -621,10 +655,12 @@ interface DocProps {
   onPhotoRemove?: (id: string) => void;
   /** Preview only: click a photo to adjust it in its frame. */
   onPhotoAdjust?: (id: string, frame: HTMLElement) => void;
+  /** Builder only: picking photos for a section; a click adds or removes. */
+  photoPick?: PhotoPick;
 }
 
-export default function OverviewDocument({ model, assets, screen, onCoverPointerDown, onPhotoRename, onPhotoRemove, onPhotoAdjust }: DocProps) {
-  const ctx: Ctx = { model, assets, onCoverPointerDown, onPhotoRename, onPhotoRemove, onPhotoAdjust };
+export default function OverviewDocument({ model, assets, screen, onCoverPointerDown, onPhotoRename, onPhotoRemove, onPhotoAdjust, photoPick }: DocProps) {
+  const ctx: Ctx = { model, assets, onCoverPointerDown, onPhotoRename, onPhotoRemove, onPhotoAdjust, photoPick };
   return (
     <div className={`ar jo${screen ? " ar--screen" : ""}`}>
       <Cover ctx={ctx} />
