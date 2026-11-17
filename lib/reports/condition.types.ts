@@ -58,6 +58,9 @@ export interface ReportJobDetails {
   /** Custom cover hero background — falls back to the default app background
    *  (conditionBg) when null. */
   coverPhoto: string | null;
+  /** A photo from the job's library used as the cover, in place of an
+   *  upload; it follows that photo's URL. */
+  coverPhotoId?: string | null;
   /** SimPRO Site ID, used only for the Save-to-Site export path — not rendered. */
   siteId: string;
 }
@@ -245,7 +248,7 @@ export function mapJobToReportDetails(job: EnrichedJob): ReportJobDetails {
     address: job.siteAddress,
     reportType: "Job Overview",
     intro:
-      "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
+      "This report outlines the works completed, including any updates, adjustments, and variations from the original scope.",
     // The job number is what the client and the office refer to.
     project: `Job ${job.jobNo}`,
     // The report's date is the day it's made, not the job's issue date

@@ -312,7 +312,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   const site = (job.site || street || job.project || "Job overview").trim();
   const intro = sanitizeNotesHtml(job.intro);
   const blurb = notesIsEmpty(intro)
-    ? "<p>This report outlines the works completed, including any updates, adjustments and variations from the original scope.</p>"
+    ? "<p>This report outlines the works completed, including any updates, adjustments, and variations from the original scope.</p>"
     : intro;
 
   // What the report shows — the same date filter applies to photos and hours.
@@ -632,7 +632,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     reportType: job.reportType || "Job Overview",
     site,
     blurb,
-    coverUrl: job.coverPhoto || coverFallback,
+    coverUrl: (job.coverPhotoId && report.photos.find((p) => p.id === job.coverPhotoId)?.url) || job.coverPhoto || coverFallback,
     coverPos: report.coverPos ?? DEFAULT_COVER_POS,
     facts: [
       { k: "Prepared for", v: job.preparedFor },

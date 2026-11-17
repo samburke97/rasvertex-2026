@@ -90,7 +90,7 @@ const DEFAULT_REPORT: ConditionReportData = {
     address: "",
     reportType: "Job Overview",
     intro:
-      "This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope.",
+      "This report outlines the works completed, including any updates, adjustments, and variations from the original scope.",
     project: "",
     date: new Date().toLocaleDateString("en-AU"),
     coverPhoto: null,
@@ -182,13 +182,13 @@ export default function ConditionReportPage({
       setReport((prev) => ({ ...prev, coverPos: { ...DEFAULT_COVER_POS } }));
 
       if (!dataUrl) {
-        setReport((prev) => ({ ...prev, job: { ...prev.job, coverPhoto: null } }));
+        setReport((prev) => ({ ...prev, job: { ...prev.job, coverPhoto: null, coverPhotoId: null } }));
         return;
       }
       compressImageDataUrl(dataUrl).then(async (compressed) => {
         setReport((prev) => ({
           ...prev,
-          job: { ...prev.job, coverPhoto: compressed },
+          job: { ...prev.job, coverPhoto: compressed, coverPhotoId: null },
         }));
         // Same reasoning as every other photo — see uploadPhoto.ts. This
         // was previously the one image left as base64 forever, in the DB
@@ -204,6 +204,15 @@ export default function ConditionReportPage({
       });
     },
     [report.job.coverPhoto, loadedJobId],
+  );
+  // A photo from the job's library as the cover (an uploaded cover it
+  // replaces is deleted).
+  const pickCoverPhoto = useCallback(
+    (id: string) => {
+      if (report.job.coverPhoto) deleteReportPhoto(report.job.coverPhoto);
+      setReport((prev) => ({ ...prev, coverPos: { ...DEFAULT_COVER_POS }, job: { ...prev.job, coverPhoto: null, coverPhotoId: id } }));
+    },
+    [report.job.coverPhoto],
   );
 
   // Off the report, not deleted: it stays in the library (under the photo
@@ -491,7 +500,9 @@ export default function ConditionReportPage({
             job: {
               ...fresh,
               coverPhoto: dj.coverPhoto ?? null,
-              intro: dj.intro || fresh.intro,
+              coverPhotoId: dj.coverPhotoId ?? null,
+              // A draft still on the old default intro takes the new one.
+              intro: dj.intro && !/This report outlines the repairs and maintenance works completed, including any updates, adjustments, and variations from the original scope\.(<\/p>)?$/.test(dj.intro.trim()) ? dj.intro : fresh.intro,
               preparedBy: dj.preparedBy || fresh.preparedBy,
               reportType:
                 !dj.reportType || dj.reportType === "Building Condition Report" ? fresh.reportType : dj.reportType,
@@ -627,6 +638,7 @@ export default function ConditionReportPage({
     // photo pages show: keep those too.
     const kept = new Set([
       ...(report.findings?.on ? report.findings.items.flatMap((f) => f.photoIds) : []),
+      ...(report.job.coverPhotoId ? [report.job.coverPhotoId] : []),
       ...(report.variations?.on ? report.variations.items.filter((v) => !v.off).flatMap((v) => v.photoIds) : []),
       ...(report.method?.on && report.method.photoId ? [report.method.photoId] : []),
     ]);
@@ -886,6 +898,7 @@ export default function ConditionReportPage({
             scheduleRows={report.schedule.length}
             onEditHours={() => setHoursOpen(true)}
             onCoverPhoto={updateCoverPhoto}
+            onPickCover={pickCoverPhoto}
             coverUrl={model.coverUrl}
             coverZoom={model.coverPos.zoom}
             onCoverZoom={(z) => setCoverPos({ zoom: z })}

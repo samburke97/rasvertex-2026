@@ -42,6 +42,8 @@ interface OptionsPanelProps {
   scheduleRows: number;
   onEditHours: () => void;
   onCoverPhoto: (dataUrl: string | null) => void;
+  /** Uses a photo from the job's library as the cover. */
+  onPickCover: (id: string) => void;
   /** The cover in use: the uploaded photo, else the default. */
   coverUrl: string;
   coverZoom: number;
@@ -149,6 +151,7 @@ export default function OptionsPanel({
   scheduleRows,
   onEditHours,
   onCoverPhoto,
+  onPickCover,
   coverUrl,
   coverZoom,
   onCoverZoom,
@@ -168,6 +171,7 @@ export default function OptionsPanel({
   // The photo library pop-up, and which photos it shows.
   const [library, setLibrary] = useState(false);
   const [libFilter, setLibFilter] = useState("all");
+  const [pickingCover, setPickingCover] = useState(false);
   const loadingPhotos = importStatus.phase === "fetching-photos";
   const hasPhotos = photos.length > 0;
   // Taken off the report: still in the library, to add back.
@@ -248,16 +252,32 @@ export default function OptionsPanel({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={coverUrl} alt="Cover" className={styles.coverPhotoThumb} />
           <div className={styles.coverPhotoActions}>
+            <button className={styles.coverPhotoChange} onClick={() => setPickingCover(true)} disabled={!photos.length} title={photos.length ? undefined : "Load the job's photos first"}>
+              Choose from job photos
+            </button>
             <button className={styles.coverPhotoChange} onClick={() => coverInputRef.current?.click()}>
               Upload photo
             </button>
-            {job.coverPhoto && (
+            {(job.coverPhoto || job.coverPhotoId) && (
               <button className={styles.coverPhotoRemove} onClick={() => onCoverPhoto(null)}>
                 Use default
               </button>
             )}
           </div>
         </div>
+        {pickingCover && (
+          <PhotoPickerModal
+            title="Cover photo"
+            subtitle="Choose a photo from the job for the cover"
+            photos={photos.map((p) => ({ id: p.id, src: p.url, title: p.name }))}
+            selected={job.coverPhotoId ? [job.coverPhotoId] : []}
+            onPick={(id) => {
+              onPickCover(id);
+              setPickingCover(false);
+            }}
+            onClose={() => setPickingCover(false)}
+          />
+        )}
         <input
           ref={coverInputRef}
           type="file"
