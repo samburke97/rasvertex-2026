@@ -3,10 +3,11 @@
 //
 // Choosing photos in a pop-up, for every report builder: optional folder
 // chips, then a grid. One photo (click uses it) or several (click adds or
-// removes, numbered in the order chosen). Esc or the backdrop closes it.
+// removes, numbered in the order chosen). A search box narrows the photos
+// by file name. Esc or the backdrop closes it.
 // Same shell as CropModal.
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import styles from "./PhotoPickerModal.module.css";
 
@@ -60,6 +61,10 @@ export default function PhotoPickerModal({
   onRemove?: (id: string) => void;
   empty?: string;
 }) {
+  const [query, setQuery] = useState("");
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = words.length ? photos.filter((p) => words.every((w) => (p.title ?? "").toLowerCase().includes(w))) : photos;
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -79,6 +84,18 @@ export default function PhotoPickerModal({
             ×
           </button>
         </div>
+        <div className={styles.search}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input autoFocus value={query} placeholder="Search by file name" onChange={(e) => setQuery(e.target.value)} />
+          {query && (
+            <button className={styles.clear} onClick={() => setQuery("")} aria-label="Clear search">
+              ×
+            </button>
+          )}
+        </div>
         {filters && filters.length > 0 && (
           <div className={styles.chips}>
             {filters.map((f) => (
@@ -95,9 +112,9 @@ export default function PhotoPickerModal({
           </div>
         )}
         <div className={styles.body}>
-          {photos.length ? (
+          {shown.length ? (
             <div className={styles.grid}>
-              {photos.map((p) => {
+              {shown.map((p) => {
                 const at = selected.indexOf(p.id);
                 return (
                   <div
@@ -108,6 +125,7 @@ export default function PhotoPickerModal({
                     onClick={() => onPick(p.id)}
                   >
                     {multi && at >= 0 && <span className={styles.no}>{at + 1}</span>}
+                    {p.title && <span className={`${styles.name} ${words.length ? styles.nameOn : ""}`}>{p.title}</span>}
                     {p.removable && onRemove && (
                       <button
                         className={styles.remove}
@@ -125,7 +143,7 @@ export default function PhotoPickerModal({
               })}
             </div>
           ) : (
-            <span className={styles.empty}>{empty}</span>
+            <span className={styles.empty}>{photos.length && words.length ? `No photos named “${query.trim()}”.` : empty}</span>
           )}
         </div>
         {multi && (

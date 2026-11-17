@@ -407,7 +407,7 @@ function PhotoModal({ ctx, title, current, onPick, onClose }: { ctx: BuilderCtx;
     <PhotoPickerModal
       title="Choose a photo"
       subtitle={title}
-      photos={pool.map((x) => ({ id: x, src: ctx.img(x), removable: ctx.p.uploads.includes(x) }))}
+      photos={pool.map((x) => ({ id: x, src: ctx.img(x), title: x.startsWith("ph:") ? ctx.p.simpro.photos.find((ph) => "ph:" + ph.id === x)?.name : "Upload", removable: ctx.p.uploads.includes(x) }))}
       selected={current ? [current] : []}
       onPick={onPick}
       onClose={onClose}

@@ -16,6 +16,7 @@
 //
 // Pages: 1 Cover · 2 Contents · 3…n flowed pages · last Recommended works.
 
+import { planRows } from "@/lib/reports/maintenancePlan";
 import { DEFAULT_TAGS } from "@/lib/reports/settings/defaults";
 import { levelRank, readTag, tagText, zoneRank } from "@/lib/reports/settings/library";
 import type { LocationTag } from "@/lib/reports/settings/types";
@@ -728,7 +729,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
   // 07 Maintenance plan (optional): required services first.
   if (shown("plan")) {
     sec("plan", true);
-    const items = [...data.plan!.items].sort((a, b) => (a.priority === b.priority ? 0 : a.priority === "required" ? -1 : 1));
+    const items = planRows(data.plan!.items);
     const next = items.some((x) => x.next?.trim());
     const planHead: Block = { type: "planHead", key: "planhead", next, gap: 0, est: 40 };
     add({ ...planHead, gap: 56, keep: true });

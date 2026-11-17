@@ -1,0 +1,10 @@
+/* Sortable.module.css: drag to reorder, for every builder list. */
+
+.row { position: relative; }
+.grip { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 28px; flex-shrink: 0; color: rgba(var(--ink-rgb), 0.3); cursor: grab; }
+.grip:hover { color: rgba(var(--ink-rgb), 0.65); }
+.grip:active { cursor: grabbing; }
+.dragging { opacity: 0.4; }
+.dropBefore::before, .dropAfter::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; border-radius: 2px; background: var(--blue-500, #3e7fb0); pointer-events: none; }
+.dropBefore::before { top: -1px; }
+.dropAfter::after { bottom: -1px; }

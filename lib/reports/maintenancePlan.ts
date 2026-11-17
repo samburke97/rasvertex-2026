@@ -46,9 +46,12 @@ export const PLAN_INTERVALS = [
 export const PLAN_INTRO =
   "Future maintenance considerations and lifecycle planning to assist with ongoing asset management and budgeting.";
 
-/** Required first, as printed. */
-export const planRows = (items: PlanItem[]) =>
+/** Required first: the order a new plan starts in. */
+export const requiredFirst = (items: PlanItem[]) =>
   [...items].sort((a, b) => (a.priority === b.priority ? 0 : a.priority === "required" ? -1 : 1));
+
+/** The rows as printed: in the order arranged in the builder. */
+export const planRows = (items: PlanItem[]) => items.filter((x) => x.service.trim());
 
 /** Services offered in the Job overview (any building's completed works). */
 export const PROJECT_PLAN: PlanPreset[] = [

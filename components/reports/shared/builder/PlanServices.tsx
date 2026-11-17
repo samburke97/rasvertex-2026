@@ -1,21 +1,25 @@
 "use client";
-// The maintenance plan editor shared by the report builders: tick a preset
-// service (or add your own), set how often and whether it's required; the
-// technician's comments print under the table. The builder adds its own
-// on/off switch, title and intro around it.
+// The maintenance plan / recommended works editor shared by the report
+// builders: the services in the plan, in the order they print (drag the grip
+// to reorder), each with its priority, frequency and next due; services not
+// in the plan sit below as chips to add. The technician's comments print
+// under the table. The builder adds its own on/off switch, title and intro.
 
 import type { MaintenancePlan, PlanItem, PlanPreset } from "@/lib/reports/maintenancePlan";
-import { PLAN_INTERVALS } from "@/lib/reports/maintenancePlan";
+import { PLAN_INTERVALS, requiredFirst } from "@/lib/reports/maintenancePlan";
 import InfoTip from "./InfoTip";
 import RichBox from "./RichBox";
+import { Grip, moveItem, useSortable } from "./Sortable";
 import styles from "./PlanServices.module.css";
 
 /** The services to start with: the required presets, and any that match
- *  defects found in the report. */
+ *  defects found in the report; required first. */
 export const seedPlan = (presets: PlanPreset[], present: string[] = []): PlanItem[] =>
-  presets
-    .filter((s) => s.priority === "required" || s.whenAny?.some((c) => present.includes(c)))
-    .map(({ service, interval, priority }) => ({ service, interval, priority }));
+  requiredFirst(
+    presets
+      .filter((s) => s.priority === "required" || s.whenAny?.some((c) => present.includes(c)))
+      .map(({ service, interval, priority }) => ({ service, interval, priority })),
+  );
 
 export default function PlanServices({
   presets,
@@ -29,79 +33,69 @@ export default function PlanServices({
   const items = plan?.items ?? [];
   const set = (next: PlanItem[]) => onPlan({ ...plan, items: next });
   const patch = (i: number, p: Partial<PlanItem>) => set(items.map((x, j) => (j === i ? { ...x, ...p } : x)));
-  const custom = items.filter((x) => !presets.some((s) => s.service === x.service));
-
-  /** Required / Recommended, as on the page; click to switch. */
-  const prio = (x: PlanItem, i: number) => (
-    <button
-      className={`${styles.prio} ${x.priority === "required" ? styles.prioReq : ""}`}
-      title="Click to switch between Required and Recommended"
-      onClick={() => patch(i, { priority: x.priority === "required" ? "recommended" : "required" })}
-    >
-      {x.priority === "required" ? "Required" : "Recommended"}
-    </button>
-  );
-  /** How often and when next, side by side under the service. */
-  const timing = (x: PlanItem, i: number) => (
-    <div className={styles.timing}>
-      <select className={`${styles.input} ${styles.select}`} value={x.interval} onChange={(e) => patch(i, { interval: e.target.value })}>
-        {[...new Set([x.interval, ...PLAN_INTERVALS])].map((v) => (
-          <option key={v}>{v}</option>
-        ))}
-      </select>
-      <input className={styles.input} value={x.next ?? ""} placeholder="Next due" onChange={(e) => patch(i, { next: e.target.value || undefined })} />
-    </div>
-  );
+  const sort = useSortable((from, to) => set(moveItem(items, from, to)));
+  const unused = presets.filter((s) => !items.some((x) => x.service === s.service));
 
   return (
     <>
       <div className={styles.section}>
         <div className={styles.title}>
-          Services <InfoTip>Tick each service the plan includes. Required ones print first.</InfoTip>
+          Services{items.length > 0 && <span className={styles.count}>{items.length}</span>}
+          <InfoTip>Printed in this order: drag ⋮⋮ to move a service. Click the priority to switch it.</InfoTip>
         </div>
-        {presets.map((s) => {
-          const i = items.findIndex((x) => x.service === s.service);
-          return (
-            <div key={s.service} className={styles.service}>
-              <div className={styles.head}>
-                <label className={styles.tick}>
-                  <input
-                    type="checkbox"
-                    checked={i >= 0}
-                    onChange={(e) =>
-                      set(
-                        e.target.checked
-                          ? [...items, { service: s.service, interval: s.interval, priority: s.priority }]
-                          : items.filter((x) => x.service !== s.service),
-                      )
-                    }
-                  />
-                  <span>{s.service}</span>
-                </label>
-                {i >= 0 && prio(items[i], i)}
+        {items.length ? (
+          <div className={styles.list}>
+            {items.map((x, i) => (
+              <div key={i} {...sort.row(i)} className={`${styles.item} ${sort.cls(i)}`}>
+                <Grip {...sort.grip(i)} />
+                <div className={styles.body}>
+                  <div className={styles.head}>
+                    <input
+                      className={styles.name}
+                      value={x.service}
+                      placeholder="Describe the service"
+                      autoFocus={!x.service}
+                      onChange={(e) => patch(i, { service: e.target.value })}
+                    />
+                    <button
+                      className={`${styles.prio} ${x.priority === "required" ? styles.prioReq : ""}`}
+                      title="Click to switch between Required and Recommended"
+                      onClick={() => patch(i, { priority: x.priority === "required" ? "recommended" : "required" })}
+                    >
+                      {x.priority === "required" ? "Required" : "Recommended"}
+                    </button>
+                    <button className={styles.remove} title="Remove from the plan" aria-label="Remove" onClick={() => set(items.filter((_, j) => j !== i))}>
+                      ×
+                    </button>
+                  </div>
+                  <div className={styles.timing}>
+                    <select className={`${styles.input} ${styles.select}`} value={x.interval} onChange={(e) => patch(i, { interval: e.target.value })}>
+                      {[...new Set([x.interval, ...PLAN_INTERVALS])].map((v) => (
+                        <option key={v}>{v}</option>
+                      ))}
+                    </select>
+                    <input className={styles.input} value={x.next ?? ""} placeholder="Next due (optional)" onChange={(e) => patch(i, { next: e.target.value || undefined })} />
+                  </div>
+                </div>
               </div>
-              {i >= 0 && timing(items[i], i)}
-            </div>
-          );
-        })}
-        {custom.map((x) => {
-          const i = items.indexOf(x);
-          return (
-            <div key={`own-${i}`} className={styles.service}>
-              <div className={styles.head}>
-                <input className={styles.input} value={x.service} placeholder="Service" onChange={(e) => patch(i, { service: e.target.value })} />
-                {prio(x, i)}
-              </div>
-              {timing(x, i)}
-              <button className={styles.link} onClick={() => set(items.filter((_, j) => j !== i))}>
-                Remove
-              </button>
-            </div>
-          );
-        })}
-        <button className={styles.add} onClick={() => set([...items, { service: "", interval: "Annually", priority: "recommended" }])}>
-          Add a service
-        </button>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.empty}>No services yet. Add one below.</div>
+        )}
+        <div className={styles.addTitle}>Add a service</div>
+        <div className={styles.chips}>
+          {unused.map((s) => (
+            <button key={s.service} className={styles.chip} onClick={() => set([...items, { service: s.service, interval: s.interval, priority: s.priority }])}>
+              <span className={styles.plus}>+</span>
+              {s.service}
+            </button>
+          ))}
+          <button className={`${styles.chip} ${styles.chipOwn}`} onClick={() => set([...items, { service: "", interval: "Annually", priority: "recommended" }])}>
+            <span className={styles.plus}>+</span>
+            Your own
+          </button>
+        </div>
       </div>
       <div className={styles.section} data-field="plan.notes" data-panel-field="planNotes">
         <div className={styles.title}>

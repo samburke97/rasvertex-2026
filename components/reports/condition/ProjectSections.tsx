@@ -197,20 +197,42 @@ export default function ProjectSections({ report, update }: { report: ConditionR
             </button>
             <div className={styles.field} data-panel-field="methodCaption">
               <span className={styles.subLabel}>
-                Photo <InfoTip>Optional. Shown after the steps, full width, with its caption.</InfoTip>
+                Photo <InfoTip>Optional, off unless you add one. Shown after the steps, full width, with its caption.</InfoTip>
               </span>
-              <div className={styles.methodThumbs}>
-                {report.photos.slice(0, 60).map((p) => (
-                  <button
-                    key={p.id}
-                    className={`${styles.methodThumb} ${m.photoId === p.id ? styles.methodThumbOn : ""}`}
-                    style={{ backgroundImage: `url("${p.url}")` }}
-                    title={p.name}
-                    onClick={() => setMethod({ photoId: m.photoId === p.id ? null : p.id })}
-                  />
-                ))}
-              </div>
+              {(() => {
+                const photo = m.photoId ? report.photos.find((p) => p.id === m.photoId) : undefined;
+                return photo ? (
+                  <div className={styles.methodPhoto}>
+                    <button className={styles.methodThumb} style={{ backgroundImage: `url("${photo.url}")` }} title="Change photo" onClick={() => setPicking("method")} />
+                    <div className={styles.methodPhotoActs}>
+                      <button className={styles.textBtn} onClick={() => setPicking("method")}>
+                        Change photo
+                      </button>
+                      <button className={styles.textBtn} onClick={() => setMethod({ photoId: null, caption: "" })}>
+                        No photo
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className={styles.btn} onClick={() => setPicking("method")} disabled={!report.photos.length}>
+                    Add a photo
+                  </button>
+                );
+              })()}
               {!report.photos.length && <span className={styles.subLabel}>Load the job&apos;s photos to choose one.</span>}
+              {picking === "method" && (
+                <PhotoPickerModal
+                  title="Methodology photo"
+                  subtitle="Shown after the steps, full width"
+                  photos={report.photos.map((p) => ({ id: p.id, src: p.url, title: p.name }))}
+                  selected={m.photoId ? [m.photoId] : []}
+                  onPick={(id) => {
+                    setMethod({ photoId: id });
+                    setPicking(null);
+                  }}
+                  onClose={() => setPicking(null)}
+                />
+              )}
               {m.photoId && (
                 <input className={styles.input} value={m.caption ?? ""} placeholder="Caption, e.g. Trafficable membrane during application." onChange={(e) => setMethod({ caption: e.target.value })} />
               )}

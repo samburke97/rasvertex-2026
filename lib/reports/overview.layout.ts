@@ -26,7 +26,7 @@ import {
   type PhotoLayout,
   type ScheduleRow,
 } from "./condition.types";
-import { CLOSER_GAP, CLOSER_H, fmtDate, pad } from "./anchor.layout";
+import { CLOSER_GAP, CLOSER_H, dotDate, pad } from "./anchor.layout";
 import { notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "./richText";
 import type { PhotoPos } from "./photos";
 import { htmlItems } from "./richText";
@@ -609,7 +609,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     facts: [
       { k: "Prepared for", v: job.preparedFor },
       { k: "Project", v: job.project },
-      { k: "Date", v: fmtDate(job.date) },
+      { k: "Date", v: dotDate(job.date) },
       { k: "Prepared by", v: job.preparedBy },
     ],
     hoursLede,

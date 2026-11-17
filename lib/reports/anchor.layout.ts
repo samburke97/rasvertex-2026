@@ -71,6 +71,13 @@ export function fmtDate(raw: string | null | undefined, short = false): string {
   return `${d.getDate()} ${short ? m.slice(0, 3) : m} ${d.getFullYear()}`;
 }
 
+/** "17.11.26": the hero's date card, kept to one line. */
+export function dotDate(raw: string | null | undefined): string {
+  const d = raw ? parseReportDate(raw) : null;
+  if (!d) return raw ?? "";
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${pad(d.getFullYear() % 100)}`;
+}
+
 function andList(a: string[]): string {
   return a.length < 2
     ? (a[0] ?? "")
@@ -466,7 +473,7 @@ export function buildAnchorModel(
       { k: "Prepared for", v: job.preparedFor },
       { k: "Prepared by", v: job.preparedBy },
       { k: "Report", v: `#${job.certNumber}` },
-      { k: "Date", v: fmtDate(job.date) },
+      { k: "Date", v: dotDate(job.date) },
     ],
     summary,
     stats: [
