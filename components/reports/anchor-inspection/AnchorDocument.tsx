@@ -133,12 +133,18 @@ input.ar-caption:focus{background:#fff;box-shadow:0 0 0 2px #4a82c9;color:var(--
 .ar-clients{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:28px;align-items:center;margin-top:40px}
 .ar-clients>div{display:flex;align-items:center;justify-content:center;height:64px;min-width:0}
 .ar-clients img{max-width:100%;width:auto;object-fit:contain}
-.ar-closer{display:flex;flex-direction:column}
-.ar-closer-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:32px}
-.ar-closer-card{display:flex;flex-direction:column;min-width:0}
-.ar-closer-card i{display:block;width:100%;height:300px;border-radius:16px;background:var(--grey) center/cover no-repeat}
-.ar-closer-card b{font-size:22px;font-weight:700;line-height:1.2;letter-spacing:-.04em;margin:20px 0 8px}
-.ar-closer-card span{font-size:17px;line-height:1.5;color:rgba(1,25,85,.6);text-wrap:pretty}
+.ar-end{display:flex;flex-direction:column}
+.ar-end-title{font-size:40px;font-weight:700;line-height:1.1;letter-spacing:-.04em}
+.ar-extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:32px;flex:1 1 auto;min-height:0}
+.ar-extra{display:flex;flex-direction:column;min-width:0;min-height:0}
+.ar-extra__img{width:100%;flex:1 1 0;min-height:120px;max-height:300px;border-radius:16px;overflow:hidden;background:var(--grey) center/cover no-repeat}
+.ar-extra h3{font-size:22px;font-weight:700;line-height:1.2;letter-spacing:-.04em;margin:20px 0 8px}
+.ar-extra p{font-size:17px;line-height:1.5;color:rgba(1,25,85,.6);min-height:3em;text-wrap:pretty}
+.ar-cta{margin-top:56px;display:flex;flex-direction:column;gap:40px}
+.ar-cta .ar-btn{align-self:flex-start;text-decoration:none}
+.ar-contact{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:16px 40px;padding-top:32px;border-top:var(--rule)}
+.ar-contact h3{font-size:22px;font-weight:700;line-height:1.2;letter-spacing:-.04em}
+.ar-contact p{font-size:20px}
 .ar-close{margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between;gap:32px}
 .ar-btn{display:inline-flex;align-items:center;gap:16px;height:64px;padding:0 36px;border-radius:14px;background:var(--navy);color:#fff !important;font-size:20px;font-weight:700;letter-spacing:-.01em}
 `;
@@ -836,9 +842,19 @@ export const CLOSER_CARDS: CloserCard[] = [
   { t: "Maintenance plan", d: "Scheduled washdowns and inspections at a fixed annual price.", img: "maintenance" },
 ];
 
-/** The end of a report: "Also worth adding", as the Inspection report has
- *  it under Recommended works. Straight after the last section when there's
- *  room (else on a short page of its own), in place of a full sales page. */
+/** The end of a report, exactly as the Inspection report closes its
+ *  Recommended works page: "Also worth adding" (the photos take the space
+ *  left), then Request a quote and who to call. Fills from just under the
+ *  last section to the foot of the page, or a page of its own. */
+export interface EndContact {
+  name: string;
+  title: string;
+  phone: string;
+  email: string;
+}
+
+export const END_CONTACT: EndContact = { name: "Phil Clark", title: "Director", phone: "07 5371 0201", email: "phil@rasvertex.com.au" };
+
 /** The Anchor report's cards: a building inspection in place of the plan. */
 const ANCHOR_CLOSER_CARDS: CloserCard[] = [
   CLOSER_CARDS[0],
@@ -846,22 +862,57 @@ const ANCHOR_CLOSER_CARDS: CloserCard[] = [
   { t: "Building inspection", d: "A photographic condition report on the whole building, with priced recommendations.", img: "inspections" },
 ];
 
-export function Closer({ images, cards = CLOSER_CARDS, style }: { images: Record<AnchorImageKey, string>; cards?: CloserCard[]; style?: React.CSSProperties }) {
+export function ReportEnd({
+  images,
+  cards = CLOSER_CARDS,
+  contact = END_CONTACT,
+  href,
+  style,
+}: {
+  images: Record<AnchorImageKey, string>;
+  cards?: CloserCard[];
+  contact?: EndContact;
+  /** Request a quote: a mailto with the job filled in. */
+  href: string;
+  style?: React.CSSProperties;
+}) {
   return (
-    <div className="ar-closer" style={style}>
-      <h3 className="ar-h-card">Also worth adding</h3>
-      <div className="ar-closer-cards">
+    <div className="ar-end" style={style}>
+      <h3 className="ar-end-title">Also worth adding</h3>
+      <div className="ar-extras">
         {cards.map((c) => (
-          <div key={c.t} className="ar-closer-card">
-            <i style={{ backgroundImage: `url("${images[c.img]}")` }} />
-            <b>{c.t}</b>
-            <span>{c.d}</span>
+          <div key={c.t} className="ar-extra">
+            <div className="ar-extra__img" style={{ backgroundImage: `url("${images[c.img]}")` }} />
+            <h3>{c.t}</h3>
+            <p>{c.d}</p>
           </div>
         ))}
+      </div>
+      <div className="ar-cta">
+        <a className="ar-btn" href={href}>
+          Request a quote
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </a>
+        <div className="ar-contact">
+          <h3>Any questions? Reach out.</h3>
+          <p>
+            {contact.name}
+            {contact.title ? `, ${contact.title}` : ""} · <strong>{contact.phone}</strong> · <strong>{contact.email}</strong>
+          </p>
+        </div>
       </div>
     </div>
   );
 }
+
+/** A quote request to the team inbox for a report's job. */
+export const quoteHref = (report: string, ref: string, site: string) =>
+  "mailto:team@rasvertex.com.au?subject=" +
+  encodeURIComponent(`Quote request, ${report}${ref ? ` ${ref}` : ""}${site ? `, ${site}` : ""}`) +
+  "&body=" +
+  encodeURIComponent(`Hi RAS-VERTEX team,\n\nPlease quote the following for ${site || "our building"}:\n\n- \n\nThanks,`);
 
 export function Partner({ images, label }: { images: Record<AnchorImageKey, string>; label: string }) {
   const img = images;
@@ -1080,7 +1131,12 @@ export default function AnchorDocument({
       {/* What else we can do and who to talk to, in place of a sales page. */}
       <div className="ar-sheet">
         <section className="ar-page">
-          <Closer images={assets.images} cards={ANCHOR_CLOSER_CARDS} />
+          <ReportEnd
+            images={assets.images}
+            cards={ANCHOR_CLOSER_CARDS}
+            href={quoteHref("Anchor inspection", model.certNumber ? `#${model.certNumber}` : "", model.site)}
+            style={{ flex: "1 1 auto", minHeight: 0, paddingBottom: 16 }}
+          />
         </section>
       </div>
     </div>

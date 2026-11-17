@@ -526,10 +526,10 @@ export const ANCHOR_IMAGES = {
 } as const;
 export type AnchorImageKey = keyof typeof ANCHOR_IMAGES;
 
-/** Page units the report closer takes ("Also worth adding": title, a row
- *  of cards with 300-high photos and two lines each; AnchorDocument's
- *  Closer), and the gap above it. */
-export const CLOSER_H = 480;
+/** The report ending (AnchorDocument's ReportEnd): the least it needs
+ *  under the last section (title, cards with their photos at the 120
+ *  minimum, the button and the contact), and the gap above it. */
+export const CLOSER_H = 640;
 export const CLOSER_GAP = 72;
 
 export const ANCHOR_ICON_NAMES = [

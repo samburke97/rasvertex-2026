@@ -107,7 +107,7 @@ const PAGE_ROWS = [
   { id: "method", name: "Methodology" },
   { id: "photos", name: "Photos" },
   { id: "findings", name: "Findings" },
-  { id: "plan", name: "Maintenance plan" },
+  { id: "plan", name: "Recommended works" },
   { id: "warranty", name: "Warranty" },
 ];
 /** Optional sections: an eye in the rail, off until switched on. */

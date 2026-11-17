@@ -11,7 +11,7 @@
 // the preview.
 
 import type { PointerEvent } from "react";
-import { ANCHOR_CSS, Closer } from "@/components/reports/anchor-inspection/AnchorDocument";
+import { ANCHOR_CSS, quoteHref, ReportEnd } from "@/components/reports/anchor-inspection/AnchorDocument";
 import type { AnchorImageKey } from "@/lib/reports/anchor.layout";
 import {
   formatHours,
@@ -373,7 +373,7 @@ function MethodPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "meth
   );
 }
 
-/** Maintenance plan: services, how often, and what's required. */
+/** Recommended works (the maintenance plan): services, how often, and what's required. */
 function PlanPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "plan" }> }) {
   const { model } = ctx;
   const p = model.plan!;
@@ -383,10 +383,10 @@ function PlanPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "plan" 
       {page.first ? (
         <>
           <SecLabel text={model.secText.plan} />
-          <Heading title="Maintenance plan" lede={p.intro} />
+          <Heading title="Recommended works" lede={p.intro} />
         </>
       ) : (
-        <SecLabel text="Maintenance plan, continued" />
+        <SecLabel text="Recommended works, continued" />
       )}
       {page.rows.length > 0 && (
         <div className="ar-table">
@@ -674,7 +674,7 @@ function FindingsPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "fi
             {f.desc && <div className="jo-find-desc ar-rich" dangerouslySetInnerHTML={{ __html: sanitizeNotesHtml(f.desc) }} />}
           </div>
           {f.rows.length > 0 && (
-            <div className="jo-find-photos">
+            <div className="jo-find-photos" style={{ gridTemplateColumns: `repeat(${f.cols},minmax(0,1fr))` }}>
               {f.rows.flat().map((p) => (
                 <div key={p.id} className="ar-photo">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -714,6 +714,7 @@ interface DocProps {
 
 export default function OverviewDocument({ model, assets, screen, onCoverPointerDown, onPhotoRename, onPhotoRemove, onPhotoAdjust, photoPick }: DocProps) {
   const ctx: Ctx = { model, assets, onCoverPointerDown, onPhotoRename, onPhotoRemove, onPhotoAdjust, photoPick };
+  const endHref = quoteHref(model.reportType || "Job overview", model.facts.find((f) => f.k === "Project")?.v ?? "", model.site);
   return (
     <div className={`ar jo${screen ? " ar--screen" : ""}`}>
       <Cover ctx={ctx} />
@@ -733,15 +734,16 @@ export default function OverviewDocument({ model, assets, screen, onCoverPointer
           ) : p.kind === "findings" ? (
             <FindingsPage ctx={ctx} page={p} />
           ) : p.kind === "closer" ? (
-            <section className="ar-page">
-              <Closer images={assets.images} />
-              <PageNo no={p.no} total={model.total} />
+            <section className="ar-page" style={{ paddingBottom: 96 }}>
+              <ReportEnd images={assets.images} href={endHref} style={{ flex: "1 1 auto", minHeight: 0 }} />
             </section>
           ) : (
             <PhotosPage ctx={ctx} page={p} />
           )}
           {/* The closer straight under the last section, when it fits there. */}
-          {model.closerOn === p.no && <Closer images={assets.images} style={{ position: "absolute", left: 96, right: 96, top: model.closerTop }} />}
+          {model.closerOn === p.no && (
+            <ReportEnd images={assets.images} href={endHref} style={{ position: "absolute", left: 96, right: 96, top: model.closerTop, bottom: 96, background: "#fff" }} />
+          )}
         </div>
       ))}
 

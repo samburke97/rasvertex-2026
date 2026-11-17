@@ -4,6 +4,7 @@
 // rail (data-pages), is off until switched on, and starts from a template
 // that's then fully editable.
 
+import { useState } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import ToggleRow from "../shared/ToggleRow";
 import InfoTip from "@/components/reports/shared/builder/InfoTip";
@@ -27,7 +28,8 @@ import {
   type WarrantyKind,
   type WarrantyScheduleRow,
 } from "@/lib/reports/warranty";
-import { FINDINGS_INTRO, type ConditionReportData, type Finding } from "@/lib/reports/condition.types";
+import { FINDING_SIZES, FINDINGS_INTRO, type ConditionReportData, type Finding } from "@/lib/reports/condition.types";
+import PhotoPickerModal from "@/components/reports/shared/builder/PhotoPickerModal";
 
 type Patch = (fn: (prev: ConditionReportData) => ConditionReportData) => void;
 export type ProjectSection = "method" | "findings" | "plan" | "warranty";
@@ -63,6 +65,8 @@ export default function ProjectSections({ report, update }: { report: ConditionR
   const setKind = (kind: WarrantyKind, w: WarrantyInfo | undefined) =>
     update((r) => ({ ...r, warranty: { ...normWarranties(r.warranty, completedOf(r))!, [kind]: w } }));
   const toggle = (key: ProjectSection) => (v: boolean) => update((r) => setSection(r, key, v));
+  // The finding whose photos are being chosen in the picker.
+  const [picking, setPicking] = useState<string | null>(null);
   const setFindings = (p: Partial<NonNullable<ConditionReportData["findings"]>>) => update((r) => ({ ...r, findings: { ...r.findings!, ...p } }));
   const setFinding = (id: string, p: Partial<Finding>) =>
     update((r) => ({ ...r, findings: { ...r.findings!, items: r.findings!.items.map((f) => (f.id === id ? { ...f, ...p } : f)) } }));
@@ -175,27 +179,37 @@ export default function ProjectSections({ report, update }: { report: ConditionR
                   placeholder="What we found, and the work we'd recommend"
                   onChange={(desc) => setFinding(f.id, { desc })}
                 />
-                <span className={styles.subLabel}>
-                  Photos{f.photoIds.length ? ` · ${f.photoIds.length} chosen` : ""}{" "}
-                  <InfoTip>Click to add or remove. They print in the order chosen, and come off the photo pages.</InfoTip>
-                </span>
-                <div className={styles.methodThumbs}>
-                  {report.photos.map((p) => {
-                    const at = f.photoIds.indexOf(p.id);
-                    return (
-                      <button
-                        key={p.id}
-                        className={`${styles.methodThumb} ${at >= 0 ? styles.methodThumbOn : ""}`}
-                        style={{ backgroundImage: `url("${p.url}")` }}
-                        title={p.name}
-                        onClick={() =>
-                          setFinding(f.id, { photoIds: at >= 0 ? f.photoIds.filter((x) => x !== p.id) : [...f.photoIds, p.id] })
-                        }
-                      />
-                    );
-                  })}
-                </div>
+                <button className={styles.btn} onClick={() => setPicking(f.id)} disabled={!report.photos.length}>
+                  {f.photoIds.length ? `Photos · ${f.photoIds.length} chosen` : "Choose photos"}
+                </button>
                 {!report.photos.length && <span className={styles.subLabel}>Load the job&apos;s photos to choose some.</span>}
+                {picking === f.id && (
+                  <PhotoPickerModal
+                    multi
+                    title="Choose photos"
+                    subtitle={f.title || `Finding ${i + 1}`}
+                    photos={report.photos.map((p) => ({ id: p.id, src: p.url, title: p.name }))}
+                    selected={f.photoIds}
+                    onPick={(id) =>
+                      setFinding(f.id, { photoIds: f.photoIds.includes(id) ? f.photoIds.filter((x) => x !== id) : [...f.photoIds, id] })
+                    }
+                    onClose={() => setPicking(null)}
+                  />
+                )}
+                <span className={styles.subLabel}>
+                  Photo size <InfoTip>How many print to a row: small 4, medium 3, large 2, full width 1.</InfoTip>
+                </span>
+                <div className={styles.presetRow}>
+                  {FINDING_SIZES.map((z) => (
+                    <button
+                      key={z.key}
+                      className={`${styles.presetBtn} ${(f.size ?? "medium") === z.key ? styles.presetBtnActive : ""}`}
+                      onClick={() => setFinding(f.id, { size: z.key })}
+                    >
+                      {z.label}
+                    </button>
+                  ))}
+                </div>
                 <button
                   className={styles.textBtn}
                   onClick={() => setFindings({ items: report.findings!.items.filter((x) => x.id !== f.id) })}
@@ -213,7 +227,7 @@ export default function ProjectSections({ report, update }: { report: ConditionR
 
       {/* ── Maintenance plan ────────────────────────────────────────────── */}
       <div className={styles.group} data-pages="plan">
-        <ToggleRow label="Include a maintenance plan" sub="Services, how often, and what's required" checked={!!report.plan?.on} onChange={toggle("plan")} />
+        <ToggleRow label="Include recommended works" sub="Services, how often, and what's required" checked={!!report.plan?.on} onChange={toggle("plan")} />
         {report.plan?.on && <PlanServices presets={PROJECT_PLAN} plan={report.plan} onPlan={(plan) => update((r) => ({ ...r, plan: { ...plan, on: true } }))} />}
       </div>
 

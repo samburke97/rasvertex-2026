@@ -19,6 +19,7 @@ import {
   filterPhotosByDateRange,
   filterScheduleByDateRange,
   FINDINGS_INTRO,
+  findingCols,
   shownSchedule,
   type ConditionReportData,
   type CoverPos,
@@ -64,8 +65,7 @@ const ROW_GAP = 32;
 const CAPTION = 32; // 8 margin + 17 × 1.4
 const DAY_HEAD = 48; // 22 × 1.2 + 20 margin, rounded
 const DAY_GAP = 24;
-/** Findings: photos per row, and the space between findings. */
-export const FINDING_COLS = 3;
+/** Findings: the space between them (photos per row: the finding's size). */
 const FINDING_GAP = 48;
 const GRIDS: Record<PhotoLayout, { cols: number; ratio: number }> = {
   large: { cols: 2, ratio: 3 / 4 },
@@ -111,6 +111,8 @@ export interface FindingBlock {
   title: string;
   desc: string;
   continued: boolean;
+  /** Photos per row (the finding's photo size). */
+  cols: number;
   rows: OverviewPhoto[][];
 }
 
@@ -466,8 +468,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   // between photo rows with its head repeated.
   if (findings.length) {
     const byId = new Map(report.photos.map((p) => [p.id, p]));
-    const colW = (CONTENT_W - COL_GAP * (FINDING_COLS - 1)) / FINDING_COLS;
-    const rowH = Math.ceil(colW * 0.75);
+    const rowHOf = (cols: number) => Math.ceil(((CONTENT_W - COL_GAP * (cols - 1)) / cols) * 0.75);
     const descH = (html: string) => (notesIsEmpty(html) ? 0 : 12 + notesLineCount(sanitizeNotesHtml(html)) * 31);
     const headH = (f: { title: string }, desc: string) => 40 + Math.max(1, Math.ceil(f.title.length / 60)) * 31 + descH(desc) + 20;
     let page: Extract<Page, { kind: "findings" }> = { kind: "findings", no: no(), first: true, items: [] };
@@ -479,13 +480,15 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     };
     findings.forEach((f, i) => {
       const list = f.photoIds.map((id) => byId.get(id)).filter((p): p is (typeof report.photos)[number] => !!p);
+      const cols = findingCols(f.size);
+      const rowH = rowHOf(cols);
       const rows: OverviewPhoto[][] = [];
-      for (let k = 0; k < list.length; k += FINDING_COLS)
-        rows.push(list.slice(k, k + FINDING_COLS).map((p) => ({ id: p.id, name: p.name, url: p.url, pos: p.pos })));
+      for (let k = 0; k < list.length; k += cols)
+        rows.push(list.slice(k, k + cols).map((p) => ({ id: p.id, name: p.name, url: p.url, pos: p.pos })));
       const gap = page.items.length ? FINDING_GAP : 0;
       // The head with its first row of photos stays together.
       if (page.items.length && used + gap + headH(f, f.desc) + (rows.length ? rowH : 0) > FLOW_H) newPage();
-      let block: FindingBlock = { n: i + 1, title: f.title.trim() || `Finding ${i + 1}`, desc: f.desc, continued: false, rows: [] };
+      let block: FindingBlock = { n: i + 1, title: f.title.trim() || `Finding ${i + 1}`, desc: f.desc, continued: false, cols, rows: [] };
       used += (page.items.length ? FINDING_GAP : 0) + headH(f, f.desc);
       page.items.push(block);
       for (const row of rows) {
@@ -575,7 +578,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   if (firstOf("method")) toc.push({ title: "The works", items: [{ name: "Methodology", page: String(firstOf("method")) }] });
   if (shownPhotos.length) toc.push({ title: "Photos", items: shownPhotos });
   if (firstOf("findings")) toc.push({ title: "Findings", items: [{ name: "Recommended additional works", page: String(firstOf("findings")) }] });
-  if (firstOf("plan")) toc.push({ title: "Maintenance", items: [{ name: "Maintenance plan", page: String(firstOf("plan")) }] });
+  if (firstOf("plan")) toc.push({ title: "Recommendations", items: [{ name: "Recommended works", page: String(firstOf("plan")) }] });
   if (kinds.length)
     toc.push({
       title: "Warranty",

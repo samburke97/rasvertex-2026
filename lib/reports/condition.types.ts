@@ -139,7 +139,19 @@ export interface Finding {
   /** Rich text: what we found and the work we'd recommend. */
   desc: string;
   photoIds: string[];
+  /** How big its photos print: per row, small 4, medium 3 (the default),
+   *  large 2, full 1. */
+  size?: FindingSize;
 }
+
+export type FindingSize = "small" | "medium" | "large" | "full";
+export const FINDING_SIZES: { key: FindingSize; label: string; cols: number }[] = [
+  { key: "small", label: "Small", cols: 4 },
+  { key: "medium", label: "Medium", cols: 3 },
+  { key: "large", label: "Large", cols: 2 },
+  { key: "full", label: "Full width", cols: 1 },
+];
+export const findingCols = (size?: FindingSize) => FINDING_SIZES.find((x) => x.key === size)?.cols ?? 3;
 
 export interface Findings {
   intro: string;
