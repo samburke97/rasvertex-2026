@@ -42,7 +42,10 @@ import InspectionDocument, {
   InspectionMeasure,
   InspectionStyles,
   type InspectionAssets,
+  type ZoneEdit,
 } from "./InspectionDocument";
+import ZoneShapeEditor from "./ZoneShapeEditor";
+import { cleanShape, zoneShape, type Shape } from "@/lib/reports/inspection/shapes";
 import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import { compressImageDataUrl, compressMapImageDataUrl } from "@/lib/reports/compressImage";
 import { deleteReportPhoto, uploadReportPhoto } from "@/lib/reports/uploadPhoto";
@@ -68,6 +71,7 @@ import {
   type InspectionJob,
   type InspectionPhoto,
   sectionHidden,
+  zoneTone,
   type InspectionReportData,
 } from "@/lib/reports/inspection/types";
 import type { EnrichedJob } from "@/lib/simpro/types";
@@ -369,6 +373,60 @@ export default function InspectionReportPage({ onBack }: Props) {
     },
     [update],
   );
+
+  // ── Zone sections ─────────────────────────────────────────────────────────
+  // A tech picks a zone in the panel and draws its section on the map in the
+  // preview (ZoneShapeEditor), then edits it there. The editor hands over a
+  // shape once per edit; each edit can be undone (Ctrl/Cmd+Z).
+  const [drawZone, setDrawZone] = useState<string | null>(null);
+  const [selZone, setSelZone] = useState<string | null>(null);
+  const undoShapes = useRef<{ zone: string; prev: Shape | undefined }[]>([]);
+  const writeShape = useCallback(
+    (zone: string, shape: Shape | undefined) =>
+      update((p) => {
+        const shapes = { ...p.shapes };
+        const boxes = { ...p.boxes };
+        // A redrawn zone leaves its old rectangle behind for good.
+        delete boxes[zone];
+        if (shape && shape.length >= 3) shapes[zone] = cleanShape(shape);
+        else delete shapes[zone];
+        return { ...p, shapes, boxes };
+      }),
+    [update],
+  );
+  const setShape = useCallback(
+    (zone: string, shape: Shape | null) => {
+      if (r) undoShapes.current = [...undoShapes.current.slice(-49), { zone, prev: zoneShape(r, zone) }];
+      writeShape(zone, shape ?? undefined);
+    },
+    [r, writeShape],
+  );
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const last = undoShapes.current.pop();
+      if (!last) return;
+      e.preventDefault();
+      writeShape(last.zone, last.prev);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [writeShape]);
+  const pickZone = useCallback((zone: string | null) => {
+    setSelZone(zone);
+    if (zone) setSel("map");
+  }, []);
+  const zoneEdit: ZoneEdit = {
+    Editor: ZoneShapeEditor,
+    drawZone,
+    selected: selZone,
+    zoom,
+    onSelect: pickZone,
+    onCommit: setShape,
+    onDrawEnd: () => setDrawZone(null),
+  };
 
   // ── Site map & cover images ───────────────────────────────────────────────
   const [imgBusy, setImgBusy] = useState<null | "map" | "cover">(null);
@@ -746,6 +804,7 @@ export default function InspectionReportPage({ onBack }: Props) {
                 assets={ASSETS}
                 screen
                 onPinPointerDown={onPinPointerDown}
+                zoneEdit={zoneEdit}
                 onCoverPointerDown={onCoverPointerDown}
               />
             </div>
@@ -948,8 +1007,82 @@ export default function InspectionReportPage({ onBack }: Props) {
                 <p className={styles.hint}>
                   {model.zoneRows.length} tag{model.zoneRows.length === 1 ? "" : "s"} from the photo labels (
                   {model.zoneRows.map((z) => z.zone).join(", ")})
-                  {model.mapPhotoId ? ". Drag them into place on the map in the preview." : "."}
+                  {model.mapPhotoId
+                    ? ". Drag a tag into place, or draw a section round the area it covers."
+                    : ". Add a site map to place them."}
                 </p>
+              )}
+              {model.mapPhotoId && model.zoneRows.length > 0 && (
+                <div className={styles.zoneList}>
+                  {model.zoneRows.map((z) => {
+                    const t = zoneTone(z.tone);
+                    const shaped = !!zoneShape(r, z.zone);
+                    const drawing = drawZone === z.zone;
+                    return (
+                      <div
+                        key={z.zone}
+                        className={`${styles.zoneItem} ${selZone === z.zone ? styles.zoneItemOn : ""}`}
+                        onClick={() => shaped && !drawZone && pickZone(z.zone)}
+                      >
+                        <span
+                          className={styles.zoneSwatch}
+                          style={shaped ? { background: t.fill, borderColor: t.line, borderStyle: "solid" } : undefined}
+                        />
+                        <span className={styles.zoneName}>
+                          <b>{z.zone}</b> {z.title !== z.zone && <span>{z.title}</span>}
+                        </span>
+                        {drawing ? (
+                          <button
+                            className={`${styles.smallBtn} ${styles.smallBtnOn}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDrawZone(null);
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        ) : (
+                          <>
+                            {shaped && (
+                              <button
+                                className={styles.linkBtn}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setShape(z.zone, null);
+                                  if (selZone === z.zone) setSelZone(null);
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                            <button
+                              className={styles.smallBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelZone(null);
+                                setDrawZone(z.zone);
+                              }}
+                            >
+                              {shaped ? "Redraw" : "Draw section"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {drawZone ? (
+                    <p className={styles.hint}>
+                      Click to place points. Click the first point to finish. Enter to finish, Backspace to undo a point, Esc to
+                      cancel. Or press and drag for a rectangle.
+                    </p>
+                  ) : (
+                    selZone && (
+                      <p className={styles.hint}>
+                        Drag the section to move it, a corner to move a point, or a + to add one. Double-click a point to remove it.
+                      </p>
+                    )
+                  )}
+                </div>
               )}
             </section>
 

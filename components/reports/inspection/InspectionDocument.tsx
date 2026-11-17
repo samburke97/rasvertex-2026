@@ -24,9 +24,12 @@ import {
   type Chip,
   type InspectionModel,
   type Layout,
+  type MapPin,
   type PhotoView,
 } from "@/lib/reports/inspection/generate";
-import { contactFor, type InspectionJob } from "@/lib/reports/inspection/types";
+import { contactFor, zoneTone, type InspectionJob } from "@/lib/reports/inspection/types";
+import { svgPoints, type Shape } from "@/lib/reports/inspection/shapes";
+import type { ComponentType } from "react";
 import { photoPosStyle } from "@/lib/reports/photos";
 
 export interface InspectionAssets {
@@ -41,6 +44,8 @@ interface Ctx {
   assets: InspectionAssets;
   chapPage: Record<string, number>;
   onPinPointerDown?: (zone: string, e: PointerEvent<HTMLElement>) => void;
+  /** Builder only: draw and edit zone sections on the map (ZoneShapeEditor). */
+  zoneEdit?: ZoneEdit;
   onCoverPointerDown?: (e: PointerEvent<HTMLElement>) => void;
   /** Builder only: click a photo to edit it; the one being edited. */
   onPhotoClick?: (id: string) => void;
@@ -48,6 +53,53 @@ interface Ctx {
   /** Builder only: the × on a photo, and dragging one onto another. */
   onPhotoRemove?: (id: string) => void;
   onPhotoMove?: (from: string, to: string) => void;
+}
+
+/** The builder's section editor, injected so this file stays hook-free
+ *  (it also renders the PDF on the server). */
+export interface ZoneEditProps {
+  pins: MapPin[];
+  /** The zone being drawn: the map takes clicks to place its points. */
+  drawZone: string | null;
+  /** The zone whose section shows its handles. */
+  selected: string | null;
+  /** The preview's CSS zoom: handles stay a constant size on screen. */
+  zoom: number;
+  onSelect: (zone: string | null) => void;
+  /** Once per edit, when the drag or the drawing ends. */
+  onCommit: (zone: string, shape: Shape) => void;
+  onDrawEnd: () => void;
+}
+export interface ZoneEdit extends Omit<ZoneEditProps, "pins"> {
+  Editor: ComponentType<ZoneEditProps>;
+}
+
+/** A section's colour fill and border, and its title centred in it. Used
+ *  as is in the PDF; the editor draws the same over its handles. */
+export function ZoneShapes({ pins }: { pins: MapPin[] }) {
+  const shaped = pins.filter((p) => p.shape);
+  if (!shaped.length) return null;
+  return (
+    <>
+      <svg className="ir-zsvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {shaped.map((p) => {
+          const t = zoneTone(p.tone);
+          return <polygon key={p.zone} points={svgPoints(p.shape!)} fill={t.fill} stroke={t.line} strokeWidth={3} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />;
+        })}
+      </svg>
+      {shaped.map((p) => <ZoneTag key={p.zone} pin={p} />)}
+    </>
+  );
+}
+
+export function ZoneTag({ pin, at }: { pin: MapPin; at?: [number, number] }) {
+  const t = zoneTone(pin.tone);
+  const [x, y] = at ?? pin.label ?? [pin.x, pin.y];
+  return (
+    <span className="ir-ztag" style={{ left: `${x}%`, top: `${y}%`, background: t.tag, borderColor: t.line }}>
+      {pin.zone}
+    </span>
+  );
 }
 
 const bg = (src: string | null | undefined) => (src ? `url("${src}")` : undefined);
@@ -157,6 +209,9 @@ export const INSPECTION_CSS = `
 .ir-map{position:relative;width:100%;aspect-ratio:3/2;border-radius:16px;overflow:hidden;background:var(--card-grey) center/cover no-repeat}
 .ir-pin{position:absolute;transform:translate(-50%,-50%);display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;background:var(--card-blue);color:var(--navy);font-size:17px;font-weight:700;line-height:1;white-space:nowrap;box-shadow:0 2px 10px rgba(1,25,85,.3);user-select:none}
 .ir-pin--drag{cursor:grab;touch-action:none}
+.ir-map--draw .ir-pin{pointer-events:none}
+.ir-zsvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.ir-ztag{position:absolute;transform:translate(-50%,-50%);display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;border:2px solid;color:var(--navy);font-size:17px;font-weight:700;line-height:1;white-space:nowrap;box-shadow:0 2px 8px rgba(1,25,85,.18);pointer-events:none;user-select:none}
 
 .ir-chapter{display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;background:var(--card-grey);border-radius:24px;padding:32px 40px}
 .ir-chapter__meta{font-size:17px;color:var(--ink-70)}
@@ -369,10 +424,16 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
           </span>
         </div>
       );
-    case "map":
+    case "map": {
+      const ed = ctx.zoneEdit;
       return (
-        <div className="ir-map" data-edit="map" style={{ backgroundImage: bg(ctx.photoUrl(b.photoId)) }}>
-          {b.pins.map((pin) => (
+        <div
+          className={`ir-map${ed?.drawZone ? " ir-map--draw" : ""}`}
+          data-edit="map"
+          style={{ backgroundImage: bg(ctx.photoUrl(b.photoId)) }}
+        >
+          {!ed && <ZoneShapes pins={b.pins} />}
+          {b.pins.filter((pin) => !pin.shape).map((pin) => (
             <span
               key={pin.zone}
               className={`ir-pin${ctx.onPinPointerDown ? " ir-pin--drag" : ""}`}
@@ -383,8 +444,11 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
               {pin.zone}
             </span>
           ))}
+          {/* Over the pins: in draw mode it takes every click on the map. */}
+          {ed && <ed.Editor {...ed} pins={b.pins} />}
         </div>
       );
+    }
     case "zones": {
       const rows = ctx.model.zoneRows;
       return (
@@ -397,7 +461,12 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
           </div>
           {rows.map((z, i) => (
             <div key={z.zone} className={`ir-tbl-row ir-cols-zones${i < rows.length - 1 ? " is-ruled" : ""}`}>
-              <span className="ir-zone">{z.title}</span>
+              <span
+                className="ir-zone"
+                style={z.shaped ? { background: zoneTone(z.tone).tag, boxShadow: `inset 0 0 0 2px ${zoneTone(z.tone).line}` } : undefined}
+              >
+                {z.title}
+              </span>
               <span className="ir-cell--muted">{z.levels}</span>
               <span className="ir-cell--muted ir-num">{z.count}</span>
               <span className="ir-cell--strong ir-right ir-num">
@@ -732,6 +801,7 @@ interface DocProps {
   /** Preview only: page shadows and gaps between sheets. */
   screen?: boolean;
   onPinPointerDown?: (zone: string, e: PointerEvent<HTMLElement>) => void;
+  zoneEdit?: ZoneEdit;
   onCoverPointerDown?: (e: PointerEvent<HTMLElement>) => void;
   onPhotoClick?: (id: string) => void;
   editing?: string | null;
@@ -753,6 +823,7 @@ export default function InspectionDocument(props: DocProps) {
     assets: props.assets,
     chapPage: layout.chapPage,
     onPinPointerDown: props.onPinPointerDown,
+    zoneEdit: props.zoneEdit,
     onCoverPointerDown: props.onCoverPointerDown,
     onPhotoClick: props.onPhotoClick,
     editing: props.editing,
