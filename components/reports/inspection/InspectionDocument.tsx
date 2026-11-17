@@ -202,7 +202,7 @@ export const INSPECTION_CSS = `
 .ir-explainer__photo{min-width:0}
 .ir-explainer__legend{background:#fff;border-radius:20px;padding:8px 32px;display:flex;flex-direction:column;min-width:0}
 .ir-legend-item{display:flex;flex-direction:column;gap:4px;padding:18px 0;border-bottom:1px solid var(--rule)}
-.ir-legend-item:last-child{border-bottom:0}
+.ir-legend-item:last-child,.ir-legend-item:not(:has(+ .ir-legend-item)){border-bottom:0}
 .ir-legend-item__ex{font-size:20px;font-weight:600;line-height:1.35}
 .ir-legend-item__mean{font-size:17px;line-height:1.5;color:var(--ink-60);text-wrap:pretty}
 
@@ -233,7 +233,7 @@ export const INSPECTION_CSS = `
 .ir-stat .ir-label{color:var(--ink-55)}
 .ir-sum-rows{display:flex;flex-direction:column;border-top:1px solid var(--rule)}
 .ir-sum-row{display:grid;grid-template-columns:220px minmax(0,1fr);gap:24px;padding:28px 0;border-bottom:1px solid var(--rule)}
-.ir-sum-row:last-child{border-bottom:0}
+.ir-sum-row:last-child,.ir-sum-row:not(:has(+ .ir-sum-row)){border-bottom:0}
 .ir-sum-row__meta{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 .ir-sum-row__count{font-size:17px;color:var(--ink-60);line-height:1.4}
 .ir-sum-row__text{font-size:20px;line-height:1.6;color:var(--ink-80);text-wrap:pretty}

@@ -38,6 +38,10 @@
 .headerRight { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .status { font-size: 12.5px !important; color: var(--app-ink-3, rgba(var(--ink-rgb), 0.5)) !important; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .statusDot { width: 6px; height: 6px; border-radius: 999px; flex-shrink: 0; }
+.history { display: flex; gap: 2px; }
+.histBtn { width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--app-ink, var(--ink)); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.histBtn:hover:not(:disabled) { background: var(--app-fill, rgba(var(--ink-rgb), 0.05)); }
+.histBtn:disabled { opacity: 0.3; cursor: default; }
 
 /* ── Buttons: one black primary, the rest quiet ── */
 .primary { height: 36px; padding: 0 18px; border: 0; border-radius: 10px; background: var(--btn-primary); color: var(--btn-primary-ink); font-size: 13.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap; }

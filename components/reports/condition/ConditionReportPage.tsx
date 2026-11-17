@@ -9,6 +9,7 @@
 // the selected page's editor. Hours are edited in a
 // sheet over the preview. The draft autosaves against the job number.
 
+import { useHistory } from "@/components/reports/shared/builder/useHistory";
 import { readSource } from "@/components/reports/shared/JobImportInput";
 import { methodFromDescription, methodIsEmpty } from "@/lib/reports/methodology";
 import { simproBase, simproRecordUrl } from "@/components/reports/shared/builder/JobStart";
@@ -120,7 +121,9 @@ const base = (n: string) => simproBase(readSource(n).source, readSource(n).id);
 export default function ConditionReportPage({
   onBack,
 }: ConditionReportPageProps) {
-  const [report, setReport] = useState<ConditionReportData>(DEFAULT_REPORT);
+  // Edits are undo steps (useHistory); loading a job or draft starts a new
+  // history, and what arrives from SimPRO (photos, hours, scope) is silent.
+  const [report, setReport, history] = useHistory<ConditionReportData>(DEFAULT_REPORT);
   const [importStatus, setImportStatus] = useState<ImportStatus>({
     phase: "idle",
   });
@@ -189,7 +192,7 @@ export default function ConditionReportPage({
           compressed,
           `condition-reports/${loadedJobId || "manual"}/cover-${Date.now()}.jpg`,
         );
-        setReport((prev) => ({
+        history.silent((prev) => ({
           ...prev,
           job: { ...prev.job, coverPhoto: blobUrl },
         }));
@@ -222,7 +225,7 @@ export default function ConditionReportPage({
     (jobNumber: string, folderId: number | null) => {
       const myGen = ++photoLoadId.current;
       const isStale = () => photoLoadId.current !== myGen;
-      setReport((prev) => ({ ...prev, photos: [] }));
+      history.silent((prev) => ({ ...prev, photos: [] }));
       setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
       const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
       return streamPhotoImport(
@@ -231,9 +234,9 @@ export default function ConditionReportPage({
         {
           isStale,
           onPhoto: (photo) =>
-            setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] })),
+            history.silent((prev) => ({ ...prev, photos: [...prev.photos, photo] })),
           onPhotoUploaded: (id, blobUrl) =>
-            setReport((prev) => ({
+            history.silent((prev) => ({
               ...prev,
               photos: prev.photos.map((p) =>
                 p.id === id ? { ...p, url: blobUrl } : p,
@@ -265,7 +268,7 @@ export default function ConditionReportPage({
       .then((d) => {
         if (!live || !d?.rows) return;
         const byId = new Map<string, ScheduleRow>((d.rows as ScheduleRow[]).map((x) => [x.id, x]));
-        setReport((prev) => ({
+        history.silent((prev) => ({
           ...prev,
           schedule: prev.schedule.map((r) => (r.start != null ? r : { ...r, start: byId.get(r.id)?.start ?? "", finish: byId.get(r.id)?.finish ?? "" })),
         }));
@@ -282,7 +285,7 @@ export default function ConditionReportPage({
       const isStale = () => scheduleLoadId.current !== myGen;
       return (async () => {
         if (isStale()) return;
-        setReport((prev) => ({ ...prev, schedule: [] }));
+        history.silent((prev) => ({ ...prev, schedule: [] }));
         setScheduleStatus({ phase: "loading" });
         try {
           const scopeQuery = costCenter
@@ -296,7 +299,7 @@ export default function ConditionReportPage({
           if (isStale()) return;
           if (!res.ok) {
             if (!isStale()) {
-              setReport((prev) => ({
+              history.silent((prev) => ({
                 ...prev,
                 settings: { ...prev.settings, scheduleLoaded: true },
               }));
@@ -307,7 +310,7 @@ export default function ConditionReportPage({
           const data = await res.json();
           if (isStale()) return;
           const rows: ScheduleRow[] = data.rows ?? [];
-          setReport((prev) => ({
+          history.silent((prev) => ({
             ...prev,
             schedule: rows,
             settings: {
@@ -319,7 +322,7 @@ export default function ConditionReportPage({
           setScheduleStatus({ phase: "done" });
         } catch {
           if (!isStale()) {
-            setReport((prev) => ({
+            history.silent((prev) => ({
               ...prev,
               settings: { ...prev.settings, scheduleLoaded: true },
             }));
@@ -336,7 +339,7 @@ export default function ConditionReportPage({
       const loadId = ++currentLoadId.current;
       const isStale = () => currentLoadId.current !== loadId;
 
-      setReport({
+      history.reset({
         ...DEFAULT_REPORT,
         job: {
           ...DEFAULT_REPORT.job,
@@ -392,7 +395,7 @@ export default function ConditionReportPage({
           .then((r) => (r.ok ? r.json() : null))
           .then((scope: ReportScope | null) => {
             if (scope && !isStale())
-              setReport((prev) => {
+              history.silent((prev) => {
                 // Methodology switched on before the description arrived, and
                 // still untouched: fill it from the description now.
                 const fill = prev.method?.on && methodIsEmpty(prev.method) ? methodFromDescription(scope.description) : null;
@@ -419,7 +422,7 @@ export default function ConditionReportPage({
           if (isStale()) return;
           const fresh = mapJobToReportDetails(jobData);
           const dj = draft.job ?? fresh;
-          setReport({
+          history.reset({
             ...DEFAULT_REPORT,
             ...draft,
             // Shallow-merged above like every other field, but settings is
@@ -450,7 +453,7 @@ export default function ConditionReportPage({
       }
       if (isStale()) return;
 
-      setReport((prev) => ({
+      history.silent((prev) => ({
         ...prev,
         job: mapJobToReportDetails(jobData),
       }));
@@ -727,6 +730,7 @@ export default function ConditionReportPage({
   return (
     <div className={styles.page}>
       <BuilderHeader
+        history={history}
         onBack={onBack}
         title="Job overview"
         subtitle={loadedJobId ? `${readSource(loadedJobId).source === "quote" ? "Quote" : "Job"} ${readSource(loadedJobId).id}` : undefined}

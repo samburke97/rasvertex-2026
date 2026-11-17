@@ -21,6 +21,7 @@ import ToggleRow from "../shared/ToggleRow";
 import DatePicker from "@/components/ui/DatePicker";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
+import { useHistory } from "@/components/reports/shared/builder/useHistory";
 import WeekScheduleDocument, { WEEK_CSS, WEEK_EDIT_CSS, pickKey, type WeekPick } from "./WeekScheduleDocument";
 import WeekEditPopover from "./WeekEditPopover";
 import { ANCHOR_IMAGES } from "@/lib/reports/anchor.layout";
@@ -139,7 +140,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
 
   // ── Edits: the draft for this range, and the site names ──────────────────
   const rangeKey = `${range.from}_${range.to}`;
-  const [draft, setDraftState] = useState<WeekDraft>(emptyDraft);
+  const [draft, setDraftState, history] = useHistory<WeekDraft>(emptyDraft);
   const [draftReady, setDraftReady] = useState(false);
   const [touched, setTouched] = useState(false);
   useEffect(() => {
@@ -151,7 +152,8 @@ export default function WeekSchedulePage({ onBack }: Props) {
       .catch(() => null)
       .then((report) => {
         if (!live) return;
-        setDraftState(isWeekDraft(report) ? report : emptyDraft());
+        // These dates' edits, with their own undo history.
+        history.reset(isWeekDraft(report) ? report : emptyDraft());
         setDraftReady(true);
       });
     return () => {
@@ -408,6 +410,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
     <div className={shell.page}>
       <style dangerouslySetInnerHTML={{ __html: WEEK_CSS + WEEK_EDIT_CSS }} />
       <BuilderHeader
+        history={history}
         onBack={onBack}
         title="Weekly schedule"
         subtitle={rangeTitle(range.from, range.to)}

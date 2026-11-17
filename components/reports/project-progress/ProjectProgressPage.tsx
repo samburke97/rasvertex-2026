@@ -16,6 +16,7 @@ import DatePicker from "@/components/ui/DatePicker";
 import SaveReportModal, { postSave } from "../shared/SaveReportModal";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
+import { useHistory } from "@/components/reports/shared/builder/useHistory";
 import { OverviewStyles } from "../condition/OverviewDocument";
 import ProgressDocument, { PROGRESS_CSS } from "./ProgressDocument";
 import { PAGE_W } from "@/lib/reports/overview.layout";
@@ -55,7 +56,7 @@ async function freshen(rows: ProgressRow[]): Promise<ProgressRow[]> {
 }
 
 export default function ProjectProgressPage({ onBack }: { onBack: () => void }) {
-  const [report, setReportState] = useState<ProgressReport>(() => newReport(today()));
+  const [report, setReportState, history] = useHistory<ProgressReport>(() => newReport(today()));
   const [touched, setTouched] = useState(false);
   const [entry, setEntry] = useState("");
   const [busy, setBusy] = useState(false);
@@ -89,7 +90,8 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
         const draft = res.ok ? (await res.json()).report : null;
         if (isProgressReport(draft) && draft.rows.length) {
           const rows = await freshen(draft.rows);
-          setReport(() => ({ ...draft, rows }));
+          // A resumed draft starts its own undo history.
+          history.reset({ ...draft, rows });
           fresh.shift();
           if (!fresh.length) return;
         }
@@ -187,6 +189,7 @@ export default function ProjectProgressPage({ onBack }: { onBack: () => void }) 
   return (
     <div className={shell.page}>
       <BuilderHeader
+        history={history}
         onBack={onBack}
         title="Project progress"
         subtitle={hasJobs ? model.title : undefined}

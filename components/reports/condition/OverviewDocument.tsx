@@ -94,6 +94,7 @@ export const OVERVIEW_CSS =
 .jo-wfacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:56px}
 .jo-wfacts .ar-fact__v,.jo-wfacts b{font-size:20px;font-weight:700;line-height:1.3}
 .jo-detail{display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px;align-items:baseline;padding:16px 0;border-bottom:var(--rule)}
+.jo-step:not(:has(+ .jo-step)),.jo-detail:not(:has(+ .jo-detail)){border-bottom:0}
 .jo-detail b{font-size:20px;font-weight:600;line-height:1.35}
 .jo-sign{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,0.8fr);gap:40px;margin-top:48px}
 .jo-sign>div{display:flex;flex-direction:column;gap:12px}

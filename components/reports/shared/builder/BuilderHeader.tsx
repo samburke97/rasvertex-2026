@@ -6,6 +6,7 @@
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import styles from "./BuilderChrome.module.css";
+import type { History } from "./useHistory";
 import type { SaveStatus } from "./useDraftAutosave";
 
 const STATUS: Record<Exclude<SaveStatus, "idle">, [string, string]> = {
@@ -24,10 +25,12 @@ interface Props {
   centre?: ReactNode;
   /** The draft's autosave state; a string shows as-is (e.g. "Importing photos…"). */
   status?: SaveStatus | { text: string; busy?: boolean };
+  /** Undo and redo (useHistory): shown beside the status. */
+  history?: Pick<History<unknown>, "undo" | "redo" | "canUndo" | "canRedo">;
   children?: ReactNode;
 }
 
-export default function BuilderHeader({ onBack, title, subtitle, badges, centre, status, children }: Props) {
+export default function BuilderHeader({ onBack, title, subtitle, badges, centre, status, history, children }: Props) {
   const s =
     status == null || status === "idle"
       ? null
@@ -56,6 +59,22 @@ export default function BuilderHeader({ onBack, title, subtitle, badges, centre,
       )}
       {centre ? <div className={styles.centre}>{centre}</div> : <div className={styles.spacer} />}
       <div className={styles.headerRight}>
+        {history && (
+          <div className={styles.history}>
+            <button className={styles.histBtn} onClick={history.undo} disabled={!history.canUndo} title="Undo (Ctrl/⌘+Z)" aria-label="Undo">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 14L4 9l5-5" />
+                <path d="M4 9h11a5 5 0 010 10h-3" />
+              </svg>
+            </button>
+            <button className={styles.histBtn} onClick={history.redo} disabled={!history.canRedo} title="Redo (Shift+Ctrl/⌘+Z)" aria-label="Redo">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 14l5-5-5-5" />
+                <path d="M20 9H9a5 5 0 000 10h3" />
+              </svg>
+            </button>
+          </div>
+        )}
         {s && (
           <span className={styles.status}>
             <span className={styles.statusDot} style={{ background: s[1] }} />

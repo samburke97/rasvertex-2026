@@ -10,6 +10,7 @@
 // The draft autosaves against the quote number; loading the same quote
 // again resumes it.
 
+import { useHistory } from "@/components/reports/shared/builder/useHistory";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./Builder.module.css";
 import QuoteStep from "./QuoteStep";
@@ -91,7 +92,7 @@ async function downsize(file: File): Promise<string> {
 }
 
 export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
-  const [p, setP] = useState<Proposal | null>(null);
+  const [p, setP, history] = useHistory<Proposal | null>(null);
   // Chosen in the Quote step; a resumed draft brings its own.
   const [trade, setTrade] = useState<Trade>("painting");
   const [step, setStep] = useState<Step>("start");
@@ -198,7 +199,8 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
       }
       // A reset is saved straight away, replacing the old draft.
       dirty.current = sameQuote || reset;
-      setP(next);
+      // A quote loaded: a new undo history.
+      history.reset(next);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load quote");
     } finally {
@@ -223,7 +225,8 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
         if (loadGen.current === gen) setLoadingFolders((l) => l.filter((x) => x !== fid));
       };
       const setPhotos = (fn: (ph: Proposal["simpro"]["photos"]) => Proposal["simpro"]["photos"]) =>
-        setP((prev) => (prev ? { ...prev, simpro: { ...prev.simpro, photos: fn(prev.simpro.photos) } } : prev));
+        // SimPRO's photos arriving, not an edit: no undo step.
+        history.silent((prev) => (prev ? { ...prev, simpro: { ...prev.simpro, photos: fn(prev.simpro.photos) } } : prev));
       streamPhotoImport(
         `/api/simpro/quotes/${quote}/attachments?companyId=0&folderId=${encodeURIComponent(fid.slice(3))}`,
         (photoId) => `proposal-reports/${quote}/${photoId}.jpg`,
@@ -482,6 +485,7 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   return (
     <div className={styles.root}>
       <BuilderHeader
+        history={history}
         onBack={onBack}
         title={p ? `${p.job.building} · ${TRADES[p.trade].label} proposal` : "New proposal"}
         subtitle={p ? `Quote ${p.job.quote} · ${p.job.client}` : "Not started"}

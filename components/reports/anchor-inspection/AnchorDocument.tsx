@@ -88,6 +88,9 @@ export const ANCHOR_CSS = `
 .ar-thead{padding-bottom:14px;border-bottom:var(--rule-head);font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-45);line-height:1.3}
 .ar-tr{align-items:center;border-bottom:var(--rule);line-height:1.3;font-size:20px;font-variant-numeric:tabular-nums}
 .ar-tr:last-child{border-bottom:0}
+/* Design rule, every report: no rule under the last row of a table or list,
+   whatever comes after it (a heading, a button, a total). */
+.ar-tr:not(:has(+ .ar-tr)){border-bottom:0}
 .ar-r{text-align:right}
 .ar-dim{color:var(--ink-65)}
 .ar-icon{flex-shrink:0;background:center/contain no-repeat}

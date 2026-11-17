@@ -27,6 +27,7 @@ import styles from "./InspectionReportPage.module.css";
 import AppleSelect from "./AppleSelect";
 import MapCaptureModal, { type MapView } from "@/components/reports/shared/MapCaptureModal";
 import SaveReportModal from "@/components/reports/shared/SaveReportModal";
+import { useHistory } from "@/components/reports/shared/builder/useHistory";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
 import DocEditor from "@/components/workspace/DocEditor";
 import JobStart from "@/components/reports/shared/builder/JobStart";
@@ -153,7 +154,7 @@ function sectionOfKey(key: string): Sel {
 
 
 export default function InspectionReportPage({ onBack }: Props) {
-  const [r, setR] = useState<InspectionReportData | null>(null);
+  const [r, setR, history] = useHistory<InspectionReportData | null>(null);
   // After loading, the details are confirmed before the report opens.
   const [confirmed, setConfirmed] = useState(false);
   const settings = useReportSettings();
@@ -184,7 +185,8 @@ export default function InspectionReportPage({ onBack }: Props) {
     setImporting(true);
     setImportError(null);
     setProgress({ loaded: 0, total: 0 });
-    setR((prev) => (prev ? { ...prev, photos: prev.photos.filter((p) => p.uploaded) } : prev));
+    // SimPRO's photos arriving: not edits, so no undo steps.
+    history.silent((prev) => (prev ? { ...prev, photos: prev.photos.filter((p) => p.uploaded) } : prev));
     const folderQ = folder !== "all" ? `&folderId=${encodeURIComponent(folder)}` : "";
     const finish = () => {
       if (importGen.current === gen) setImporting(false);
@@ -195,7 +197,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       {
         isStale: () => importGen.current !== gen,
         onPhoto: (photo) =>
-          setR((prev) =>
+          history.silent((prev) =>
             !prev || prev.photos.some((x) => x.id === photo.id)
               ? prev
               : {
@@ -213,7 +215,7 @@ export default function InspectionReportPage({ onBack }: Props) {
                 },
           ),
         onPhotoUploaded: (id, url) =>
-          setR((prev) =>
+          history.silent((prev) =>
             prev ? { ...prev, photos: prev.photos.map((x) => (x.id === id ? { ...x, url } : x)) } : prev,
           ),
         onProgress: (loaded, total) => setProgress({ loaded, total }),
@@ -287,7 +289,8 @@ export default function InspectionReportPage({ onBack }: Props) {
       setSaveStatus("idle");
       setExp({ phase: "idle" });
       setConfirmed(false);
-      setR(next);
+      // A job loaded: a new undo history.
+      history.reset(next);
       if (!next.photos.some((p) => !p.uploaded)) importPhotos(jobId, next.folder, new Map(), next.source);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : "Failed to load job");
@@ -377,10 +380,9 @@ export default function InspectionReportPage({ onBack }: Props) {
   // ── Zone sections ─────────────────────────────────────────────────────────
   // A tech picks a zone in the panel and draws its section on the map in the
   // preview (ZoneShapeEditor), then edits it there. The editor hands over a
-  // shape once per edit; each edit can be undone (Ctrl/Cmd+Z).
+  // shape once per edit; each edit is an undo step (the report's history).
   const [drawZone, setDrawZone] = useState<string | null>(null);
   const [selZone, setSelZone] = useState<string | null>(null);
-  const undoShapes = useRef<{ zone: string; prev: Shape | undefined }[]>([]);
   const writeShape = useCallback(
     (zone: string, shape: Shape | undefined) =>
       update((p) => {
@@ -396,24 +398,10 @@ export default function InspectionReportPage({ onBack }: Props) {
   );
   const setShape = useCallback(
     (zone: string, shape: Shape | null) => {
-      if (r) undoShapes.current = [...undoShapes.current.slice(-49), { zone, prev: zoneShape(r, zone) }];
       writeShape(zone, shape ?? undefined);
     },
-    [r, writeShape],
+    [writeShape],
   );
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== "z") return;
-      const t = e.target as HTMLElement | null;
-      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-      const last = undoShapes.current.pop();
-      if (!last) return;
-      e.preventDefault();
-      writeShape(last.zone, last.prev);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [writeShape]);
   const pickZone = useCallback((zone: string | null) => {
     setSelZone(zone);
     if (zone) setSel("map");
@@ -685,6 +673,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       <InspectionStyles />
       <style dangerouslySetInnerHTML={{ __html: PHOTO_TOOLS_CSS }} />
       <BuilderHeader
+          history={history}
         onBack={onBack}
         title={r ? `${r.job.site} · ${lib.label}` : "New inspection report"}
         subtitle={r ? `${r.source === "quote" ? "Quote" : "Job"} ${r.jobId} · ${r.job.forName}` : "Not started"}
@@ -754,7 +743,7 @@ export default function InspectionReportPage({ onBack }: Props) {
           onBack={() => {
             importGen.current++; // stop any photo import for this job
             setImporting(false);
-            setR(null);
+            history.reset(null);
           }}
           onOpen={() => setConfirmed(true)}
         />

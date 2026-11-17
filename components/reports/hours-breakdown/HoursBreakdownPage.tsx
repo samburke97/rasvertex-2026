@@ -11,6 +11,7 @@ import { PAGE_W } from "@/lib/reports/overview.layout";
 import HoursBreakdownOptionsPanel from "./HoursBreakdownOptionsPanel";
 import SaveReportModal, { postSave } from "../shared/SaveReportModal";
 import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder/BuilderHeader";
+import { useHistory } from "@/components/reports/shared/builder/useHistory";
 import {
   filterScheduleByDateRange,
   type ScheduleRow,
@@ -42,7 +43,7 @@ const DEFAULT_DATA: HoursBreakdownData = {
 };
 
 export default function HoursBreakdownPage({ onBack }: Props) {
-  const [report, setReport] = useState<HoursBreakdownData>(DEFAULT_DATA);
+  const [report, setReport, history] = useHistory<HoursBreakdownData>(DEFAULT_DATA);
   const [importStatus, setImportStatus] = useState<HoursImportStatus>({
     phase: "idle",
   });
@@ -88,7 +89,8 @@ export default function HoursBreakdownPage({ onBack }: Props) {
     const loadId = ++currentLoadId.current;
     const isStale = () => currentLoadId.current !== loadId;
 
-    setReport(DEFAULT_DATA);
+    // A new job: a new undo history.
+    history.reset(DEFAULT_DATA);
     setSavedFilename(null);
     setImportStatus({ phase: "fetching-job" });
     setScheduleLoading(false);
@@ -109,7 +111,8 @@ export default function HoursBreakdownPage({ onBack }: Props) {
       const jobData: EnrichedJob = await jobRes.json();
       if (isStale()) return;
 
-      setReport((prev) => ({
+      // From SimPRO, not an edit: no undo step.
+      history.silent((prev) => ({
         ...prev,
         job: {
           jobNo: `#${jobNumber}`,
@@ -141,7 +144,7 @@ export default function HoursBreakdownPage({ onBack }: Props) {
       const data = await res.json();
       if (isStale()) return;
       const rows: ScheduleRow[] = data.rows ?? [];
-      setReport((prev) => ({ ...prev, schedule: rows }));
+      history.silent((prev) => ({ ...prev, schedule: rows }));
       setImportStatus({ phase: "done" });
     } catch {
       if (!isStale()) setImportStatus({ phase: "done" });
@@ -230,6 +233,7 @@ export default function HoursBreakdownPage({ onBack }: Props) {
   return (
     <div className={styles.page}>
       <BuilderHeader
+        history={history}
         onBack={onBack}
         title="Hours breakdown"
         subtitle={loadedJobId ? `Job ${loadedJobId}` : undefined}

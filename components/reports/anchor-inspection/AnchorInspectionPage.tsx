@@ -1,6 +1,7 @@
 "use client";
 // components/reports/anchor-inspection/AnchorInspectionPage.tsx
 
+import { useHistory } from "@/components/reports/shared/builder/useHistory";
 import React, {
   useState,
   useCallback,
@@ -119,7 +120,9 @@ const PAGE_ROWS = [
 export default function AnchorInspectionPage({
   onBack,
 }: AnchorInspectionPageProps) {
-  const [report, setReport] = useState<AnchorReportData>(DEFAULT_ANCHOR_REPORT);
+  // Edits are undo steps (useHistory); loads start a new history, and
+  // imports, uploads finishing and settings merges are silent.
+  const [report, setReport, history] = useHistory<AnchorReportData>(DEFAULT_ANCHOR_REPORT);
   // Anchor types are copied into each new report, so later edits to the
   // settings don't change a report already started.
   const settings = useReportSettings();
@@ -135,7 +138,7 @@ export default function AnchorInspectionPage({
   // so a renamed or re-rated type never changes a report already sent.
   useEffect(() => {
     if (!loadedJobId) return;
-    setReport((prev) => {
+    history.silent((prev) => {
       const have = prev.anchorTypes ?? defaultSettings().anchors;
       const added = settings.anchors.filter((a) => !have.some((h) => h.key === a.key));
       return added.length ? { ...prev, anchorTypes: [...have, ...added] } : prev;
@@ -320,7 +323,7 @@ export default function AnchorInspectionPage({
             report: AnchorReportData;
           };
           if (isStale()) return;
-          setReport({
+          history.reset({
             // Backfills fields added after this draft was first saved (e.g.
             // photos/photoSettings) — an old draft's JSON simply doesn't
             // have them, so without this a resumed draft crashes on
@@ -344,7 +347,7 @@ export default function AnchorInspectionPage({
 
         // Start from a clean report (not the previous job's zones/anchors —
         // only merge job fields on top of a fresh draft).
-        setReport({
+        history.reset({
           ...DEFAULT_ANCHOR_REPORT,
           job: buildJobFields(jobData, DEFAULT_ANCHOR_REPORT.job),
           anchorTypes: settings.anchors,
@@ -430,7 +433,7 @@ export default function AnchorInspectionPage({
           dataUrl,
           `anchor-reports/${loadedJobId || "manual"}/zone-${updatedZone.id}-${Date.now()}.jpg`,
         ).then((blobUrl) => {
-          setReport((prev) => ({
+          history.silent((prev) => ({
             ...prev,
             zones: prev.zones.map((z) =>
               z.id === updatedZone.id && z.mapImageUrl === dataUrl
@@ -502,7 +505,7 @@ export default function AnchorInspectionPage({
             compressedUrl,
             `anchor-reports/${loadedJobId || "manual"}/${photoId}.jpg`,
           );
-          setReport((prev) => ({
+          history.silent((prev) => ({
             ...prev,
             photos: prev.photos.map((p) =>
               p.id === photoId ? { ...p, url: blobUrl } : p,
@@ -522,7 +525,7 @@ export default function AnchorInspectionPage({
     (jobNumber: string, folderId: number | null) => {
       const myGen = ++photoLoadId.current;
       const isStale = () => photoLoadId.current !== myGen;
-      setReport((prev) => ({ ...prev, photos: [] }));
+      history.silent((prev) => ({ ...prev, photos: [] }));
       setPhotoImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
       const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
       return streamPhotoImport(
@@ -531,9 +534,9 @@ export default function AnchorInspectionPage({
         {
           isStale,
           onPhoto: (photo) =>
-            setReport((prev) => ({ ...prev, photos: [...prev.photos, photo] })),
+            history.silent((prev) => ({ ...prev, photos: [...prev.photos, photo] })),
           onPhotoUploaded: (id, blobUrl) =>
-            setReport((prev) => ({
+            history.silent((prev) => ({
               ...prev,
               photos: prev.photos.map((p) =>
                 p.id === id ? { ...p, url: blobUrl } : p,
@@ -747,6 +750,7 @@ export default function AnchorInspectionPage({
   return (
     <div className={styles.page}>
       <BuilderHeader
+        history={history}
         onBack={onBack}
         title="Anchor inspection"
         subtitle={loadedJobId ? `${readSource(loadedJobId).source === "quote" ? "Quote" : "Job"} ${readSource(loadedJobId).id}` : undefined}
