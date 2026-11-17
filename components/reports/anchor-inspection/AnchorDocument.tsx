@@ -133,6 +133,14 @@ input.ar-caption:focus{background:#fff;box-shadow:0 0 0 2px #4a82c9;color:var(--
 .ar-clients{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:28px;align-items:center;margin-top:40px}
 .ar-clients>div{display:flex;align-items:center;justify-content:center;height:64px;min-width:0}
 .ar-clients img{max-width:100%;width:auto;object-fit:contain}
+.ar-closer{display:flex;flex-direction:column}
+.ar-closer-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:32px}
+.ar-closer-card{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ar-closer-card i{display:block;aspect-ratio:4/3;border-radius:16px;background:var(--grey) center/cover no-repeat;margin-bottom:12px}
+.ar-closer-card b{font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1.25}
+.ar-closer-card span{font-size:17px;line-height:1.5;color:var(--ink-65)}
+.ar-closer-contact{display:flex;align-items:center;justify-content:space-between;gap:32px;margin-top:48px;padding-top:40px;border-top:var(--rule)}
+.ar-closer-contact img{width:72px;height:88px;border-radius:12px;object-fit:cover;flex-shrink:0}
 .ar-close{margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between;gap:32px}
 .ar-btn{display:inline-flex;align-items:center;gap:16px;height:64px;padding:0 36px;border-radius:14px;background:var(--navy);color:#fff !important;font-size:20px;font-weight:700;letter-spacing:-.01em}
 `;
@@ -152,7 +160,7 @@ function SecLabel({ text }: { text: string }) {
   );
 }
 
-const secText = (n: number) => `Section ${pad(n)} / 04`;
+const secText = (n: number) => `Section ${pad(n)} / 03`;
 
 function PageNo({ no, total }: { no: number; total: number }) {
   return (
@@ -821,6 +829,58 @@ const CLIENTS: [AnchorImageKey, string, number][] = [
 
 /** The closing RAS-VERTEX page. Shared with the Job Overview report, which
  *  renders it inside its own .ar scope. */
+/** What else we can do, as cards ("Also worth adding"). */
+export type CloserCard = { t: string; d: string; img: AnchorImageKey };
+
+export const CLOSER_CARDS: CloserCard[] = [
+  { t: "Building wash", d: "Salt, grime and mould off every face, by rope access, so finishes last longer.", img: "cleaning" },
+  { t: "Repaint", d: "Protect and refresh the facade before wear turns into repairs.", img: "painting" },
+  { t: "Maintenance plan", d: "Scheduled washdowns and inspections at a fixed annual price.", img: "maintenance" },
+];
+
+/** The end of a report: "Also worth adding" and who to talk to. Fills the
+ *  foot of the last page when there's room (else a short page of its own),
+ *  in place of a full sales page. */
+/** The Anchor report's cards: a building inspection in place of the plan. */
+const ANCHOR_CLOSER_CARDS: CloserCard[] = [
+  CLOSER_CARDS[0],
+  CLOSER_CARDS[1],
+  { t: "Building inspection", d: "A photographic condition report on the whole building, with priced recommendations.", img: "inspections" },
+];
+
+export function Closer({ images, cards = CLOSER_CARDS, style }: { images: Record<AnchorImageKey, string>; cards?: CloserCard[]; style?: React.CSSProperties }) {
+  return (
+    <div className="ar-closer" style={style}>
+      <h3 className="ar-h-card">Also worth adding</h3>
+      <div className="ar-closer-cards">
+        {cards.map((c) => (
+          <div key={c.t} className="ar-closer-card">
+            <i style={{ backgroundImage: `url("${images[c.img]}")` }} />
+            <b>{c.t}</b>
+            <span>{c.d}</span>
+          </div>
+        ))}
+      </div>
+      <div className="ar-closer-contact">
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={images.caroline} alt="Caroline" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 17, color: "rgba(1,25,85,.6)", lineHeight: 1.3 }}>Questions, or want a price?</span>
+            <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.2 }}>Caroline, Client Services Manager</span>
+          </div>
+        </div>
+        <a className="ar-btn" href={`${SITE}/contact`} target="_blank" rel="noopener">
+          Let us know how we can help
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </a>
+      </div>
+    </div>
+  );
+}
+
 export function Partner({ images, label }: { images: Record<AnchorImageKey, string>; label: string }) {
   const img = images;
   return (
@@ -1035,7 +1095,12 @@ export default function AnchorDocument({
           )}
         </div>
       ))}
-      <Partner images={assets.images} label={secText(4)} />
+      {/* What else we can do and who to talk to, in place of a sales page. */}
+      <div className="ar-sheet">
+        <section className="ar-page">
+          <Closer images={assets.images} cards={ANCHOR_CLOSER_CARDS} />
+        </section>
+      </div>
     </div>
   );
 }

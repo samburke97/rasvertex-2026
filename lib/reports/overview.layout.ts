@@ -25,7 +25,7 @@ import {
   type PhotoLayout,
   type ScheduleRow,
 } from "./condition.types";
-import { fmtDate, pad } from "./anchor.layout";
+import { CLOSER_H, fmtDate, pad } from "./anchor.layout";
 import { notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "./richText";
 import type { PhotoPos } from "./photos";
 import { htmlItems } from "./richText";
@@ -115,6 +115,7 @@ export interface FindingBlock {
 }
 
 export type Page =
+  | { kind: "closer"; no: number }
   | { kind: "findings"; no: number; first: boolean; items: FindingBlock[] }
   | { kind: "method"; no: number; first: boolean; blocks: MethodBlock[] }
   | { kind: "plan"; no: number; first: boolean; rows: PlanItem[]; notes: boolean }
@@ -146,7 +147,9 @@ export interface OverviewModel {
   pages: Page[];
   total: number;
   /** "Section 01 / 04" label for each section present, plus the closing page. */
-  secText: Record<SectionKey | "about", string>;
+  secText: Record<SectionKey, string>;
+  /** The page whose foot has the closer; null when it has its own page. */
+  closerOn: number | null;
   toc: { title: string; items: { name: string; page: string }[] }[];
   photoCount: number;
   /** Findings shown (the findings pages' lede). */
@@ -325,13 +328,16 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   if (findings.length) sections.push("findings");
   if (plan) sections.push("plan");
   if (kinds.length) sections.push("warranty");
-  const nSec = sections.length + 1;
+  const nSec = sections.length;
   const secText = {} as OverviewModel["secText"];
   sections.forEach((k, i) => (secText[k] = `Section ${pad(i + 1)} / ${pad(nSec)}`));
-  secText.about = `Section ${pad(nSec)} / ${pad(nSec)}`;
+
 
   const pages: Page[] = [];
   const no = () => pages.length + 3;
+  // How full the last page is, when the section that made it knows; null
+  // otherwise (hours, warranties). Decides where the closer goes.
+  let lastUsed: number | null = null;
 
   // Hours: the table, its header repeated on every page. A section header
   // never sits alone at a page foot.
@@ -376,7 +382,9 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     if (method.photoId && report.photos.some((p) => p.id === method.photoId)) {
       if (used + METHOD_PHOTO > FLOW_H) newPage();
       page.blocks.push({ t: "photo" });
+      used += METHOD_PHOTO;
     }
+    lastUsed = used;
     pages.push(page);
   }
 
@@ -447,6 +455,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
         day.rows.push(row);
       }
     }
+    lastUsed = used;
     pages.push(page);
   }
 
@@ -489,6 +498,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
         block.rows.push(row);
       }
     });
+    lastUsed = used;
     pages.push(page);
   }
 
@@ -512,9 +522,12 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
       if (used + noteH(planNotes) > FLOW_H) {
         pages.push(page);
         page = { kind: "plan", no: no(), first: false, rows: [], notes: false };
+        used = SEC_LABEL;
       }
       page.notes = true;
+      used += noteH(planNotes);
     }
+    lastUsed = used;
     pages.push(page);
   }
 
@@ -522,9 +535,17 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   kinds.forEach((w, i) => {
     pages.push({ kind: "warranty", no: no(), w, first: i === 0 });
     pages.push({ kind: "care", no: no(), w });
+    lastUsed = null;
   });
 
-  const total = pages.length + 3;
+  // The closer ("Also worth adding" and who to talk to) at the foot of the
+  // last page when it fits under what's there; else a short page of its own.
+  // The page's content starts 80 down and the closer ends 150 from the foot.
+  const last = pages[pages.length - 1];
+  const closerOn = last && lastUsed != null && 80 + lastUsed + 48 <= PAGE_H - 150 - CLOSER_H ? last.no : null;
+  if (closerOn == null) pages.push({ kind: "closer", no: no() });
+
+  const total = pages.length + 2;
   const firstOf = (k: Page["kind"]) => pages.find((p) => p.kind === k)?.no;
   const jobItems: { name: string; page: string }[] = [];
   if (firstOf("hours")) jobItems.push({ name: "Hours schedule", page: String(firstOf("hours")) });
@@ -562,7 +583,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
             : [],
       ),
     });
-  toc.push({ title: "RAS-VERTEX", items: [{ name: "One partner", page: String(total) }] });
+
 
   return {
     reportType: job.reportType || "Job Overview",
@@ -582,6 +603,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     grid,
     pages,
     total,
+    closerOn,
     secText,
     toc,
     photoCount: photos.length,

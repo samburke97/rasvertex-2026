@@ -11,7 +11,7 @@
 // the preview.
 
 import type { PointerEvent } from "react";
-import { ANCHOR_CSS, Partner } from "@/components/reports/anchor-inspection/AnchorDocument";
+import { ANCHOR_CSS, Closer } from "@/components/reports/anchor-inspection/AnchorDocument";
 import type { AnchorImageKey } from "@/lib/reports/anchor.layout";
 import {
   formatHours,
@@ -74,6 +74,8 @@ export const OVERVIEW_CSS =
 .jo-pick .ar-photo.is-picked{outline-color:#3e7fb0}
 .jo-tick{position:absolute;top:12px;left:12px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.92);box-shadow:0 1px 6px rgba(1,25,85,.3);display:flex;align-items:center;justify-content:center;color:transparent;pointer-events:none}
 .ar-photo.is-picked .jo-tick{background:#3e7fb0;color:#fff}
+.jo-pick .ar-photo:hover .jo-tick{color:rgba(62,127,176,.6)}
+.jo-pick .ar-photo.is-picked:hover .jo-tick{background:#a83a3a;color:#fff}
 .jo-h3{font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1.2}
 .jo-num{font-family:var(--bebas);font-size:22px;letter-spacing:.04em;color:var(--ink-35);margin-right:14px;font-weight:400}
 .jo-group{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;height:62px;padding-bottom:14px;border-bottom:var(--rule-head)}
@@ -717,7 +719,7 @@ export default function OverviewDocument({ model, assets, screen, onCoverPointer
       <Cover ctx={ctx} />
       <Contents ctx={ctx} />
       {model.pages.map((p) => (
-        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-page={p.kind === "care" ? "warranty" : p.kind}>
+        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-page={p.kind === "care" ? "warranty" : p.kind === "closer" ? undefined : p.kind}>
           {p.kind === "hours" ? (
             <HoursPage ctx={ctx} page={p} />
           ) : p.kind === "method" ? (
@@ -730,12 +732,19 @@ export default function OverviewDocument({ model, assets, screen, onCoverPointer
             <CarePage ctx={ctx} page={p} />
           ) : p.kind === "findings" ? (
             <FindingsPage ctx={ctx} page={p} />
+          ) : p.kind === "closer" ? (
+            <section className="ar-page">
+              <Closer images={assets.images} />
+              <PageNo no={p.no} total={model.total} />
+            </section>
           ) : (
             <PhotosPage ctx={ctx} page={p} />
           )}
+          {/* The closer at the foot of the last page, when it fits there. */}
+          {model.closerOn === p.no && <Closer images={assets.images} style={{ position: "absolute", left: 96, right: 96, bottom: 150 }} />}
         </div>
       ))}
-      <Partner images={assets.images} label={model.secText.about} />
+
     </div>
   );
 }

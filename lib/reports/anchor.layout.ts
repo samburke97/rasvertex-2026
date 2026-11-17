@@ -485,10 +485,6 @@ export function buildAnchorModel(
           { name: `Certification #${job.certNumber}`, page: String(total) },
         ],
       },
-      {
-        title: "RAS-VERTEX",
-        items: [{ name: "One partner", page: String(total + 1) }],
-      },
     ],
     certFacts: [
       { k: "Attention", v: job.preparedFor },
@@ -529,6 +525,10 @@ export const ANCHOR_IMAGES = {
   racv: "reports/anchor/clients/racv.png",
 } as const;
 export type AnchorImageKey = keyof typeof ANCHOR_IMAGES;
+
+/** Page units the report closer takes ("Also worth adding" cards and the
+ *  contact; AnchorDocument's Closer). */
+export const CLOSER_H = 760;
 
 export const ANCHOR_ICON_NAMES = [
   "fall-arrest-anchor",

@@ -39,6 +39,7 @@ import {
   type ScheduleCostCenter,
   type ScheduleImportStatus,
   type ScheduleRow,
+  type PhotoSection,
 } from "@/lib/reports/condition.types";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
@@ -612,11 +613,25 @@ export default function ConditionReportPage({
   const filteredSchedule = shownSchedule(report.schedule, report.settings);
 
   // ── The document ───────────────────────────────────────────────────────
-  const model = useMemo(() => buildOverviewModel(report, DEFAULT_COVER_URL), [report]);
+  // Picking photos for a section: the pages hold still (photos don't jump
+  // into their section mid-pick, which put a different photo under the
+  // cursor); they regroup once picking is done.
+  const [pickingSection, setPickingState] = useState<string | null>(null);
+  const [frozenSections, setFrozenSections] = useState<PhotoSection[] | null>(null);
+  const setPickingSection = useCallback(
+    (id: string | null) => {
+      setPickingState(id);
+      setFrozenSections(id ? (report.photoSections ?? []) : null);
+    },
+    [report.photoSections],
+  );
+  const model = useMemo(
+    () => buildOverviewModel(frozenSections ? { ...report, photoSections: frozenSections } : report, DEFAULT_COVER_URL),
+    [report, frozenSections],
+  );
   const [hoursOpen, setHoursOpen] = useState(false);
 
   // ── Photo sections: picking photos on the page ───────────────────────────
-  const [pickingSection, setPickingSection] = useState<string | null>(null);
   const picking = (report.photoSections ?? []).find((s) => s.id === pickingSection) ?? null;
   // A photo is in one section at most: adding it here takes it off another.
   const togglePick = (id: string) =>
