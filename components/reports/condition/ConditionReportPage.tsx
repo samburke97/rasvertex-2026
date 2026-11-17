@@ -807,10 +807,6 @@ export default function ConditionReportPage({
             importStatus={importStatus}
             scheduleStatus={scheduleStatus}
             onSettings={updateSettings}
-            onImport={(jobNumber) => {
-              setLoadedJobId(jobNumber);
-              handleImport(jobNumber);
-            }}
             photoFolders={photoFolders}
             selectedFolderId={selectedFolderId}
             onSelectFolder={selectFolder}

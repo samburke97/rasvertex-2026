@@ -7,7 +7,6 @@
 import React, { useRef, useMemo } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import ToggleRow from "../shared/ToggleRow";
-import JobImportInput from "../shared/JobImportInput";
 import DatePicker from "@/components/ui/DatePicker";
 import type {
   ImportStatus,
@@ -32,7 +31,6 @@ interface OptionsPanelProps {
   importStatus: ImportStatus;
   scheduleStatus: ScheduleImportStatus;
   onSettings: (s: ReportSettings) => void;
-  onImport: (jobNumber: string) => void;
   photoFolders: PhotoFolder[];
   selectedFolderId: number | null;
   onSelectFolder: (folderId: number | null) => void;
@@ -134,7 +132,6 @@ export default function OptionsPanel({
   importStatus,
   scheduleStatus,
   onSettings,
-  onImport,
   photoFolders,
   selectedFolderId,
   onSelectFolder,
@@ -198,19 +195,16 @@ export default function OptionsPanel({
 
   return (
     <aside className={styles.panel}>
-      {/* ── Import ───────────────────────────────────────────────────────── */}
-      <div className={styles.group} data-pages="cover">
-        <div className={styles.groupLabel}>Import</div>
-        <JobImportInput quotes onImport={onImport} importStatus={importStatus} />
-        {importStatus.phase === "fetching-photos" && progressPct !== null && (
+      {/* The job or quote is chosen on the start screen (JobStart); here,
+          only how the photo import is going. */}
+      {importStatus.phase === "fetching-photos" && progressPct !== null && (
+        <div className={styles.group} data-pages="cover">
+          <div className={styles.subLabel}>Loading photos from SimPRO…</div>
           <div className={styles.progressWrap}>
-            <div
-              className={styles.progressBar}
-              style={{ width: `${progressPct}%` }}
-            />
+            <div className={styles.progressBar} style={{ width: `${progressPct}%` }} />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Report details ───────────────────────────────────────────────── */}
       <div className={styles.group} data-pages="cover">

@@ -536,6 +536,21 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     pages.push(page);
   }
 
+  // The closer ("Also worth adding", Request a quote, who to call) ends
+  // Recommended works whenever that's on, warranties or not; otherwise the
+  // report. Straight under the section when it fits there, else a short
+  // page of its own right after it. Page content starts 80 down.
+  let closerOn: number | null = null;
+  let closerTop = 0;
+  const placeCloser = () => {
+    const last = pages[pages.length - 1];
+    if (last && lastUsed != null && lastUsed + CLOSER_GAP + CLOSER_H <= FLOW_H) {
+      closerOn = last.no;
+      closerTop = 80 + lastUsed + CLOSER_GAP;
+    } else pages.push({ kind: "closer", no: no() });
+  };
+  if (plan) placeCloser();
+
   // Warranties: each the warranty itself, then what keeps it valid.
   kinds.forEach((w, i) => {
     pages.push({ kind: "warranty", no: no(), w, first: i === 0 });
@@ -543,14 +558,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     lastUsed = null;
   });
 
-  // The closer ("Also worth adding") straight after the last section when
-  // it fits under what's there; else a short page of its own. Page content
-  // starts 80 down.
-  const last = pages[pages.length - 1];
-  const fits = last && lastUsed != null && lastUsed + CLOSER_GAP + CLOSER_H <= FLOW_H;
-  const closerOn = fits ? last.no : null;
-  const closerTop = fits ? 80 + lastUsed! + CLOSER_GAP : 0;
-  if (closerOn == null) pages.push({ kind: "closer", no: no() });
+  if (!plan) placeCloser();
 
   const total = pages.length + 2;
   const firstOf = (k: Page["kind"]) => pages.find((p) => p.kind === k)?.no;
@@ -649,7 +657,8 @@ function warrantyModel(kind: WarrantyKind, w: WarrantyInfo, site: string, job: C
     (kind === "waterproofing"
       ? `The undersigned, on behalf of RAS-VERTEX, confirms that the installation of the ${name ? `${name} ` : ""}products listed above was carried out in accordance with the manufacturer's Technical Data Sheets and installation instructions.`
       : "The undersigned, on behalf of RAS-VERTEX, certifies that the coating system listed above was applied in accordance with the manufacturer's Product Data Sheets and project specification and AS/NZS 2311, and that RAS-VERTEX provides the workmanship warranty set out in this document.");
-  const reference = job.jobNo ? `#${job.jobNo}` : job.project;
+  // The job number comes as "#10983" already: one # only.
+  const reference = job.jobNo ? `#${String(job.jobNo).replace(/^#+/, "")}` : job.project;
   return {
     title: k.title,
     intro,
