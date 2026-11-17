@@ -135,12 +135,10 @@ input.ar-caption:focus{background:#fff;box-shadow:0 0 0 2px #4a82c9;color:var(--
 .ar-clients img{max-width:100%;width:auto;object-fit:contain}
 .ar-closer{display:flex;flex-direction:column}
 .ar-closer-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:32px}
-.ar-closer-card{display:flex;flex-direction:column;gap:6px;min-width:0}
-.ar-closer-card i{display:block;aspect-ratio:4/3;border-radius:16px;background:var(--grey) center/cover no-repeat;margin-bottom:12px}
-.ar-closer-card b{font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1.25}
-.ar-closer-card span{font-size:17px;line-height:1.5;color:var(--ink-65)}
-.ar-closer-contact{display:flex;align-items:center;justify-content:space-between;gap:32px;margin-top:48px;padding-top:40px;border-top:var(--rule)}
-.ar-closer-contact img{width:72px;height:88px;border-radius:12px;object-fit:cover;flex-shrink:0}
+.ar-closer-card{display:flex;flex-direction:column;min-width:0}
+.ar-closer-card i{display:block;width:100%;height:300px;border-radius:16px;background:var(--grey) center/cover no-repeat}
+.ar-closer-card b{font-size:22px;font-weight:700;line-height:1.2;letter-spacing:-.04em;margin:20px 0 8px}
+.ar-closer-card span{font-size:17px;line-height:1.5;color:rgba(1,25,85,.6);text-wrap:pretty}
 .ar-close{margin-top:auto;display:flex;align-items:flex-end;justify-content:space-between;gap:32px}
 .ar-btn{display:inline-flex;align-items:center;gap:16px;height:64px;padding:0 36px;border-radius:14px;background:var(--navy);color:#fff !important;font-size:20px;font-weight:700;letter-spacing:-.01em}
 `;
@@ -838,9 +836,9 @@ export const CLOSER_CARDS: CloserCard[] = [
   { t: "Maintenance plan", d: "Scheduled washdowns and inspections at a fixed annual price.", img: "maintenance" },
 ];
 
-/** The end of a report: "Also worth adding" and who to talk to. Fills the
- *  foot of the last page when there's room (else a short page of its own),
- *  in place of a full sales page. */
+/** The end of a report: "Also worth adding", as the Inspection report has
+ *  it under Recommended works. Straight after the last section when there's
+ *  room (else on a short page of its own), in place of a full sales page. */
 /** The Anchor report's cards: a building inspection in place of the plan. */
 const ANCHOR_CLOSER_CARDS: CloserCard[] = [
   CLOSER_CARDS[0],
@@ -860,22 +858,6 @@ export function Closer({ images, cards = CLOSER_CARDS, style }: { images: Record
             <span>{c.d}</span>
           </div>
         ))}
-      </div>
-      <div className="ar-closer-contact">
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={images.caroline} alt="Caroline" />
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 17, color: "rgba(1,25,85,.6)", lineHeight: 1.3 }}>Questions, or want a price?</span>
-            <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.04em", lineHeight: 1.2 }}>Caroline, Client Services Manager</span>
-          </div>
-        </div>
-        <a className="ar-btn" href={`${SITE}/contact`} target="_blank" rel="noopener">
-          Let us know how we can help
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M5 12h14M13 6l6 6-6 6" />
-          </svg>
-        </a>
       </div>
     </div>
   );

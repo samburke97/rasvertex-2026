@@ -740,8 +740,8 @@ export default function OverviewDocument({ model, assets, screen, onCoverPointer
           ) : (
             <PhotosPage ctx={ctx} page={p} />
           )}
-          {/* The closer at the foot of the last page, when it fits there. */}
-          {model.closerOn === p.no && <Closer images={assets.images} style={{ position: "absolute", left: 96, right: 96, bottom: 150 }} />}
+          {/* The closer straight under the last section, when it fits there. */}
+          {model.closerOn === p.no && <Closer images={assets.images} style={{ position: "absolute", left: 96, right: 96, top: model.closerTop }} />}
         </div>
       ))}
 

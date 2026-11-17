@@ -25,7 +25,7 @@ import {
   type PhotoLayout,
   type ScheduleRow,
 } from "./condition.types";
-import { CLOSER_H, fmtDate, pad } from "./anchor.layout";
+import { CLOSER_GAP, CLOSER_H, fmtDate, pad } from "./anchor.layout";
 import { notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "./richText";
 import type { PhotoPos } from "./photos";
 import { htmlItems } from "./richText";
@@ -148,8 +148,10 @@ export interface OverviewModel {
   total: number;
   /** "Section 01 / 04" label for each section present, plus the closing page. */
   secText: Record<SectionKey, string>;
-  /** The page whose foot has the closer; null when it has its own page. */
+  /** The page the closer ends (under its content, closerTop down); null
+   *  when it has a page of its own. */
   closerOn: number | null;
+  closerTop: number;
   toc: { title: string; items: { name: string; page: string }[] }[];
   photoCount: number;
   /** Findings shown (the findings pages' lede). */
@@ -538,11 +540,13 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     lastUsed = null;
   });
 
-  // The closer ("Also worth adding" and who to talk to) at the foot of the
-  // last page when it fits under what's there; else a short page of its own.
-  // The page's content starts 80 down and the closer ends 150 from the foot.
+  // The closer ("Also worth adding") straight after the last section when
+  // it fits under what's there; else a short page of its own. Page content
+  // starts 80 down.
   const last = pages[pages.length - 1];
-  const closerOn = last && lastUsed != null && 80 + lastUsed + 48 <= PAGE_H - 150 - CLOSER_H ? last.no : null;
+  const fits = last && lastUsed != null && lastUsed + CLOSER_GAP + CLOSER_H <= FLOW_H;
+  const closerOn = fits ? last.no : null;
+  const closerTop = fits ? 80 + lastUsed! + CLOSER_GAP : 0;
   if (closerOn == null) pages.push({ kind: "closer", no: no() });
 
   const total = pages.length + 2;
@@ -604,6 +608,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     pages,
     total,
     closerOn,
+    closerTop,
     secText,
     toc,
     photoCount: photos.length,

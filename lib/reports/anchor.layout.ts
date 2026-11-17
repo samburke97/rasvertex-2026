@@ -526,9 +526,11 @@ export const ANCHOR_IMAGES = {
 } as const;
 export type AnchorImageKey = keyof typeof ANCHOR_IMAGES;
 
-/** Page units the report closer takes ("Also worth adding" cards and the
- *  contact; AnchorDocument's Closer). */
-export const CLOSER_H = 760;
+/** Page units the report closer takes ("Also worth adding": title, a row
+ *  of cards with 300-high photos and two lines each; AnchorDocument's
+ *  Closer), and the gap above it. */
+export const CLOSER_H = 480;
+export const CLOSER_GAP = 72;
 
 export const ANCHOR_ICON_NAMES = [
   "fall-arrest-anchor",
