@@ -30,6 +30,18 @@ export async function simproGet<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** simproGet, asking again when SimPRO's rate limit answers 429. */
+export async function simproGetRetry<T>(url: string, tries = 4): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await simproGet<T>(url);
+    } catch (err) {
+      if (i >= tries || !/HTTP 429/.test(String(err))) throw err;
+      await new Promise((r) => setTimeout(r, 400 * 2 ** (i - 1)));
+    }
+  }
+}
+
 // ── Field extraction helpers ──────────────────────────────────────────────────
 
 /**

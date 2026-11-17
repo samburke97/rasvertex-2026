@@ -13,7 +13,7 @@ const ALLOWED = new Set([
 const DROP_WITH_CONTENT = /<(script|style|iframe|object|embed|svg|math|template)\b[\s\S]*?<\/\1\s*>/gi;
 
 function escapeText(s: string): string {
-  return s.replace(/&(?![a-z]+;|#\d+;|#x[0-9a-f]+;)/gi, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return s.replace(/&(?![a-z][a-z0-9]*;|#\d+;|#x[0-9a-f]+;)/gi, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function cleanTag(tag: string): string {
@@ -81,3 +81,33 @@ export function htmlItems(raw: string | null | undefined): string[] {
  *  as sentences however they were typed. */
 export const capFirst = (s: string): string =>
   s ? s.replace(/^((?:\s|<[^>]*>)*)(\p{Ll})/u, (_m, lead: string, c: string) => lead + c.toUpperCase()) : s;
+
+/** A SimPRO description (divs, <br>s, inline styles, "- " bullets) as the
+ *  editor's HTML: a paragraph per line, bullets as a list, bold kept. */
+export function richFromSimpro(raw: string | null | undefined): string {
+  const out: string[] = [];
+  let list: string[] = [];
+  const flush = () => {
+    if (list.length) out.push(`<ul>${list.map((t) => `<li><p>${t}</p></li>`).join("")}</ul>`);
+    list = [];
+  };
+  for (const seg of (raw ?? "").split(/<\/(?:div|p|li|h[1-6])>|<br\s*\/?>|\n/i)) {
+    let t = seg
+      .replace(/<(?!\/?(?:strong|b|em|i)\b)[^>]*>/gi, "")
+      .replace(/<(\/?)b\b[^>]*>/gi, "<$1strong>")
+      .replace(/<(\/?)(strong|em|i)\b[^>]*>/gi, "<$1$2>")
+      .replace(/&nbsp;|&#160;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!t.replace(/<[^>]*>/g, "").trim()) continue;
+    const bullet = /^[-–•*·]\s+/.test(t.replace(/<[^>]*>/g, ""));
+    if (bullet) t = t.replace(/^((?:<[^>]*>)*)[-–•*·]\s+/, "$1");
+    if (/<li\b/i.test(seg) || bullet) list.push(t);
+    else {
+      flush();
+      out.push(`<p>${t}</p>`);
+    }
+  }
+  flush();
+  return sanitizeNotesHtml(out.join(""));
+}

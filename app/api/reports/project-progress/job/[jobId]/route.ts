@@ -7,7 +7,7 @@
 // yet is priced at its labour sell rate × the hours worked.
 
 import { NextRequest, NextResponse } from "next/server";
-import { simproGet } from "@/lib/simpro/client";
+import { simproGetRetry } from "@/lib/simpro/client";
 import { cleanSite } from "@/lib/reports/weekSchedule";
 import type { ProgressJob } from "@/lib/reports/projectProgress";
 
@@ -30,17 +30,7 @@ interface SimproCostCentre {
   Totals?: { ResourcesCost?: { LaborHours?: { Actual?: number; Estimate?: number } } };
 }
 
-/** SimPRO's rate limit answers 429: wait a moment and ask again. */
-async function get<T>(url: string, tries = 4): Promise<T> {
-  for (let i = 1; ; i++) {
-    try {
-      return await simproGet<T>(url);
-    } catch (err) {
-      if (i >= tries || !/HTTP 429/.test(String(err))) throw err;
-      await new Promise((r) => setTimeout(r, 400 * 2 ** (i - 1)));
-    }
-  }
-}
+const get = simproGetRetry;
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 

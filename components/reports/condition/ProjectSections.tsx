@@ -1,6 +1,6 @@
 "use client";
 // The Job overview's optional sections, in its right-hand panel: Methodology,
-// Findings, Maintenance plan and Warranty. Each group shows on its own page in the
+// Variations, Findings, Maintenance plan and Warranty. Each group shows on its own page in the
 // rail (data-pages), is off until switched on, and starts from a template
 // that's then fully editable.
 
@@ -28,11 +28,65 @@ import {
   type WarrantyKind,
   type WarrantyScheduleRow,
 } from "@/lib/reports/warranty";
-import { FINDING_SIZES, FINDINGS_INTRO, type ConditionReportData, type Finding } from "@/lib/reports/condition.types";
+import { FINDING_SIZES, FINDINGS_INTRO, VARIATIONS_INTRO, type ConditionReportData, type Finding, type Variation } from "@/lib/reports/condition.types";
+import { formatHours } from "@/lib/reports/overview.layout";
 import PhotoPickerModal from "@/components/reports/shared/builder/PhotoPickerModal";
 
 type Patch = (fn: (prev: ConditionReportData) => ConditionReportData) => void;
-export type ProjectSection = "method" | "findings" | "plan" | "warranty";
+export type ProjectSection = "method" | "variations" | "findings" | "plan" | "warranty";
+
+/** A finding's or variation's photos: chosen in the picker, with how big
+ *  they print. */
+function ItemPhotos({
+  report,
+  item,
+  label,
+  onChange,
+}: {
+  report: ConditionReportData;
+  item: Pick<Finding, "photoIds" | "size">;
+  label: string;
+  onChange: (p: Partial<Finding>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className={styles.btn} onClick={() => setOpen(true)} disabled={!report.photos.length}>
+        {item.photoIds.length ? `Photos · ${item.photoIds.length} chosen` : "Choose photos"}
+      </button>
+      {!report.photos.length && <span className={styles.subLabel}>Load the job&apos;s photos to choose some.</span>}
+      {open && (
+        <PhotoPickerModal
+          multi
+          title="Choose photos"
+          subtitle={label}
+          photos={report.photos.map((p) => ({ id: p.id, src: p.url, title: p.name }))}
+          selected={item.photoIds}
+          onPick={(id) => onChange({ photoIds: item.photoIds.includes(id) ? item.photoIds.filter((x) => x !== id) : [...item.photoIds, id] })}
+          onClose={() => setOpen(false)}
+        />
+      )}
+      {item.photoIds.length > 0 && (
+        <>
+          <span className={styles.subLabel}>
+            Photo size <InfoTip>How many print to a row: small 4, medium 3, large 2, full width 1.</InfoTip>
+          </span>
+          <div className={styles.presetRow}>
+            {FINDING_SIZES.map((z) => (
+              <button
+                key={z.key}
+                className={`${styles.presetBtn} ${(item.size ?? "medium") === z.key ? styles.presetBtnActive : ""}`}
+                onClick={() => onChange({ size: z.key })}
+              >
+                {z.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
 
 const newFinding = (): Finding => ({ id: `f${Date.now().toString(36)}`, title: "", desc: "", photoIds: [] });
 
@@ -55,6 +109,7 @@ export function setSection(r: ConditionReportData, key: ProjectSection, on: bool
       },
     };
   if (key === "plan") return { ...r, plan: { ...(r.plan ?? { items: seedPlan(PROJECT_PLAN) }), on } };
+  if (key === "variations") return { ...r, variations: { ...(r.variations ?? { intro: VARIATIONS_INTRO, items: [], showHours: true }), on } };
   if (key === "findings") return { ...r, findings: { ...(r.findings ?? { intro: FINDINGS_INTRO, items: [newFinding()] }), on } };
   const ws = normWarranties(r.warranty, completedOf(r));
   if (ws) return { ...r, warranty: { ...ws, on } };
@@ -80,9 +135,12 @@ export default function ProjectSections({ report, update }: { report: ConditionR
   const setKind = (kind: WarrantyKind, w: WarrantyInfo | undefined) =>
     update((r) => ({ ...r, warranty: { ...normWarranties(r.warranty, completedOf(r))!, [kind]: w } }));
   const toggle = (key: ProjectSection) => (v: boolean) => update((r) => setSection(r, key, v));
-  // The finding whose photos are being chosen in the picker.
+  // The methodology's photo picker is open.
   const [picking, setPicking] = useState<string | null>(null);
   const setFindings = (p: Partial<NonNullable<ConditionReportData["findings"]>>) => update((r) => ({ ...r, findings: { ...r.findings!, ...p } }));
+  const setVariations = (p: Partial<NonNullable<ConditionReportData["variations"]>>) => update((r) => ({ ...r, variations: { ...r.variations!, ...p } }));
+  const setVariation = (id: string, p: Partial<Variation>) =>
+    update((r) => ({ ...r, variations: { ...r.variations!, items: r.variations!.items.map((v) => (v.id === id ? { ...v, ...p } : v)) } }));
   const setFinding = (id: string, p: Partial<Finding>) =>
     update((r) => ({ ...r, findings: { ...r.findings!, items: r.findings!.items.map((f) => (f.id === id ? { ...f, ...p } : f)) } }));
 
@@ -241,6 +299,51 @@ export default function ProjectSections({ report, update }: { report: ConditionR
         )}
       </div>
 
+      {/* ── Variations ──────────────────────────────────────────────────── */}
+      <div className={styles.group} data-pages="variations">
+        <ToggleRow
+          label="Include variations"
+          sub="Each variation cost centre in SimPRO, with its description, photos and hours"
+          checked={!!report.variations?.on}
+          onChange={toggle("variations")}
+        />
+        {report.variations?.on && (
+          <>
+            <label className={styles.field}>
+              <span className={styles.subLabel}>Intro</span>
+              <textarea className={styles.textarea} rows={2} value={report.variations.intro} onChange={(e) => setVariations({ intro: e.target.value })} />
+            </label>
+            <ToggleRow
+              label="Show hours"
+              sub="The labour hours logged to each variation in SimPRO"
+              checked={report.variations.showHours !== false}
+              onChange={(v) => setVariations({ showHours: v })}
+            />
+            {report.variations.items.length ? (
+              report.variations.items.map((v, i) => (
+                <div key={v.id} className={styles.field} style={v.off ? { opacity: 0.5 } : undefined}>
+                  <span className={styles.subLabel}>
+                    Variation {i + 1} · {v.hours > 0 ? `${formatHours(v.hours)} hours logged` : "no hours logged yet"}
+                  </span>
+                  {!v.off && (
+                    <>
+                      <input className={styles.input} value={v.title} placeholder="Variation title" onChange={(e) => setVariation(v.id, { title: e.target.value })} />
+                      <RichBox value={v.desc} placeholder="What was added to the scope, and why" onChange={(desc) => setVariation(v.id, { desc })} />
+                      <ItemPhotos report={report} item={v} label={v.title || `Variation ${i + 1}`} onChange={(p) => setVariation(v.id, p)} />
+                    </>
+                  )}
+                  <button className={styles.textBtn} onClick={() => setVariation(v.id, { off: !v.off })}>
+                    {v.off ? `Include “${v.title || `Variation ${i + 1}`}”` : "Leave off the report"}
+                  </button>
+                </div>
+              ))
+            ) : (
+              <span className={styles.subLabel}>No variation cost centres on this job in SimPRO.</span>
+            )}
+          </>
+        )}
+      </div>
+
       {/* ── Findings ────────────────────────────────────────────────────── */}
       <div className={styles.group} data-pages="findings">
         <ToggleRow
@@ -274,37 +377,7 @@ export default function ProjectSections({ report, update }: { report: ConditionR
                   placeholder="What we found, and the work we'd recommend"
                   onChange={(desc) => setFinding(f.id, { desc })}
                 />
-                <button className={styles.btn} onClick={() => setPicking(f.id)} disabled={!report.photos.length}>
-                  {f.photoIds.length ? `Photos · ${f.photoIds.length} chosen` : "Choose photos"}
-                </button>
-                {!report.photos.length && <span className={styles.subLabel}>Load the job&apos;s photos to choose some.</span>}
-                {picking === f.id && (
-                  <PhotoPickerModal
-                    multi
-                    title="Choose photos"
-                    subtitle={f.title || `Finding ${i + 1}`}
-                    photos={report.photos.map((p) => ({ id: p.id, src: p.url, title: p.name }))}
-                    selected={f.photoIds}
-                    onPick={(id) =>
-                      setFinding(f.id, { photoIds: f.photoIds.includes(id) ? f.photoIds.filter((x) => x !== id) : [...f.photoIds, id] })
-                    }
-                    onClose={() => setPicking(null)}
-                  />
-                )}
-                <span className={styles.subLabel}>
-                  Photo size <InfoTip>How many print to a row: small 4, medium 3, large 2, full width 1.</InfoTip>
-                </span>
-                <div className={styles.presetRow}>
-                  {FINDING_SIZES.map((z) => (
-                    <button
-                      key={z.key}
-                      className={`${styles.presetBtn} ${(f.size ?? "medium") === z.key ? styles.presetBtnActive : ""}`}
-                      onClick={() => setFinding(f.id, { size: z.key })}
-                    >
-                      {z.label}
-                    </button>
-                  ))}
-                </div>
+                <ItemPhotos report={report} item={f} label={f.title || `Finding ${i + 1}`} onChange={(p) => setFinding(f.id, p)} />
                 <button
                   className={styles.textBtn}
                   onClick={() => setFindings({ items: report.findings!.items.filter((x) => x.id !== f.id) })}

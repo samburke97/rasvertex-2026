@@ -128,6 +128,9 @@ export interface ConditionReportData {
   /** Things found on site, each with photos and a description, suggesting
    *  additional works. Off until switched on. */
   findings?: Findings & { on: boolean };
+  /** Variation works: each variation cost centre on the job in SimPRO,
+   *  with its description, photos and hours. On when the job has any. */
+  variations?: Variations & { on: boolean };
   /** Photos grouped under a title ("Level 3 balcony – crack repairs"),
    *  shown first, each in the order picked. A photo is in one at most. */
   photoSections?: PhotoSection[];
@@ -160,6 +163,52 @@ export interface Findings {
 
 export const FINDINGS_INTRO =
   "While on site our team noted the items below. They weren't part of this job; we recommend them as additional works and can quote on request.";
+
+/** A variation cost centre as SimPRO has it. */
+export interface SimproVariation {
+  ccId: string;
+  name: string;
+  /** HTML from SimPRO. */
+  description: string;
+  /** Labour hours logged to it. */
+  hours: number;
+  approved: string | null;
+}
+
+/** A variation in the report: a finding's shape (title, description,
+ *  photos, photo size), tied to its cost centre. The title, description and
+ *  photos are the rep's; the hours are SimPRO's, refreshed on each load. */
+export interface Variation extends Finding {
+  ccId: string;
+  hours: number;
+  /** Left off the report (it comes back from SimPRO on reload otherwise). */
+  off?: boolean;
+}
+
+export interface Variations {
+  intro: string;
+  items: Variation[];
+  /** Print each variation's hours. */
+  showHours?: boolean;
+}
+
+export const VARIATIONS_INTRO = "Works added to the original scope during the project, as approved, with the hours our team spent on each.";
+
+/** SimPRO's variations into the report's: new ones added from SimPRO, known
+ *  ones keep what was written here and take SimPRO's hours. On when the job
+ *  has variations and the section hasn't been switched off. */
+export function mergeVariations(
+  cur: (Variations & { on: boolean }) | undefined,
+  fresh: SimproVariation[],
+  fromSimpro: (v: SimproVariation) => Pick<Variation, "title" | "desc">,
+): (Variations & { on: boolean }) | undefined {
+  if (!fresh.length) return cur;
+  const items: Variation[] = fresh.map((v) => {
+    const had = cur?.items.find((x) => x.ccId === v.ccId);
+    return had ? { ...had, hours: v.hours } : { id: `v${v.ccId}`, ccId: v.ccId, ...fromSimpro(v), photoIds: [], hours: v.hours };
+  });
+  return { intro: cur?.intro ?? VARIATIONS_INTRO, showHours: cur?.showHours ?? true, on: cur?.on ?? true, items };
+}
 
 export interface PhotoSection {
   id: string;

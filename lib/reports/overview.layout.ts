@@ -20,6 +20,8 @@ import {
   filterScheduleByDateRange,
   FINDINGS_INTRO,
   findingCols,
+  VARIATIONS_INTRO,
+  type FindingSize,
   shownSchedule,
   type ConditionReportData,
   type CoverPos,
@@ -110,15 +112,21 @@ export interface FindingBlock {
   n: number;
   title: string;
   desc: string;
+  /** Beside the title, e.g. a variation's hours. */
+  meta?: string;
   continued: boolean;
   /** Photos per row (the finding's photo size). */
   cols: number;
   rows: OverviewPhoto[][];
 }
 
+/** Pages of numbered items with photos. */
+export type BlockKind = "findings" | "variations";
+
 export type Page =
   | { kind: "closer"; no: number }
   | { kind: "findings"; no: number; first: boolean; items: FindingBlock[] }
+  | { kind: "variations"; no: number; first: boolean; items: FindingBlock[] }
   | { kind: "method"; no: number; first: boolean; blocks: MethodBlock[] }
   | { kind: "plan"; no: number; first: boolean; rows: PlanItem[]; notes: boolean }
   | { kind: "warranty"; no: number; w: WarrantyKind; first: boolean }
@@ -131,7 +139,7 @@ export type Page =
       days: PhotoDay[];
     };
 
-export type SectionKey = "hours" | "method" | "photos" | "findings" | "plan" | "warranty";
+export type SectionKey = "hours" | "method" | "variations" | "photos" | "findings" | "plan" | "warranty";
 
 export interface OverviewModel {
   reportType: string;
@@ -158,6 +166,8 @@ export interface OverviewModel {
   photoCount: number;
   /** Findings shown (the findings pages' lede). */
   findingsIntro: string;
+  /** The variations pages' lede. */
+  variationsIntro: string;
   /** Photo sections with photos in them (the photo pages' lede). */
   photoSections: number;
   totalHours: number;
@@ -311,7 +321,8 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   // Findings: each with its own photos (any of the job's, whatever the date
   // filter), which then don't repeat on the photo pages.
   const findings = report.findings?.on ? report.findings.items.filter((f) => f.title.trim() || f.photoIds.length || !notesIsEmpty(f.desc)) : [];
-  const findingPhotoIds = new Set(findings.flatMap((f) => f.photoIds));
+  const variations = report.variations?.on ? report.variations.items.filter((v) => !v.off) : [];
+  const findingPhotoIds = new Set([...findings, ...variations].flatMap((f) => f.photoIds));
   // Photos taken off the report stay in its library but not on the pages.
   const photos = settings.showPhotos
     ? filterPhotosByDateRange(report.photos.filter((p) => !p.off), from, to).filter((p) => !findingPhotoIds.has(p.id))
@@ -328,6 +339,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   const sections: SectionKey[] = [];
   if (schedule.length) sections.push("hours");
   if (method) sections.push("method");
+  if (variations.length) sections.push("variations");
   if (photos.length) sections.push("photos");
   if (findings.length) sections.push("findings");
   if (plan) sections.push("plan");
@@ -391,6 +403,14 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     lastUsed = used;
     pages.push(page);
   }
+
+  if (variations.length)
+    flowBlocks(
+      "variations",
+      variations.map((v) => ({ ...v, meta: report.variations!.showHours !== false && v.hours > 0 ? `${hrs(v.hours)} hours` : undefined })),
+      report.variations!.intro || VARIATIONS_INTRO,
+      "Variation",
+    );
 
   // Photos: the sections first (each a title, its note and its photos in
   // the order picked), then the rest grouped by day when dates are shown,
@@ -463,32 +483,38 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     pages.push(page);
   }
 
-  // Findings: a head per finding (number, title, description), then its
-  // photos in rows of three. A finding that won't fit moves on, or splits
+  // Findings and variations: a head per item (number, title, description),
+  // then its photos in rows. An item that won't fit moves on, or splits
   // between photo rows with its head repeated.
-  if (findings.length) {
+  function flowBlocks(
+    kind: BlockKind,
+    list: { title: string; desc: string; photoIds: string[]; size?: FindingSize; meta?: string }[],
+    intro: string,
+    fallback: string,
+  ) {
     const byId = new Map(report.photos.map((p) => [p.id, p]));
     const rowHOf = (cols: number) => Math.ceil(((CONTENT_W - COL_GAP * (cols - 1)) / cols) * 0.75);
     const descH = (html: string) => (notesIsEmpty(html) ? 0 : 12 + notesLineCount(sanitizeNotesHtml(html)) * 31);
-    const headH = (f: { title: string }, desc: string) => 40 + Math.max(1, Math.ceil(f.title.length / 60)) * 31 + descH(desc) + 20;
-    let page: Extract<Page, { kind: "findings" }> = { kind: "findings", no: no(), first: true, items: [] };
-    let used = SEC_LABEL + H2 + 20 + ledeH(report.findings!.intro || FINDINGS_INTRO) + 56;
+    const headH = (f: { title: string; meta?: string }, desc: string) => 40 + Math.max(1, Math.ceil(f.title.length / 60)) * 31 + (f.meta ? 40 : 0) + descH(desc) + 20;
+    type P = { kind: BlockKind; no: number; first: boolean; items: FindingBlock[] };
+    let page: P = { kind, no: no(), first: true, items: [] };
+    let used = SEC_LABEL + H2 + 20 + ledeH(intro) + 56;
     const newPage = () => {
-      pages.push(page);
-      page = { kind: "findings", no: no(), first: false, items: [] };
+      pages.push(page as Page);
+      page = { kind, no: no(), first: false, items: [] };
       used = SEC_LABEL;
     };
-    findings.forEach((f, i) => {
-      const list = f.photoIds.map((id) => byId.get(id)).filter((p): p is (typeof report.photos)[number] => !!p);
+    list.forEach((f, i) => {
+      const shots = f.photoIds.map((id) => byId.get(id)).filter((p): p is (typeof report.photos)[number] => !!p);
       const cols = findingCols(f.size);
       const rowH = rowHOf(cols);
       const rows: OverviewPhoto[][] = [];
-      for (let k = 0; k < list.length; k += cols)
-        rows.push(list.slice(k, k + cols).map((p) => ({ id: p.id, name: p.name, url: p.url, pos: p.pos })));
+      for (let k = 0; k < shots.length; k += cols)
+        rows.push(shots.slice(k, k + cols).map((p) => ({ id: p.id, name: p.name, url: p.url, pos: p.pos })));
       const gap = page.items.length ? FINDING_GAP : 0;
       // The head with its first row of photos stays together.
       if (page.items.length && used + gap + headH(f, f.desc) + (rows.length ? rowH : 0) > FLOW_H) newPage();
-      let block: FindingBlock = { n: i + 1, title: f.title.trim() || `Finding ${i + 1}`, desc: f.desc, continued: false, cols, rows: [] };
+      let block: FindingBlock = { n: i + 1, title: f.title.trim() || `${fallback} ${i + 1}`, desc: f.desc, meta: f.meta, continued: false, cols, rows: [] };
       used += (page.items.length ? FINDING_GAP : 0) + headH(f, f.desc);
       page.items.push(block);
       for (const row of rows) {
@@ -504,8 +530,9 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
       }
     });
     lastUsed = used;
-    pages.push(page);
+    pages.push(page as Page);
   }
+  if (findings.length) flowBlocks("findings", findings, report.findings!.intro || FINDINGS_INTRO, "Finding");
 
   // Maintenance plan: the table (header repeated), then the comments.
   const planNotes = plan ? sanitizeNotesHtml(plan.notes) : "";
@@ -584,6 +611,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   const toc: OverviewModel["toc"] = [];
   if (jobItems.length) toc.push({ title: "The job", items: jobItems });
   if (firstOf("method")) toc.push({ title: "The works", items: [{ name: "Methodology", page: String(firstOf("method")) }] });
+  if (firstOf("variations")) toc[toc.length - 1]?.title === "The works" ? toc[toc.length - 1].items.push({ name: "Variations", page: String(firstOf("variations")) }) : toc.push({ title: "The works", items: [{ name: "Variations", page: String(firstOf("variations")) }] });
   if (shownPhotos.length) toc.push({ title: "Photos", items: shownPhotos });
   if (firstOf("findings")) toc.push({ title: "Findings", items: [{ name: "Recommended additional works", page: String(firstOf("findings")) }] });
   if (firstOf("plan")) toc.push({ title: "Recommendations", items: [{ name: "Recommended works", page: String(firstOf("plan")) }] });
@@ -624,6 +652,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     toc,
     photoCount: photos.length,
     findingsIntro: report.findings?.intro || FINDINGS_INTRO,
+    variationsIntro: report.variations?.intro || VARIATIONS_INTRO,
     photoSections: (report.photoSections ?? []).filter((sec) => sec.photoIds.some((id) => photos.some((p) => p.id === id))).length,
     totalHours,
     method: method

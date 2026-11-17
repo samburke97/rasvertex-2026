@@ -42,7 +42,11 @@ import {
   type ScheduleImportStatus,
   type ScheduleRow,
   type PhotoSection,
+  type SimproVariation,
+  mergeVariations,
 } from "@/lib/reports/condition.types";
+import { richFromSimpro } from "@/lib/reports/richText";
+import { tidyName } from "@/lib/reports/projectProgress";
 import type { EnrichedJob } from "@/lib/simpro/types";
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
 import { usePagePanel, SidePanel } from "@/components/reports/shared/builder/PagePanel";
@@ -107,13 +111,14 @@ const PAGE_ROWS = [
   { id: "cover", name: "Cover", num: "C" },
   { id: "hours", name: "Hours" },
   { id: "method", name: "Methodology" },
+  { id: "variations", name: "Variations" },
   { id: "photos", name: "Photos" },
   { id: "findings", name: "Findings" },
   { id: "plan", name: "Recommended works" },
   { id: "warranty", name: "Warranty" },
 ];
 /** Optional sections: an eye in the rail, off until switched on. */
-const OPTIONAL: ProjectSection[] = ["method", "findings", "plan", "warranty"];
+const OPTIONAL: ProjectSection[] = ["method", "variations", "findings", "plan", "warranty"];
 
 /** The SimPRO route for a loaded number ("Q11234" is a quote). */
 const base = (n: string) => simproBase(readSource(n).source, readSource(n).id);
@@ -404,6 +409,23 @@ export default function ConditionReportPage({
           })
           .catch(() => {});
 
+      // The job's variation cost centres, each with its description and
+      // hours: on every load, in the background. What's written here stays;
+      // SimPRO's hours refresh, and new variations are added.
+      const loadVariations = () => {
+        if (readSource(jobNumber).source === "quote") return;
+        fetch(`/api/simpro/jobs/${readSource(jobNumber).id}/variations`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((data: { variations?: SimproVariation[] } | null) => {
+            if (!data?.variations || isStale()) return;
+            history.silent((prev) => ({
+              ...prev,
+              variations: mergeVariations(prev.variations, data.variations!, (v) => ({ title: tidyName(v.name), desc: richFromSimpro(v.description) })),
+            }));
+          })
+          .catch(() => {});
+      };
+
       // 1b. Resume an in-progress draft if one exists for this job number —
       // keep the tech's own work (photos, schedule, comments,
       // recommendations, settings) and only refresh the SimPRO-sourced job
@@ -446,6 +468,7 @@ export default function ConditionReportPage({
           setImportStatus({ phase: "done" });
           setScheduleStatus({ phase: "done" });
           loadScope();
+          loadVariations();
           return;
         }
       } catch {
@@ -458,6 +481,7 @@ export default function ConditionReportPage({
         job: mapJobToReportDetails(jobData),
       }));
       loadScope();
+      loadVariations();
 
       // Schedule loads in the background, independent of photos — the
       // report is editable while it fetches. Cost centres are fetched in
@@ -570,6 +594,7 @@ export default function ConditionReportPage({
     // photo pages show: keep those too.
     const kept = new Set([
       ...(report.findings?.on ? report.findings.items.flatMap((f) => f.photoIds) : []),
+      ...(report.variations?.on ? report.variations.items.filter((v) => !v.off).flatMap((v) => v.photoIds) : []),
       ...(report.method?.on && report.method.photoId ? [report.method.photoId] : []),
     ]);
     const photos = [...shown, ...report.photos.filter((p) => kept.has(p.id) && !shown.includes(p))];

@@ -20,6 +20,7 @@ import {
   type HourItem,
   type OverviewModel,
   type Page,
+  type BlockKind,
 } from "@/lib/reports/overview.layout";
 import { photoPosStyle } from "@/lib/reports/photos";
 import { sanitizeNotesHtml } from "@/lib/reports/richText";
@@ -65,6 +66,7 @@ export const OVERVIEW_CSS =
 .jo-find-no{font-family:var(--bebas);font-size:34px;letter-spacing:.04em;color:var(--ink-35);line-height:1}
 .jo-find-title{font-size:26px;font-weight:700;letter-spacing:-.04em;line-height:1.2}
 .jo-find-title span{font-weight:400;color:var(--ink-45)}
+.jo-find-meta{grid-column:2;margin-top:8px;justify-self:start;padding:4px 10px;border-radius:6px;background:#eef1f6;color:rgba(1,25,85,.72);font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
 .jo-find-desc{grid-column:2;margin-top:12px;font-size:20px;line-height:1.55;color:var(--ink-65)}
 .jo-find-photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:20px}
 .jo-find-photos .ar-photo{aspect-ratio:4/3}
@@ -650,19 +652,20 @@ function PhotosPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "phot
   );
 }
 
-/** Findings: each one numbered, with its title, what we found and the work
- *  we'd recommend, then its photos. */
-function FindingsPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "findings" }> }) {
+/** Findings and variations: each one numbered, with its title (and, for
+ *  a variation, its hours), its description, then its photos. */
+function BlocksPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: BlockKind }> }) {
   const { model } = ctx;
+  const title = page.kind === "variations" ? "Variations" : "Findings";
   return (
     <section className="ar-page">
       {page.first ? (
         <>
-          <SecLabel text={model.secText.findings} />
-          <Heading title="Findings" lede={model.findingsIntro} />
+          <SecLabel text={model.secText[page.kind]} />
+          <Heading title={title} lede={page.kind === "variations" ? model.variationsIntro : model.findingsIntro} />
         </>
       ) : (
-        <SecLabel text="Findings, continued" />
+        <SecLabel text={`${title}, continued`} />
       )}
       {page.items.map((f) => (
         <div key={`${f.n}-${f.continued}`} className="jo-find">
@@ -672,6 +675,7 @@ function FindingsPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "fi
               {f.title}
               {f.continued && <span>, continued</span>}
             </h3>
+            {f.meta && !f.continued && <span className="jo-find-meta">{f.meta}</span>}
             {f.desc && <div className="jo-find-desc ar-rich" dangerouslySetInnerHTML={{ __html: sanitizeNotesHtml(f.desc) }} />}
           </div>
           {f.rows.length > 0 && (
@@ -732,8 +736,8 @@ export default function OverviewDocument({ model, assets, screen, onCoverPointer
             <WarrantyPage ctx={ctx} page={p} />
           ) : p.kind === "care" ? (
             <CarePage ctx={ctx} page={p} />
-          ) : p.kind === "findings" ? (
-            <FindingsPage ctx={ctx} page={p} />
+          ) : p.kind === "findings" || p.kind === "variations" ? (
+            <BlocksPage ctx={ctx} page={p} />
           ) : p.kind === "closer" ? (
             <section className="ar-page" style={{ paddingBottom: 96 }}>
               <ReportEnd images={assets.images} href={endHref} style={{ flex: "1 1 auto", minHeight: 0 }} />
