@@ -432,9 +432,9 @@ export function buildAnchorModel(
   // ── Optional photos ──
   const ps = report.photoSettings;
   if (ps?.enabled && report.photos?.length) {
-    const photos = ps.filterByDate
-      ? filterPhotosByDateRange(report.photos, ps.dateFrom, ps.dateTo)
-      : report.photos;
+    // Photos taken off the report stay in its library but not on the pages.
+    const onPage = report.photos.filter((p) => !p.off);
+    const photos = ps.filterByDate ? filterPhotosByDateRange(onPage, ps.dateFrom, ps.dateTo) : onPage;
     for (let k = 0; k < photos.length; k += PHOTOS_PER_PAGE) {
       pages.push({
         kind: "photos",

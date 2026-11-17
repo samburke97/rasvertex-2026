@@ -458,17 +458,14 @@ export default function AnchorInspectionPage({
     [],
   );
 
-  const removePhoto = useCallback(
-    (id: string) => {
-      const removed = report.photos.find((p) => p.id === id);
-      if (removed) deleteReportPhoto(removed.url);
-      setReport((prev) => ({
-        ...prev,
-        photos: prev.photos.filter((p) => p.id !== id),
-      }));
-    },
-    [report.photos],
-  );
+  // Off the report, not deleted: it stays in the library (under Supporting
+  // photos) to add back, as in every report.
+  const removePhoto = useCallback((id: string) => {
+    setReport((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id ? { ...p, off: true } : p)) }));
+  }, []);
+  const restorePhoto = useCallback((id: string) => {
+    setReport((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id ? { ...p, off: undefined } : p)) }));
+  }, []);
 
   const renamePhoto = useCallback((id: string, name: string) => {
     setReport((prev) => ({
@@ -793,6 +790,7 @@ export default function AnchorInspectionPage({
         <PanelResizer panel={panelWidth} />
         <SidePanel panel={pagePanel} title={PAGE_ROWS.find((x) => x.id === pagePanel.sel)?.name ?? ""} width={panelWidth.w}>
           <AnchorOptionsPanel
+            onRestorePhoto={restorePhoto}
             zones={report.zones}
             onAddZone={addZone}
             onOpenZone={openZoneMap}

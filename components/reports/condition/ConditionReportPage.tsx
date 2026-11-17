@@ -196,17 +196,14 @@ export default function ConditionReportPage({
     [report.job.coverPhoto, loadedJobId],
   );
 
-  const removePhoto = useCallback(
-    (id: string) => {
-      const removed = report.photos.find((p) => p.id === id);
-      if (removed) deleteReportPhoto(removed.url);
-      setReport((prev) => ({
-        ...prev,
-        photos: prev.photos.filter((p) => p.id !== id),
-      }));
-    },
-    [report.photos],
-  );
+  // Off the report, not deleted: it stays in the library (under the photo
+  // settings) to add back, as in every report.
+  const removePhoto = useCallback((id: string) => {
+    setReport((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id ? { ...p, off: true } : p)) }));
+  }, []);
+  const restorePhoto = useCallback((id: string) => {
+    setReport((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id ? { ...p, off: undefined } : p)) }));
+  }, []);
 
   const renamePhoto = useCallback((id: string, name: string) => {
     setReport((prev) => ({
@@ -556,11 +553,8 @@ export default function ConditionReportPage({
   // went to Blob storage. Blob URLs pass straight through.
   const reportForTransfer = useCallback(async (): Promise<ConditionReportData> => {
     const s = report.settings;
-    const shown = !s.showPhotos
-      ? []
-      : s.filterByDate
-        ? filterPhotosByDateRange(report.photos, s.dateFrom, s.dateTo)
-        : report.photos;
+    const onPage = report.photos.filter((p) => !p.off);
+    const shown = !s.showPhotos ? [] : s.filterByDate ? filterPhotosByDateRange(onPage, s.dateFrom, s.dateTo) : onPage;
     // Findings and the methodology use their own photos, whatever the
     // photo pages show: keep those too.
     const kept = new Set([
@@ -820,6 +814,7 @@ export default function ConditionReportPage({
             onPhotoSections={(next) => setReport((r) => ({ ...r, photoSections: next }))}
             pickingSection={pickingSection}
             onPickingSection={setPickingSection}
+            onRestorePhoto={restorePhoto}
           />
           <ProjectSections report={report} update={setReport} />
         </SidePanel>

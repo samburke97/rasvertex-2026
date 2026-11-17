@@ -1,6 +1,7 @@
 "use client";
 // components/reports/anchor-inspection/AnchorOptionsPanel.tsx
 
+import { PhotoTray } from "@/components/reports/shared/builder/PhotoGrid";
 import React, { useRef } from "react";
 import styles from "../shared/OptionsPanel.module.css";
 import JobImportInput from "../shared/JobImportInput";
@@ -33,6 +34,8 @@ interface AnchorOptionsPanelProps {
   // Photos — entirely optional, off by default (see AnchorPhotoSettings).
   hasLoadedJob: boolean;
   photos: ReportPhoto[];
+  /** Puts a photo taken off the report back on. */
+  onRestorePhoto: (id: string) => void;
   photoSettings: AnchorPhotoSettings;
   onPhotoSettings: (s: AnchorPhotoSettings) => void;
   photoImportStatus: PhotoImportStatus;
@@ -131,6 +134,7 @@ export default function AnchorOptionsPanel({
   onImport,
   hasLoadedJob,
   photos,
+  onRestorePhoto,
   photoSettings,
   onPhotoSettings,
   photoImportStatus,
@@ -157,6 +161,8 @@ export default function AnchorOptionsPanel({
   const coverRef = useRef<HTMLInputElement>(null);
 
   const hasPhotos = photos.length > 0;
+  // Taken off the report: still in its library, to add back.
+  const offPhotos = photos.filter((p) => p.off);
   const isLoadingPhotos = photoImportStatus.phase === "fetching-photos";
 
   const set = (patch: Partial<AnchorPhotoSettings>) =>
@@ -428,6 +434,16 @@ export default function AnchorOptionsPanel({
                     </button>
                   ))}
                 </div>
+              </>
+            )}
+
+            {offPhotos.length > 0 && (
+              <>
+                <div className={styles.subLabel}>Not in the report · {offPhotos.length}</div>
+                <PhotoTray
+                  items={offPhotos.map((p) => ({ id: p.id, src: p.url, title: `Add “${p.name.replace(/\.[^.]+$/, "")}” back` }))}
+                  onAdd={(i) => onRestorePhoto(offPhotos[i].id)}
+                />
               </>
             )}
 

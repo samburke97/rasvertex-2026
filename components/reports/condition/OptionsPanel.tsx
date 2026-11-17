@@ -22,6 +22,7 @@ import Slider from "@/components/ui/Slider";
 import InfoTip from "@/components/reports/shared/builder/InfoTip";
 import RichBox from "@/components/reports/shared/builder/RichBox";
 import PhotoSections from "./PhotoSections";
+import { PhotoTray } from "@/components/reports/shared/builder/PhotoGrid";
 import type { PhotoSection } from "@/lib/reports/condition.types";
 
 interface OptionsPanelProps {
@@ -53,6 +54,8 @@ interface OptionsPanelProps {
   onPhotoSections: (next: PhotoSection[]) => void;
   pickingSection: string | null;
   onPickingSection: (id: string | null) => void;
+  /** Puts a photo taken off the report back on. */
+  onRestorePhoto: (id: string) => void;
 }
 
 // ── Date preset helpers ───────────────────────────────────────────────────────
@@ -150,9 +153,12 @@ export default function OptionsPanel({
   onPhotoSections,
   pickingSection,
   onPickingSection,
+  onRestorePhoto,
 }: OptionsPanelProps) {
   const coverInputRef = useRef<HTMLInputElement>(null);
   const hasPhotos = photos.length > 0;
+  // Taken off the report: still in the job's library, to add back.
+  const offPhotos = photos.filter((p) => p.off);
   const canFilterByDate = hasPhotos || settings.scheduleLoaded;
 
   const progressPct =
@@ -333,6 +339,16 @@ export default function OptionsPanel({
 
             {hasPhotos && (
               <PhotoSections sections={photoSections} onChange={onPhotoSections} picking={pickingSection} onPicking={onPickingSection} />
+            )}
+
+            {offPhotos.length > 0 && (
+              <>
+                <div className={styles.subLabel}>Not in the report · {offPhotos.length}</div>
+                <PhotoTray
+                  items={offPhotos.map((p) => ({ id: p.id, src: p.url, title: `Add “${p.name.replace(/\.[^.]+$/, "")}” back` }))}
+                  onAdd={(i) => onRestorePhoto(offPhotos[i].id)}
+                />
+              </>
             )}
           </>
         )}

@@ -305,7 +305,10 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   // filter), which then don't repeat on the photo pages.
   const findings = report.findings?.on ? report.findings.items.filter((f) => f.title.trim() || f.photoIds.length || !notesIsEmpty(f.desc)) : [];
   const findingPhotoIds = new Set(findings.flatMap((f) => f.photoIds));
-  const photos = settings.showPhotos ? filterPhotosByDateRange(report.photos, from, to).filter((p) => !findingPhotoIds.has(p.id)) : [];
+  // Photos taken off the report stay in its library but not on the pages.
+  const photos = settings.showPhotos
+    ? filterPhotosByDateRange(report.photos.filter((p) => !p.off), from, to).filter((p) => !findingPhotoIds.has(p.id))
+    : [];
   const schedule = settings.showSchedule
     ? shownSchedule(report.schedule, { ...settings, filterByDate: !!(from || to), dateFrom: from, dateTo: to })
     : [];
