@@ -10,6 +10,7 @@
 // sheet over the preview. The draft autosaves against the job number.
 
 import { readSource } from "@/components/reports/shared/JobImportInput";
+import { methodFromDescription, methodIsEmpty } from "@/lib/reports/methodology";
 import { simproBase, simproRecordUrl } from "@/components/reports/shared/builder/JobStart";
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import styles from "../shared/ReportPage.module.css";
@@ -390,7 +391,13 @@ export default function ConditionReportPage({
         fetch(`${base(jobNumber)}/scope`)
           .then((r) => (r.ok ? r.json() : null))
           .then((scope: ReportScope | null) => {
-            if (scope && !isStale()) setReport((prev) => ({ ...prev, scope }));
+            if (scope && !isStale())
+              setReport((prev) => {
+                // Methodology switched on before the description arrived, and
+                // still untouched: fill it from the description now.
+                const fill = prev.method?.on && methodIsEmpty(prev.method) ? methodFromDescription(scope.description) : null;
+                return { ...prev, scope, ...(fill ? { method: { ...fill, on: true } } : {}) };
+              });
           })
           .catch(() => {});
 

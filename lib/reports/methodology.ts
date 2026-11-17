@@ -102,6 +102,9 @@ const SKIP = /^(notes?|exclusions?|inclusions?|pricing|price|payment|terms|valid
 const SCOPE = /^(project )?scope( of works)?\b/i;
 const MARKER = /^methodology$/i;
 
+// Symbols SimPRO's editor writes as entities (m², 45°, 2×…).
+const NAMED: Record<string, string> = { sup2: "²", sup3: "³", deg: "°", times: "×", frac12: "½", frac14: "¼", hellip: "…", middot: "·", bull: "•", reg: "®", copy: "©", trade: "™" };
+
 const decode = (s: string) =>
   s
     .replace(/&nbsp;|&#160;/g, " ")
@@ -113,7 +116,9 @@ const decode = (s: string) =>
     .replace(/&ldquo;|&rdquo;/g, '"')
     .replace(/&ndash;/g, "–")
     .replace(/&mdash;/g, "—")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+    .replace(/&(sup2|sup3|deg|times|frac12|frac14|hellip|middot|bull|reg|copy|trade);/g, (_, k: string) => NAMED[k])
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)));
 const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const textOf = (html: string) => decode(html.replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim();
 
@@ -132,6 +137,12 @@ function cleanStep(t: string): string {
   s = s.charAt(0).toUpperCase() + s.slice(1);
   return /[.!?:;]$/.test(s) ? s : s + ".";
 }
+
+/** An empty methodology to write by hand, when the job has no description. */
+export const emptyMethod = (): Methodology => ({ intro: "How the works were carried out, from site setup to completion.", groups: [{ title: "", steps: "" }] });
+
+/** True until something has been written into it. */
+export const methodIsEmpty = (m: Methodology) => m.groups.every((g) => !g.title.trim() && !g.steps.replace(/<[^>]*>/g, "").trim());
 
 export function methodFromDescription(html: string | null | undefined): Methodology | null {
   if (!html?.trim()) return null;
@@ -157,15 +168,20 @@ export function methodFromDescription(html: string | null | undefined): Methodol
       if (!isLi) g.paras++;
     }
   }
+  // Every section of the description becomes a stage, bullets or
+  // paragraphs alike; the commercial ones (exclusions, terms, warranty…)
+  // stay out, and the rest of the description after them too.
   const kept: MethodGroup[] = [];
   for (const g of groups) {
     if (g.scope || !g.steps.length) continue;
-    if (g.skip || g.paras) {
+    if (g.skip) {
       if (kept.length) break;
       continue;
     }
     kept.push({ title: g.title, steps: list(g.steps.map(cleanStep).filter(Boolean).map(escape)) });
   }
+  // No headings at all: the description's text is the one stage.
+  if (!kept.length && intro.length) return { intro: "How the works were carried out.", groups: [{ title: "", steps: list(intro.map(cleanStep).filter(Boolean).map(escape)) }] };
   if (!kept.length) return null;
   return {
     intro: intro.length ? intro.map(cleanStep).join(" ") : "How the works were carried out, from site setup to completion.",

@@ -11,7 +11,7 @@ import InfoTip from "@/components/reports/shared/builder/InfoTip";
 import RichBox from "@/components/reports/shared/builder/RichBox";
 import PlanServices, { seedPlan } from "@/components/reports/shared/builder/PlanServices";
 import { htmlItems } from "@/lib/reports/richText";
-import { METHOD_TEMPLATES, methodFromDescription } from "@/lib/reports/methodology";
+import { emptyMethod, METHOD_TEMPLATES, methodFromDescription, methodIsEmpty } from "@/lib/reports/methodology";
 import { PROJECT_PLAN } from "@/lib/reports/maintenancePlan";
 import {
   defaultRequirements,
@@ -44,7 +44,16 @@ const completedOf = (r: ConditionReportData) =>
  *  template. */
 export function setSection(r: ConditionReportData, key: ProjectSection, on: boolean): ConditionReportData {
   if (key === "method")
-    return { ...r, method: { ...(r.method ?? methodFromDescription(r.scope?.description) ?? METHOD_TEMPLATES.waterproofing.method), on } };
+    // From the job's description in SimPRO, never a made-up template (those
+    // are only used when picked under "Start from"). Nothing to read yet:
+    // empty, and filled in when the description arrives.
+    return {
+      ...r,
+      method: {
+        ...(r.method && !methodIsEmpty(r.method) ? r.method : (methodFromDescription(r.scope?.description) ?? r.method ?? emptyMethod())),
+        on,
+      },
+    };
   if (key === "plan") return { ...r, plan: { ...(r.plan ?? { items: seedPlan(PROJECT_PLAN) }), on } };
   if (key === "findings") return { ...r, findings: { ...(r.findings ?? { intro: FINDINGS_INTRO, items: [newFinding()] }), on } };
   const ws = normWarranties(r.warranty, completedOf(r));
@@ -61,6 +70,12 @@ export default function ProjectSections({ report, update }: { report: ConditionR
   const m = report.method;
   const ws = normWarranties(report.warranty, completedOf(report));
   const fromJob = methodFromDescription(report.scope?.description);
+  // The last stage removed, for Undo.
+  const [removedStage, setRemovedStage] = useState<{ g: { title: string; steps: string }; at: number } | null>(null);
+  // The job's stages missing from the report (matched by title).
+  const titleKey = (t: string) => t.trim().toLowerCase();
+  const missing =
+    fromJob && m ? fromJob.groups.map((g, at) => ({ g, at })).filter(({ g }) => !m.groups.some((x) => titleKey(x.title) === titleKey(g.title))) : [];
   const setMethod = (p: Partial<NonNullable<ConditionReportData["method"]>>) => update((r) => ({ ...r, method: { ...r.method!, ...p } }));
   const setKind = (kind: WarrantyKind, w: WarrantyInfo | undefined) =>
     update((r) => ({ ...r, warranty: { ...normWarranties(r.warranty, completedOf(r))!, [kind]: w } }));
@@ -80,7 +95,7 @@ export default function ProjectSections({ report, update }: { report: ConditionR
           <>
             <label className={styles.field}>
               <span className={styles.subLabel}>
-                Start from <InfoTip>Replaces the stages below. The job description is read from SimPRO: each bold heading becomes a stage and its bullets the steps.</InfoTip>
+                Start from <InfoTip>Replaces the stages below. The job description is read from SimPRO: each bold heading becomes a stage, and its bullets or paragraphs the steps.</InfoTip>
               </span>
               <select
                 className={styles.input}
@@ -100,6 +115,42 @@ export default function ProjectSections({ report, update }: { report: ConditionR
                 ))}
               </select>
             </label>
+            {/* The job's own stages that aren't in the report: add one back,
+                or reload them all from the description. */}
+            {fromJob && (
+              <div className={styles.field}>
+                {missing.length > 0 && (
+                  <>
+                    <span className={styles.subLabel}>From the job description, not in the report</span>
+                    <div className={styles.presetRow}>
+                      {missing.map(({ g, at }) => (
+                        <button
+                          key={at}
+                          className={styles.presetBtn}
+                          title="Add this stage back, from the job description"
+                          onClick={() => {
+                            const next = [...m.groups];
+                            next.splice(Math.min(at, next.length), 0, g);
+                            setMethod({ groups: next });
+                          }}
+                        >
+                          + {g.title || `Stage ${at + 1}`}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <button
+                  className={styles.textBtn}
+                  onClick={() => {
+                    if (!methodIsEmpty(m) && !confirm("Reload every stage from the job description in SimPRO? Changes to the stages here are replaced.")) return;
+                    setMethod({ intro: fromJob.intro, groups: fromJob.groups });
+                  }}
+                >
+                  Reload all stages from the job
+                </button>
+              </div>
+            )}
             <label className={styles.field} data-panel-field="methodIntro">
               <span className={styles.subLabel}>Intro</span>
               <textarea className={styles.textarea} rows={2} value={m.intro} onChange={(e) => setMethod({ intro: e.target.value })} />
@@ -114,11 +165,33 @@ export default function ProjectSections({ report, update }: { report: ConditionR
                   onChange={(e) => setMethod({ groups: m.groups.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)) })}
                 />
                 <RichBox list value={g.steps} placeholder="One step per line" onChange={(steps) => setMethod({ groups: m.groups.map((x, j) => (j === i ? { ...x, steps } : x)) })} />
-                <button className={styles.textBtn} onClick={() => setMethod({ groups: m.groups.filter((_, j) => j !== i) })}>
+                <button
+                  className={styles.textBtn}
+                  onClick={() => {
+                    setRemovedStage({ g, at: i });
+                    setMethod({ groups: m.groups.filter((_, j) => j !== i) });
+                  }}
+                >
                   Remove stage
                 </button>
               </div>
             ))}
+            {removedStage && (
+              <span className={styles.subLabel}>
+                Removed “{removedStage.g.title || `Stage ${removedStage.at + 1}`}”.{" "}
+                <button
+                  className={styles.textBtn}
+                  onClick={() => {
+                    const next = [...m.groups];
+                    next.splice(Math.min(removedStage.at, next.length), 0, removedStage.g);
+                    setMethod({ groups: next });
+                    setRemovedStage(null);
+                  }}
+                >
+                  Undo
+                </button>
+              </span>
+            )}
             <button className={styles.addBtn} onClick={() => setMethod({ groups: [...m.groups, { title: "", steps: "" }] })}>
               Add a stage
             </button>
