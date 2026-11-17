@@ -1,6 +1,6 @@
 "use client";
 // The Job overview's optional sections, in its right-hand panel: Methodology,
-// Maintenance plan and Warranty. Each group shows on its own page in the
+// Findings, Maintenance plan and Warranty. Each group shows on its own page in the
 // rail (data-pages), is off until switched on, and starts from a template
 // that's then fully editable.
 
@@ -27,10 +27,12 @@ import {
   type WarrantyKind,
   type WarrantyScheduleRow,
 } from "@/lib/reports/warranty";
-import type { ConditionReportData } from "@/lib/reports/condition.types";
+import { FINDINGS_INTRO, type ConditionReportData, type Finding } from "@/lib/reports/condition.types";
 
 type Patch = (fn: (prev: ConditionReportData) => ConditionReportData) => void;
-export type ProjectSection = "method" | "plan" | "warranty";
+export type ProjectSection = "method" | "findings" | "plan" | "warranty";
+
+const newFinding = (): Finding => ({ id: `f${Date.now().toString(36)}`, title: "", desc: "", photoIds: [] });
 
 const completedOf = (r: ConditionReportData) =>
   /^\d{4}-\d{2}-\d{2}$/.test(r.job.date) ? r.job.date : new Date().toISOString().slice(0, 10);
@@ -42,6 +44,7 @@ export function setSection(r: ConditionReportData, key: ProjectSection, on: bool
   if (key === "method")
     return { ...r, method: { ...(r.method ?? methodFromDescription(r.scope?.description) ?? METHOD_TEMPLATES.waterproofing.method), on } };
   if (key === "plan") return { ...r, plan: { ...(r.plan ?? { items: seedPlan(PROJECT_PLAN) }), on } };
+  if (key === "findings") return { ...r, findings: { ...(r.findings ?? { intro: FINDINGS_INTRO, items: [newFinding()] }), on } };
   const ws = normWarranties(r.warranty, completedOf(r));
   if (ws) return { ...r, warranty: { ...ws, on } };
   const kind = guessKind(r.scope?.description);
@@ -60,6 +63,9 @@ export default function ProjectSections({ report, update }: { report: ConditionR
   const setKind = (kind: WarrantyKind, w: WarrantyInfo | undefined) =>
     update((r) => ({ ...r, warranty: { ...normWarranties(r.warranty, completedOf(r))!, [kind]: w } }));
   const toggle = (key: ProjectSection) => (v: boolean) => update((r) => setSection(r, key, v));
+  const setFindings = (p: Partial<NonNullable<ConditionReportData["findings"]>>) => update((r) => ({ ...r, findings: { ...r.findings!, ...p } }));
+  const setFinding = (id: string, p: Partial<Finding>) =>
+    update((r) => ({ ...r, findings: { ...r.findings!, items: r.findings!.items.map((f) => (f.id === id ? { ...f, ...p } : f)) } }));
 
   return (
     <>
@@ -132,6 +138,75 @@ export default function ProjectSections({ report, update }: { report: ConditionR
                 <input className={styles.input} value={m.caption ?? ""} placeholder="Caption, e.g. Trafficable membrane during application." onChange={(e) => setMethod({ caption: e.target.value })} />
               )}
             </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Findings ────────────────────────────────────────────────────── */}
+      <div className={styles.group} data-pages="findings">
+        <ToggleRow
+          label="Include findings"
+          sub="What our team found on site, with photos, suggesting additional works"
+          checked={!!report.findings?.on}
+          onChange={toggle("findings")}
+        />
+        {report.findings?.on && (
+          <>
+            <label className={styles.field}>
+              <span className={styles.subLabel}>Intro</span>
+              <textarea
+                className={styles.textarea}
+                rows={3}
+                value={report.findings.intro}
+                onChange={(e) => setFindings({ intro: e.target.value })}
+              />
+            </label>
+            {report.findings.items.map((f, i) => (
+              <div key={f.id} className={styles.field}>
+                <span className={styles.subLabel}>Finding {i + 1}</span>
+                <input
+                  className={styles.input}
+                  value={f.title}
+                  placeholder="e.g. Cracked render, north wall level 2"
+                  onChange={(e) => setFinding(f.id, { title: e.target.value })}
+                />
+                <RichBox
+                  value={f.desc}
+                  placeholder="What we found, and the work we'd recommend"
+                  onChange={(desc) => setFinding(f.id, { desc })}
+                />
+                <span className={styles.subLabel}>
+                  Photos{f.photoIds.length ? ` · ${f.photoIds.length} chosen` : ""}{" "}
+                  <InfoTip>Click to add or remove. They print in the order chosen, and come off the photo pages.</InfoTip>
+                </span>
+                <div className={styles.methodThumbs}>
+                  {report.photos.map((p) => {
+                    const at = f.photoIds.indexOf(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        className={`${styles.methodThumb} ${at >= 0 ? styles.methodThumbOn : ""}`}
+                        style={{ backgroundImage: `url("${p.url}")` }}
+                        title={p.name}
+                        onClick={() =>
+                          setFinding(f.id, { photoIds: at >= 0 ? f.photoIds.filter((x) => x !== p.id) : [...f.photoIds, p.id] })
+                        }
+                      />
+                    );
+                  })}
+                </div>
+                {!report.photos.length && <span className={styles.subLabel}>Load the job&apos;s photos to choose some.</span>}
+                <button
+                  className={styles.textBtn}
+                  onClick={() => setFindings({ items: report.findings!.items.filter((x) => x.id !== f.id) })}
+                >
+                  Remove finding
+                </button>
+              </div>
+            ))}
+            <button className={styles.addBtn} onClick={() => setFindings({ items: [...report.findings!.items, newFinding()] })}>
+              Add a finding
+            </button>
           </>
         )}
       </div>

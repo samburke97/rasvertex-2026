@@ -22,6 +22,7 @@ import {
   type Page,
 } from "@/lib/reports/overview.layout";
 import { photoPosStyle } from "@/lib/reports/photos";
+import { sanitizeNotesHtml } from "@/lib/reports/richText";
 
 export interface OverviewAssets {
   /** Logo plus the closing page's service and client images. */
@@ -58,6 +59,15 @@ export const OVERVIEW_CSS =
 .jo-grid{display:grid;column-gap:24px;row-gap:32px}
 .jo-day{font-size:22px;font-weight:700;letter-spacing:-.04em;line-height:1.2;margin-bottom:20px}
 .jo-day span{font-weight:400;color:var(--ink-45)}
+.jo-find{display:flex;flex-direction:column}
+.jo-find+.jo-find{margin-top:48px;padding-top:48px;border-top:var(--rule)}
+.jo-find-head{display:grid;grid-template-columns:72px minmax(0,1fr);column-gap:8px;align-items:baseline}
+.jo-find-no{font-family:var(--bebas);font-size:34px;letter-spacing:.04em;color:var(--ink-35);line-height:1}
+.jo-find-title{font-size:26px;font-weight:700;letter-spacing:-.04em;line-height:1.2}
+.jo-find-title span{font-weight:400;color:var(--ink-45)}
+.jo-find-desc{grid-column:2;margin-top:12px;font-size:20px;line-height:1.55;color:var(--ink-65)}
+.jo-find-photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:20px}
+.jo-find-photos .ar-photo{aspect-ratio:4/3}
 .jo-day-note{font-size:18px;line-height:1.5;color:var(--ink-65);margin:-12px 0 20px;max-width:900px}
 .jo-pick .ar-photo{cursor:pointer;outline:3px solid transparent;outline-offset:3px;transition:outline-color 100ms}
 .jo-pick .ar-photo:hover{outline-color:rgba(62,127,176,.45)}
@@ -637,6 +647,47 @@ function PhotosPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "phot
   );
 }
 
+/** Findings: each one numbered, with its title, what we found and the work
+ *  we'd recommend, then its photos. */
+function FindingsPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "findings" }> }) {
+  const { model } = ctx;
+  return (
+    <section className="ar-page">
+      {page.first ? (
+        <>
+          <SecLabel text={model.secText.findings} />
+          <Heading title="Findings" lede={model.findingsIntro} />
+        </>
+      ) : (
+        <SecLabel text="Findings, continued" />
+      )}
+      {page.items.map((f) => (
+        <div key={`${f.n}-${f.continued}`} className="jo-find">
+          <div className="jo-find-head">
+            <span className="jo-find-no">{pad(f.n)}</span>
+            <h3 className="jo-find-title">
+              {f.title}
+              {f.continued && <span>, continued</span>}
+            </h3>
+            {f.desc && <div className="jo-find-desc ar-rich" dangerouslySetInnerHTML={{ __html: sanitizeNotesHtml(f.desc) }} />}
+          </div>
+          {f.rows.length > 0 && (
+            <div className="jo-find-photos">
+              {f.rows.flat().map((p) => (
+                <div key={p.id} className="ar-photo">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt="" style={photoPosStyle(p.pos)} />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+      <PageNo no={page.no} total={model.total} />
+    </section>
+  );
+}
+
 export interface PhotoPick {
   selected: string[];
   onToggle: (id: string) => void;
@@ -677,6 +728,8 @@ export default function OverviewDocument({ model, assets, screen, onCoverPointer
             <WarrantyPage ctx={ctx} page={p} />
           ) : p.kind === "care" ? (
             <CarePage ctx={ctx} page={p} />
+          ) : p.kind === "findings" ? (
+            <FindingsPage ctx={ctx} page={p} />
           ) : (
             <PhotosPage ctx={ctx} page={p} />
           )}

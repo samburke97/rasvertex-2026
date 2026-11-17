@@ -105,11 +105,12 @@ const PAGE_ROWS = [
   { id: "hours", name: "Hours" },
   { id: "method", name: "Methodology" },
   { id: "photos", name: "Photos" },
+  { id: "findings", name: "Findings" },
   { id: "plan", name: "Maintenance plan" },
   { id: "warranty", name: "Warranty" },
 ];
 /** Optional sections: an eye in the rail, off until switched on. */
-const OPTIONAL: ProjectSection[] = ["method", "plan", "warranty"];
+const OPTIONAL: ProjectSection[] = ["method", "findings", "plan", "warranty"];
 
 /** The SimPRO route for a loaded number ("Q11234" is a quote). */
 const base = (n: string) => simproBase(readSource(n).source, readSource(n).id);
@@ -555,11 +556,18 @@ export default function ConditionReportPage({
   // went to Blob storage. Blob URLs pass straight through.
   const reportForTransfer = useCallback(async (): Promise<ConditionReportData> => {
     const s = report.settings;
-    const photos = !s.showPhotos
+    const shown = !s.showPhotos
       ? []
       : s.filterByDate
         ? filterPhotosByDateRange(report.photos, s.dateFrom, s.dateTo)
         : report.photos;
+    // Findings and the methodology use their own photos, whatever the
+    // photo pages show: keep those too.
+    const kept = new Set([
+      ...(report.findings?.on ? report.findings.items.flatMap((f) => f.photoIds) : []),
+      ...(report.method?.on && report.method.photoId ? [report.method.photoId] : []),
+    ]);
+    const photos = [...shown, ...report.photos.filter((p) => kept.has(p.id) && !shown.includes(p))];
     const schedule = shownSchedule(report.schedule, s);
     const shrink = (url: string) => (url.startsWith("data:") ? compressImageDataUrl(url) : Promise.resolve(url));
     return {

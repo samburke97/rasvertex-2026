@@ -18,6 +18,7 @@ import {
   DEFAULT_COVER_POS,
   filterPhotosByDateRange,
   filterScheduleByDateRange,
+  FINDINGS_INTRO,
   shownSchedule,
   type ConditionReportData,
   type CoverPos,
@@ -63,6 +64,9 @@ const ROW_GAP = 32;
 const CAPTION = 32; // 8 margin + 17 × 1.4
 const DAY_HEAD = 48; // 22 × 1.2 + 20 margin, rounded
 const DAY_GAP = 24;
+/** Findings: photos per row, and the space between findings. */
+export const FINDING_COLS = 3;
+const FINDING_GAP = 48;
 const GRIDS: Record<PhotoLayout, { cols: number; ratio: number }> = {
   large: { cols: 2, ratio: 3 / 4 },
   medium: { cols: 3, ratio: 3 / 4 },
@@ -99,7 +103,19 @@ export type MethodBlock =
   | { t: "step"; n: number; html: string }
   | { t: "photo" };
 
+/** A finding on its page: its head (number, title, description), then rows
+ *  of its photos. A finding split across pages repeats its head, marked
+ *  continued, without the description. */
+export interface FindingBlock {
+  n: number;
+  title: string;
+  desc: string;
+  continued: boolean;
+  rows: OverviewPhoto[][];
+}
+
 export type Page =
+  | { kind: "findings"; no: number; first: boolean; items: FindingBlock[] }
   | { kind: "method"; no: number; first: boolean; blocks: MethodBlock[] }
   | { kind: "plan"; no: number; first: boolean; rows: PlanItem[]; notes: boolean }
   | { kind: "warranty"; no: number; w: WarrantyKind; first: boolean }
@@ -112,7 +128,7 @@ export type Page =
       days: PhotoDay[];
     };
 
-export type SectionKey = "hours" | "method" | "photos" | "plan" | "warranty";
+export type SectionKey = "hours" | "method" | "photos" | "findings" | "plan" | "warranty";
 
 export interface OverviewModel {
   reportType: string;
@@ -133,6 +149,8 @@ export interface OverviewModel {
   secText: Record<SectionKey | "about", string>;
   toc: { title: string; items: { name: string; page: string }[] }[];
   photoCount: number;
+  /** Findings shown (the findings pages' lede). */
+  findingsIntro: string;
   /** Photo sections with photos in them (the photo pages' lede). */
   photoSections: number;
   totalHours: number;
@@ -283,7 +301,11 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   // What the report shows — the same date filter applies to photos and hours.
   const range = (from: string | null, to: string | null) => (settings.filterByDate ? [from, to] : [null, null]) as [string | null, string | null];
   const [from, to] = range(settings.dateFrom, settings.dateTo);
-  const photos = settings.showPhotos ? filterPhotosByDateRange(report.photos, from, to) : [];
+  // Findings: each with its own photos (any of the job's, whatever the date
+  // filter), which then don't repeat on the photo pages.
+  const findings = report.findings?.on ? report.findings.items.filter((f) => f.title.trim() || f.photoIds.length || !notesIsEmpty(f.desc)) : [];
+  const findingPhotoIds = new Set(findings.flatMap((f) => f.photoIds));
+  const photos = settings.showPhotos ? filterPhotosByDateRange(report.photos, from, to).filter((p) => !findingPhotoIds.has(p.id)) : [];
   const schedule = settings.showSchedule
     ? shownSchedule(report.schedule, { ...settings, filterByDate: !!(from || to), dateFrom: from, dateTo: to })
     : [];
@@ -297,6 +319,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   if (schedule.length) sections.push("hours");
   if (method) sections.push("method");
   if (photos.length) sections.push("photos");
+  if (findings.length) sections.push("findings");
   if (plan) sections.push("plan");
   if (kinds.length) sections.push("warranty");
   const nSec = sections.length + 1;
@@ -424,6 +447,48 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     pages.push(page);
   }
 
+  // Findings: a head per finding (number, title, description), then its
+  // photos in rows of three. A finding that won't fit moves on, or splits
+  // between photo rows with its head repeated.
+  if (findings.length) {
+    const byId = new Map(report.photos.map((p) => [p.id, p]));
+    const colW = (CONTENT_W - COL_GAP * (FINDING_COLS - 1)) / FINDING_COLS;
+    const rowH = Math.ceil(colW * 0.75);
+    const descH = (html: string) => (notesIsEmpty(html) ? 0 : 12 + notesLineCount(sanitizeNotesHtml(html)) * 31);
+    const headH = (f: { title: string }, desc: string) => 40 + Math.max(1, Math.ceil(f.title.length / 60)) * 31 + descH(desc) + 20;
+    let page: Extract<Page, { kind: "findings" }> = { kind: "findings", no: no(), first: true, items: [] };
+    let used = SEC_LABEL + H2 + 20 + ledeH(report.findings!.intro || FINDINGS_INTRO) + 56;
+    const newPage = () => {
+      pages.push(page);
+      page = { kind: "findings", no: no(), first: false, items: [] };
+      used = SEC_LABEL;
+    };
+    findings.forEach((f, i) => {
+      const list = f.photoIds.map((id) => byId.get(id)).filter((p): p is (typeof report.photos)[number] => !!p);
+      const rows: OverviewPhoto[][] = [];
+      for (let k = 0; k < list.length; k += FINDING_COLS)
+        rows.push(list.slice(k, k + FINDING_COLS).map((p) => ({ id: p.id, name: p.name, url: p.url, pos: p.pos })));
+      const gap = page.items.length ? FINDING_GAP : 0;
+      // The head with its first row of photos stays together.
+      if (page.items.length && used + gap + headH(f, f.desc) + (rows.length ? rowH : 0) > FLOW_H) newPage();
+      let block: FindingBlock = { n: i + 1, title: f.title.trim() || `Finding ${i + 1}`, desc: f.desc, continued: false, rows: [] };
+      used += (page.items.length ? FINDING_GAP : 0) + headH(f, f.desc);
+      page.items.push(block);
+      for (const row of rows) {
+        const g = block.rows.length ? COL_GAP : 0;
+        if (used + g + rowH > FLOW_H) {
+          newPage();
+          block = { ...block, desc: "", continued: true, rows: [] };
+          used += headH(f, "");
+          page.items.push(block);
+        }
+        used += (block.rows.length ? COL_GAP : 0) + rowH;
+        block.rows.push(row);
+      }
+    });
+    pages.push(page);
+  }
+
   // Maintenance plan: the table (header repeated), then the comments.
   const planNotes = plan ? sanitizeNotesHtml(plan.notes) : "";
   if (plan) {
@@ -481,6 +546,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   if (jobItems.length) toc.push({ title: "The job", items: jobItems });
   if (firstOf("method")) toc.push({ title: "The works", items: [{ name: "Methodology", page: String(firstOf("method")) }] });
   if (shownPhotos.length) toc.push({ title: "Photos", items: shownPhotos });
+  if (firstOf("findings")) toc.push({ title: "Findings", items: [{ name: "Recommended additional works", page: String(firstOf("findings")) }] });
   if (firstOf("plan")) toc.push({ title: "Maintenance", items: [{ name: "Maintenance plan", page: String(firstOf("plan")) }] });
   if (kinds.length)
     toc.push({
@@ -516,6 +582,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     secText,
     toc,
     photoCount: photos.length,
+    findingsIntro: report.findings?.intro || FINDINGS_INTRO,
     photoSections: (report.photoSections ?? []).filter((sec) => sec.photoIds.some((id) => photos.some((p) => p.id === id))).length,
     totalHours,
     method: method

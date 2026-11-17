@@ -125,10 +125,29 @@ export interface ConditionReportData {
   plan?: MaintenancePlan & { on: boolean };
   /** Waterproofing and/or painting. */
   warranty?: Warranties;
+  /** Things found on site, each with photos and a description, suggesting
+   *  additional works. Off until switched on. */
+  findings?: Findings & { on: boolean };
   /** Photos grouped under a title ("Level 3 balcony – crack repairs"),
    *  shown first, each in the order picked. A photo is in one at most. */
   photoSections?: PhotoSection[];
 }
+
+export interface Finding {
+  id: string;
+  title: string;
+  /** Rich text: what we found and the work we'd recommend. */
+  desc: string;
+  photoIds: string[];
+}
+
+export interface Findings {
+  intro: string;
+  items: Finding[];
+}
+
+export const FINDINGS_INTRO =
+  "While on site our team noted the items below. They weren't part of this job; we recommend them as additional works and can quote on request.";
 
 export interface PhotoSection {
   id: string;
