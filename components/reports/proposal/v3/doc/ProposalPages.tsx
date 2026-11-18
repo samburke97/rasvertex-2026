@@ -1440,26 +1440,25 @@ function Maintenance({ r, s }: PageProps) {
         </div>
       )}
       {f.has("contact") && (
-        // At the foot of the page: Caroline, then the button (as on the
-        // inspection report's ending).
-        <div style={{ marginTop: "auto", paddingTop: f.mt("contact", 56), alignSelf: "flex-start", display: "inline-flex", flexDirection: "column", alignItems: "stretch", gap: 24 }}>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 20 }}>
-            <img src={r.img(asset("people-caro.jpg")) || undefined} alt="Caroline" style={{ width: 96, height: 120, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-              <span style={sub}>Caroline</span>
-              <span style={{ fontSize: "1.25rem", lineHeight: 1.3, color: INK(0.6) }}>Client Services Manager</span>
-            </div>
+      <div style={{ marginTop: "auto", paddingTop: f.mt("contact", 56), alignSelf: "flex-start", display: "inline-flex", flexDirection: "column", alignItems: "stretch", gap: 24 }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 20 }}>
+          <img src={r.img(asset("people-caro.jpg")) || undefined} alt="Caroline Park" style={{ width: 96, height: 120, borderRadius: 14, objectFit: "cover", flexShrink: 0 }} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={sub}>Caroline Park</span>
+            <span style={{ fontSize: "1.25rem", lineHeight: 1.3, color: INK(0.6) }}>Client Services Manager</span>
+            <span style={{ fontSize: "1.25rem", lineHeight: 1.3, fontWeight: 700, marginTop: 6 }}>07 5371 0201</span>
           </div>
-          <a
-            href={`mailto:${r.p.job.email}?subject=${encodeURIComponent(`Maintenance plan enquiry - ${r.p.job.building}`)}`}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, height: 64, padding: "0 32px", borderRadius: 14, background: NAVY, color: "#ffffff", fontSize: "1.25rem", fontWeight: 700, letterSpacing: "-0.01em", textDecoration: "none" }}
-          >
-            Let us know how we can help
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-          </a>
         </div>
+        <a
+          href={`mailto:${r.p.job.email}?subject=${encodeURIComponent(`Maintenance plan enquiry - ${r.p.job.building}`)}`}
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, height: 64, padding: "0 32px", borderRadius: 14, background: NAVY, color: "#ffffff", fontSize: "1.25rem", fontWeight: 700, letterSpacing: "-0.01em", textDecoration: "none" }}
+        >
+          Chat about your plan
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+            <path d="M5 12h14M13 6l6 6-6 6" />
+          </svg>
+        </a>
+      </div>
       )}
       <Footer r={r} s={s} />
     </Sheet>
