@@ -273,3 +273,25 @@
   border-color: var(--blue-500);
   color: var(--blue-600);
 }
+
+/* Alerts: each job set to go over its estimate. */
+.alertCount { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: #b4412f; color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+.alert { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid rgba(var(--ink-rgb), 0.08); border-left: 3px solid var(--alert-c); border-radius: 10px; background: var(--surface); }
+.alert_over { --alert-c: #b4412f; --alert-bg: #fbeae6; }
+.alert_going { --alert-c: #c07a1c; --alert-bg: #fcf0dc; }
+.alert_noEstimate { --alert-c: rgba(var(--ink-rgb), 0.3); --alert-bg: rgba(var(--ink-rgb), 0.05); }
+.alertHead { display: flex; align-items: flex-start; gap: 8px; padding: 0; border: 0; background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
+.alertDot { width: 8px; height: 8px; margin-top: 5px; border-radius: 4px; background: var(--alert-c); flex-shrink: 0; }
+.alertTitle { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.alertTitle b { font-size: 13px; font-weight: 600; }
+.alertTitle small { font-size: 11.5px; color: rgba(var(--ink-rgb), 0.5); }
+.alertTag { flex-shrink: 0; padding: 2px 7px; border-radius: 5px; background: var(--alert-bg); color: var(--alert-c); font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.alert_noEstimate .alertTag { color: rgba(var(--ink-rgb), 0.6); }
+.alertBar { position: relative; display: flex; height: 6px; border-radius: 3px; background: rgba(var(--ink-rgb), 0.06); overflow: visible; }
+.alertUsed { height: 100%; border-radius: 3px 0 0 3px; background: var(--alert-c); }
+.alertBooked { height: 100%; background: repeating-linear-gradient(135deg, var(--alert-c) 0 3px, transparent 3px 6px); opacity: 0.6; }
+.alertEst { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); }
+.alertLine { margin: 0; font-size: 12px; line-height: 1.45; color: rgba(var(--ink-rgb), 0.75); }
+.alertTeam { display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid rgba(var(--ink-rgb), 0.06); font-size: 12px; }
+.alertTeam > span { font-size: 11px; color: rgba(var(--ink-rgb), 0.5); }
+.alertTeam > div { display: flex; justify-content: space-between; gap: 8px; }

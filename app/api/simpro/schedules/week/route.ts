@@ -181,6 +181,7 @@ export async function GET(request: NextRequest) {
         kind,
         label: siteOf(rec, fallback),
         ref: no != null ? String(no) : null,
+        cc: String(s.Reference).split("-")[1]?.trim() || null,
         name: rec?.Name?.trim() ?? "",
         address: (rec?.Site?.ID && address.get(rec.Site.ID)) || "",
         hours: s.TotalHours ?? 0,

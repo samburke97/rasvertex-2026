@@ -23,6 +23,7 @@ import BuilderHeader, { HeaderButton } from "@/components/reports/shared/builder
 import { useDraftAutosave } from "@/components/reports/shared/builder/useDraftAutosave";
 import { useHistory } from "@/components/reports/shared/builder/useHistory";
 import WeekScheduleDocument, { WEEK_CSS, WEEK_EDIT_CSS, pickKey, type WeekPick } from "./WeekScheduleDocument";
+import WeekAlerts from "./WeekAlerts";
 import WeekEditPopover from "./WeekEditPopover";
 import { ANCHOR_IMAGES } from "@/lib/reports/anchor.layout";
 import {
@@ -478,6 +479,9 @@ export default function WeekSchedulePage({ onBack }: Props) {
               {load.phase === "loading" ? "Reading SimPRO…" : "Refresh from SimPRO"}
             </button>
           </div>
+
+          {/* ── Alerts ── */}
+          <WeekAlerts entries={data?.entries ?? null} reloadKey={reloadKey} />
 
           {/* ── Table ── */}
           <div className={panel.group}>

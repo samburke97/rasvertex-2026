@@ -17,6 +17,8 @@ export interface WeekEntry {
   label: string;
   /** SimPRO job or quote number, if any. */
   ref: string | null;
+  /** The job's cost centre the block is booked to, if any. */
+  cc?: string | null;
   /** Job or quote name, for the tooltip and the jobs overview. */
   name: string;
   /** The site's street address ("131 Coolum Terrace, Coolum Beach"). */
