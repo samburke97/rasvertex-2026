@@ -397,6 +397,14 @@ export default function ProjectSections({ report, update }: { report: ConditionR
       <div className={styles.group} data-pages="plan">
         <ToggleRow label="Include recommended works" sub="Services, how often, and what's required" checked={!!report.plan?.on} onChange={toggle("plan")} />
         {report.plan?.on && <PlanServices presets={PROJECT_PLAN} plan={report.plan} onPlan={(plan) => update((r) => ({ ...r, plan: { ...plan, on: true } }))} />}
+        {report.plan?.on && (
+          <ToggleRow
+            label="End with Also worth adding"
+            sub="Our other services, Request a quote and who to call, after the recommended works"
+            checked={report.plan.ending !== false}
+            onChange={(v) => update((r) => ({ ...r, plan: { ...r.plan!, ending: v } }))}
+          />
+        )}
       </div>
 
       {/* ── Warranty ────────────────────────────────────────────────────── */}

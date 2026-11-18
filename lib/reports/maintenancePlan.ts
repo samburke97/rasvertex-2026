@@ -18,6 +18,9 @@ export interface PlanItem {
 export interface MaintenancePlan {
   items: PlanItem[];
   notes?: string;
+  /** The report ending after it: Also worth adding, Request a quote and
+   *  who to call. On unless switched off. */
+  ending?: boolean;
 }
 
 /** A service offered in the editor; whenAny: ticked to start with when one

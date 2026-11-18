@@ -1132,7 +1132,8 @@ export default function AnchorDocument({
         </div>
       ))}
       {/* What else we can do and who to talk to, in place of a sales page. */}
-      <div className="ar-sheet">
+      {model.ending && (
+      <div className="ar-sheet" data-page="end">
         <section className="ar-page">
           <ReportEnd
             images={assets.images}
@@ -1142,6 +1143,7 @@ export default function AnchorDocument({
           />
         </section>
       </div>
+      )}
     </div>
   );
 }

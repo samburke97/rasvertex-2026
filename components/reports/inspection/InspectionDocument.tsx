@@ -770,6 +770,7 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
             contact always close the page. No footer. */}
         {extras}
         {works.fit !== "images" && <div style={{ flex: "1 1 auto" }} />}
+        {works.ending && (
         <div className="ir-cta">
           <a className="ir-btn ir-btn--primary" href={works.href}>
             Request a quote
@@ -785,6 +786,7 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
             </p>
           </div>
         </div>
+        )}
       </section>
     </div>
   );

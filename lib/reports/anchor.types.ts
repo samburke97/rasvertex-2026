@@ -142,6 +142,9 @@ export interface AnchorReportData {
   coverPos?: CoverPos;
   /** Anchor types as set in Reports › Settings when this report started. */
   anchorTypes?: AnchorTypeDef[];
+  /** The last page: Also worth adding, Request a quote and who to call.
+   *  On unless switched off. */
+  ending?: boolean;
 }
 
 export const ANCHOR_TYPE_COLOURS: Record<string, string> = {

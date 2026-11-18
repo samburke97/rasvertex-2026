@@ -178,6 +178,8 @@ export interface AnchorModel {
   certRows: CertRow[];
   certNumber: string;
   comments: string;
+  /** The ending page after the certification. */
+  ending: boolean;
 }
 
 /** Street and suburb: "7 Venning Street, Mooloolaba". */
@@ -484,6 +486,7 @@ export function buildAnchorModel(
     zones,
     pages,
     total,
+    ending: report.ending !== false,
     toc: [
       { title: "Inspection", items: inspectionItems },
       {

@@ -563,9 +563,10 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     pages.push(page);
   }
 
-  // The closer ("Also worth adding", Request a quote, who to call) ends
-  // Recommended works whenever that's on, warranties or not; otherwise the
-  // report. Straight under the section when it fits there, else a short
+  // The ending ("Also worth adding", Request a quote, who to call) belongs
+  // to Recommended works: it follows that section when it's on (and the
+  // ending isn't switched off), warranties or not; no Recommended works, no
+  // ending. Straight under the section when it fits there, else a short
   // page of its own right after it. Page content starts 80 down.
   let closerOn: number | null = null;
   let closerTop = 0;
@@ -576,7 +577,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
       closerTop = 80 + lastUsed + CLOSER_GAP;
     } else pages.push({ kind: "closer", no: no() });
   };
-  if (plan) placeCloser();
+  if (plan && plan.ending !== false) placeCloser();
 
   // Warranties: each the warranty itself, then what keeps it valid.
   kinds.forEach((w, i) => {
@@ -584,8 +585,6 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     pages.push({ kind: "care", no: no(), w });
     lastUsed = null;
   });
-
-  if (!plan) placeCloser();
 
   const total = pages.length + 2;
   const firstOf = (k: Page["kind"]) => pages.find((p) => p.kind === k)?.no;

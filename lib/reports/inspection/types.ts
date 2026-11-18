@@ -114,6 +114,9 @@ export interface InspectionReportData {
   text?: Record<string, string>;
   /** Sections left out of the report. */
   hidden?: Partial<Record<SectionKey, boolean>>;
+  /** Recommended works ends with Also worth adding, Request a quote and
+   *  who to call. On unless switched off. */
+  ending?: boolean;
   /** Maintenance plan (optional section): the services picked and the
    *  technician's comments. */
   plan?: MaintenancePlan;

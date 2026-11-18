@@ -1289,6 +1289,12 @@ export default function InspectionReportPage({ onBack }: Props) {
               <>
                 <section className={styles.group}>
                   <Field {...txt("sec.works.title", secOf("works")?.title ?? "")} label="Title" />
+                  <ToggleRow
+                    label="End with Also worth adding"
+                    sub="Our other services, Request a quote and who to call, under the works"
+                    checked={r.ending !== false}
+                    onChange={(v) => update((p) => ({ ...p, ending: v }))}
+                  />
                 </section>
                 {model.works.items.map((w) => (
                   <section key={w.chip.code} className={styles.group}>

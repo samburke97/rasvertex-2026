@@ -115,6 +115,7 @@ const PAGE_ROWS = [
   { id: "register", name: "Asset register" },
   { id: "photos", name: "Supporting photos" },
   { id: "cert", name: "Certification" },
+  { id: "end", name: "Also worth adding" },
 ];
 
 export default function AnchorInspectionPage({
@@ -774,7 +775,12 @@ export default function AnchorInspectionPage({
 
       {/* ── Body ── */}
       <div className={styles.editorBody}>
-        <PageRail rows={PAGE_ROWS} sel={pagePanel.sel} onPick={(id) => pagePanel.pick(id, previewRef.current)} />
+        <PageRail
+          rows={PAGE_ROWS.map((r) => (r.id === "end" ? { ...r, hideable: true, hidden: report.ending === false } : r))}
+          sel={pagePanel.sel}
+          onPick={(id) => pagePanel.pick(id, previewRef.current)}
+          onToggle={(id) => id === "end" && setReport((r) => ({ ...r, ending: r.ending === false }))}
+        />
 
         {/* ── Preview: the report itself, scaled to the column ── */}
         <div ref={previewRef} className={styles.canvas} onClick={pagePanel.onDocClick}>
@@ -824,6 +830,8 @@ export default function AnchorInspectionPage({
             onJob={updateJob}
             comments={report.job.certComments}
             onComments={(v) => updateJob("certComments", v)}
+            ending={report.ending !== false}
+            onEnding={(v) => setReport((r) => ({ ...r, ending: v }))}
             technicianNotes={report.job.technicianNotes ?? ""}
             onTechnicianNotes={(v) => updateJob("technicianNotes", v)}
           />

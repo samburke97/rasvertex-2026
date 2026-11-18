@@ -60,6 +60,9 @@ interface AnchorOptionsPanelProps {
 
   comments: string;
   onComments: (v: string) => void;
+  /** The ending page: Also worth adding, Request a quote, who to call. */
+  ending: boolean;
+  onEnding: (v: boolean) => void;
   technicianNotes: string;
   onTechnicianNotes: (v: string) => void;
 }
@@ -154,6 +157,8 @@ export default function AnchorOptionsPanel({
   onJob,
   comments,
   onComments,
+  ending,
+  onEnding,
   technicianNotes,
   onTechnicianNotes,
 }: AnchorOptionsPanelProps) {
@@ -373,6 +378,16 @@ export default function AnchorOptionsPanel({
       <div className={styles.group} data-pages="cert">
         <div className={styles.groupLabel}>Certification comments</div>
         <RichBox value={comments} onChange={onComments} placeholder="Optional: shown under Please note" />
+      </div>
+
+      {/* ── Ending ─────────────────────────────────────────────────────── */}
+      <div className={styles.group} data-pages="end">
+        <ToggleRow
+          label="End with Also worth adding"
+          sub="A last page with our other services, Request a quote and who to call"
+          checked={ending}
+          onChange={onEnding}
+        />
       </div>
 
       {/* ── Supporting Photos — optional, off by default ────────────────── */}

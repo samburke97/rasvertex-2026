@@ -247,7 +247,7 @@ export interface InspectionModel {
   about: CardDef[];
   /** fit: how much of "Also worth adding" the space under the works table
    *  holds: the cards with photos, the cards without, or nothing. */
-  works: { items: WorkItem[]; extras: (ExtraDef & { n: number })[]; href: string; fit: "images" | "text" | "none" };
+  works: { items: WorkItem[]; extras: (ExtraDef & { n: number })[]; href: string; fit: "images" | "text" | "none"; ending: boolean };
   nDefects: number;
 }
 
@@ -786,7 +786,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     chapters: chapList.filter((c) => c.title).map((c) => ({ key: c.key, title: c.title })),
     hasOther: other.length > 0,
     about: lib.about.map((a, i) => ({ ...a, t: T(`about.${i}.t`, a.t), d: T(`about.${i}.d`, a.d) })),
-    works: { items, extras, href, fit: extras.length ? worksFit(items) : "none" },
+    works: { items, extras, href, fit: data.ending !== false && extras.length ? worksFit(items) : "none", ending: data.ending !== false },
     nDefects: nDef,
   };
 }

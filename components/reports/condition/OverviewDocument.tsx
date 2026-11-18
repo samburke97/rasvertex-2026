@@ -725,7 +725,7 @@ export default function OverviewDocument({ model, assets, screen, onCoverPointer
       <Cover ctx={ctx} />
       <Contents ctx={ctx} />
       {model.pages.map((p) => (
-        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-page={p.kind === "care" ? "warranty" : p.kind === "closer" ? undefined : p.kind}>
+        <div key={`${p.kind}-${p.no}`} className="ar-sheet" data-page={p.kind === "care" ? "warranty" : p.kind === "closer" ? "plan" : p.kind}>
           {p.kind === "hours" ? (
             <HoursPage ctx={ctx} page={p} />
           ) : p.kind === "method" ? (
