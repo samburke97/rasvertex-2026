@@ -633,7 +633,7 @@ const FLOW_ITEMS: Record<"project" | "intro" | "maintenance" | "accept", (p: Pro
     // Table head, two group bars and eight rows.
     { id: "table", h: TABLE_HEAD + (16 + 68) + (28 + 68) + 8 * 53, mt: 56 },
     { id: "price", h: 260, mt: 72 },
-    { id: "contact", h: 146, mt: 40 },
+    { id: "contact", h: 208, mt: 56 },
   ],
   accept: (p) => [
     { id: "h2", h: H2, mt: 0, keep: true },
