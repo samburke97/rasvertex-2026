@@ -109,8 +109,8 @@ const DEFAULT_REPORT: ConditionReportData = {
  *  data-pages refer to these ids. */
 const PAGE_ROWS = [
   { id: "cover", name: "Cover", num: "C" },
-  { id: "hours", name: "Hours" },
   { id: "method", name: "Methodology" },
+  { id: "hours", name: "Hours" },
   { id: "variations", name: "Variations" },
   { id: "photos", name: "Photos" },
   { id: "findings", name: "Findings" },

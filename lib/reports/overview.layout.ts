@@ -337,8 +337,8 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   const ws = normWarranties(report.warranty, report.job.date);
   const kinds = ws?.on ? WARRANTY_KINDS.filter((k) => ws[k]?.on) : [];
   const sections: SectionKey[] = [];
-  if (schedule.length) sections.push("hours");
   if (method) sections.push("method");
+  if (schedule.length) sections.push("hours");
   if (variations.length) sections.push("variations");
   if (photos.length) sections.push("photos");
   if (findings.length) sections.push("findings");
@@ -354,14 +354,6 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   // How full the last page is, when the section that made it knows; null
   // otherwise (hours, warranties). Decides where the closer goes.
   let lastUsed: number | null = null;
-
-  // Hours: the table, its header repeated on every page. A section header
-  // never sits alone at a page foot.
-  if (schedule.length) {
-    const items = hourItems(schedule, settings.scheduleSections);
-    const split = paginateHours(items, settings.showScheduleNotes, SEC_LABEL + H2 + T_INTRO - LEDE_LINE + ledeH(hoursLede), SEC_LABEL);
-    split.forEach((items, i) => pages.push({ kind: "hours", no: no(), first: i === 0, items }));
-  }
 
   // Methodology: each stage's head, then its numbered steps; a stage split
   // across pages repeats its head. The photo, if any, closes the section.
@@ -402,6 +394,15 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     }
     lastUsed = used;
     pages.push(page);
+  }
+
+  // Hours, always straight after the methodology: the table, its header
+  // repeated on every page. A section header never sits alone at a page foot.
+  if (schedule.length) {
+    const items = hourItems(schedule, settings.scheduleSections);
+    const split = paginateHours(items, settings.showScheduleNotes, SEC_LABEL + H2 + T_INTRO - LEDE_LINE + ledeH(hoursLede), SEC_LABEL);
+    split.forEach((items, i) => pages.push({ kind: "hours", no: no(), first: i === 0, items }));
+    lastUsed = null;
   }
 
   if (variations.length)
@@ -608,9 +609,13 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   const shownPhotos = photoItems.length > 14 ? [...photoItems.slice(0, 13), { name: `And ${photoItems.length - 13} more days`, page: "" }] : photoItems;
 
   const toc: OverviewModel["toc"] = [];
-  if (jobItems.length) toc.push({ title: "The job", items: jobItems });
-  if (firstOf("method")) toc.push({ title: "The works", items: [{ name: "Methodology", page: String(firstOf("method")) }] });
-  if (firstOf("variations")) toc[toc.length - 1]?.title === "The works" ? toc[toc.length - 1].items.push({ name: "Variations", page: String(firstOf("variations")) }) : toc.push({ title: "The works", items: [{ name: "Variations", page: String(firstOf("variations")) }] });
+  // The works, in page order: methodology, hours, variations.
+  const works = [
+    ...(firstOf("method") ? [{ name: "Methodology", page: String(firstOf("method")) }] : []),
+    ...jobItems,
+    ...(firstOf("variations") ? [{ name: "Variations", page: String(firstOf("variations")) }] : []),
+  ];
+  if (works.length) toc.push({ title: "The works", items: works });
   if (shownPhotos.length) toc.push({ title: "Photos", items: shownPhotos });
   if (firstOf("findings")) toc.push({ title: "Findings", items: [{ name: "Recommended additional works", page: String(firstOf("findings")) }] });
   if (firstOf("plan")) toc.push({ title: "Recommendations", items: [{ name: "Recommended works", page: String(firstOf("plan")) }] });
