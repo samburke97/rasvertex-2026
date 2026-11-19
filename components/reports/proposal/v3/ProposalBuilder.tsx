@@ -25,7 +25,7 @@ import { streamPhotoImport } from "@/lib/reports/streamPhotoImport";
 import { compressMapImageDataUrl } from "@/lib/reports/compressImage";
 import { deleteReportPhoto, uploadReportPhoto } from "@/lib/reports/uploadPhoto";
 import { derive } from "@/lib/reports/proposal/v3/derive";
-import { enabledPhotos, fillTitles, standardFromPhotos, syncSurvey } from "@/lib/reports/proposal/v3/survey";
+import { enabledPhotos, fillTitles, refillFindings, standardFromPhotos, syncSurvey } from "@/lib/reports/proposal/v3/survey";
 import {
   LIBRARY_FOLDERS,
   LIMITS,
@@ -114,6 +114,9 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGen = useRef(0);
   const startedFolders = useRef(new Set<string>());
+  // Reload from SimPRO: rebuild the findings from the fresh photos, in this
+  // style, once they've all arrived.
+  const refill = useRef<Proposal["d"]["findings"]["style"] | null>(null);
   const dirty = useRef(false);
   const autoFilled = useRef(-1); // loadGen the findings were auto-filled for
 
@@ -262,8 +265,15 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
     }
     if (!enabledPhotos(p).length) return;
     autoFilled.current = loadGen.current;
+    const style = refill.current;
+    refill.current = null;
     update((prev) => {
       const next = standardFromPhotos(prev);
+      // Reloaded: only the findings are rebuilt (codes and locations from
+      // the new tags in report style); which pages show, and everything
+      // else, stays as it was. syncSurvey (in update) then refreshes the
+      // survey's automatic rows; rows added or edited by hand are kept.
+      if (style) return refillFindings(prev);
       // Standard style has no use for empty Flagged / Pre-start pages.
       const hidden = { ...next.hidden };
       if (!prev.d.flagged.rows.length) hidden.flagged = true;
@@ -332,10 +342,19 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
     [update],
   );
 
-  // Fetch the folder list again, and re-stream every switched-on folder.
-  // Photos already here are skipped by id, so only new ones arrive.
+  // A fresh fetch: nothing kept from before. Every SimPRO photo is dropped
+  // and downloaded again with its current file name (renamed or re-tagged
+  // in SimPRO), and the findings (and with them the survey's automatic
+  // rows) are rebuilt from them once they're in. Uploads, pricing, page
+  // choices and everything else stay.
   const reloadSimpro = useCallback(async () => {
     if (!p || reloading) return;
+    const ok = await confirm({
+      title: "Reload photos from SimPRO?",
+      body: "Every SimPRO photo is fetched again with its current file name, and the findings and site survey are rebuilt from the new tags. Changes made to the findings here are replaced; the rest of the proposal stays as it is.",
+      ok: "Reload",
+    });
+    if (!ok) return;
     setReloading(true);
     try {
       const res = await fetch(`/api/simpro/quotes/${p.quote}/attachments/folders`).catch(() => null);
@@ -344,16 +363,30 @@ export default function ProposalBuilder({ onBack }: { onBack: () => void }) {
         return;
       }
       const list: SimproFolder[] = ((await res.json()).folders ?? []).map((f: SimproFolder) => ({ ...f, id: "sp:" + f.id }));
-      for (const f of list) startedFolders.current.delete(f.id);
-      update((prev) => ({
-        ...prev,
-        simpro: { ...prev.simpro, folders: list },
-        folders: [...new Set([...prev.folders, ...list.filter((f) => f.id === UNFILED).map((f) => f.id)])],
-      }));
+      // The old copies are replaced by the new ones.
+      for (const ph of p.simpro.photos) void deleteReportPhoto(ph.url);
+      refill.current = p.d.findings.style;
+      loadGen.current++;
+      startedFolders.current = new Set();
+      setLoadingFolders([]);
+      setFocusFinding(null);
+      setPicker(null);
+      dirty.current = true;
+      // SimPRO's data, not an edit: the undo history starts again.
+      history.reset((prev) =>
+        prev
+          ? {
+              ...prev,
+              simpro: { folders: list, photos: [] },
+              folders: [...new Set([...prev.folders, ...list.filter((f) => f.id === UNFILED).map((f) => f.id)])],
+              d: { ...prev.d, findings: { ...prev.d.findings, items: [] } },
+            }
+          : prev,
+      );
     } finally {
       setReloading(false);
     }
-  }, [p, reloading, update]);
+  }, [p, reloading, history, confirm]);
 
   const pickFinding = useCallback((i: number | null, scroll: boolean) => {
     setSel("findings");

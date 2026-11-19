@@ -161,6 +161,17 @@ export function recodeFromTags(p: Proposal): Proposal {
   return { ...p, d: { ...p.d, findings: { ...p.d.findings, items } } };
 }
 
+/** After Reload from SimPRO: the findings rebuilt from the fresh photos in
+ *  the style already in use (codes and locations from the tags in report
+ *  style). Only the findings change; which pages show and everything else
+ *  stays. Run through syncSurvey afterwards for the survey's automatic rows. */
+export function refillFindings(p: Proposal): Proposal {
+  const style = p.d.findings.style;
+  const fresh = standardFromPhotos(p);
+  const built = style === "report" ? recodeFromTags({ ...fresh, d: { ...fresh.d, findings: { ...fresh.d.findings, style } } }) : fresh;
+  return { ...p, d: { ...p.d, findings: { ...p.d.findings, items: built.d.findings.items } } };
+}
+
 /** Keeps Flagged issues and Pre-start in step with the findings' codes (report
  *  style only). Automatic rows are rebuilt from every code in use — counted
  *  by location, where a tag gives one — and dropped when no finding uses the
