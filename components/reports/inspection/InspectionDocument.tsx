@@ -13,6 +13,7 @@
 // content width; its [data-bk] heights feed paginate() (lib/reports/
 // inspection/generate.ts), which decides what goes on each page.
 
+import { PLAN_CSS, PlanHead, PlanRow } from "@/components/reports/shared/doc/PlanTable";
 import type { CSSProperties, PointerEvent, ReactNode } from "react";
 import { sanitizeNotesHtml } from "@/lib/reports/richText";
 import type { ImageKey } from "@/lib/reports/inspection/codes";
@@ -169,12 +170,6 @@ export const INSPECTION_CSS = `
 .ir-cols-def{grid-template-columns:90px 320px minmax(0,1fr) minmax(0,1fr)}
 .ir-cols-ix{grid-template-columns:150px 110px 110px minmax(0,1fr) 220px}
 .ir-cols-works{grid-template-columns:64px 340px minmax(0,1fr) 180px}
-.ir-cols-plan{grid-template-columns:minmax(0,1fr) 200px 170px}
-.ir-cols-plan-next{grid-template-columns:minmax(0,1fr) 190px 170px 170px}
-.ir-cols-plan.ir-tbl-row,.ir-cols-plan-next.ir-tbl-row{padding:16px 0}
-.ir-prio{justify-self:start}
-.ir-prio--required{background:#fcf0dc;color:#86561a}
-.ir-prio--recommended{background:#eef1f6;color:rgba(1,25,85,.72)}
 .ir-cell{font-size:20px}
 .ir-cell--strong{font-size:20px;font-weight:600}
 .ir-cell--muted{font-size:20px;color:var(--ink-65)}
@@ -266,7 +261,7 @@ export const INSPECTION_CSS = `
 .ir a.ir-btn--primary{color:#fff}
 .ir-contact{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:16px 40px;padding-top:32px;border-top:1px solid var(--rule)}
 .ir-contact p{font-size:20px}
-`;
+` + PLAN_CSS;
 
 export function InspectionStyles() {
   return <style dangerouslySetInnerHTML={{ __html: INSPECTION_CSS }} />;
@@ -535,26 +530,9 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
         </div>
       );
     case "planHead":
-      return (
-        <div className={`ir-tbl-head ${b.next ? "ir-cols-plan-next" : "ir-cols-plan"}`}>
-          <span>Service</span>
-          <span>Frequency</span>
-          <span>Priority</span>
-          {b.next && <span>Next due</span>}
-        </div>
-      );
+      return <PlanHead next={b.next} base="ir-tbl-head" />;
     case "planRow":
-      return (
-        <div className={rowCls(b.next ? "ir-cols-plan-next" : "ir-cols-plan")} data-edit="plan">
-          <div>
-            <div className="ir-cell--strong">{b.item.service}</div>
-            {b.item.note?.trim() && <div className="ir-cell--small">{b.item.note}</div>}
-          </div>
-          <span className="ir-cell--muted">{b.item.interval}</span>
-          <span className={`ir-chip ir-chip--band ir-prio ir-prio--${b.item.priority}`}>{b.item.priority === "required" ? "Required" : "Recommended"}</span>
-          {b.next && <span className="ir-cell--muted">{b.item.next || "—"}</span>}
-        </div>
-      );
+      return <PlanRow item={b.item} next={b.next} base={rowCls("").trim()} edit="plan" />;
     case "planNotes":
       return (
         <div className="ir-notes" data-edit="plan.notes">

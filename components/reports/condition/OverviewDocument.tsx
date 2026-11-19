@@ -12,6 +12,7 @@
 
 import type { PointerEvent } from "react";
 import { ANCHOR_CSS, quoteHref, ReportEnd } from "@/components/reports/anchor-inspection/AnchorDocument";
+import { PLAN_CSS, PlanHead, PlanRow } from "@/components/reports/shared/doc/PlanTable";
 import type { AnchorImageKey } from "@/lib/reports/anchor.layout";
 import {
   formatHours,
@@ -87,12 +88,6 @@ export const OVERVIEW_CSS =
 .jo-mphoto{position:relative;margin-top:56px;height:760px;border-radius:20px;overflow:hidden;background:var(--grey);flex-shrink:0}
 .jo-mphoto img{width:100%;height:100%;display:block}
 .jo-cap{font-size:17px;line-height:1.4;color:var(--ink-55);margin-top:14px}
-.jo-plan{grid-template-columns:minmax(0,1fr) 200px 170px}
-.jo-plan--next{grid-template-columns:minmax(0,1fr) 190px 170px 170px}
-.jo-plan.ar-tr,.jo-plan--next.ar-tr{padding:16px 0}
-.jo-prio{justify-self:start;display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
-.jo-prio--required{background:#fcf0dc;color:#86561a}
-.jo-prio--recommended{background:#eef1f6;color:rgba(1,25,85,.72)}
 .jo-wfacts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:56px}
 .jo-wfacts .ar-fact__v,.jo-wfacts b{font-size:20px;font-weight:700;line-height:1.3}
 .jo-detail{display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px;align-items:baseline;padding:16px 0;border-bottom:var(--rule)}
@@ -104,7 +99,8 @@ export const OVERVIEW_CSS =
 .jo-sched{grid-template-columns:200px 280px minmax(0,1fr)}
 .jo-sched.ar-tr{padding:18px 0;align-items:start}
 .jo-small{font-size:17px;line-height:1.5;color:var(--ink-60);text-wrap:pretty}
-`;
+` +
+  PLAN_CSS;
 
 export function OverviewStyles() {
   return <style dangerouslySetInnerHTML={{ __html: OVERVIEW_CSS }} />;
@@ -380,7 +376,6 @@ function MethodPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "meth
 function PlanPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "plan" }> }) {
   const { model } = ctx;
   const p = model.plan!;
-  const cols = p.next ? "jo-plan--next" : "jo-plan";
   return (
     <section className="ar-page">
       {page.first ? (
@@ -393,19 +388,9 @@ function PlanPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "plan" 
       )}
       {page.rows.length > 0 && (
         <div className="ar-table">
-          <div className={`ar-thead ${cols}`}>
-            <span>Service</span>
-            <span>Frequency</span>
-            <span>Priority</span>
-            {p.next && <span>Next due</span>}
-          </div>
+          <PlanHead next={p.next} base="ar-thead" />
           {page.rows.map((x, i) => (
-            <div key={i} className={`ar-tr ${cols}`}>
-              <span style={{ fontWeight: 600 }}>{x.service}</span>
-              <span className="ar-dim">{x.interval}</span>
-              <span className={`jo-prio jo-prio--${x.priority}`}>{x.priority === "required" ? "Required" : "Recommended"}</span>
-              {p.next && <span className="ar-dim">{x.next || "—"}</span>}
-            </div>
+            <PlanRow key={i} item={x} next={p.next} base="ar-tr" />
           ))}
         </div>
       )}
