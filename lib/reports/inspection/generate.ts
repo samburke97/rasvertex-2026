@@ -14,7 +14,8 @@
 //                 next page; a chapter that breaks starts with "{Zone},
 //                 continued"; a header is never left alone at a page foot.
 //
-// Pages: 1 Cover · 2 Contents · 3…n flowed pages · last Recommended works.
+// Pages: 1 Cover · 2 Contents · 3…n flowed pages · then Recommended works
+// (one sheet or more).
 
 import { planRows } from "@/lib/reports/maintenancePlan";
 import { DEFAULT_TAGS } from "@/lib/reports/settings/defaults";
@@ -57,18 +58,43 @@ const PER_ROW = 2;
 const wrapLines = (s: string, px: number, w: number, bold = false) =>
   Math.max(1, Math.ceil((s.length * px * (bold ? 0.55 : 0.5)) / w));
 
-/** The Recommended works page is one sheet, always ending with the quote
- *  button. What's left under the table decides whether "Also worth adding"
- *  shows with its photos (which then fill the space), as text only, or not
- *  at all. Heights follow the page's CSS. */
-function worksFit(items: WorkItem[]): "images" | "text" | "none" {
-  const rows = items.reduce(
-    (h, w) => h + 32 + Math.max(wrapLines(w.name, 20, 340, true) * 28, wrapLines(w.why.replace(/<[^>]*>/g, ""), 17, 432) * 24, wrapLines(w.zones, 17, 180) * 24),
-    0,
-  );
-  const left = PAGE_H - 80 - 96 - 115 /* label, title */ - 80 /* table head */ - rows - 210 /* button, contact */ - 30;
-  const text = 240; // title, card titles and two lines each
-  return left >= text + 140 ? "images" : left >= text ? "text" : "none";
+/** Recommended works flows over as many sheets as its rows need, the table
+ *  head repeated on each; the last sheet ends with the quote button and who
+ *  to call (a sheet of their own if they don't fit under the rows). What's
+ *  left above the button decides whether "Also worth adding" shows with its
+ *  photos (which then fill the space), as text only, or not at all. Heights
+ *  follow the page's CSS. */
+const workRowH = (w: WorkItem) =>
+  32 + Math.max(wrapLines(w.name, 20, 340, true) * 28, wrapLines(w.why.replace(/<[^>]*>/g, ""), 17, 432) * 24, wrapLines(w.zones, 17, 180) * 24);
+// Row heights are estimates: keep 5% spare so a row never runs off a page.
+const WORKS_FIRST = (PAGE_H - 80 - 96 - 115 /* label, title */ - 80) /* table head */ * 0.95;
+const WORKS_NEXT = (PAGE_H - 80 - 96 - 60 /* label */ - 80) /* table head */ * 0.95;
+const WORKS_END = 210 /* button, contact */ + 30;
+const EXTRAS_TEXT = 240; // title, card titles and two lines each
+const EXTRAS_IMG = 140;
+
+function worksPages(items: WorkItem[], ending: boolean, extras: boolean): { pages: WorkItem[][]; fit: "images" | "text" | "none" } {
+  const pages: WorkItem[][] = [[]];
+  let cap = WORKS_FIRST;
+  let used = 0;
+  for (const w of items) {
+    const h = workRowH(w);
+    if (pages[pages.length - 1].length && used + h > cap) {
+      pages.push([]);
+      cap = WORKS_NEXT;
+      used = 0;
+    }
+    pages[pages.length - 1].push(w);
+    used += h;
+  }
+  if (!ending) return { pages, fit: "none" };
+  let left = cap - used - WORKS_END;
+  if (left < 0) {
+    pages.push([]);
+    left = WORKS_NEXT + 80 - WORKS_END;
+  }
+  const fit = !extras ? "none" : left >= EXTRAS_TEXT + EXTRAS_IMG ? "images" : left >= EXTRAS_TEXT ? "text" : "none";
+  return { pages, fit };
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -247,7 +273,9 @@ export interface InspectionModel {
   about: CardDef[];
   /** fit: how much of "Also worth adding" the space under the works table
    *  holds: the cards with photos, the cards without, or nothing. */
-  works: { items: WorkItem[]; extras: (ExtraDef & { n: number })[]; href: string; fit: "images" | "text" | "none"; ending: boolean };
+  /** pages: the rows on each Recommended works sheet; fit: how much of
+   *  "Also worth adding" the space on the last one holds. */
+  works: { items: WorkItem[]; pages: WorkItem[][]; extras: (ExtraDef & { n: number })[]; href: string; fit: "images" | "text" | "none"; ending: boolean };
   nDefects: number;
 }
 
@@ -739,7 +767,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       add({ type: "planNotes", key: "plan-notes", html: notes, gap: 72, est: 120 + notesLineCount(notes) * 32 });
   }
 
-  // 07 Recommended works (own page, rendered outside the flow)
+  // 07 Recommended works (its own sheets after the flow: worksPages)
   const items: WorkItem[] = present.map((code) => ({
     chip: chip(code),
     name: T(`works.${code}.name`, CODE_MAP[code].work),
@@ -786,7 +814,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     chapters: chapList.filter((c) => c.title).map((c) => ({ key: c.key, title: c.title })),
     hasOther: other.length > 0,
     about: lib.about.map((a, i) => ({ ...a, t: T(`about.${i}.t`, a.t), d: T(`about.${i}.d`, a.d) })),
-    works: { items, extras, href, fit: data.ending !== false && extras.length ? worksFit(items) : "none", ending: data.ending !== false },
+    works: { items, extras, href, ending: data.ending !== false, ...worksPages(items, data.ending !== false, extras.length > 0) },
     nDefects: nDef,
   };
 }
@@ -802,7 +830,7 @@ export type PlacedBlock = Block & {
 
 export interface Layout {
   pages: PlacedBlock[][];
-  /** Page count including cover, contents and the works page. */
+  /** Page count including cover, contents and the works sheets. */
   total: number;
   secPage: Partial<Record<SectionKey, number>>;
   chapPage: Record<string, number>;
@@ -816,7 +844,8 @@ const RULED: BlockType[] = ["kRow", "defect", "ixRow", "planRow"];
 /** First flowed page's number (after Cover and Contents). */
 const FIRST_FLOW_PAGE = 3;
 
-export function paginate(blocks: Block[], heights: Record<string, number>): Layout {
+/** worksPages: how many sheets Recommended works takes (model.works.pages). */
+export function paginate(blocks: Block[], heights: Record<string, number>, worksPages = 1): Layout {
   const hOf = (b: Block) => heights[b.key] ?? b.est;
   const pages: PlacedBlock[][] = [];
   const startPage = new Map<Block, number>();
@@ -868,8 +897,8 @@ export function paginate(blocks: Block[], heights: Record<string, number>): Layo
   }
   let sec: SectionKey = "about";
   const pageSec = pages.map((page) => (sec = page.find((b) => b.secKey)?.secKey ?? sec));
-  const total = pages.length + FIRST_FLOW_PAGE;
-  secPage.works = total;
+  secPage.works = pages.length + FIRST_FLOW_PAGE;
+  const total = pages.length + FIRST_FLOW_PAGE + worksPages - 1;
   return { pages, total, secPage, chapPage, pageSec };
 }
 

@@ -332,7 +332,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     if (changed) setHeights(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r?.photos, r?.job, r?.text, r?.hidden, !!model?.mapPhotoId, fontsReady, !!model, confirmed]);
-  const layout = useMemo(() => (model ? paginate(model.blocks, heights) : null), [model, heights]);
+  const layout = useMemo(() => (model ? paginate(model.blocks, heights, model.works.pages.length) : null), [model, heights]);
 
   const urlById = useMemo(() => new Map((r ? reportImages(r) : []).map((p) => [p.id, p.url])), [r]);
   const photoUrl = useCallback((id: string | null) => (id ? (urlById.get(id) ?? null) : null), [urlById]);

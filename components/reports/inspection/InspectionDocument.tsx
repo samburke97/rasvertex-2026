@@ -247,6 +247,7 @@ export const INSPECTION_CSS = `
 .ir-note p{font-size:17px;line-height:1.6;color:var(--ink-60);text-wrap:pretty}
 
 .ir-works-tbl{margin-top:48px;display:flex;flex-direction:column}
+.ir-works-tbl--cont{margin-top:0}
 .ir-extras-title{margin-top:64px}
 .ir-extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:32px}
 .ir-extras--img{flex:1 1 auto;min-height:0}
@@ -696,6 +697,7 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
   const { works, sections } = ctx.model;
   const sec = sections.find((s) => s.key === "works")!;
   const contact = contactFor(job.contact);
+  const first = layout.secPage.works ?? layout.total;
   const extras = works.fit !== "none" && (
     <>
       <h3 className="ir-h-card ir-extras-title">Also worth adding</h3>
@@ -712,61 +714,77 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
       </div>
     </>
   );
+  // One sheet per page of rows; the last ends with the button and contact
+  // (no footer), the others carry the page number like every flowed page.
   return (
-    <div className="ir-sheet" data-pageno={layout.total} data-section="works">
-      <section className="ir-page ir-page--works">
-        <div className="ir-seclabel">
-          <span>{sec.label}</span>
-        </div>
-        <h2 className="ir-h-section" data-edit="sec.works.title">
-          {sec.title}
-        </h2>
+    <>
+      {works.pages.map((rows, pi) => {
+        const last = pi === works.pages.length - 1;
+        return (
+          <div key={pi} className="ir-sheet" data-pageno={first + pi} data-section="works">
+            <section className="ir-page ir-page--works">
+              <div className="ir-seclabel">
+                <span>{pi === 0 ? sec.label : `${sec.title}, continued`}</span>
+              </div>
+              {pi === 0 && (
+                <h2 className="ir-h-section" data-edit="sec.works.title">
+                  {sec.title}
+                </h2>
+              )}
 
-        <div className="ir-works-tbl">
-          <div className="ir-tbl-head ir-cols-works">
-            <span>Code</span>
-            <span>Work</span>
-            <span>Why</span>
-            <span>Where</span>
-          </div>
-          {works.items.map((w, i) => (
-            <div
-              key={w.chip.code}
-              className={`ir-tbl-row ir-cols-works${i < works.items.length - 1 ? " is-ruled" : ""}`}
-            >
-              <ChipView chip={w.chip} />
-              <span className="ir-cell--strong" data-edit={`works.${w.chip.code}.name`}>
-                {w.name}
-              </span>
-              <Rt className="ir-cell--small" edit={`works.${w.chip.code}.why`} v={w.why} />
-              <span className="ir-cell--small">{w.zones || "—"}</span>
-            </div>
-          ))}
-        </div>
+              {rows.length > 0 && (
+                <div className={`ir-works-tbl${pi ? " ir-works-tbl--cont" : ""}`}>
+                  <div className="ir-tbl-head ir-cols-works">
+                    <span>Code</span>
+                    <span>Work</span>
+                    <span>Why</span>
+                    <span>Where</span>
+                  </div>
+                  {rows.map((w, i) => (
+                    <div key={w.chip.code} className={`ir-tbl-row ir-cols-works${i < rows.length - 1 ? " is-ruled" : ""}`}>
+                      <ChipView chip={w.chip} />
+                      <span className="ir-cell--strong" data-edit={`works.${w.chip.code}.name`}>
+                        {w.name}
+                      </span>
+                      <Rt className="ir-cell--small" edit={`works.${w.chip.code}.why`} v={w.why} />
+                      <span className="ir-cell--small">{w.zones || "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
-        {/* Photos (if shown) take whatever space is left; the button and
-            contact always close the page. No footer. */}
-        {extras}
-        {works.fit !== "images" && <div style={{ flex: "1 1 auto" }} />}
-        {works.ending && (
-        <div className="ir-cta">
-          <a className="ir-btn ir-btn--primary" href={works.href}>
-            Request a quote
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-          </a>
-          <div className="ir-contact" data-edit="job.contact">
-            <h3 className="ir-h-sub">Any questions? Reach out.</h3>
-            <p>
-              {contact.name}
-              {contact.title ? `, ${contact.title}` : ""} · <strong>{contact.phone}</strong> · <strong>{contact.email}</strong>
-            </p>
+              {last ? (
+                <>
+                  {/* Photos (if shown) take whatever space is left; the button
+                      and contact always close the section. No footer. */}
+                  {extras}
+                  {works.fit !== "images" && <div style={{ flex: "1 1 auto" }} />}
+                  {works.ending && (
+                    <div className="ir-cta">
+                      <a className="ir-btn ir-btn--primary" href={works.href}>
+                        Request a quote
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                          <path d="M5 12h14M13 6l6 6-6 6" />
+                        </svg>
+                      </a>
+                      <div className="ir-contact" data-edit="job.contact">
+                        <h3 className="ir-h-sub">Any questions? Reach out.</h3>
+                        <p>
+                          {contact.name}
+                          {contact.title ? `, ${contact.title}` : ""} · <strong>{contact.phone}</strong> · <strong>{contact.email}</strong>
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Footer no={first + pi} total={layout.total} />
+              )}
+            </section>
           </div>
-        </div>
-        )}
-      </section>
-    </div>
+        );
+      })}
+    </>
   );
 }
 
