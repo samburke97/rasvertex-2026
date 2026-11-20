@@ -327,13 +327,14 @@ function runsOf(cells: WeekCell[][], edited: boolean[]): WeekRun[] {
 }
 
 // Heights in page units, for splitting rows across pages: a row (38 + its
-// rule), each extra item of a split day (28 bar + 4 gap), and the room under
-// the title on the first sheet and on the rest. Compact rows (24px bars) are
-// used when they keep everyone on one sheet and normal rows don't.
+// rule), the extra a split day adds (two 22 bars + 4 gap, in place of one
+// 28 bar), and the room under the title on the first sheet and on the rest.
+// Compact rows (24px bars) are used when they keep everyone on one sheet and
+// normal rows don't.
 const ROW_H = 39;
-const ITEM_H = 32;
+const ITEM_H = 20;
 const ROW_H_COMPACT = 32;
-const ITEM_H_COMPACT = 26;
+const ITEM_H_COMPACT = 18;
 const FIRST_BODY = 900;
 const NEXT_BODY = 990;
 /** Day columns on one sheet. */
@@ -419,8 +420,9 @@ export function buildWeekModel(
   if (!chunks.length) chunks.push([]);
 
   // Rows: as many as fit on each sheet; compact when that makes them fit.
-  // A day is one bar ("A / B"), so rows don't grow; kept for a stacked day.
-  const extra = (_r: WeekRow, _cols: number[]) => 0;
+  // A row with a two-job day is taller (its bars stacked); the rest of the
+  // row stays centred.
+  const extra = (r: WeekRow, cols: number[]) => (cols.some((i) => r.cells[i].length > 1) ? 1 : 0);
   const height = (cols: number[], row: number, item: number) => rows.reduce((t, r) => t + row + item * extra(r, cols), 0);
   const compact = chunks.some((cols, k) => {
     const room = k ? NEXT_BODY : FIRST_BODY;

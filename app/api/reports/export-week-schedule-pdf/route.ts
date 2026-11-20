@@ -1,5 +1,6 @@
 // app/api/reports/export-week-schedule-pdf/route.ts
-// The Weekly schedule to PDF, from the same component the builder previews
+// The Weekly schedule to PDF (or, with format "png", one image of every
+// sheet stacked), from the same component the builder previews
 // (WeekScheduleDocument), with the schedule the builder already read and its
 // edits (overrides and site aliases) laid over it, so the PDF matches the
 // preview.
@@ -19,7 +20,7 @@ import {
   type WeekOptions,
   type WeekScheduleResponse,
 } from "@/lib/reports/weekSchedule";
-import { pdfDownloadResponse, renderPDF } from "@/lib/server/pdf-utils";
+import { pdfDownloadResponse, renderPDF, renderPNG } from "@/lib/server/pdf-utils";
 import { loadAssets } from "@/lib/server/anchorPdf";
 
 interface Body {
@@ -31,6 +32,7 @@ interface Body {
   aliases?: SiteAliases;
   opts?: Partial<WeekOptions>;
   hidden?: number[];
+  format?: "pdf" | "png";
 }
 
 export async function POST(request: NextRequest) {
@@ -40,7 +42,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { filename = "Weekly Schedule", from, to, data, opts, hidden = [], draft, aliases = {} } = body;
+  const { filename = "Weekly Schedule", from, to, data, opts, hidden = [], draft, aliases = {}, format = "pdf" } = body;
   const day = /^\d{4}-\d{2}-\d{2}$/;
   if (!data || !from || !to || !day.test(from) || !day.test(to)) {
     return NextResponse.json({ error: "from, to and data are required" }, { status: 400 });
@@ -63,11 +65,22 @@ ${fontCSS}
 @page{size:${WEEK_PAGE_W}px ${WEEK_PAGE_H}px;margin:0;}
 html,body{margin:0;padding:0;background:#fff;}
 ${WEEK_CSS}
+${format === "png" ? ".ar-sheet+.ar-sheet{border-top:24px solid #eef1f6}" : ""}
 </style></head><body>${renderToStaticMarkup(createElement(WeekScheduleDocument, { model, logo: doc.images.logo }))}</body></html>`;
+    if (format === "png") {
+      const png = await renderPNG(html, { width: WEEK_PAGE_W });
+      const name = filename.trim().replace(/\.png$/i, "") + ".png";
+      return new Response(new Uint8Array(png), {
+        headers: {
+          "Content-Type": "image/png",
+          "Content-Disposition": `attachment; filename="${name.replace(/[^\x20-\x7e]|"/g, "-")}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+        },
+      });
+    }
     const buffer = await renderPDF(html, { pageSize: { width: `${WEEK_PAGE_W}px`, height: `${WEEK_PAGE_H}px` } });
     return pdfDownloadResponse(buffer, filename);
   } catch (err) {
     console.error("[ExportWeekSchedulePDF]", err);
-    return NextResponse.json({ error: "PDF generation failed." }, { status: 500 });
+    return NextResponse.json({ error: `${format === "png" ? "Image" : "PDF"} generation failed.` }, { status: 500 });
   }
 }

@@ -103,7 +103,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
   const [hidden, setHidden] = useState<number[]>([]);
   const [opts, setOpts] = useState<WeekOptions>(DEFAULT_WEEK_OPTIONS);
   const [copied, setCopied] = useState<"ok" | "fail" | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<"pdf" | "png" | null>(null);
 
   useEffect(() => {
     setHidden(readJSON<number[]>(HIDDEN_KEY, []));
@@ -318,16 +318,16 @@ export default function WeekSchedulePage({ onBack }: Props) {
     setTimeout(() => setCopied(null), 2500);
   }, [model, opts.refs]);
 
-  // ── Download PDF ─────────────────────────────────────────────────────────
-  const downloadPDF = useCallback(async () => {
+  // ── Download PDF or PNG ──────────────────────────────────────────────────
+  const download = useCallback(async (format: "pdf" | "png") => {
     if (!data) return;
-    setExporting(true);
+    setExporting(format);
     const filename = `Weekly Schedule ${range.from}${range.to !== range.from ? ` to ${range.to}` : ""}`;
     try {
       const res = await fetch("/api/reports/export-week-schedule-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename, from: range.from, to: range.to, data, opts, hidden, draft, aliases }),
+        body: JSON.stringify({ filename, from: range.from, to: range.to, data, opts, hidden, draft, aliases, format }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -336,7 +336,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename + ".pdf";
+      a.download = `${filename}.${format}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -345,7 +345,7 @@ export default function WeekSchedulePage({ onBack }: Props) {
       console.error("[ExportWeekSchedulePDF]", err);
       alert(err instanceof Error ? err.message : "Export failed. Please try again.");
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   }, [data, range, opts, hidden, draft, aliases]);
 
@@ -421,8 +421,11 @@ export default function WeekSchedulePage({ onBack }: Props) {
         <HeaderButton onClick={copyForExcel} disabled={!ready}>
           Copy for Excel
         </HeaderButton>
-        <HeaderButton primary onClick={downloadPDF} disabled={!ready || exporting}>
-          {exporting ? "Exporting…" : "Download PDF"}
+        <HeaderButton onClick={() => download("png")} disabled={!ready || !!exporting}>
+          {exporting === "png" ? "Exporting…" : "Download PNG"}
+        </HeaderButton>
+        <HeaderButton primary onClick={() => download("pdf")} disabled={!ready || !!exporting}>
+          {exporting === "pdf" ? "Exporting…" : "Download PDF"}
         </HeaderButton>
       </BuilderHeader>
 

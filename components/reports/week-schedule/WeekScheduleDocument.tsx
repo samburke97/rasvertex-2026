@@ -30,10 +30,15 @@ export const WEEK_CSS =
 .ws-bar span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ws-ref{flex-shrink:0;margin-left:auto;font-size:13px;font-weight:400;color:var(--ink-45);font-variant-numeric:tabular-nums}
 .ws-bar--off{background:none;box-shadow:inset 0 0 0 1px rgba(1,25,85,.12);padding:0 12px;font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-35)}
+/* A day with two jobs: one short bar each, stacked, smaller type. */
+.ws-run--split{gap:4px}
+.ws-run--split .ws-bar{height:22px;padding:0 10px;border-radius:6px;font-size:13.5px}
+.ws-run--split .ws-ref{font-size:11.5px}
 .ws--compact .ws-tr{min-height:32px;padding:3px 0}
 .ws--compact .ws-run{gap:2px}
 .ws--compact .ws-bar{height:24px;font-size:15px}
 .ws--compact .ws-empty{height:24px}
+.ws--compact .ws-run--split .ws-bar{height:19px;font-size:12.5px}
 /* Jobs starting (scoped .jb): the overview table after the schedule. */
 .ws .jb .ar-page{padding:80px 96px 0}
 .jb-top{display:flex;align-items:flex-start;justify-content:space-between;gap:40px}
@@ -64,12 +69,11 @@ export const WEEK_EDIT_CSS = `
 .ws-x{position:absolute;right:-9px;top:-9px;width:22px;height:22px;border:0;border-radius:50%;background:#fff;color:var(--navy);box-shadow:0 1px 5px rgba(1,25,85,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity 100ms}
 .ws-bar:hover .ws-x,.ws-bar.is-on .ws-x{opacity:1}
 .ws-x:hover{color:#a83a3a}
+.ws-run--split .ws-x{width:18px;height:18px;right:-7px;top:-7px}
 .ws-edit .ws-name{position:relative;display:flex;align-items:center;gap:8px;padding-right:30px}
 .ws-name span{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .ws-name .ws-x{position:static;flex-shrink:0;margin-left:auto}
 .ws-name:hover .ws-x{opacity:1}
-.ws-part{cursor:pointer;border-radius:4px}
-.ws-part:hover{text-decoration:underline;text-underline-offset:3px}
 .ws-dot{flex-shrink:0;width:7px;height:7px;border-radius:50%;background:#3e7fb0}
 .ws-empty{grid-row:1;height:28px;border:0;border-radius:8px;background:none;cursor:pointer;color:transparent;font-size:18px;line-height:1}
 .ws-empty:hover,.ws-empty.is-on{background:rgba(1,25,85,.04);color:var(--ink-35);box-shadow:inset 0 0 0 1px rgba(1,25,85,.12)}
@@ -99,64 +103,49 @@ export const pickKey = (p: WeekPick) => `${p.staffId}|${p.days[0]}|${p.item}`;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** A run of days: one bar. A day with two jobs reads "A / B" (more: "+2"),
- *  coloured as its first; in the builder each name is picked on its own. */
+/** A run of days: one bar, or (a day with two jobs) one short bar per job,
+ *  stacked, each in its own colour with its own job number; a third job and
+ *  more read "+N" on the second. In the builder each bar is picked on its own. */
 function Run({ run, refs, staffId, isos, edit }: { run: WeekRun; refs: boolean; staffId: number; isos: string[]; edit?: WeekEditView }) {
   const days = isos.slice(run.start, run.start + run.span);
-  const first = run.items[0];
   const shown = run.items.slice(0, MAX_DAY_JOBS);
   const more = run.items.length - shown.length;
   const picks = run.items.map((_, i): WeekPick => ({ staffId, days, item: i }));
-  const on = picks.some((p) => edit?.selected === pickKey(p));
-  const allRefs = [...new Set(run.items.flatMap((it) => it.refs))];
+  const split = shown.length > 1;
   return (
-    <div className="ws-run" style={{ gridColumn: `${run.start + 2} / span ${run.span}` }}>
-      <div
-        className={`ws-bar${first.leave && !first.flag ? " ws-bar--off" : ""}${on ? " is-on" : ""}`}
-        style={first.tone ? { background: first.tone } : undefined}
-        onClick={edit ? (e) => edit.onPick(picks[0], e.currentTarget) : undefined}
-        title={edit ? "Click to edit" : run.items.length > 1 ? run.items.map((it) => it.label).join(" / ") : undefined}
-      >
-        <span>
-          {shown.map((it, i) => (
-            <span
-              key={i}
-              className={edit && run.items.length > 1 ? "ws-part" : undefined}
-              onClick={
-                edit && run.items.length > 1
-                  ? (e) => {
-                      e.stopPropagation();
-                      edit.onPick(picks[i], e.currentTarget.closest(".ws-bar") as HTMLElement);
-                    }
-                  : undefined
-              }
+    <div className={`ws-run${split ? " ws-run--split" : ""}`} style={{ gridColumn: `${run.start + 2} / span ${run.span}` }}>
+      {shown.map((it, i) => (
+        <div
+          key={i}
+          className={`ws-bar${it.leave && !it.flag ? " ws-bar--off" : ""}${edit?.selected === pickKey(picks[i]) ? " is-on" : ""}`}
+          style={it.tone ? { background: it.tone } : undefined}
+          onClick={edit ? (e) => edit.onPick(picks[i], e.currentTarget) : undefined}
+          title={edit ? "Click to edit" : undefined}
+        >
+          <span>
+            {it.label}
+            {i === shown.length - 1 && more > 0 && ` +${more}`}
+          </span>
+          {refs && it.refs.length > 0 && <span className="ws-ref">{refText(it.refs)}</span>}
+          {edit && run.edited && i === 0 && <span className="ws-dot" title="Edited here, not in SimPRO" />}
+          {edit && (
+            <button
+              type="button"
+              className="ws-x"
+              aria-label="Remove"
+              title="Remove"
+              onClick={(e) => {
+                e.stopPropagation();
+                edit.onRemove(picks[i]);
+              }}
             >
-              {i > 0 && " / "}
-              {it.label}
-            </span>
-          ))}
-          {more > 0 && ` +${more}`}
-        </span>
-        {refs && allRefs.length > 0 && <span className="ws-ref">{refText(allRefs)}</span>}
-        {edit && run.edited && <span className="ws-dot" title="Edited here, not in SimPRO" />}
-        {/* × only for a single item: on "A / B", pick a name, then Remove. */}
-        {edit && run.items.length === 1 && (
-          <button
-            type="button"
-            className="ws-x"
-            aria-label="Remove"
-            title="Remove"
-            onClick={(e) => {
-              e.stopPropagation();
-              edit.onRemove(picks[0]);
-            }}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-              <path d="M6 6l12 12M18 6L6 18" />
-            </svg>
-          </button>
-        )}
-      </div>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

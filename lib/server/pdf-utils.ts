@@ -286,6 +286,23 @@ export async function renderPDF(
   }
 }
 
+// The same HTML as an image instead of a PDF: the whole document, laid out
+// at `width` CSS pixels and captured at `scale` (2 = sharp on retina and
+// when zoomed in a chat).
+export async function renderPNG(htmlContent: string, options: { width: number; scale?: number }): Promise<Buffer> {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+  try {
+    await page.setViewport({ width: options.width, height: 800, deviceScaleFactor: options.scale ?? 2 });
+    await page.setContent(htmlContent, { waitUntil: "load", timeout: 30000 });
+    await page.evaluate(() => document.fonts.ready);
+    const png = await page.screenshot({ type: "png", fullPage: true });
+    return Buffer.from(png);
+  } finally {
+    await page.close();
+  }
+}
+
 // Loads html in the same cached browser and returns what `script` (an
 // expression, evaluated after fonts load) evaluates to — e.g. measuring
 // rendered block heights so a report can be paginated before it's printed.
