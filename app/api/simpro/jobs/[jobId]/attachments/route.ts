@@ -10,6 +10,9 @@
 import { jpegDataUrl } from "@/lib/server/heic";
 import { NextRequest, NextResponse } from "next/server";
 
+// Every photo, however many: a big job streams for a while.
+export const maxDuration = 300;
+
 const SIMPRO_BASE_URL = process.env.NEXT_PUBLIC_SIMPRO_BASE_URL;
 const SIMPRO_ACCESS_TOKEN = process.env.SIMPRO_ACCESS_TOKEN;
 
@@ -23,7 +26,6 @@ const PER_WORKER_DELAY_MS = 100;
 // asked for, so jobs with more attachments than one page need multiple
 // requests, paged via `page=`, concatenated together.
 const SIMPRO_PAGE_SIZE = 250;
-const MAX_ATTACHMENTS = 500;
 
 interface SimproAttachmentListItem {
   ID: string;
@@ -165,11 +167,7 @@ export async function GET(
         let attachmentsList: SimproAttachmentListItem[];
         try {
           attachmentsList = [];
-          for (
-            let page = 1;
-            attachmentsList.length < MAX_ATTACHMENTS;
-            page++
-          ) {
+          for (let page = 1; ; page++) {
             const listUrl = `${SIMPRO_BASE_URL}/api/v1.0/companies/${companyId}/jobs/${parsedJobId}/attachments/files/?pageSize=${SIMPRO_PAGE_SIZE}&page=${page}&columns=ID,Filename,Folder`;
             const pageItems =
               await simproFetchWithRetry<SimproAttachmentListItem[]>(listUrl);
@@ -177,9 +175,6 @@ export async function GET(
             // A short page means we've reached the end — no point requesting
             // another page that'll just come back empty.
             if (pageItems.length < SIMPRO_PAGE_SIZE) break;
-          }
-          if (attachmentsList.length > MAX_ATTACHMENTS) {
-            attachmentsList = attachmentsList.slice(0, MAX_ATTACHMENTS);
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);

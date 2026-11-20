@@ -11,7 +11,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSimproConfig, simproFetch } from "@/lib/server/simpro";
 
 const SIMPRO_PAGE_SIZE = 250;
-const MAX_ATTACHMENTS = 500;
 const IMAGE_EXT = /\.(jpg|jpeg|png|gif|webp|bmp|tiff|heic|heif)$/i;
 
 interface SimproAttachmentListItem {
@@ -42,7 +41,7 @@ export async function GET(
 
   try {
     const files: SimproAttachmentListItem[] = [];
-    for (let page = 1; files.length < MAX_ATTACHMENTS; page++) {
+    for (let page = 1; ; page++) {
       const pageItems = await simproFetch<SimproAttachmentListItem[]>(
         `${baseUrl}/api/v1.0/companies/${companyId}/quotes/${parsedQuoteId}/attachments/files/?pageSize=${SIMPRO_PAGE_SIZE}&page=${page}&columns=ID,Filename,Folder`,
       );
@@ -52,7 +51,7 @@ export async function GET(
 
     const order: string[] = [];
     const folders = new Map<string, { id: string; name: string; count: number }>();
-    for (const f of files.slice(0, MAX_ATTACHMENTS)) {
+    for (const f of files) {
       if (!IMAGE_EXT.test(f.Filename)) continue;
       const id = f.Folder ? String(f.Folder.ID) : "none";
       if (!folders.has(id)) {
