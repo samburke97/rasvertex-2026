@@ -302,6 +302,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     }
   }, [pick, settings, loading, importPhotos]);
 
+  const [reloading, setReloading] = useState(false);
   // Reload from SimPRO: nothing kept. The saved draft (and its photo copies)
   // is deleted and the report built again from the job as it is now.
   const reloadFromSimpro = useCallback(async () => {
@@ -312,15 +313,22 @@ export default function InspectionReportPage({ onBack }: Props) {
     if (!ok) return;
     const report = r.kind ?? "building";
     importGen.current++; // stop any photo import still running
-    await fetch(`/api/inspection-reports/${draftKeyFor(settingsOf(r), ownerKey(r.source, r.jobId), report, r.type)}`, { method: "DELETE" }).catch(() => null);
-    await loadJob(r.jobId, r.source ?? "job", { report, type: r.type });
+    // No autosave until the fresh report is in: a save still pending for the
+    // old one would write it back after the delete.
+    setReloading(true);
+    try {
+      await fetch(`/api/inspection-reports/${draftKeyFor(settingsOf(r), ownerKey(r.source, r.jobId), report, r.type)}`, { method: "DELETE" }).catch(() => null);
+      await loadJob(r.jobId, r.source ?? "job", { report, type: r.type });
+    } finally {
+      setReloading(false);
+    }
   }, [r, loadJob]);
 
   // ── Autosave (never mid-import: photos sit on data: URLs until uploaded) ──
   const { status: saveStatus, setStatus: setSaveStatus } = useDraftAutosave(
     r ? `/api/inspection-reports/${draftKeyFor(settingsOf(r), ownerKey(r.source, r.jobId), r.kind ?? "building", r.type)}` : null,
     r,
-    { ready: !importing && !uploading },
+    { ready: !importing && !uploading && !reloading },
   );
 
   // ── Generate, measure, paginate ───────────────────────────────────────────
@@ -698,7 +706,7 @@ export default function InspectionReportPage({ onBack }: Props) {
       >
         {r && confirmed && (
           <>
-            <HeaderButton onClick={reloadFromSimpro} disabled={loading || importing}>
+            <HeaderButton onClick={reloadFromSimpro} disabled={loading || importing || reloading}>
               {loading ? "Reloading…" : "Reload from SimPRO"}
             </HeaderButton>
             <HeaderButton onClick={exportPdf} disabled={!canExport || exp.phase === "exporting"}>

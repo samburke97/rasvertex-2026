@@ -449,31 +449,25 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
         </div>
       );
     }
-    case "zones": {
-      const rows = ctx.model.zoneRows;
+    case "zHead":
       return (
-        <div>
-          <div className="ir-tbl-head ir-cols-zones">
-            <span>Zone</span>
-            <span>Levels</span>
-            <span>Photos</span>
-            <span className="ir-right">Page</span>
-          </div>
-          {rows.map((z, i) => (
-            <div key={z.zone} className={`ir-tbl-row ir-cols-zones${i < rows.length - 1 ? " is-ruled" : ""}`}>
-              <span
-                className="ir-zone"
-                style={z.shaped ? { background: zoneTone(z.tone).tag } : undefined}
-              >
-                {z.title}
-              </span>
-              <span className="ir-cell--muted">{z.levels}</span>
-              <span className="ir-cell--muted ir-num">{z.count}</span>
-              <span className="ir-cell--strong ir-right ir-num">
-                {ctx.chapPage[z.zone] ? padPage(ctx.chapPage[z.zone]) : ""}
-              </span>
-            </div>
-          ))}
+        <div className="ir-tbl-head ir-cols-zones">
+          <span>Zone</span>
+          <span>Levels</span>
+          <span>Photos</span>
+          <span className="ir-right">Page</span>
+        </div>
+      );
+    case "zRow": {
+      const z = b.row;
+      return (
+        <div className={rowCls("ir-cols-zones")}>
+          <span className="ir-zone" style={z.shaped ? { background: zoneTone(z.tone).tag } : undefined}>
+            {z.title}
+          </span>
+          <span className="ir-cell--muted">{z.levels}</span>
+          <span className="ir-cell--muted ir-num">{z.count}</span>
+          <span className="ir-cell--strong ir-right ir-num">{ctx.chapPage[z.zone] ? padPage(ctx.chapPage[z.zone]) : ""}</span>
         </div>
       );
     }

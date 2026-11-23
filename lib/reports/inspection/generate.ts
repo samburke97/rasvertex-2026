@@ -199,7 +199,8 @@ export type Block = BlockBase &
     | { type: "kGroup"; band: Band; def: BandDef; first: boolean }
     | { type: "kRow"; chip: Chip; name: string; count: string }
     | { type: "map"; photoId: string; pins: MapPin[] }
-    | { type: "zones" }
+    | { type: "zHead" }
+    | { type: "zRow"; row: ZoneRow }
     | { type: "dHead" }
     | { type: "defect"; chip: Chip; name: string; what: string; act: string }
     | { type: "chap"; title: string; meta: string }
@@ -674,7 +675,13 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     tone: i,
     shaped: !!(mapPhotoId && zoneShape(data, c.zone)),
   }));
-  if (shown("map")) add({ type: "zones", key: "zones", gap: 72, est: 40 + zoneRows.length * 51 });
+  // The zones table flows like the other tables: head kept with its first
+  // row, repeated on each page it continues on.
+  if (shown("map") && zoneRows.length) {
+    const zHead: Block = { type: "zHead", key: "zhead", gap: 0, est: 40 };
+    add({ ...zHead, gap: 72, keep: true });
+    for (const row of zoneRows) add({ type: "zRow", key: "z-" + row.zone, row, gap: 0, est: 57, cont: zHead });
+  }
 
   // 03 Defects explained
   if (shown("defects")) {
@@ -899,7 +906,7 @@ export interface Layout {
 }
 
 /** Table rows that lose their bottom rule as the last row on a page. */
-const RULED: BlockType[] = ["kRow", "defect", "ixRow", "planRow"];
+const RULED: BlockType[] = ["kRow", "zRow", "defect", "ixRow", "planRow"];
 
 /** worksPages: how many sheets Recommended works takes (model.works.pages);
  *  contentsPages: how many the contents takes (model.toc). Flowed pages
