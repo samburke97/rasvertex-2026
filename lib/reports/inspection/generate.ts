@@ -243,6 +243,60 @@ export interface ZoneRow {
   shaped: boolean;
 }
 
+/** A contents row: a section, or a findings chapter (a zone). */
+export interface TocRow {
+  name: string;
+  sec?: SectionKey;
+  chap?: string;
+}
+export interface TocGroup {
+  title: string;
+  rows: TocRow[];
+}
+
+// Contents heights (page units): a row (20px type, 1.4 lines + 12 gap), a
+// group's heading and the space before the next, and the room on the first
+// sheet (under "Contents") and on the rest. 5% spare.
+const TOC_ROW = 40;
+const TOC_GROUP = 56 + 64;
+const TOC_FIRST = (PAGE_H - 80 - 130 - 53 - 80) * 0.95;
+const TOC_NEXT = (PAGE_H - 80 - 130) * 0.95;
+
+/** The contents' groups, filled sheet by sheet; a long group (many zones)
+ *  carries on at the top of the next sheet under its heading again. */
+function tocPages(sections: { key: SectionKey; title: string }[], chapters: { key: string; title: string }[]): TocGroup[][] {
+  const sec = (k: SectionKey): TocRow[] => {
+    const s = sections.find((x) => x.key === k);
+    return s?.title ? [{ name: s.title, sec: k }] : [];
+  };
+  const groups: TocGroup[] = [
+    { title: "About this report", rows: [...sec("about"), ...sec("map"), ...sec("defects")] },
+    { title: "Findings", rows: [...(chapters.length ? chapters.map((c) => ({ name: c.title, chap: c.key })) : sec("findings")), ...sec("index")] },
+    { title: "Summary and next steps", rows: [...sec("summary"), ...sec("plan"), ...sec("works")] },
+  ].filter((g) => g.rows.length);
+  const pages: TocGroup[][] = [[]];
+  let room = TOC_FIRST;
+  for (const g of groups) {
+    let cur: TocGroup | null = null;
+    for (const row of g.rows) {
+      const need = (cur ? 0 : TOC_GROUP) + TOC_ROW;
+      if (need > room && pages[pages.length - 1].length) {
+        pages.push([]);
+        room = TOC_NEXT;
+        cur = null;
+      }
+      if (!cur) {
+        cur = { title: g.title, rows: [] };
+        pages[pages.length - 1].push(cur);
+        room -= TOC_GROUP;
+      }
+      cur.rows.push(row);
+      room -= TOC_ROW;
+    }
+  }
+  return pages;
+}
+
 export interface WorkItem {
   chip: Chip;
   name: string;
@@ -266,6 +320,9 @@ export interface InspectionModel {
   sections: { key: SectionKey; title: string; intro: string; label: string }[];
   /** Findings chapters with a heading, for the contents. */
   chapters: { key: string; title: string }[];
+  /** The contents, split over as many sheets as it needs: each sheet's
+   *  groups, each row pointing at a section or a findings chapter. */
+  toc: TocGroup[][];
   blocks: Block[];
   zoneRows: ZoneRow[];
   hasOther: boolean;
@@ -812,6 +869,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     blocks: B,
     zoneRows,
     chapters: chapList.filter((c) => c.title).map((c) => ({ key: c.key, title: c.title })),
+    toc: tocPages(sections, chapList.filter((c) => c.title)),
     hasOther: other.length > 0,
     about: lib.about.map((a, i) => ({ ...a, t: T(`about.${i}.t`, a.t), d: T(`about.${i}.d`, a.d) })),
     works: { items, extras, href, ending: data.ending !== false, ...worksPages(items, data.ending !== false, extras.length > 0) },
@@ -834,6 +892,8 @@ export interface Layout {
   total: number;
   secPage: Partial<Record<SectionKey, number>>;
   chapPage: Record<string, number>;
+  /** The first flowed page's number (after the cover and the contents). */
+  first: number;
   /** The section each flowed page belongs to (the one under way at its top). */
   pageSec: SectionKey[];
 }
@@ -841,11 +901,11 @@ export interface Layout {
 /** Table rows that lose their bottom rule as the last row on a page. */
 const RULED: BlockType[] = ["kRow", "defect", "ixRow", "planRow"];
 
-/** First flowed page's number (after Cover and Contents). */
-const FIRST_FLOW_PAGE = 3;
-
-/** worksPages: how many sheets Recommended works takes (model.works.pages). */
-export function paginate(blocks: Block[], heights: Record<string, number>, worksPages = 1): Layout {
+/** worksPages: how many sheets Recommended works takes (model.works.pages);
+ *  contentsPages: how many the contents takes (model.toc). Flowed pages
+ *  start after the cover and the contents. */
+export function paginate(blocks: Block[], heights: Record<string, number>, worksPages = 1, contentsPages = 1): Layout {
+  const FIRST_FLOW_PAGE = 2 + contentsPages;
   const hOf = (b: Block) => heights[b.key] ?? b.est;
   const pages: PlacedBlock[][] = [];
   const startPage = new Map<Block, number>();
@@ -899,7 +959,7 @@ export function paginate(blocks: Block[], heights: Record<string, number>, works
   const pageSec = pages.map((page) => (sec = page.find((b) => b.secKey)?.secKey ?? sec));
   secPage.works = pages.length + FIRST_FLOW_PAGE;
   const total = pages.length + FIRST_FLOW_PAGE + worksPages - 1;
-  return { pages, total, secPage, chapPage, pageSec };
+  return { pages, total, secPage, chapPage, pageSec, first: FIRST_FLOW_PAGE };
 }
 
 export { pad as padPage };

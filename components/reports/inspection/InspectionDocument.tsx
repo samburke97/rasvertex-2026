@@ -25,6 +25,7 @@ import {
   type Chip,
   type InspectionModel,
   type Layout,
+  type TocRow,
   type MapPin,
   type PhotoView,
 } from "@/lib/reports/inspection/generate";
@@ -97,7 +98,7 @@ export function ZoneTag({ pin, at }: { pin: MapPin; at?: [number, number] }) {
   const t = zoneTone(pin.tone);
   const [x, y] = at ?? pin.label ?? [pin.x, pin.y];
   return (
-    <span className="ir-ztag" style={{ left: `${x}%`, top: `${y}%`, background: t.tag, borderColor: t.line }}>
+    <span className="ir-ztag" style={{ left: `${x}%`, top: `${y}%`, background: t.tag }}>
       {pin.zone}
     </span>
   );
@@ -152,6 +153,9 @@ export const INSPECTION_CSS = `
 .ir-fact__v{font-size:20px;font-weight:700;letter-spacing:-.02em;line-height:1.3;margin-top:8px}
 
 .ir-toc{margin-top:auto;display:flex;flex-direction:column;gap:64px}
+/* Over more than one sheet: from the top, under "Contents" on the first. */
+.ir-page--contents-long .ir-toc{margin-top:80px}
+.ir-page--contents-long .ir-toc:first-child{margin-top:0}
 .ir-toc .ir-h-sub{margin-bottom:20px}
 .ir-toc__items{display:flex;flex-direction:column;gap:12px}
 .ir-toc__row{display:flex;justify-content:space-between;align-items:baseline;gap:24px;font-size:20px;line-height:1.4;color:rgba(1,25,85,.72)}
@@ -202,11 +206,11 @@ export const INSPECTION_CSS = `
 .ir-legend-item__mean{font-size:17px;line-height:1.5;color:var(--ink-60);text-wrap:pretty}
 
 .ir-map{position:relative;width:100%;aspect-ratio:3/2;border-radius:16px;overflow:hidden;background:var(--card-grey) center/cover no-repeat}
-.ir-pin{position:absolute;transform:translate(-50%,-50%);display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;background:var(--card-blue);color:var(--navy);font-size:17px;font-weight:700;line-height:1;white-space:nowrap;box-shadow:0 2px 10px rgba(1,25,85,.3);user-select:none}
+.ir-pin{position:absolute;z-index:3;transform:translate(-50%,-50%);display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;background:var(--card-blue);color:var(--navy);font-size:17px;font-weight:700;line-height:1;white-space:nowrap;box-shadow:0 2px 10px rgba(1,25,85,.3);user-select:none}
 .ir-pin--drag{cursor:grab;touch-action:none}
 .ir-map--draw .ir-pin{pointer-events:none}
 .ir-zsvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
-.ir-ztag{position:absolute;transform:translate(-50%,-50%);display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;border:2px solid;color:var(--navy);font-size:17px;font-weight:700;line-height:1;white-space:nowrap;box-shadow:0 2px 8px rgba(1,25,85,.18);pointer-events:none;user-select:none}
+.ir-ztag{position:absolute;z-index:1;transform:translate(-50%,-50%);display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;color:var(--navy);font-size:14px;font-weight:700;line-height:1;white-space:nowrap;box-shadow:0 2px 10px rgba(1,25,85,.3);pointer-events:none;user-select:none}
 
 .ir-chapter{display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;background:var(--card-grey);border-radius:24px;padding:32px 40px}
 .ir-chapter__meta{font-size:17px;color:var(--ink-70)}
@@ -459,7 +463,7 @@ function BlockView({ b, ctx, ruled }: { b: Block; ctx: Ctx; ruled: boolean }): R
             <div key={z.zone} className={`ir-tbl-row ir-cols-zones${i < rows.length - 1 ? " is-ruled" : ""}`}>
               <span
                 className="ir-zone"
-                style={z.shaped ? { background: zoneTone(z.tone).tag, boxShadow: `inset 0 0 0 2px ${zoneTone(z.tone).line}` } : undefined}
+                style={z.shaped ? { background: zoneTone(z.tone).tag } : undefined}
               >
                 {z.title}
               </span>
@@ -654,42 +658,37 @@ function Cover({ ctx, job }: { ctx: Ctx; job: InspectionJob }) {
   );
 }
 
+/** The contents: one sheet, or more when there are many zones (model.toc
+ *  splits it); page numbers from the layout. */
 function Contents({ ctx, layout }: { ctx: Ctx; layout: Layout }) {
-  const { model } = ctx;
-  const title = (k: string) => model.sections.find((s) => s.key === k)?.title ?? "";
-  const it = (k: keyof Layout["secPage"]) => ({ name: title(k), page: layout.secPage[k] });
-  // Sections left out (hidden, or no zones / locations) drop off the list.
-  const findings: { name: string; page: number | undefined }[] = model.chapters.length
-    ? model.chapters.map((c) => ({ name: c.title, page: layout.chapPage[c.key] }))
-    : [it("findings")];
-  findings.push(it("index"));
-  const groups = [
-    { title: "About this report", items: [it("about"), it("map"), it("defects")] },
-    { title: "Findings", items: findings },
-    { title: "Summary and next steps", items: [it("summary"), it("plan"), it("works")] },
-  ].map((g) => ({ ...g, items: g.items.filter((x) => x.name) }));
+  const pages = ctx.model.toc;
+  const pageOf = (r: TocRow) => (r.chap ? layout.chapPage[r.chap] : r.sec ? layout.secPage[r.sec] : undefined);
   return (
-    <div className="ir-sheet">
-      <section className="ir-page ir-page--contents" data-pageno={2}>
-        <h2 className="ir-h-section">Contents</h2>
-        <div className="ir-toc">
-          {groups.map((g) => (
-            <div key={g.title}>
-              <h3 className="ir-h-sub">{g.title}</h3>
-              <div className="ir-toc__items">
-                {g.items.map((t) => (
-                  <div key={t.name} className="ir-toc__row">
-                    <span>{t.name}</span>
-                    <span className="ir-num">{t.page ?? ""}</span>
+    <>
+      {pages.map((groups, pi) => (
+        <div key={pi} className="ir-sheet">
+          <section className={`ir-page ir-page--contents${pages.length > 1 ? " ir-page--contents-long" : ""}`} data-pageno={2 + pi}>
+            {pi === 0 && <h2 className="ir-h-section">Contents</h2>}
+            <div className="ir-toc">
+              {groups.map((g, gi) => (
+                <div key={`${g.title}-${gi}`}>
+                  <h3 className="ir-h-sub">{g.title}</h3>
+                  <div className="ir-toc__items">
+                    {g.rows.map((t) => (
+                      <div key={t.chap ?? t.sec ?? t.name} className="ir-toc__row">
+                        <span>{t.name}</span>
+                        <span className="ir-num">{pageOf(t) ?? ""}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
-          ))}
+            <Footer no={2 + pi} total={layout.total} />
+          </section>
         </div>
-        <Footer no={2} total={layout.total} />
-      </section>
-    </div>
+      ))}
+    </>
   );
 }
 
@@ -851,7 +850,7 @@ export default function InspectionDocument(props: DocProps) {
       <Cover ctx={ctx} job={job} />
       <Contents ctx={ctx} layout={layout} />
       {layout.pages.map((blocks, pi) => (
-        <div key={pi} className="ir-sheet" data-pageno={pi + 3} data-section={layout.pageSec[pi]}>
+        <div key={pi} className="ir-sheet" data-pageno={layout.first + pi} data-section={layout.pageSec[pi]}>
           <section className="ir-page">
             {blocks.map((b, i) => (
               <div key={`${i}-${b.key}`} style={{ paddingTop: b.pt }}>
@@ -860,7 +859,7 @@ export default function InspectionDocument(props: DocProps) {
                 </div>
               </div>
             ))}
-            <Footer no={pi + 3} total={layout.total} />
+            <Footer no={layout.first + pi} total={layout.total} />
           </section>
         </div>
       ))}

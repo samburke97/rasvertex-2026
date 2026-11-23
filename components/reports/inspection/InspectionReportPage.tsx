@@ -242,16 +242,19 @@ export default function InspectionReportPage({ onBack }: Props) {
   };
 
   // ── Load (or resume) a job ────────────────────────────────────────────────
-  const loadJob = useCallback(async (input: string, source: SimproSource = "job") => {
+  // fresh: Reload from SimPRO, the saved draft discarded and the report built
+  // again from SimPRO alone, as the same report and type.
+  const loadJob = useCallback(async (input: string, source: SimproSource = "job", fresh?: { report: string; type?: string }) => {
     const jobId = input.trim().replace(/^#/, "");
     const what = source === "quote" ? "quote" : "job";
     if (!jobId || loading) return;
+    const want = fresh ?? pick;
     setLoading(true);
     setLoadError(null);
     const safe = (url: string) => fetch(url).catch(() => null);
     const [jRes, dRes, fRes, tRes] = await Promise.all([
       safe(simproRecordUrl(source, jobId)),
-      safe(`/api/inspection-reports/${draftKeyFor(settings, ownerKey(source, jobId), pick.report, pick.type)}`),
+      fresh ? Promise.resolve(null) : safe(`/api/inspection-reports/${draftKeyFor(settings, ownerKey(source, jobId), want.report, want.type)}`),
       safe(`${simproBase(source, jobId)}/attachments/folders?companyId=0`),
       safe(`${simproBase(source, jobId)}/technician-notes`),
     ]);
@@ -269,14 +272,14 @@ export default function InspectionReportPage({ onBack }: Props) {
       if (draft) {
         // Keep the draft's edits; only fill fields it's missing.
         // A resumed draft keeps the settings it was started with.
-        const fresh = createInspectionReport(jobId, job, settingsOf(draft), pick.report, pick.type);
+        const blank = createInspectionReport(jobId, job, settingsOf(draft), want.report, want.type);
         const j = { ...draft.job };
         (Object.keys(j) as (keyof InspectionJob)[]).forEach((k) => {
-          if (!j[k]) j[k] = fresh.job[k];
+          if (!j[k]) j[k] = blank.job[k];
         });
-        next = { ...draft, kind: pick.report, type: draft.type ?? pick.type, jobId, job: j };
+        next = { ...draft, kind: want.report, type: draft.type ?? want.type, jobId, job: j };
       } else {
-        next = createInspectionReport(jobId, job, settings, pick.report, pick.type);
+        next = createInspectionReport(jobId, job, settings, want.report, want.type);
       }
       if (source === "quote") next = { ...next, source: "quote" };
       // The technicians' notes from SimPRO fill an empty comments box.
@@ -298,6 +301,20 @@ export default function InspectionReportPage({ onBack }: Props) {
       setLoading(false);
     }
   }, [pick, settings, loading, importPhotos]);
+
+  // Reload from SimPRO: nothing kept. The saved draft (and its photo copies)
+  // is deleted and the report built again from the job as it is now.
+  const reloadFromSimpro = useCallback(async () => {
+    if (!r) return;
+    const ok = window.confirm(
+      "Reload this report fresh from SimPRO? The job details, technician notes and every photo are read again. Everything changed here is discarded: labels, wording, the site map, sections and uploads.",
+    );
+    if (!ok) return;
+    const report = r.kind ?? "building";
+    importGen.current++; // stop any photo import still running
+    await fetch(`/api/inspection-reports/${draftKeyFor(settingsOf(r), ownerKey(r.source, r.jobId), report, r.type)}`, { method: "DELETE" }).catch(() => null);
+    await loadJob(r.jobId, r.source ?? "job", { report, type: r.type });
+  }, [r, loadJob]);
 
   // ── Autosave (never mid-import: photos sit on data: URLs until uploaded) ──
   const { status: saveStatus, setStatus: setSaveStatus } = useDraftAutosave(
@@ -332,7 +349,7 @@ export default function InspectionReportPage({ onBack }: Props) {
     if (changed) setHeights(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [r?.photos, r?.job, r?.text, r?.hidden, !!model?.mapPhotoId, fontsReady, !!model, confirmed]);
-  const layout = useMemo(() => (model ? paginate(model.blocks, heights, model.works.pages.length) : null), [model, heights]);
+  const layout = useMemo(() => (model ? paginate(model.blocks, heights, model.works.pages.length, model.toc.length) : null), [model, heights]);
 
   const urlById = useMemo(() => new Map((r ? reportImages(r) : []).map((p) => [p.id, p.url])), [r]);
   const photoUrl = useCallback((id: string | null) => (id ? (urlById.get(id) ?? null) : null), [urlById]);
@@ -681,6 +698,9 @@ export default function InspectionReportPage({ onBack }: Props) {
       >
         {r && confirmed && (
           <>
+            <HeaderButton onClick={reloadFromSimpro} disabled={loading || importing}>
+              {loading ? "Reloading…" : "Reload from SimPRO"}
+            </HeaderButton>
             <HeaderButton onClick={exportPdf} disabled={!canExport || exp.phase === "exporting"}>
               {exp.phase === "exporting" ? "Exporting…" : "Download PDF"}
             </HeaderButton>
