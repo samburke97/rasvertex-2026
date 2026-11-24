@@ -44,6 +44,7 @@ import {
   type PhotoSection,
   type SimproVariation,
   mergeVariations,
+  pickedPhotoIds,
 } from "@/lib/reports/condition.types";
 import { richFromSimpro } from "@/lib/reports/richText";
 import { tidyName } from "@/lib/reports/projectProgress";
@@ -262,14 +263,22 @@ export default function ConditionReportPage({
     setReport((prev) => ({ ...prev, schedule: rows }));
   }, []);
 
-  /** The job's photos from SimPRO. A new load replaces the library;
+  /** The job's photos from SimPRO. A new load replaces the library, except
+   *  the photos the cover, methodology, findings and variations use (kept
+   *  off the photo pages until the load brings them back);
    *  `merge` (Reload in the photo library) only adds photos not in it yet,
-   *  so uploads, photos taken off and adjustments stay as they are. */
+   *  so uploads, photos taken off and adjustments stay as they are.
+   *  `off`: the photos added aren't put on the photo pages (Reload in a
+   *  finding's or variation's picker: there to choose from). */
   const fetchPhotos = useCallback(
-    (jobNumber: string, folderId: number | null, merge = false) => {
+    (jobNumber: string, folderId: number | null, merge = false, off = false) => {
       const myGen = ++photoLoadId.current;
       const isStale = () => photoLoadId.current !== myGen;
-      if (!merge) history.silent((prev) => ({ ...prev, photos: [] }));
+      if (!merge)
+        history.silent((prev) => {
+          const keep = pickedPhotoIds(prev);
+          return { ...prev, photos: prev.photos.filter((p) => keep.has(p.id)).map((p) => ({ ...p, off: true })) };
+        });
       setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
       const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
       return streamPhotoImport(
@@ -278,9 +287,12 @@ export default function ConditionReportPage({
         {
           isStale,
           onPhoto: (photo) =>
-            history.silent((prev) =>
-              prev.photos.some((p) => p.id === photo.id) ? prev : { ...prev, photos: [...prev.photos, photo] },
-            ),
+            history.silent((prev) => {
+              const had = prev.photos.find((p) => p.id === photo.id);
+              // A kept photo that's in the new folder goes back on the pages.
+              if (had) return merge || !had.off ? prev : { ...prev, photos: prev.photos.map((p) => (p === had ? { ...p, off: false } : p)) };
+              return { ...prev, photos: [...prev.photos, off ? { ...photo, off: true } : photo] };
+            }),
           // On a merge the photo already in the library keeps its URL.
           onPhotoUploaded: (id, blobUrl) =>
             history.silent((prev) => ({
@@ -913,7 +925,15 @@ export default function ConditionReportPage({
             onDeletePhoto={deletePhoto}
             onReloadPhotos={loadedJobId ? () => fetchPhotos(loadedJobId, selectedFolderId, true) : undefined}
           />
-          <ProjectSections report={report} update={setReport} />
+          <ProjectSections
+            report={report}
+            update={setReport}
+            library={
+              loadedJobId
+                ? { loading: importStatus.phase === "fetching-photos", reload: () => fetchPhotos(loadedJobId, null, true, true) }
+                : undefined
+            }
+          />
         </SidePanel>
       </div>
       )}

@@ -295,3 +295,17 @@ export function shownSchedule(rows: ScheduleRow[], s: ReportSettings): ScheduleR
   const today = todayIso();
   return ranged.filter((r) => !r.date || r.date <= today);
 }
+
+/** Photos the report uses outside the photo pages: the cover, the
+ *  methodology's, and each finding's and variation's. A new photo load keeps
+ *  them, so changing folder never empties those sections. */
+export function pickedPhotoIds(r: ConditionReportData): Set<string> {
+  return new Set(
+    [
+      r.job.coverPhotoId,
+      r.method?.photoId,
+      ...(r.findings?.items ?? []).flatMap((f) => f.photoIds),
+      ...(r.variations?.items ?? []).flatMap((v) => v.photoIds),
+    ].filter((x): x is string => !!x),
+  );
+}

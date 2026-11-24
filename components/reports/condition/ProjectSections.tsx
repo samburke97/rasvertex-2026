@@ -30,7 +30,24 @@ import {
 } from "@/lib/reports/warranty";
 import { FINDING_SIZES, FINDINGS_INTRO, VARIATIONS_INTRO, type ConditionReportData, type Finding, type Variation } from "@/lib/reports/condition.types";
 import { formatHours } from "@/lib/reports/overview.layout";
-import PhotoPickerModal from "@/components/reports/shared/builder/PhotoPickerModal";
+import PhotoPickerModal, { PickerAction } from "@/components/reports/shared/builder/PhotoPickerModal";
+
+/** The job's photo library in SimPRO, reloadable from any photo picker here. */
+export type Library = { loading: boolean; reload: () => void };
+
+/** Each picker's library props: every photo the report has, with Reload from
+ *  SimPRO (all folders, added off the photo pages) beside the title. */
+function libraryProps(report: ConditionReportData, library?: Library) {
+  return {
+    photos: report.photos.map((p) => ({ id: p.id, src: p.url, title: p.name })),
+    headAction: library && (
+      <PickerAction disabled={library.loading} onClick={library.reload} title="Fetch every photo on the job in SimPRO, adding any new ones">
+        {library.loading ? "Loading…" : "↻ Reload from SimPRO"}
+      </PickerAction>
+    ),
+    empty: library?.loading ? "Loading photos from SimPRO…" : "No photos yet. Reload from SimPRO to load the job's photos.",
+  };
+}
 
 type Patch = (fn: (prev: ConditionReportData) => ConditionReportData) => void;
 export type ProjectSection = "method" | "variations" | "findings" | "plan" | "warranty";
@@ -39,11 +56,13 @@ export type ProjectSection = "method" | "variations" | "findings" | "plan" | "wa
  *  they print. */
 function ItemPhotos({
   report,
+  library,
   item,
   label,
   onChange,
 }: {
   report: ConditionReportData;
+  library?: Library;
   item: Pick<Finding, "photoIds" | "size">;
   label: string;
   onChange: (p: Partial<Finding>) => void;
@@ -51,16 +70,15 @@ function ItemPhotos({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button className={styles.btn} onClick={() => setOpen(true)} disabled={!report.photos.length}>
+      <button className={styles.btn} onClick={() => setOpen(true)}>
         {item.photoIds.length ? `Photos · ${item.photoIds.length} chosen` : "Choose photos"}
       </button>
-      {!report.photos.length && <span className={styles.subLabel}>Load the job&apos;s photos to choose some.</span>}
       {open && (
         <PhotoPickerModal
           multi
           title="Choose photos"
           subtitle={label}
-          photos={report.photos.map((p) => ({ id: p.id, src: p.url, title: p.name }))}
+          {...libraryProps(report, library)}
           selected={item.photoIds}
           onPick={(id) => onChange({ photoIds: item.photoIds.includes(id) ? item.photoIds.filter((x) => x !== id) : [...item.photoIds, id] })}
           onClose={() => setOpen(false)}
@@ -121,7 +139,7 @@ export const sectionOn = (r: ConditionReportData, key: ProjectSection) => !!r[ke
 
 const listHtml = (items: string[]) => `<ul>${items.map((t) => `<li><p>${t}</p></li>`).join("")}</ul>`;
 
-export default function ProjectSections({ report, update }: { report: ConditionReportData; update: Patch }) {
+export default function ProjectSections({ report, update, library }: { report: ConditionReportData; update: Patch; library?: Library }) {
   const m = report.method;
   const ws = normWarranties(report.warranty, completedOf(report));
   const fromJob = methodFromDescription(report.scope?.description);
@@ -272,17 +290,16 @@ export default function ProjectSections({ report, update }: { report: ConditionR
                     </div>
                   </div>
                 ) : (
-                  <button className={styles.btn} onClick={() => setPicking("method")} disabled={!report.photos.length}>
+                  <button className={styles.btn} onClick={() => setPicking("method")}>
                     Add a photo
                   </button>
                 );
               })()}
-              {!report.photos.length && <span className={styles.subLabel}>Load the job&apos;s photos to choose one.</span>}
               {picking === "method" && (
                 <PhotoPickerModal
                   title="Methodology photo"
                   subtitle="Shown after the steps, full width"
-                  photos={report.photos.map((p) => ({ id: p.id, src: p.url, title: p.name }))}
+                  {...libraryProps(report, library)}
                   selected={m.photoId ? [m.photoId] : []}
                   onPick={(id) => {
                     setMethod({ photoId: id });
@@ -329,7 +346,7 @@ export default function ProjectSections({ report, update }: { report: ConditionR
                     <>
                       <input className={styles.input} value={v.title} placeholder="Variation title" onChange={(e) => setVariation(v.id, { title: e.target.value })} />
                       <RichBox value={v.desc} placeholder="What was added to the scope, and why" onChange={(desc) => setVariation(v.id, { desc })} />
-                      <ItemPhotos report={report} item={v} label={v.title || `Variation ${i + 1}`} onChange={(p) => setVariation(v.id, p)} />
+                      <ItemPhotos report={report} library={library} item={v} label={v.title || `Variation ${i + 1}`} onChange={(p) => setVariation(v.id, p)} />
                     </>
                   )}
                   <button className={styles.textBtn} onClick={() => setVariation(v.id, { off: !v.off })}>
@@ -377,7 +394,7 @@ export default function ProjectSections({ report, update }: { report: ConditionR
                   placeholder="What we found, and the work we'd recommend"
                   onChange={(desc) => setFinding(f.id, { desc })}
                 />
-                <ItemPhotos report={report} item={f} label={f.title || `Finding ${i + 1}`} onChange={(p) => setFinding(f.id, p)} />
+                <ItemPhotos report={report} library={library} item={f} label={f.title || `Finding ${i + 1}`} onChange={(p) => setFinding(f.id, p)} />
                 <button
                   className={styles.textBtn}
                   onClick={() => setFindings({ items: report.findings!.items.filter((x) => x.id !== f.id) })}
