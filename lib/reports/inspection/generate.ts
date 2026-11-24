@@ -384,7 +384,8 @@ export function buildModel(data: InspectionReportData): InspectionModel {
         codes: r.codes,
         note: r.note,
         head: r.head,
-        title: photo.title?.trim() || undefined,
+        // Emptied in the builder: no title printed ("" kept, unlike unset).
+        title: photo.title?.trim(),
         desc: photo.desc && !notesIsEmpty(sanitizeNotesHtml(photo.desc)) ? photo.desc : undefined,
         pos: photo.pos,
         order: photo.order,
@@ -465,7 +466,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       id: p.id,
       num: pad(numOf.get(p) ?? 0),
       chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].filter((c) => p.codes.includes(c)).map(chip),
-      gname: capFirst(p.title?.trim() || autoName),
+      gname: capFirst(p.title ?? autoName),
       pos: p.pos,
       where: placeOf(p, withZone),
       note: capFirst(p.desc ?? autoNote),

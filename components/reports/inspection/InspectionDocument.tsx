@@ -318,7 +318,7 @@ function Photo({ p, ctx }: { p: PhotoView; ctx: Ctx }) {
           {p.where} · Photo {p.num}
         </span>
       </div>
-      <div className="ir-photo__name">{p.gname}</div>
+      {p.gname && <div className="ir-photo__name">{p.gname}</div>}
       {p.note && <Rt className="ir-photo__desc" v={p.note} />}
     </div>
   );
