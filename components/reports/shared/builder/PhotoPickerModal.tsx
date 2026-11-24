@@ -1,8 +1,8 @@
 "use client";
 // components/reports/shared/builder/PhotoPickerModal.tsx
 //
-// Choosing photos in a pop-up, for every report builder: optional folder
-// chips, then a grid. One photo (click uses it) or several (click adds or
+// Choosing photos in a pop-up, for every report builder: optional filter
+// chips, a chip per SimPRO folder when the photos span several, then a grid. One photo (click uses it) or several (click adds or
 // removes, numbered in the order chosen). A search box narrows the photos
 // by file name. Esc or the backdrop closes it.
 // Same shell as CropModal.
@@ -17,6 +17,9 @@ export interface PickerPhoto {
   title?: string;
   /** Shows a × to delete it (e.g. an upload). */
   removable?: boolean;
+  /** Its SimPRO folder: with photos in two or more, the picker offers a
+   *  chip per folder to browse by. */
+  folder?: string | null;
 }
 
 export interface PickerFilter {
@@ -78,7 +81,13 @@ export default function PhotoPickerModal({
 }) {
   const [query, setQuery] = useState("");
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const shown = words.length ? photos.filter((p) => words.every((w) => (p.title ?? "").toLowerCase().includes(w))) : photos;
+  // Folders, in the order they first appear; "" = no folder (uploads).
+  const folders = [...new Set(photos.map((p) => p.folder ?? ""))];
+  const byFolder = folders.length > 1;
+  const [folder, setFolder] = useState<string | null>(null);
+  const inFolder = byFolder && folder !== null ? photos.filter((p) => (p.folder ?? "") === folder) : photos;
+  const shown = words.length ? inFolder.filter((p) => words.every((w) => (p.title ?? "").toLowerCase().includes(w))) : inFolder;
+  const count = (f: string) => photos.filter((p) => (p.folder ?? "") === f).length;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -122,6 +131,19 @@ export default function PhotoPickerModal({
               >
                 {f.dot && <span className={styles.dot} />}
                 {f.name}
+              </button>
+            ))}
+          </div>
+        )}
+        {byFolder && (
+          <div className={styles.chips}>
+            <button className={`${styles.filter} ${folder === null ? styles.filterOn : ""}`} onClick={() => setFolder(null)}>
+              All folders · {photos.length}
+            </button>
+            {folders.map((f) => (
+              <button key={f} className={`${styles.filter} ${folder === f ? styles.filterOn : ""}`} onClick={() => setFolder(f)}>
+                <span className={styles.dot} />
+                {f || "No folder"} · {count(f)}
               </button>
             ))}
           </div>

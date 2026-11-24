@@ -51,3 +51,8 @@
   color: var(--ink-55);
   margin-bottom: -20px;
 }
+
+/* An item on the page with its own editor (data-item: a variation, a
+   finding): click to open it. Builder only. */
+.canvas :global([data-item]) { cursor: pointer; border-radius: 8px; transition: box-shadow 0.12s; }
+.canvas :global([data-item]:hover) { box-shadow: 0 0 0 8px rgba(59, 111, 212, 0.08), 0 0 0 9px rgba(59, 111, 212, 0.35); }

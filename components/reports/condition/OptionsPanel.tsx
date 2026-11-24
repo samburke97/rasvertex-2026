@@ -269,7 +269,7 @@ export default function OptionsPanel({
           <PhotoPickerModal
             title="Cover photo"
             subtitle="Choose a photo from the job for the cover"
-            photos={photos.map((p) => ({ id: p.id, src: p.url, title: p.name }))}
+            photos={photos.map((p) => ({ id: p.id, src: p.url, title: p.name, folder: p.folder }))}
             selected={job.coverPhotoId ? [job.coverPhotoId] : []}
             onPick={(id) => {
               onPickCover(id);
@@ -331,7 +331,7 @@ export default function OptionsPanel({
             subtitle="Ticked photos are on the report. Click one to add it or take it off."
             photos={photos
               .filter((p) => (libFilter === "on" ? !p.off : libFilter === "off" ? p.off : libFilter === "uploads" ? p.uploaded : true))
-              .map((p) => ({ id: p.id, src: p.url, title: p.name, removable: p.uploaded }))}
+              .map((p) => ({ id: p.id, src: p.url, title: p.name, removable: p.uploaded, folder: p.folder }))}
             selected={photos.filter((p) => !p.off).map((p) => p.id)}
             onPick={(id) => (photos.find((p) => p.id === id)?.off ? onRestorePhoto(id) : onRemovePhoto(id))}
             onRemove={(id) => confirm("Delete this uploaded photo?") && onDeletePhoto(id)}

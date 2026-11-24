@@ -32,6 +32,8 @@ export interface StreamPhotoImportCallbacks {
   onError: (message: string) => void;
   /** True once a newer call has superseded this one — stop touching state. */
   isStale: () => boolean;
+  /** A photo the caller already has (asked to skip): its folder only. */
+  onKnown?: (id: string, folder: string | null) => void;
 }
 
 const UPLOAD_CONCURRENCY = 6;
@@ -48,14 +50,20 @@ export async function streamPhotoImport(
   sseUrl: string,
   blobPathname: (photoId: string) => string,
   callbacks: StreamPhotoImportCallbacks,
+  /** SimPRO attachment IDs already held: sent in the body (POST), they're
+   *  not downloaded again, only reported to onKnown with their folder. */
+  skip?: string[],
 ): Promise<void> {
-  const { onPhoto, onPhotoUploaded, onProgress, onDone, onError, isStale } =
+  const { onPhoto, onPhotoUploaded, onProgress, onDone, onError, isStale, onKnown } =
     callbacks;
   const scheduleUpload = createUploadQueue(UPLOAD_CONCURRENCY);
   const pendingUploads: Promise<void>[] = [];
 
   try {
-    const response = await fetch(sseUrl);
+    const response = await fetch(
+      sseUrl,
+      skip?.length ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skip }) } : undefined,
+    );
     if (isStale()) return;
     if (!response.ok || !response.body)
       throw new Error("Stream connect failed");
@@ -106,6 +114,7 @@ export async function streamPhotoImport(
             url: compressedUrl,
             size: Number(payload.size) || 0,
             dateAdded: payload.dateAdded ? String(payload.dateAdded) : null,
+            folder: payload.folder ? String(payload.folder) : null,
           });
 
           pendingUploads.push(
@@ -115,6 +124,8 @@ export async function streamPhotoImport(
               if (!isStale()) onPhotoUploaded(photoId, blobUrl);
             }),
           );
+        } else if (event === "known") {
+          if (!isStale()) onKnown?.(String(payload.id), payload.folder ? String(payload.folder) : null);
         } else if (event === "progress") {
           if (!isStale())
             onProgress(Number(payload.loaded) || 0, Number(payload.total) || 0);

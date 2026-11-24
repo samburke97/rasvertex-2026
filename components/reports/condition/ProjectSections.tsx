@@ -28,8 +28,10 @@ import {
   type WarrantyKind,
   type WarrantyScheduleRow,
 } from "@/lib/reports/warranty";
-import { FINDING_SIZES, FINDINGS_INTRO, VARIATIONS_INTRO, type ConditionReportData, type Finding, type Variation } from "@/lib/reports/condition.types";
+import { COMBINED_TITLE, FINDING_SIZES, FINDINGS_INTRO, VARIATIONS_INTRO, type ConditionReportData, type Finding, type ScheduleRow, type Variation } from "@/lib/reports/condition.types";
+import HoursEditor from "./HoursEditor";
 import { formatHours } from "@/lib/reports/overview.layout";
+import ItemList, { ItemBack } from "@/components/reports/shared/builder/ItemList";
 import PhotoPickerModal, { PickerAction } from "@/components/reports/shared/builder/PhotoPickerModal";
 
 /** The job's photo library in SimPRO, reloadable from any photo picker here. */
@@ -39,7 +41,7 @@ export type Library = { loading: boolean; reload: () => void };
  *  SimPRO (all folders, added off the photo pages) beside the title. */
 function libraryProps(report: ConditionReportData, library?: Library) {
   return {
-    photos: report.photos.map((p) => ({ id: p.id, src: p.url, title: p.name })),
+    photos: report.photos.map((p) => ({ id: p.id, src: p.url, title: p.name, folder: p.folder })),
     headAction: library && (
       <PickerAction disabled={library.loading} onClick={library.reload} title="Fetch every photo on the job in SimPRO, adding any new ones">
         {library.loading ? "Loading…" : "↻ Reload from SimPRO"}
@@ -48,6 +50,8 @@ function libraryProps(report: ConditionReportData, library?: Library) {
     empty: library?.loading ? "Loading photos from SimPRO…" : "No photos yet. Reload from SimPRO to load the job's photos.",
   };
 }
+
+const photoCount = (n: number) => (n ? `${n} photo${n === 1 ? "" : "s"}` : "No photos");
 
 type Patch = (fn: (prev: ConditionReportData) => ConditionReportData) => void;
 export type ProjectSection = "method" | "variations" | "findings" | "plan" | "warranty";
@@ -60,9 +64,12 @@ function ItemPhotos({
   item,
   label,
   onChange,
+  sized = true,
 }: {
   report: ConditionReportData;
   library?: Library;
+  /** Offer the photo size (off when the photos print elsewhere's size). */
+  sized?: boolean;
   item: Pick<Finding, "photoIds" | "size">;
   label: string;
   onChange: (p: Partial<Finding>) => void;
@@ -84,7 +91,7 @@ function ItemPhotos({
           onClose={() => setOpen(false)}
         />
       )}
-      {item.photoIds.length > 0 && (
+      {sized && item.photoIds.length > 0 && (
         <>
           <span className={styles.subLabel}>
             Photo size <InfoTip>How many print to a row: small 4, medium 3, large 2, full width 1.</InfoTip>
@@ -100,6 +107,146 @@ function ItemPhotos({
               </button>
             ))}
           </div>
+        </>
+      )}
+    </>
+  );
+}
+
+/** A variation's own hours schedule: on or off, loaded from its cost centre
+ *  in SimPRO when switched on, edited in the same sheet as the job's. */
+function VariationHours({
+  report,
+  v,
+  load,
+  onChange,
+}: {
+  report: ConditionReportData;
+  v: Variation;
+  load: (v: Variation) => Promise<ScheduleRow[] | null>;
+  onChange: (p: Partial<Variation>) => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const fetchRows = async () => {
+    setLoading(true);
+    setFailed(false);
+    const rows = await load(v);
+    setLoading(false);
+    if (rows) onChange({ schedule: rows, showSchedule: true });
+    else setFailed(true);
+  };
+  const rows = v.schedule ?? [];
+  const total = rows.reduce((t, r) => t + (r.actualHours || 0), 0);
+  return (
+    <>
+      <ToggleRow
+        label="Hours schedule"
+        sub="Each day logged to this variation in SimPRO, set out like the job's hours schedule"
+        checked={!!v.showSchedule}
+        onChange={(on) => (on && !v.schedule ? fetchRows() : onChange({ showSchedule: on }))}
+      />
+      {v.showSchedule && (
+        <div className={styles.libraryRow}>
+          <button className={styles.btn} onClick={() => setEditing(true)} disabled={loading}>
+            {loading ? "Loading…" : `Edit hours · ${rows.length} ${rows.length === 1 ? "day" : "days"}, ${formatHours(total)}h`}
+          </button>
+          <button className={styles.btn} onClick={fetchRows} disabled={loading}>
+            Reload from SimPRO
+          </button>
+        </div>
+      )}
+      {loading && !v.showSchedule && <span className={styles.subLabel}>Loading the hours from SimPRO…</span>}
+      {failed && <span className={styles.subLabel}>Couldn&apos;t load this variation&apos;s hours from SimPRO. Reload the report, then try again.</span>}
+      {editing && (
+        <HoursEditor
+          rows={rows}
+          loading={loading}
+          showNotes={report.settings.showScheduleNotes}
+          sectioned={false}
+          showTimes={!!report.settings.showScheduleTimes}
+          onChange={(schedule) => onChange({ schedule })}
+          onClose={() => setEditing(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/** Combined variations: the heading, photo size and the one hours schedule
+ *  (each variation's days, loaded from SimPRO when it's switched on). */
+function CombinedVariations({
+  report,
+  load,
+  update,
+}: {
+  report: ConditionReportData;
+  load?: (v: Variation) => Promise<ScheduleRow[] | null>;
+  update: Patch;
+}) {
+  const vs = report.variations!;
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const set = (p: Partial<NonNullable<ConditionReportData["variations"]>>) => update((r) => ({ ...r, variations: { ...r.variations!, ...p } }));
+  const fetchAll = async (only: Variation[]) => {
+    if (!load) return;
+    setLoading(true);
+    setFailed(false);
+    const got = await Promise.all(only.map(async (v) => [v.id, await load(v)] as const));
+    setLoading(false);
+    if (got.some(([, rows]) => !rows)) setFailed(true);
+    update((r) => ({
+      ...r,
+      variations: {
+        ...r.variations!,
+        showSchedule: true,
+        items: r.variations!.items.map((v) => {
+          const rows = got.find(([id]) => id === v.id)?.[1];
+          return rows ? { ...v, schedule: rows } : v;
+        }),
+      },
+    }));
+  };
+  const items = vs.items.filter((v) => !v.off);
+  const days = items.reduce((t, v) => t + (v.schedule?.length ?? 0), 0);
+  return (
+    <>
+      <label className={styles.field}>
+        <span className={styles.subLabel}>Heading</span>
+        <input className={styles.input} value={vs.combinedTitle ?? ""} placeholder={COMBINED_TITLE} onChange={(e) => set({ combinedTitle: e.target.value })} />
+      </label>
+      <span className={styles.subLabel}>
+        Photo size <InfoTip>How many print to a row: small 4, medium 3, large 2, full width 1.</InfoTip>
+      </span>
+      <div className={styles.presetRow}>
+        {FINDING_SIZES.map((z) => (
+          <button key={z.key} className={`${styles.presetBtn} ${(vs.size ?? "medium") === z.key ? styles.presetBtnActive : ""}`} onClick={() => set({ size: z.key })}>
+            {z.label}
+          </button>
+        ))}
+      </div>
+      {load && (
+        <>
+          <ToggleRow
+            label="Hours schedule"
+            sub="Every day logged to the variations in SimPRO, a section for each, set out like the job's hours schedule"
+            checked={!!vs.showSchedule}
+            onChange={(on) => {
+              const missing = items.filter((v) => !v.schedule);
+              if (on && missing.length) fetchAll(missing);
+              else set({ showSchedule: on });
+            }}
+          />
+          {(vs.showSchedule || loading) && (
+            <div className={styles.libraryRow}>
+              <span className={styles.subLabel}>{loading ? "Loading the hours from SimPRO…" : `${days} ${days === 1 ? "entry" : "entries"} logged across the variations.`}</span>
+              <button className={styles.btn} onClick={() => fetchAll(items)} disabled={loading}>
+                Reload from SimPRO
+              </button>
+            </div>
+          )}
+          {failed && <span className={styles.subLabel}>Some variations&apos; hours couldn&apos;t be loaded from SimPRO. Reload the report, then try again.</span>}
         </>
       )}
     </>
@@ -139,7 +286,24 @@ export const sectionOn = (r: ConditionReportData, key: ProjectSection) => !!r[ke
 
 const listHtml = (items: string[]) => `<ul>${items.map((t) => `<li><p>${t}</p></li>`).join("")}</ul>`;
 
-export default function ProjectSections({ report, update, library }: { report: ConditionReportData; update: Patch; library?: Library }) {
+export default function ProjectSections({
+  report,
+  update,
+  library,
+  loadHours,
+  item,
+  onItem,
+}: {
+  report: ConditionReportData;
+  update: Patch;
+  library?: Library;
+  /** A variation's schedule from SimPRO (jobs only; quotes have no hours). */
+  loadHours?: (v: Variation) => Promise<ScheduleRow[] | null>;
+  /** The variation or finding open in its own editor (from the list or a
+   *  click on the page); null: the section's settings and list. */
+  item: string | null;
+  onItem: (id: string | null) => void;
+}) {
   const m = report.method;
   const ws = normWarranties(report.warranty, completedOf(report));
   const fromJob = methodFromDescription(report.scope?.description);
@@ -316,99 +480,152 @@ export default function ProjectSections({ report, update, library }: { report: C
         )}
       </div>
 
-      {/* ── Variations ──────────────────────────────────────────────────── */}
-      <div className={styles.group} data-pages="variations">
-        <ToggleRow
-          label="Include variations"
-          sub="Each variation cost centre in SimPRO, with its description, photos and hours"
-          checked={!!report.variations?.on}
-          onChange={toggle("variations")}
-        />
-        {report.variations?.on && (
-          <>
-            <label className={styles.field}>
-              <span className={styles.subLabel}>Intro</span>
-              <textarea className={styles.textarea} rows={2} value={report.variations.intro} onChange={(e) => setVariations({ intro: e.target.value })} />
-            </label>
-            <ToggleRow
-              label="Show hours"
-              sub="The labour hours logged to each variation in SimPRO"
-              checked={report.variations.showHours !== false}
-              onChange={(v) => setVariations({ showHours: v })}
-            />
-            {report.variations.items.length ? (
-              report.variations.items.map((v, i) => (
-                <div key={v.id} className={styles.field} style={v.off ? { opacity: 0.5 } : undefined}>
-                  <span className={styles.subLabel}>
-                    Variation {i + 1} · {v.hours > 0 ? `${formatHours(v.hours)} hours logged` : "no hours logged yet"}
-                  </span>
-                  {!v.off && (
-                    <>
-                      <input className={styles.input} value={v.title} placeholder="Variation title" onChange={(e) => setVariation(v.id, { title: e.target.value })} />
-                      <RichBox value={v.desc} placeholder="What was added to the scope, and why" onChange={(desc) => setVariation(v.id, { desc })} />
-                      <ItemPhotos report={report} library={library} item={v} label={v.title || `Variation ${i + 1}`} onChange={(p) => setVariation(v.id, p)} />
-                    </>
+      {/* ── Variations: the section's settings and its list, or one
+          variation's own editor (opened from the list or the page). ── */}
+      {(() => {
+        const vs = report.variations;
+        const k = vs?.on ? vs.items.findIndex((x) => x.id === item) : -1;
+        if (k >= 0) {
+          const v = vs!.items[k];
+          const name = v.title || `Variation ${k + 1}`;
+          return (
+            <div className={styles.group} data-pages="variations">
+              <ItemBack label="All variations" onClick={() => onItem(null)} />
+              <span className={styles.subLabel}>
+                Variation {k + 1} · {v.hours > 0 ? `${formatHours(v.hours)} hours logged` : "no hours logged yet"}
+              </span>
+              {!v.off && (
+                <>
+                  <input className={styles.input} value={v.title} placeholder="Variation title" onChange={(e) => setVariation(v.id, { title: e.target.value })} />
+                  <RichBox value={v.desc} placeholder="What was added to the scope, and why" onChange={(desc) => setVariation(v.id, { desc })} />
+                  <ItemPhotos report={report} library={library} item={v} label={name} sized={!vs!.combined} onChange={(p) => setVariation(v.id, p)} />
+                  {vs!.combined ? (
+                    <span className={styles.subLabel}>Combined with the other variations: the photo size and hours schedule are set under All variations.</span>
+                  ) : (
+                    loadHours && <VariationHours report={report} v={v} load={loadHours} onChange={(p) => setVariation(v.id, p)} />
                   )}
-                  <button className={styles.textBtn} onClick={() => setVariation(v.id, { off: !v.off })}>
-                    {v.off ? `Include “${v.title || `Variation ${i + 1}`}”` : "Leave off the report"}
-                  </button>
-                </div>
-              ))
-            ) : (
-              <span className={styles.subLabel}>No variation cost centres on this job in SimPRO.</span>
+                </>
+              )}
+              <button className={styles.textBtn} onClick={() => setVariation(v.id, { off: !v.off })}>
+                {v.off ? `Include “${name}”` : "Leave off the report"}
+              </button>
+            </div>
+          );
+        }
+        return (
+          <div className={styles.group} data-pages="variations">
+            <ToggleRow
+              label="Include variations"
+              sub="Each variation cost centre in SimPRO, with its description, photos and hours"
+              checked={!!vs?.on}
+              onChange={toggle("variations")}
+            />
+            {vs?.on && (
+              <>
+                <label className={styles.field}>
+                  <span className={styles.subLabel}>Intro</span>
+                  <textarea className={styles.textarea} rows={2} value={vs.intro} onChange={(e) => setVariations({ intro: e.target.value })} />
+                </label>
+                <ToggleRow
+                  label="Show hours"
+                  sub="The labour hours logged to each variation in SimPRO"
+                  checked={vs.showHours !== false}
+                  onChange={(v) => setVariations({ showHours: v })}
+                />
+                {vs.items.length > 1 && (
+                  <ToggleRow
+                    label="Combine into one"
+                    sub="Each variation's name and description, then all their photos, then one hours schedule"
+                    checked={!!vs.combined}
+                    onChange={(v) => setVariations({ combined: v })}
+                  />
+                )}
+                {vs.combined && vs.items.length > 1 && <CombinedVariations report={report} load={loadHours} update={update} />}
+                {vs.items.length ? (
+                  <ItemList
+                    items={vs.items.map((v, n) => ({
+                      id: v.id,
+                      title: v.title,
+                      fallback: `Variation ${n + 1}`,
+                      meta: v.off
+                        ? "Left off the report"
+                        : [v.hours > 0 ? `${formatHours(v.hours)} hours` : "No hours yet", photoCount(v.photoIds.length), v.showSchedule ? "hours schedule" : ""].filter(Boolean).join(" · "),
+                      muted: v.off,
+                    }))}
+                    onOpen={onItem}
+                  />
+                ) : (
+                  <span className={styles.subLabel}>No variation cost centres on this job in SimPRO.</span>
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        );
+      })()}
 
-      {/* ── Findings ────────────────────────────────────────────────────── */}
-      <div className={styles.group} data-pages="findings">
-        <ToggleRow
-          label="Include findings"
-          sub="What our team found on site, with photos, suggesting additional works"
-          checked={!!report.findings?.on}
-          onChange={toggle("findings")}
-        />
-        {report.findings?.on && (
-          <>
-            <label className={styles.field}>
-              <span className={styles.subLabel}>Intro</span>
-              <textarea
-                className={styles.textarea}
-                rows={3}
-                value={report.findings.intro}
-                onChange={(e) => setFindings({ intro: e.target.value })}
+      {/* ── Findings: as Variations, each with its own editor. ─────────── */}
+      {(() => {
+        const fs = report.findings;
+        const k = fs?.on ? fs.items.findIndex((x) => x.id === item) : -1;
+        if (k >= 0) {
+          const f = fs!.items[k];
+          return (
+            <div className={styles.group} data-pages="findings">
+              <ItemBack label="All findings" onClick={() => onItem(null)} />
+              <span className={styles.subLabel}>Finding {k + 1}</span>
+              <input
+                className={styles.input}
+                value={f.title}
+                placeholder="e.g. Cracked render, north wall level 2"
+                onChange={(e) => setFinding(f.id, { title: e.target.value })}
               />
-            </label>
-            {report.findings.items.map((f, i) => (
-              <div key={f.id} className={styles.field}>
-                <span className={styles.subLabel}>Finding {i + 1}</span>
-                <input
-                  className={styles.input}
-                  value={f.title}
-                  placeholder="e.g. Cracked render, north wall level 2"
-                  onChange={(e) => setFinding(f.id, { title: e.target.value })}
+              <RichBox value={f.desc} placeholder="What we found, and the work we'd recommend" onChange={(desc) => setFinding(f.id, { desc })} />
+              <ItemPhotos report={report} library={library} item={f} label={f.title || `Finding ${k + 1}`} onChange={(p) => setFinding(f.id, p)} />
+              <button
+                className={styles.textBtn}
+                onClick={() => {
+                  setFindings({ items: fs!.items.filter((x) => x.id !== f.id) });
+                  onItem(null);
+                }}
+              >
+                Remove finding
+              </button>
+            </div>
+          );
+        }
+        return (
+          <div className={styles.group} data-pages="findings">
+            <ToggleRow
+              label="Include findings"
+              sub="What our team found on site, with photos, suggesting additional works"
+              checked={!!fs?.on}
+              onChange={toggle("findings")}
+            />
+            {fs?.on && (
+              <>
+                <label className={styles.field}>
+                  <span className={styles.subLabel}>Intro</span>
+                  <textarea className={styles.textarea} rows={3} value={fs.intro} onChange={(e) => setFindings({ intro: e.target.value })} />
+                </label>
+                <ItemList
+                  items={fs.items.map((f, n) => ({ id: f.id, title: f.title, fallback: `Finding ${n + 1}`, meta: photoCount(f.photoIds.length) }))}
+                  onOpen={onItem}
                 />
-                <RichBox
-                  value={f.desc}
-                  placeholder="What we found, and the work we'd recommend"
-                  onChange={(desc) => setFinding(f.id, { desc })}
-                />
-                <ItemPhotos report={report} library={library} item={f} label={f.title || `Finding ${i + 1}`} onChange={(p) => setFinding(f.id, p)} />
                 <button
-                  className={styles.textBtn}
-                  onClick={() => setFindings({ items: report.findings!.items.filter((x) => x.id !== f.id) })}
+                  className={styles.addBtn}
+                  onClick={() => {
+                    const f = newFinding();
+                    setFindings({ items: [...fs.items, f] });
+                    onItem(f.id);
+                  }}
                 >
-                  Remove finding
+                  Add a finding
                 </button>
-              </div>
-            ))}
-            <button className={styles.addBtn} onClick={() => setFindings({ items: [...report.findings!.items, newFinding()] })}>
-              Add a finding
-            </button>
-          </>
-        )}
-      </div>
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Maintenance plan ────────────────────────────────────────────── */}
       <div className={styles.group} data-pages="plan">

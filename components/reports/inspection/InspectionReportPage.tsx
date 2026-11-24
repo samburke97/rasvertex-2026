@@ -1516,9 +1516,11 @@ function PhotoEditor({
         <span className={styles.fieldLabel}>Title</span>
         <input
           className={styles.input}
-          value={photo.title ?? ""}
+          // The title as it prints (from the photo's name), there to edit;
+          // emptied, it prints from the name again.
+          value={photo.title ?? view.autoName}
           placeholder={view.autoName}
-          onChange={(e) => onChange({ title: e.target.value || undefined })}
+          onChange={(e) => onChange({ title: e.target.value === view.autoName ? undefined : e.target.value })}
         />
       </label>
 

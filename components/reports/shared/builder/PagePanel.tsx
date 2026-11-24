@@ -6,13 +6,16 @@
 // Sheets carry data-page="<id>"; the panel's groups carry
 // data-pages="<id> <id>…" (the pages they edit). Clicking a sheet selects its
 // page; an element with data-panel-field="<field>" also puts the cursor in
-// the panel's matching data-panel-field input.
+// the panel's matching data-panel-field input, and one with
+// data-item="<id>" (a variation, a finding) opens that item's own editor.
 
 import { useRef, useState, type MouseEvent, type ReactNode } from "react";
 import styles from "./BuilderChrome.module.css";
 
 export function usePagePanel(initial: string) {
   const [sel, setSel] = useState(initial);
+  // The item on the selected page being edited on its own, if any.
+  const [item, setItem] = useState<string | null>(null);
   const panelRef = useRef<HTMLElement>(null);
 
   const focusField = (field: string) =>
@@ -29,6 +32,7 @@ export function usePagePanel(initial: string) {
     const page = t.closest<HTMLElement>("[data-page]")?.dataset.page;
     if (!page) return;
     setSel(page);
+    setItem(t.closest<HTMLElement>("[data-item]")?.dataset.item ?? null);
     const field = t.closest<HTMLElement>("[data-panel-field]")?.dataset.panelField;
     if (field) focusField(field);
     else if (panelRef.current) panelRef.current.scrollTop = 0;
@@ -37,10 +41,17 @@ export function usePagePanel(initial: string) {
   /** From the rail: select the page and bring its first sheet into view. */
   const pick = (id: string, preview: HTMLElement | null) => {
     setSel(id);
+    setItem(null);
     preview?.querySelector(`[data-page="${id}"]`)?.scrollIntoView({ block: "start" });
   };
 
-  return { sel, pick, onDocClick, panelRef };
+  /** Open an item's own editor (null: back to the page's settings). */
+  const openItem = (id: string | null) => {
+    setItem(id);
+    if (panelRef.current) panelRef.current.scrollTop = 0;
+  };
+
+  return { sel, item, openItem, pick, onDocClick, panelRef };
 }
 
 /** The right-hand panel: the selected page's name, then its settings only. */

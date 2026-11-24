@@ -20,6 +20,8 @@ export interface ReportPhoto {
   off?: boolean;
   /** Uploaded from the computer, not from SimPRO: can be deleted. */
   uploaded?: boolean;
+  /** The SimPRO attachment folder it's in ("Progress Photos"). */
+  folder?: string | null;
 }
 
 /** How a photo sits in its frame: focal point (0–100 %) and zoom (1 = just

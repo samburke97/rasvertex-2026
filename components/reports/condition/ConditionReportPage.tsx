@@ -35,6 +35,7 @@ import {
   type CoverPos,
   type ImportStatus,
   type PhotoFolder,
+  type ReportPhoto,
   type ReportJobDetails,
   type ReportScope,
   type ReportSettings,
@@ -43,6 +44,7 @@ import {
   type ScheduleRow,
   type PhotoSection,
   type SimproVariation,
+  type Variation,
   mergeVariations,
   pickedPhotoIds,
 } from "@/lib/reports/condition.types";
@@ -120,6 +122,16 @@ const PAGE_ROWS = [
 ];
 /** Optional sections: an eye in the rail, off until switched on. */
 const OPTIONAL: ProjectSection[] = ["method", "variations", "findings", "plan", "warranty"];
+
+/** The panel's title while a variation or finding is open on its own. */
+function itemTitle(r: ConditionReportData, id: string | null): string | null {
+  if (!id) return null;
+  const vi = r.variations?.items.findIndex((v) => v.id === id) ?? -1;
+  if (vi >= 0) return r.variations!.items[vi].title || `Variation ${vi + 1}`;
+  const fi = r.findings?.items.findIndex((f) => f.id === id) ?? -1;
+  if (fi >= 0) return r.findings!.items[fi].title || `Finding ${fi + 1}`;
+  return null;
+}
 
 /** The SimPRO route for a loaded number ("Q11234" is a quote). */
 const base = (n: string) => simproBase(readSource(n).source, readSource(n).id);
@@ -263,15 +275,19 @@ export default function ConditionReportPage({
     setReport((prev) => ({ ...prev, schedule: rows }));
   }, []);
 
-  /** The job's photos from SimPRO. A new load replaces the library, except
-   *  the photos the cover, methodology, findings and variations use (kept
-   *  off the photo pages until the load brings them back);
-   *  `merge` (Reload in the photo library) only adds photos not in it yet,
+  // The report as it is now, for callbacks that run later (photo loads).
+  const reportRef = useRef(report);
+  reportRef.current = report;
+
+  /** Every photo on the job in SimPRO, from all its folders: the library
+   *  always has them all. A fresh load replaces the library, except the
+   *  photos the cover, methodology, findings and variations use; `merge`
+   *  downloads only photos not in it yet (the rest just take their folder),
    *  so uploads, photos taken off and adjustments stay as they are.
-   *  `off`: the photos added aren't put on the photo pages (Reload in a
-   *  finding's or variation's picker: there to choose from). */
+   *  `offPage`: which new photos go in the library without going on the
+   *  photo pages. */
   const fetchPhotos = useCallback(
-    (jobNumber: string, folderId: number | null, merge = false, off = false) => {
+    (jobNumber: string, merge = false, offPage: (p: ReportPhoto) => boolean = () => false) => {
       const myGen = ++photoLoadId.current;
       const isStale = () => photoLoadId.current !== myGen;
       if (!merge)
@@ -280,9 +296,9 @@ export default function ConditionReportPage({
           return { ...prev, photos: prev.photos.filter((p) => keep.has(p.id)).map((p) => ({ ...p, off: true })) };
         });
       setImportStatus({ phase: "fetching-photos", loaded: 0, total: 0 });
-      const folderQuery = folderId != null ? `&folderId=${folderId}` : "";
+      const skip = merge ? reportRef.current.photos.filter((p) => p.id.startsWith("simpro_")).map((p) => p.id.slice(7)) : [];
       return streamPhotoImport(
-        `${base(jobNumber)}/attachments?companyId=0${folderQuery}`,
+        `${base(jobNumber)}/attachments?companyId=0`,
         (photoId) => `condition-reports/${jobNumber}/${photoId}.jpg`,
         {
           isStale,
@@ -291,8 +307,10 @@ export default function ConditionReportPage({
               const had = prev.photos.find((p) => p.id === photo.id);
               // A kept photo that's in the new folder goes back on the pages.
               if (had) return merge || !had.off ? prev : { ...prev, photos: prev.photos.map((p) => (p === had ? { ...p, off: false } : p)) };
-              return { ...prev, photos: [...prev.photos, off ? { ...photo, off: true } : photo] };
+              return { ...prev, photos: [...prev.photos, offPage(photo) ? { ...photo, off: true } : photo] };
             }),
+          onKnown: (id, folder) =>
+            history.silent((prev) => ({ ...prev, photos: prev.photos.map((p) => (p.id === id && p.folder !== folder ? { ...p, folder } : p)) })),
           // On a merge the photo already in the library keeps its URL.
           onPhotoUploaded: (id, blobUrl) =>
             history.silent((prev) => ({
@@ -306,6 +324,7 @@ export default function ConditionReportPage({
           onDone: () => setImportStatus({ phase: "done" }),
           onError: (message) => setImportStatus({ phase: "error", message }),
         },
+        skip,
       );
     },
     [],
@@ -525,6 +544,13 @@ export default function ConditionReportPage({
           setScheduleStatus({ phase: "done" });
           loadScope();
           loadVariations();
+          // The library always has every photo on the job: any not in the
+          // draft yet come in, off the photo pages, to choose from.
+          foldersPromise
+            .then((r) => (r?.ok ? r.json() : null))
+            .then((d) => !isStale() && (d?.folders?.length ?? 0) > 1 && setPhotoFolders(d.folders))
+            .catch(() => {});
+          fetchPhotos(jobNumber, true, () => true);
           return;
         }
       } catch {
@@ -577,14 +603,9 @@ export default function ConditionReportPage({
       }
       if (isStale()) return;
 
-      if (folders.length > 1) {
-        setPhotoFolders(folders);
-        setImportStatus({ phase: "idle" });
-        return;
-      }
-
-      // 0 or 1 folder — nothing meaningful to choose, import everything.
-      fetchPhotos(jobNumber, null);
+      // Every folder's photos, always; the folders are offered as a filter.
+      if (folders.length > 1) setPhotoFolders(folders);
+      fetchPhotos(jobNumber);
     },
     [fetchPhotos, fetchSchedule],
   );
@@ -622,12 +643,30 @@ export default function ConditionReportPage({
     handleImport(loadedJobId);
   }, [loadedJobId, handleImport]);
 
+  // A folder chosen in Photos: its photos are the ones on the photo pages
+  // (All photos: every SimPRO photo). The library keeps every folder.
+  const folderName = (id: number | null) => (id == null ? null : (photoFolders.find((f) => f.id === id)?.name.trim() ?? null));
   const selectFolder = useCallback(
     (folderId: number | null) => {
       setSelectedFolderId(folderId);
-      if (loadedJobId) fetchPhotos(loadedJobId, folderId);
+      const name = folderId == null ? null : (photoFolders.find((f) => f.id === folderId)?.name.trim() ?? null);
+      setReport((prev) => ({
+        ...prev,
+        photos: prev.photos.map((p) => (p.uploaded || !p.id.startsWith("simpro_") ? p : { ...p, off: name != null && p.folder !== name })),
+      }));
     },
-    [loadedJobId, fetchPhotos],
+    [photoFolders],
+  );
+
+  // A variation's hours schedule: the days logged to its cost centre.
+  const loadVariationHours = useCallback(
+    async (v: Variation): Promise<ScheduleRow[] | null> => {
+      if (!loadedJobId || !v.sectionId) return null;
+      const res = await fetch(`/api/simpro/jobs/${loadedJobId}/schedule?companyId=0&sectionId=${v.sectionId}&costCentreId=${v.ccId}`).catch(() => null);
+      const data = res?.ok ? await res.json().catch(() => null) : null;
+      return data?.rows ?? null;
+    },
+    [loadedJobId],
   );
 
   const selectCostCenter = useCallback(
@@ -698,9 +737,6 @@ export default function ConditionReportPage({
 
   const hasReport = report.photos.length > 0 || !!report.job.preparedFor;
 
-  // Photos are deliberately deferred (see handleImport) while the user picks
-  // a folder from more than one option.
-  const awaitingFolderChoice = importStatus.phase === "idle" && photoFolders.length > 0;
 
   const filteredSchedule = shownSchedule(report.schedule, report.settings);
 
@@ -803,11 +839,9 @@ export default function ConditionReportPage({
   const photoStatus =
     importStatus.phase === "fetching-photos"
       ? `Loading photos${importStatus.total ? ` · ${importStatus.loaded} of ${importStatus.total}` : "…"}`
-      : awaitingFolderChoice
-        ? "Pick a photo folder to load photos"
-        : scheduleStatus.phase === "loading"
-          ? "Loading schedule…"
-          : null;
+      : scheduleStatus.phase === "loading"
+        ? "Loading schedule…"
+        : null;
 
   return (
     <div className={styles.page}>
@@ -892,7 +926,7 @@ export default function ConditionReportPage({
           </div>
         </div>
         <PanelResizer panel={panelWidth} />
-        <SidePanel panel={pagePanel} title={PAGE_ROWS.find((x) => x.id === pagePanel.sel)?.name ?? ""} width={panelWidth.w}>
+        <SidePanel panel={pagePanel} title={itemTitle(report, pagePanel.item) ?? PAGE_ROWS.find((x) => x.id === pagePanel.sel)?.name ?? ""} width={panelWidth.w}>
           <OptionsPanel
             settings={report.settings}
             photos={report.photos}
@@ -923,14 +957,24 @@ export default function ConditionReportPage({
             onRemovePhoto={removePhoto}
             onUploadPhotos={uploadPhotos}
             onDeletePhoto={deletePhoto}
-            onReloadPhotos={loadedJobId ? () => fetchPhotos(loadedJobId, selectedFolderId, true) : undefined}
+            onReloadPhotos={
+              loadedJobId
+                ? () => {
+                    const name = folderName(selectedFolderId);
+                    fetchPhotos(loadedJobId, true, (p) => name != null && p.folder !== name);
+                  }
+                : undefined
+            }
           />
           <ProjectSections
             report={report}
             update={setReport}
+            item={pagePanel.item}
+            onItem={pagePanel.openItem}
+            loadHours={loadedJobId && readSource(loadedJobId).source === "job" ? loadVariationHours : undefined}
             library={
               loadedJobId
-                ? { loading: importStatus.phase === "fetching-photos", reload: () => fetchPhotos(loadedJobId, null, true, true) }
+                ? { loading: importStatus.phase === "fetching-photos", reload: () => fetchPhotos(loadedJobId, true, () => true) }
                 : undefined
             }
           />

@@ -12,7 +12,7 @@ const ALLOWED = new Set([
 ]);
 const DROP_WITH_CONTENT = /<(script|style|iframe|object|embed|svg|math|template)\b[\s\S]*?<\/\1\s*>/gi;
 
-function escapeText(s: string): string {
+export function escapeText(s: string): string {
   return s.replace(/&(?![a-z][a-z0-9]*;|#\d+;|#x[0-9a-f]+;)/gi, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 

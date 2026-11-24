@@ -465,7 +465,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
       id: p.id,
       num: pad(numOf.get(p) ?? 0),
       chips: [code, ...p.codes.filter((c) => c !== code).sort((a, b) => codeOrd(a) - codeOrd(b))].filter((c) => p.codes.includes(c)).map(chip),
-      gname: capFirst(p.title ?? autoName),
+      gname: capFirst(p.title?.trim() || autoName),
       pos: p.pos,
       where: placeOf(p, withZone),
       note: capFirst(p.desc ?? autoNote),

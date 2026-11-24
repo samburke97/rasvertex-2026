@@ -34,6 +34,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ job
         if (!cc.Variation) continue;
         variations.push({
           ccId: String(cc.ID),
+          sectionId: String(s.ID),
           name: (cc.Name ?? "").trim(),
           description: cc.Description ?? "",
           hours: cc.Totals?.ResourcesCost?.LaborHours?.Actual ?? 0,

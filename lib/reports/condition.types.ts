@@ -170,6 +170,8 @@ export const FINDINGS_INTRO =
 /** A variation cost centre as SimPRO has it. */
 export interface SimproVariation {
   ccId: string;
+  /** The job section the cost centre is in. */
+  sectionId: string;
   name: string;
   /** HTML from SimPRO. */
   description: string;
@@ -183,7 +185,13 @@ export interface SimproVariation {
  *  photos are the rep's; the hours are SimPRO's, refreshed on each load. */
 export interface Variation extends Finding {
   ccId: string;
+  /** The cost centre's job section (absent on drafts until a reload). */
+  sectionId?: string;
   hours: number;
+  /** Print its own hours schedule, as the job's, under its photos. */
+  showSchedule?: boolean;
+  /** Each day logged to it in SimPRO; loaded when the schedule is switched on. */
+  schedule?: ScheduleRow[];
   /** Left off the report (it comes back from SimPRO on reload otherwise). */
   off?: boolean;
 }
@@ -193,7 +201,18 @@ export interface Variations {
   items: Variation[];
   /** Print each variation's hours. */
   showHours?: boolean;
+  /** All variations printed as one: their names and descriptions, then
+   *  every photo, then one hours schedule (a section per variation). */
+  combined?: boolean;
+  /** Combined: the heading. */
+  combinedTitle?: string;
+  /** Combined: how big the photos print. */
+  size?: FindingSize;
+  /** Combined: print the hours schedule. */
+  showSchedule?: boolean;
 }
+
+export const COMBINED_TITLE = "Variations on this job";
 
 export const VARIATIONS_INTRO = "Works added to the original scope during the project, as approved, with the hours our team spent on each.";
 
@@ -208,7 +227,9 @@ export function mergeVariations(
   if (!fresh.length) return cur;
   const items: Variation[] = fresh.map((v) => {
     const had = cur?.items.find((x) => x.ccId === v.ccId);
-    return had ? { ...had, hours: v.hours } : { id: `v${v.ccId}`, ccId: v.ccId, ...fromSimpro(v), photoIds: [], hours: v.hours };
+    return had
+      ? { ...had, sectionId: v.sectionId, hours: v.hours }
+      : { id: `v${v.ccId}`, ccId: v.ccId, sectionId: v.sectionId, ...fromSimpro(v), photoIds: [], hours: v.hours };
   });
   return { intro: cur?.intro ?? VARIATIONS_INTRO, showHours: cur?.showHours ?? true, on: cur?.on ?? true, items };
 }

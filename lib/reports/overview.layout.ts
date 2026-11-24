@@ -27,9 +27,12 @@ import {
   type CoverPos,
   type PhotoLayout,
   type ScheduleRow,
+  type Variation,
+  type Variations,
+  COMBINED_TITLE,
 } from "./condition.types";
 import { CLOSER_GAP, CLOSER_H, dotDate, pad } from "./anchor.layout";
-import { notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "./richText";
+import { escapeText, notesIsEmpty, notesLineCount, sanitizeNotesHtml } from "./richText";
 import type { PhotoPos } from "./photos";
 import { htmlItems } from "./richText";
 import { planRows, PLAN_INTRO, type PlanItem } from "./maintenancePlan";
@@ -59,6 +62,8 @@ const T_ROW_NOTES = 76;
 const T_SEC = 72;
 const T_SUB = 56;
 const T_TOTAL = 72;
+/** Between a variation's photos and its hours table. */
+const HOURS_GAP = 40;
 const T_INTRO = 20 + LEDE_LINE + 56; // a one-line lede and its margins
 
 // Photos.
@@ -106,9 +111,11 @@ export type MethodBlock =
   | { t: "photo" };
 
 /** A finding on its page: its head (number, title, description), then rows
- *  of its photos. A finding split across pages repeats its head, marked
- *  continued, without the description. */
+ *  of its photos. A finding split across pages carries on with its photos
+ *  alone (continued: no head). */
 export interface FindingBlock {
+  /** The finding's or variation's id: clicking it opens its editor. */
+  id: string;
   n: number;
   title: string;
   desc: string;
@@ -118,6 +125,9 @@ export interface FindingBlock {
   /** Photos per row (the finding's photo size). */
   cols: number;
   rows: OverviewPhoto[][];
+  /** A variation's hours schedule rows on this page, under its photos;
+   *  the table's header repeats on each page it's on. */
+  hours: HourItem[];
 }
 
 /** Pages of numbered items with photos. */
@@ -260,6 +270,35 @@ const longDate = (iso: string) => {
   const d = new Date(iso + "T00:00:00");
   return isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
 };
+
+/** Every variation as one item: each one's name (and hours) and
+ *  description in turn, all their photos, and one hours schedule with a
+ *  section per variation. */
+function combinedVariations(vs: Variations, list: Variation[], showHrs: boolean, shown: (rows: ScheduleRow[]) => ScheduleRow[]) {
+  const total = list.reduce((t, v) => t + v.hours, 0);
+  const desc = list
+    .map((v, i) => {
+      const name = escapeText(v.title.trim() || `Variation ${i + 1}`);
+      const head = `<p><strong>${name}</strong>${showHrs && v.hours > 0 ? ` · ${hrs(v.hours)} hours` : ""}</p>`;
+      return head + (notesIsEmpty(v.desc) ? "" : v.desc);
+    })
+    .join("");
+  // Each variation's days, the first one starting its section.
+  const rows = vs.showSchedule
+    ? list.flatMap((v, i) =>
+        shown(v.schedule ?? []).map((r, k) => ({ ...r, sectionTitle: k === 0 ? v.title.trim() || `Variation ${i + 1}` : undefined })),
+      )
+    : [];
+  return {
+    id: "variations-all",
+    title: vs.combinedTitle?.trim() || COMBINED_TITLE,
+    desc,
+    photoIds: [...new Set(list.flatMap((v) => v.photoIds))],
+    size: vs.size,
+    meta: showHrs && total > 0 ? `${hrs(total)} hours` : undefined,
+    hours: rows.length ? hourItems(rows, true) : [],
+  };
+}
 
 /** "The hours below were logged by our team between … and … on job #11360." */
 export function hoursLedeText(rows: ScheduleRow[], jobNo: string): string {
@@ -405,13 +444,18 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
     lastUsed = null;
   }
 
-  if (variations.length)
-    flowBlocks(
-      "variations",
-      variations.map((v) => ({ ...v, meta: report.variations!.showHours !== false && v.hours > 0 ? `${hrs(v.hours)} hours` : undefined })),
-      report.variations!.intro || VARIATIONS_INTRO,
-      "Variation",
-    );
+  if (variations.length) {
+    const vs = report.variations!;
+    const showHrs = vs.showHours !== false;
+    const list = vs.combined
+      ? [combinedVariations(vs, variations, showHrs, (rows) => shownSchedule(rows, settings))]
+      : variations.map((v) => ({
+          ...v,
+          meta: showHrs && v.hours > 0 ? `${hrs(v.hours)} hours` : undefined,
+          hours: v.showSchedule && v.schedule ? hourItems(shownSchedule(v.schedule, settings), false) : [],
+        }));
+    flowBlocks("variations", list, vs.intro || VARIATIONS_INTRO, "Variation");
+  }
 
   // Photos: the sections first (each a title, its note and its photos in
   // the order picked), then the rest grouped by day when dates are shown,
@@ -489,7 +533,7 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
   // between photo rows with its head repeated.
   function flowBlocks(
     kind: BlockKind,
-    list: { title: string; desc: string; photoIds: string[]; size?: FindingSize; meta?: string }[],
+    list: { id: string; title: string; desc: string; photoIds: string[]; size?: FindingSize; meta?: string; hours?: HourItem[] }[],
     intro: string,
     fallback: string,
   ) {
@@ -515,20 +559,34 @@ export function buildOverviewModel(report: ConditionReportData, coverFallback: s
       const gap = page.items.length ? FINDING_GAP : 0;
       // The head with its first row of photos stays together.
       if (page.items.length && used + gap + headH(f, f.desc) + (rows.length ? rowH : 0) > FLOW_H) newPage();
-      let block: FindingBlock = { n: i + 1, title: f.title.trim() || `${fallback} ${i + 1}`, desc: f.desc, meta: f.meta, continued: false, cols, rows: [] };
+      let block: FindingBlock = { id: f.id, n: i + 1, title: f.title.trim() || `${fallback} ${i + 1}`, desc: f.desc, meta: f.meta, continued: false, cols, rows: [], hours: [] };
       used += (page.items.length ? FINDING_GAP : 0) + headH(f, f.desc);
       page.items.push(block);
       for (const row of rows) {
         const g = block.rows.length ? COL_GAP : 0;
         if (used + g + rowH > FLOW_H) {
           newPage();
-          block = { ...block, desc: "", continued: true, rows: [] };
-          used += headH(f, "");
+          // The photos carry on at the top of the next page, no head.
+          block = { ...block, desc: "", continued: true, rows: [], hours: [] };
           page.items.push(block);
         }
         used += (block.rows.length ? COL_GAP : 0) + rowH;
         block.rows.push(row);
       }
+      // Its hours schedule, as the job's: the header with at least its
+      // first row, repeated on each page the table carries on to.
+      const hrsH = (it: HourItem) => (it.kind === "section" ? T_SEC : it.kind === "row" ? (settings.showScheduleNotes ? T_ROW_NOTES : T_ROW) : it.kind === "subtotal" ? T_SUB : T_TOTAL);
+      (f.hours ?? []).forEach((it, k) => {
+        const top = k === 0 ? (block.rows.length || !block.continued ? HOURS_GAP : 0) + T_HEAD : 0;
+        if (used + top + hrsH(it) > FLOW_H) {
+          newPage();
+          block = { ...block, desc: "", continued: true, rows: [], hours: [] };
+          page.items.push(block);
+          used += T_HEAD;
+        } else used += top;
+        used += hrsH(it);
+        block.hours.push(it);
+      });
     });
     lastUsed = used;
     pages.push(page as Page);

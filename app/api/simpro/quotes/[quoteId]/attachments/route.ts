@@ -106,9 +106,24 @@ function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
-export async function GET(
+export function GET(request: NextRequest, ctx: { params: Promise<{ quoteId: string }> }) {
+  return stream(request, ctx, new Set());
+}
+
+/** As GET, with { skip: string[] } in the body: SimPRO attachment IDs the
+ *  caller already has. */
+export async function POST(request: NextRequest, ctx: { params: Promise<{ quoteId: string }> }) {
+  const body = (await request.json().catch(() => ({}))) as { skip?: unknown };
+  const skip = Array.isArray(body.skip) ? body.skip.map(String) : [];
+  return stream(request, ctx, new Set(skip));
+}
+
+async function stream(
   request: NextRequest,
   { params }: { params: Promise<{ quoteId: string }> },
+  /** Attachments the caller already has: not downloaded again, only
+   *  reported with their folder ("known"). */
+  skip: Set<string>,
 ) {
   const { quoteId } = await params;
   const { searchParams } = new URL(request.url);
@@ -200,9 +215,12 @@ export async function GET(
 
         const imageExtensions =
           /\.(jpg|jpeg|png|gif|webp|bmp|tiff|heic|heif)$/i;
-        const candidates = attachmentsList.filter(
+        const inScope = attachmentsList.filter(
           (a) => imageExtensions.test(a.Filename) && matchesFolder(a),
         );
+        for (const a of inScope)
+          if (skip.has(String(a.ID))) send("known", { id: `simpro_${a.ID}`, folder: a.Folder?.Name?.trim() || null });
+        const candidates = inScope.filter((a) => !skip.has(String(a.ID)));
 
         send("start", { total: candidates.length, quoteId: parsedQuoteId });
 
@@ -232,6 +250,7 @@ export async function GET(
                   url: await jpegDataUrl(`data:${detail.MimeType};base64,${detail.Base64Data}`),
                   size: detail.FileSizeBytes ?? 0,
                   dateAdded: detail.DateAdded ?? null,
+                  folder: (detail.Folder ?? att.Folder)?.Name?.trim() || null,
                   index: i,
                 });
                 loaded++;

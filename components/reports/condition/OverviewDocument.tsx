@@ -71,6 +71,9 @@ export const OVERVIEW_CSS =
 .jo-find-desc{grid-column:2;margin-top:12px;font-size:20px;line-height:1.55;color:var(--ink-65)}
 .jo-find-photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:20px}
 .jo-find-photos .ar-photo{aspect-ratio:4/3}
+.jo-find-photos:first-child{margin-top:0}
+.jo-find-hours{margin-top:40px}
+.jo-find-hours:first-child{margin-top:0}
 .jo-day-note{font-size:18px;line-height:1.5;color:var(--ink-65);margin:-12px 0 20px;max-width:900px}
 .jo-pick .ar-photo{cursor:pointer;outline:3px solid transparent;outline-offset:3px;transition:outline-color 100ms}
 .jo-pick .ar-photo:hover{outline-color:rgba(62,127,176,.45)}
@@ -288,6 +291,30 @@ export function HourRow({ it, notes, times }: { it: HourItem; notes: boolean; ti
   }
 }
 
+/** The hours table: its header, then the rows. The Hours schedule pages
+ *  and each variation's schedule. */
+function HoursTable({ items, notes, times, className = "" }: { items: HourItem[]; notes: boolean; times: boolean; className?: string }) {
+  return (
+    <div className={`ar-table ${className}`}>
+      <div className={`ar-thead ${hourCols(notes, times)}`}>
+        <span>Date</span>
+        <span>Team member</span>
+        {times && (
+          <>
+            <span>Start</span>
+            <span>Finish</span>
+          </>
+        )}
+        <span className="ar-r">Hours</span>
+        {notes && <span>Notes</span>}
+      </div>
+      {items.map((it, i) => (
+        <HourRow key={i} it={it} notes={notes} times={times} />
+      ))}
+    </div>
+  );
+}
+
 function HoursPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "hours" }> }) {
   const { model } = ctx;
   const notes = model.showNotes;
@@ -302,23 +329,7 @@ function HoursPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: "hours
       ) : (
         <SecLabel text="Hours schedule, continued" />
       )}
-      <div className="ar-table">
-        <div className={`ar-thead ${hourCols(notes, times)}`}>
-          <span>Date</span>
-          <span>Team member</span>
-          {times && (
-            <>
-              <span>Start</span>
-              <span>Finish</span>
-            </>
-          )}
-          <span className="ar-r">Hours</span>
-          {notes && <span>Notes</span>}
-        </div>
-        {page.items.map((it, i) => (
-          <HourRow key={i} it={it} notes={notes} times={times} />
-        ))}
-      </div>
+      <HoursTable items={page.items} notes={notes} times={times} />
       <PageNo no={page.no} total={model.total} />
     </section>
   );
@@ -653,16 +664,15 @@ function BlocksPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: Block
         <SecLabel text={`${title}, continued`} />
       )}
       {page.items.map((f) => (
-        <div key={`${f.n}-${f.continued}`} className="jo-find">
-          <div className="jo-find-head">
-            <span className="jo-find-no">{pad(f.n)}</span>
-            <h3 className="jo-find-title">
-              {f.title}
-              {f.continued && <span>, continued</span>}
-            </h3>
-            {f.meta && !f.continued && <span className="jo-find-meta">{f.meta}</span>}
-            {f.desc && <div className="jo-find-desc ar-rich" dangerouslySetInnerHTML={{ __html: sanitizeNotesHtml(f.desc) }} />}
-          </div>
+        <div key={`${f.n}-${f.continued}`} className="jo-find" data-item={f.id}>
+          {!f.continued && (
+            <div className="jo-find-head">
+              <span className="jo-find-no">{pad(f.n)}</span>
+              <h3 className="jo-find-title">{f.title}</h3>
+              {f.meta && <span className="jo-find-meta">{f.meta}</span>}
+              {f.desc && <div className="jo-find-desc ar-rich" dangerouslySetInnerHTML={{ __html: sanitizeNotesHtml(f.desc) }} />}
+            </div>
+          )}
           {f.rows.length > 0 && (
             <div className="jo-find-photos" style={{ gridTemplateColumns: `repeat(${f.cols},minmax(0,1fr))` }}>
               {f.rows.flat().map((p) => (
@@ -673,6 +683,7 @@ function BlocksPage({ ctx, page }: { ctx: Ctx; page: Extract<Page, { kind: Block
               ))}
             </div>
           )}
+          {f.hours.length > 0 && <HoursTable items={f.hours} notes={model.showNotes} times={model.showTimes} className="jo-find-hours" />}
         </div>
       ))}
       <PageNo no={page.no} total={model.total} />
