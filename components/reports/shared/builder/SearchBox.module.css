@@ -1,0 +1,5 @@
+/* SearchBox.module.css: the builders' search field. */
+.search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid rgba(var(--ink-rgb), 0.12); border-radius: 10px; color: rgba(var(--ink-rgb), 0.45); background: var(--surface); }
+.search:focus-within { border-color: rgba(var(--ink-rgb), 0.35); }
+.search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: none; font: inherit; font-size: 13px; color: var(--ink); }
+.clear { width: 22px; height: 22px; border: 0; border-radius: 6px; background: rgba(var(--ink-rgb), 0.06); color: var(--ink); font-size: 14px; line-height: 1; cursor: pointer; }

@@ -15,6 +15,8 @@ export interface GridItem {
   id: string;
   src: string;
   title: string;
+  /** In the corner in place of its place in the grid (e.g. its photo number). */
+  label?: string;
 }
 
 export function PhotoGrid({
@@ -22,15 +24,20 @@ export function PhotoGrid({
   onOpen,
   onMove,
   children,
+  full,
 }: {
   items: GridItem[];
   onOpen: (index: number) => void;
-  onMove: (from: number, to: number) => void;
+  /** Absent: no dragging (e.g. while a search narrows the grid). */
+  onMove?: (from: number, to: number) => void;
   /** Extra cells after the photos, e.g. Add. */
   children?: ReactNode;
+  /** Show every item, never "Show all" (search results). */
+  full?: boolean;
 }) {
   const [drag, setDrag] = useState<{ from: number; over: number } | null>(null);
-  const { shown, toggle, open } = useCollapse(items);
+  const collapsed = useCollapse(items);
+  const { shown, toggle, open } = full ? { shown: items, toggle: null, open: true } : collapsed;
   return (
     <div className={styles.fgrid}>
       {shown.map((it, i) => (
@@ -40,7 +47,7 @@ export function PhotoGrid({
           style={bg(it.src)}
           title={it.title}
           onClick={() => onOpen(i)}
-          draggable
+          draggable={!!onMove}
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = "move";
             setDrag({ from: i, over: i });
@@ -52,12 +59,12 @@ export function PhotoGrid({
           }}
           onDrop={(e) => {
             e.preventDefault();
-            if (drag && drag.from !== i) onMove(drag.from, i);
+            if (drag && drag.from !== i) onMove?.(drag.from, i);
             setDrag(null);
           }}
           onDragEnd={() => setDrag(null)}
         >
-          <span className={styles.fnum}>{i + 1}</span>
+          <span className={styles.fnum}>{it.label ?? i + 1}</span>
         </button>
       ))}
       {toggle}

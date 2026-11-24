@@ -10,6 +10,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import styles from "./PhotoPickerModal.module.css";
+import SearchBox, { matches } from "./SearchBox";
 
 export interface PickerPhoto {
   id: string;
@@ -86,7 +87,7 @@ export default function PhotoPickerModal({
   const byFolder = folders.length > 1;
   const [folder, setFolder] = useState<string | null>(null);
   const inFolder = byFolder && folder !== null ? photos.filter((p) => (p.folder ?? "") === folder) : photos;
-  const shown = words.length ? inFolder.filter((p) => words.every((w) => (p.title ?? "").toLowerCase().includes(w))) : inFolder;
+  const shown = words.length ? inFolder.filter((p) => matches(p.title ?? "", query)) : inFolder;
   const count = (f: string) => photos.filter((p) => (p.folder ?? "") === f).length;
 
   useEffect(() => {
@@ -108,18 +109,7 @@ export default function PhotoPickerModal({
             ×
           </button>
         </div>
-        <div className={styles.search}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-          <input autoFocus value={query} placeholder="Search by file name" onChange={(e) => setQuery(e.target.value)} />
-          {query && (
-            <button className={styles.clear} onClick={() => setQuery("")} aria-label="Clear search">
-              ×
-            </button>
-          )}
-        </div>
+        <SearchBox autoFocus value={query} onChange={setQuery} placeholder="Search by file name" />
         {filters && filters.length > 0 && (
           <div className={styles.chips}>
             {filters.map((f) => (

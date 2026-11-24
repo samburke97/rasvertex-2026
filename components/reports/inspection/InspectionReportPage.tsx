@@ -34,6 +34,7 @@ import JobStart from "@/components/reports/shared/builder/JobStart";
 import PageRail, { type RailRow } from "@/components/reports/shared/builder/PageRail";
 import RichBox from "@/components/reports/shared/builder/RichBox";
 import { CodeChips, PhotoGrid, PhotoTray } from "@/components/reports/shared/builder/PhotoGrid";
+import SearchBox, { matches } from "@/components/reports/shared/builder/SearchBox";
 import ToggleRow from "@/components/reports/shared/ToggleRow";
 import PlanServices, { seedPlan } from "@/components/reports/shared/builder/PlanServices";
 import { notesIsEmpty } from "@/lib/reports/richText";
@@ -692,6 +693,16 @@ export default function InspectionReportPage({ onBack }: Props) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   const lib = r ? libraryOf(r) : libraryFrom(settings, pick.report, pick.type);
+  // The photos panel's search: title, file name, codes (and their names),
+  // location and photo number.
+  const [photoQuery, setPhotoQuery] = useState("");
+  const foundPhotos = useMemo(() => {
+    if (!photoQuery.trim()) return [];
+    const nameOf = new Map((r?.photos ?? []).map((p) => [p.id, p.name ?? ""]));
+    return photoViews.filter((v) =>
+      matches([v.gname, nameOf.get(v.id), v.where, v.num, ...v.chips.flatMap((c) => [c.code, lib.codeMap[c.code]?.name ?? ""])].join(" "), photoQuery),
+    );
+  }, [photoQuery, photoViews, r?.photos, lib]);
 
   return (
     <div className={styles.root}>
@@ -1225,11 +1236,25 @@ export default function InspectionReportPage({ onBack }: Props) {
               )}
               {importError && <div className={styles.error}>{importError}</div>}
               {photoViews.length > 0 && (
-                <PhotoGrid
-                  items={photoViews.map((v) => ({ id: v.id, src: photoUrl(v.id) ?? "", title: v.gname }))}
-                  onOpen={(i) => pickPhoto(photoViews[i].id, true)}
-                  onMove={movePhoto}
-                />
+                <>
+                  <SearchBox value={photoQuery} onChange={setPhotoQuery} placeholder="Search by title, file name, code or location" />
+                  {photoQuery.trim() && (
+                    <span className={styles.hint}>
+                      {foundPhotos.length ? `${foundPhotos.length} of ${photoViews.length} photos. Click one to edit it.` : "No photos match."}
+                    </span>
+                  )}
+                  <PhotoGrid
+                    items={(photoQuery.trim() ? foundPhotos : photoViews).map((v) => ({
+                      id: v.id,
+                      src: photoUrl(v.id) ?? "",
+                      title: v.gname,
+                      label: photoQuery.trim() ? v.num : undefined,
+                    }))}
+                    onOpen={(i) => pickPhoto((photoQuery.trim() ? foundPhotos : photoViews)[i].id, true)}
+                    onMove={photoQuery.trim() ? undefined : movePhoto}
+                    full={!!photoQuery.trim()}
+                  />
+                </>
               )}
               {offPhotos.length > 0 && (
                 <>
