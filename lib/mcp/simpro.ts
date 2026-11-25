@@ -46,7 +46,10 @@ export async function simproRead(
 ): Promise<SimproPage> {
   if (!BASE || !TOKEN) throw new Error("SimPRO configuration missing — check env vars");
   const bare = normalisePath(path);
-  const qs = Object.entries(query)
+  // A query written into the path ("/jobs/?Stage=Progress") counts too:
+  // dropping it would answer for every record. Explicit params win.
+  const inPath = Object.fromEntries(new URLSearchParams(path.split("?")[1] ?? ""));
+  const qs = Object.entries({ ...inPath, ...query })
     .filter(([, v]) => v !== undefined && v !== "")
     // Encoded the same way as app/api/simpro/jobs/search (SimPRO decodes
     // %25…%25 back to its %…% wildcards).
