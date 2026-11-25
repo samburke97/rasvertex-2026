@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import styles from "./Sidebar.module.css";
@@ -82,8 +82,38 @@ export default function Sidebar({
     return pathname?.startsWith(href);
   };
 
-  const getProfileInitials = () => "U"; // Ultimate fallback — no auth session wired up yet
-  const getProfileImage = (): string | null => null; // OAuth profile image, once wired up
+  // Signed-in staff member (middleware.ts / lib/auth), for the avatar menu.
+  const [me, setMe] = useState<{ name: string; email: string } | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setMe(d))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuOpen]);
+
+  const signOut = async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    window.location.href = "/login";
+  };
+
+  const getProfileInitials = () => {
+    const source = me?.name || me?.email || "";
+    const parts = source.split(/[\s@.]+/).filter(Boolean);
+    return (parts.length > 1 ? parts[0][0] + parts[1][0] : parts[0]?.slice(0, 2) || "U").toUpperCase();
+  };
+  const getProfileImage = (): string | null => null;
 
   return (
     <aside className={styles.rail}>
@@ -137,14 +167,36 @@ export default function Sidebar({
 
       <div className={styles.spacer} />
 
-      <button className={styles.avatar} title="Account" type="button">
-        {getProfileImage() ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={getProfileImage()!} alt="Profile" className={styles.avatarImage} />
-        ) : (
-          <span className={styles.avatarInitials}>{getProfileInitials()}</span>
+      <div className={styles.accountWrap} ref={menuRef}>
+        <button
+          className={styles.avatar}
+          title={me ? `${me.name} — account` : "Account"}
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((o) => !o)}
+        >
+          {getProfileImage() ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={getProfileImage()!} alt="Profile" className={styles.avatarImage} />
+          ) : (
+            <span className={styles.avatarInitials}>{getProfileInitials()}</span>
+          )}
+        </button>
+        {menuOpen && (
+          <div className={styles.accountMenu} role="menu">
+            {me && (
+              <div className={styles.accountWho}>
+                <span className={styles.accountName}>{me.name}</span>
+                <span className={styles.accountEmail}>{me.email}</span>
+              </div>
+            )}
+            <button type="button" role="menuitem" className={styles.accountItem} onClick={signOut}>
+              Sign out
+            </button>
+          </div>
         )}
-      </button>
+      </div>
     </aside>
   );
 }

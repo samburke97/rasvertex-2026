@@ -169,3 +169,51 @@
     display: none;
   }
 }
+
+/* Account menu (avatar → sign out) */
+.accountWrap {
+  position: relative;
+}
+.accountMenu {
+  position: absolute;
+  left: 46px;
+  bottom: 0;
+  min-width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+  z-index: 70;
+}
+.accountWho {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.accountName {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.accountEmail {
+  font-size: 12px;
+  color: var(--ink-55);
+}
+.accountItem {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.accountItem:hover {
+  background: var(--fill-hover);
+}
