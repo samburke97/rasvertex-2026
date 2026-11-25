@@ -157,6 +157,18 @@ export const METHODS: Record<string, string[]> = {
     "Re-render to match the surface texture.",
     "Reinstate the finish to match.",
   ],
+  PS: [
+    "Sound the area and mark out drummy or cracked concrete.",
+    "Cut out delaminated material and treat the exposed steel.",
+    "Patch with repair mortar to match the profile.",
+    "Prime and paint to match.",
+  ],
+  EJF: [
+    "Cut out the failed joint sealant and backing.",
+    "Clean and prime the joint faces.",
+    "Install backing rod and a flexible joint sealant.",
+    "Tool off for a neat, watertight finish.",
+  ],
   CD: [
     "Scrape back loose and flaking paint.",
     "Sand the edges smooth and clean down.",

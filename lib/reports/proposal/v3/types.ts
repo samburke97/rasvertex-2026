@@ -81,7 +81,6 @@ export const JOB_FIELDS = registry.jobFields;
 /** Proposals are a scope of works, not an assessment: no code reads as a
  *  concrete or structural finding (the inspection reports keep theirs). */
 const PROPOSAL_WORDING: Record<string, Partial<DefectCodeDef>> = {
-  SC: { name: "Substantial crack", defaultWork: "Substantial crack repairs" },
   SP: { defaultWork: "Spalling repairs" },
 };
 
