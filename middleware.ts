@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth/session";
+import { isActive } from "@/lib/auth/active";
 
 const PUBLIC_PREFIXES = ["/login", "/api/auth/login", "/api/mcp", "/api/webhooks/", "/api/outreach/unsubscribe"];
 
@@ -45,7 +46,7 @@ export async function middleware(req: NextRequest) {
   if (isCron(req)) return NextResponse.next();
 
   const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
-  if (session) return NextResponse.next();
+  if (session && (await isActive(session.email))) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });

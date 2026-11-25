@@ -2,7 +2,7 @@
 // POST {email, password} → sets the signed session cookie (lib/auth/session.ts).
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyLogin } from "@/lib/auth/users";
+import { LOCK_MINUTES, isLocked, verifyLogin } from "@/lib/auth/users";
 import { SESSION_COOKIE, signSession, cookieOptions } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
@@ -22,6 +22,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    if (await isLocked(email)) {
+      return NextResponse.json(
+        { error: `Too many wrong passwords. Try again in ${LOCK_MINUTES} minutes.` },
+        { status: 429 },
+      );
+    }
     const user = await verifyLogin(email, password);
     if (!user) {
       return NextResponse.json({ error: "That email and password don't match." }, { status: 401 });

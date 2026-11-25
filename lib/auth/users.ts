@@ -15,6 +15,7 @@
 //   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 //   last_login_at  TIMESTAMPTZ
 // );
+// CREATE TABLE IF NOT EXISTS staff_login_failures (email TEXT NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
@@ -54,8 +55,32 @@ async function checkPassword(password: string, stored: string): Promise<boolean>
 // long as a wrong password.
 let dummyHash: Promise<string> | null = null;
 
+/** Wrong passwords allowed per email in LOCK_MINUTES before sign-in is
+ *  refused for that email (so a password can't be guessed by brute force). */
+const MAX_FAILS = 5;
+export const LOCK_MINUTES = 15;
+
+export async function isLocked(email: string): Promise<boolean> {
+  const rows = (await sql()`
+    SELECT COUNT(*)::int AS n FROM staff_login_failures
+    WHERE email = ${email.trim().toLowerCase()} AND at > NOW() - make_interval(mins => ${LOCK_MINUTES})
+  `) as { n: number }[];
+  return rows[0].n >= MAX_FAILS;
+}
+
 export async function verifyLogin(email: string, password: string): Promise<{ email: string; name: string } | null> {
   const e = email.trim().toLowerCase();
+  const user = await findAndCheck(e, password);
+  if (!user) {
+    await sql()`INSERT INTO staff_login_failures (email) VALUES (${e})`;
+    return null;
+  }
+  await sql()`DELETE FROM staff_login_failures WHERE email = ${e} OR at < NOW() - INTERVAL '1 day'`;
+  await sql()`UPDATE staff_users SET last_login_at = NOW() WHERE email = ${e}`;
+  return user;
+}
+
+async function findAndCheck(e: string, password: string): Promise<{ email: string; name: string } | null> {
   const rows = (await sql()`
     SELECT email, name, password_hash FROM staff_users WHERE email = ${e} AND active = TRUE
   `) as { email: string; name: string; password_hash: string }[];
@@ -66,7 +91,6 @@ export async function verifyLogin(email: string, password: string): Promise<{ em
     return null;
   }
   if (!(await checkPassword(password, user.password_hash))) return null;
-  await sql()`UPDATE staff_users SET last_login_at = NOW() WHERE email = ${e}`;
   return { email: user.email, name: user.name };
 }
 
@@ -80,6 +104,12 @@ export async function ensureTable(): Promise<void> {
       created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       last_login_at  TIMESTAMPTZ
     )`;
+  await sql()`
+    CREATE TABLE IF NOT EXISTS staff_login_failures (
+      email  TEXT NOT NULL,
+      at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  await sql()`CREATE INDEX IF NOT EXISTS staff_login_failures_email ON staff_login_failures (email, at)`;
 }
 
 export async function upsertUser(email: string, name: string, password: string): Promise<void> {

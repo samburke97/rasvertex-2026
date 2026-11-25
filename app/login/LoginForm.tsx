@@ -27,9 +27,10 @@ export default function LoginForm() {
         setBusy(false);
         return;
       }
-      // Only same-site paths, so the link can't bounce people elsewhere.
+      // Only same-site paths, so the link can't bounce people elsewhere
+      // ("//site" and "/\site" both leave it).
       const next = params.get("next") ?? "";
-      window.location.href = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+      window.location.href = /^\/(?![/\\])/.test(next) && !next.includes("\\") ? next : "/dashboard";
     } catch {
       setError("Couldn't reach the server. Try again.");
       setBusy(false);
