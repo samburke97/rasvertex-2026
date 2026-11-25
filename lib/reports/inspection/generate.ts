@@ -60,20 +60,18 @@ const wrapLines = (s: string, px: number, w: number, bold = false) =>
 
 /** Recommended works flows over as many sheets as its rows need, the table
  *  head repeated on each; the last sheet ends with the quote button and who
- *  to call (a sheet of their own if they don't fit under the rows). What's
- *  left above the button decides whether "Also worth adding" shows with its
- *  photos (which then fill the space), as text only, or not at all. Heights
- *  follow the page's CSS. */
+ *  to call (a sheet of their own if they don't fit under the rows). "Also
+ *  worth adding" takes the space left above the button, which the page
+ *  itself measures (InspectionDocument, .ir-extras-wrap). Heights follow
+ *  the page's CSS. */
 const workRowH = (w: WorkItem) =>
   32 + Math.max(wrapLines(w.name, 20, 340, true) * 28, wrapLines(w.why.replace(/<[^>]*>/g, ""), 17, 432) * 24, wrapLines(w.zones, 17, 180) * 24);
 // Row heights are estimates: keep 5% spare so a row never runs off a page.
 const WORKS_FIRST = (PAGE_H - 80 - 96 - 115 /* label, title */ - 80) /* table head */ * 0.95;
 const WORKS_NEXT = (PAGE_H - 80 - 96 - 60 /* label */ - 80) /* table head */ * 0.95;
 const WORKS_END = 210 /* button, contact */ + 30;
-const EXTRAS_TEXT = 240; // title, card titles and two lines each
-const EXTRAS_IMG = 140;
 
-function worksPages(items: WorkItem[], ending: boolean, extras: boolean): { pages: WorkItem[][]; fit: "images" | "text" | "none" } {
+function worksPages(items: WorkItem[], ending: boolean): WorkItem[][] {
   const pages: WorkItem[][] = [[]];
   let cap = WORKS_FIRST;
   let used = 0;
@@ -87,14 +85,8 @@ function worksPages(items: WorkItem[], ending: boolean, extras: boolean): { page
     pages[pages.length - 1].push(w);
     used += h;
   }
-  if (!ending) return { pages, fit: "none" };
-  let left = cap - used - WORKS_END;
-  if (left < 0) {
-    pages.push([]);
-    left = WORKS_NEXT + 80 - WORKS_END;
-  }
-  const fit = !extras ? "none" : left >= EXTRAS_TEXT + EXTRAS_IMG ? "images" : left >= EXTRAS_TEXT ? "text" : "none";
-  return { pages, fit };
+  if (ending && cap - used - WORKS_END < 0) pages.push([]);
+  return pages;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -329,11 +321,8 @@ export interface InspectionModel {
   hasOther: boolean;
   /** About this report cards for this report kind. */
   about: CardDef[];
-  /** fit: how much of "Also worth adding" the space under the works table
-   *  holds: the cards with photos, the cards without, or nothing. */
-  /** pages: the rows on each Recommended works sheet; fit: how much of
-   *  "Also worth adding" the space on the last one holds. */
-  works: { items: WorkItem[]; pages: WorkItem[][]; extras: (ExtraDef & { n: number })[]; href: string; fit: "images" | "text" | "none"; ending: boolean };
+  /** pages: the rows on each Recommended works sheet. */
+  works: { items: WorkItem[]; pages: WorkItem[][]; extras: (ExtraDef & { n: number })[]; href: string; ending: boolean };
   nDefects: number;
 }
 
@@ -480,8 +469,14 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     (c) => c.code,
   );
   const withCode = (code: string) => parsed.filter((p) => p.codes.includes(code));
-  const zonesOf = (code: string) =>
-    [...new Set(withCode(code).map((p) => p.zone).filter(Boolean))].sort((a, b) => zoneOrd(a) - zoneOrd(b));
+  // Where a code was found: its zones, or (a site with no zones, like a row
+  // of townhouses) its units.
+  const zonesOf = (code: string) => {
+    const ps = withCode(code);
+    const zones = [...new Set(ps.map((p) => p.zone).filter(Boolean))].sort((a, b) => zoneOrd(a) - zoneOrd(b));
+    if (zones.length) return zones;
+    return [...new Set(ps.map((p) => p.unit).filter((u): u is string => !!u))].sort((a, b) => unitOrd(a, TAGS) - unitOrd(b, TAGS));
+  };
 
   const sumRows: SummaryRow[] = [];
   for (const band of BAND_ORDER) {
@@ -880,7 +875,7 @@ export function buildModel(data: InspectionReportData): InspectionModel {
     toc: tocPages(sections, chapList.filter((c) => c.title)),
     hasOther: other.length > 0,
     about: lib.about.map((a, i) => ({ ...a, t: T(`about.${i}.t`, a.t), d: T(`about.${i}.d`, a.d) })),
-    works: { items, extras, href, ending: data.ending !== false, ...worksPages(items, data.ending !== false, extras.length > 0) },
+    works: { items, extras, href, ending: data.ending !== false, pages: worksPages(items, data.ending !== false) },
     nDefects: nDef,
   };
 }

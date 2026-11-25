@@ -283,9 +283,16 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
 
   // Tags first, then the name: after " - ", or (without one) from the first
   // word that isn't a tag, as in the proposal: "S1 RC Hairline at window".
-  const split = label.indexOf(" - ");
+  // A dash without the spaces works too when only tags are before it, as
+  // site photos get named: "RS-unit 5", "LF -unit 3".
+  const norm = (tok: string) => tok.toUpperCase().replace(/[,;.]$/, "");
+  const known = (tok: string) => !!readTag(norm(tok), lib.tags) || !!lib.codeMap[lib.aliases[norm(tok)] ?? norm(tok)];
+  const dash = label.indexOf("-");
+  const dashHead = dash > 0 ? label.slice(0, dash).trim().split(/\s+/).filter(Boolean) : [];
+  const tight = dashHead.length > 0 && dashHead.every(known);
+  const split = tight ? dash : label.indexOf(" - ");
   const head = (split >= 0 ? label.slice(0, split) : label).trim();
-  let note = split >= 0 ? label.slice(split + 3).trim() : "";
+  let note = split >= 0 ? label.slice(split + (tight ? 1 : 3)).replace(/^[\s-]+/, "").trim() : "";
 
   let zone: string | null = null;
   let level: string | null = null;
@@ -295,7 +302,7 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
   const toks = head.split(/\s+/).filter(Boolean);
   for (let k = 0; k < toks.length; k++) {
     const tok = toks[k];
-    const up = tok.toUpperCase().replace(/[,;.]$/, "");
+    const up = norm(tok);
     const x = lib.aliases[up] ?? up;
     const where = readTag(up, lib.tags);
     if (where?.kind === "zone") {
@@ -311,6 +318,17 @@ export function parseLabel(raw: string, lib: Library): ParsedLabel {
       break;
     } else {
       ignored.push(tok);
+    }
+  }
+
+  // "unit 4" written out in the name is the unit (one unit only: "units
+  // 4 5 6" names several), and comes out of the name so it isn't the title.
+  const unitTag = lib.tags.find((t) => t.kind === "unit" && t.num);
+  if (!unit && unitTag) {
+    const m = note.match(/(^|[\s-])unit\s*(\d+)\b/i);
+    if (m) {
+      unit = `${unitTag.prefix}${m[2]}`;
+      note = (note.slice(0, m.index! + m[1].length) + note.slice(m.index! + m[0].length)).replace(/\s{2,}/g, " ").replace(/^[\s,&-]+|[\s,&-]+$/g, "");
     }
   }
 

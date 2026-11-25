@@ -252,11 +252,16 @@ export const INSPECTION_CSS = `
 
 .ir-works-tbl{margin-top:48px;display:flex;flex-direction:column}
 .ir-works-tbl--cont{margin-top:0}
+/* Also worth adding: the space between the works table and the button,
+   measured by the page. Room for photos: they fill it; room for the text:
+   cards without photos; less: nothing. */
+.ir-extras-wrap{flex:1 1 0;min-height:0;overflow:hidden;container-type:size;display:flex;flex-direction:column}
 .ir-extras-title{margin-top:64px}
-.ir-extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:32px}
-.ir-extras--img{flex:1 1 auto;min-height:0}
+.ir-extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:32px;flex:1 1 auto;min-height:0}
 .ir-extra{display:flex;flex-direction:column;min-width:0;min-height:0}
 .ir-extra__img{width:100%;flex:1 1 0;min-height:120px;max-height:300px;border-radius:16px;overflow:hidden;background:var(--img-empty) center/cover no-repeat}
+@container (height < 360px){.ir-extra__img{display:none}}
+@container (height < 240px){.ir-extras-wrap>*{display:none}}
 .ir-extra .ir-h-sub{margin:20px 0 8px}
 .ir-extra .ir-h-sub:first-child{margin-top:0}
 .ir-extra__text{font-size:17px;line-height:1.5;color:var(--ink-60);min-height:3em;text-wrap:pretty}
@@ -691,21 +696,26 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
   const sec = sections.find((s) => s.key === "works")!;
   const contact = contactFor(job.contact);
   const first = layout.secPage.works ?? layout.total;
-  const extras = works.fit !== "none" && (
-    <>
-      <h3 className="ir-h-card ir-extras-title">Also worth adding</h3>
-      <div className={`ir-extras${works.fit === "images" ? " ir-extras--img" : ""}`}>
-        {works.extras.map((x) => (
-          <div key={x.t} className="ir-extra">
-            {works.fit === "images" && <div className="ir-extra__img" style={{ backgroundImage: bg(ctx.assets.images[x.img]) }} />}
-            <h3 className="ir-h-sub" data-edit={`extra.${x.n}.t`}>
-              {x.t}
-            </h3>
-            <Rt className="ir-extra__text" edit={`extra.${x.n}.d`} v={x.d} />
+  // Also the spacer that keeps the button and contact at the foot.
+  const extras = (
+    <div className="ir-extras-wrap">
+      {works.ending && works.extras.length > 0 && (
+        <>
+          <h3 className="ir-h-card ir-extras-title">Also worth adding</h3>
+          <div className="ir-extras">
+            {works.extras.map((x) => (
+              <div key={x.t} className="ir-extra">
+                <div className="ir-extra__img" style={{ backgroundImage: bg(ctx.assets.images[x.img]) }} />
+                <h3 className="ir-h-sub" data-edit={`extra.${x.n}.t`}>
+                  {x.t}
+                </h3>
+                <Rt className="ir-extra__text" edit={`extra.${x.n}.d`} v={x.d} />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </>
+        </>
+      )}
+    </div>
   );
   // One sheet per page of rows; the last ends with the button and contact
   // (no footer), the others carry the page number like every flowed page.
@@ -748,10 +758,9 @@ function Works({ ctx, job, layout }: { ctx: Ctx; job: InspectionJob; layout: Lay
 
               {last ? (
                 <>
-                  {/* Photos (if shown) take whatever space is left; the button
+                  {/* Also worth adding takes whatever space is left; the button
                       and contact always close the section. No footer. */}
                   {extras}
-                  {works.fit !== "images" && <div style={{ flex: "1 1 auto" }} />}
                   {works.ending && (
                     <div className="ir-cta">
                       <a className="ir-btn ir-btn--primary" href={works.href}>

@@ -1483,6 +1483,36 @@ function PhotoEditor({
   };
   const toggle = (c: string) =>
     onChange({ label: composeLabel({ ...tags, codes: tags.codes.includes(c) ? tags.codes.filter((x) => x !== c) : [...tags.codes, c] }) });
+  /** Codes and location typed in capitals at the start of the title
+   *  ("U5 UF Flashing lifted"), as in a SimPRO file name: flagged and
+   *  placed, and the rest stays the title (none: the defect name). */
+  const readTitle = (raw: string) => {
+    const toks = raw.trim().split(/\s+/).filter(Boolean);
+    const found = { zone: "", level: "", unit: "", codes: [] as string[] };
+    let k = 0;
+    for (; k < toks.length; k++) {
+      const tok = toks[k].replace(/[,;.]$/, "");
+      // Capitals only, so a word like "Al" or "Co" stays a word.
+      if (tok !== tok.toUpperCase()) break;
+      const hit = readTag(tok, lib.tags);
+      const code = lib.aliases[tok] ?? tok;
+      if (hit) found[hit.kind] ||= tok;
+      else if (lib.codeMap[code]) {
+        if (!found.codes.includes(code)) found.codes.push(code);
+      } else break;
+    }
+    if (!k) return;
+    const next = {
+      ...tags,
+      zone: found.zone || tags.zone,
+      level: found.level || tags.level,
+      unit: found.unit || tags.unit,
+      codes: [...tags.codes, ...found.codes.filter((c) => !tags.codes.includes(c))],
+    };
+    const rest = toks.slice(k).join(" ").replace(/^[-–:]\s*/, "");
+    onChange({ label: composeLabel(next), title: rest || undefined });
+    setWhere([next.zone, next.level, next.unit].filter(Boolean).join(" "));
+  };
   return (
     <section className={styles.group}>
       <div className={styles.focusBar}>
@@ -1538,7 +1568,9 @@ function PhotoEditor({
       </label>
 
       <label className={styles.field}>
-        <span className={styles.fieldLabel}>Title</span>
+        <span className={styles.fieldLabel}>
+          Title <InfoTip>Start it with codes or a location in capitals (U5 UF Flashing lifted) and they are flagged for you.</InfoTip>
+        </span>
         <input
           className={styles.input}
           // The title as it prints (from the photo's name), there to edit;
@@ -1546,6 +1578,8 @@ function PhotoEditor({
           value={photo.title ?? view.autoName}
           placeholder="No title"
           onChange={(e) => onChange({ title: e.target.value === view.autoName ? undefined : e.target.value })}
+          onBlur={(e) => readTitle(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && readTitle(e.currentTarget.value)}
         />
       </label>
 
