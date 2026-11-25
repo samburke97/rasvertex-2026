@@ -33,6 +33,8 @@
   outline: none;
 }
 .input:focus { border-color: transparent; box-shadow: 0 0 0 3px var(--blue-ring); }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-62, rgba(23, 23, 26, 0.62)); cursor: pointer; user-select: none; }
+.check input { width: 15px; height: 15px; margin: 0; accent-color: var(--btn-primary); cursor: pointer; }
 .error { font-size: 13px; color: var(--red); background: var(--red-tint); border-radius: 8px; padding: 8px 10px; margin: 0; }
 .button {
   font: inherit;

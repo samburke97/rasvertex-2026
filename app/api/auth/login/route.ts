@@ -3,17 +3,19 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { LOCK_MINUTES, isLocked, verifyLogin } from "@/lib/auth/users";
-import { SESSION_COOKIE, signSession, cookieOptions } from "@/lib/auth/session";
+import { SESSION_COOKIE, signSession, loginCookieOptions } from "@/lib/auth/session";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   let email = "";
   let password = "";
+  let remember = true;
   try {
     const body = await req.json();
     email = String(body.email ?? "");
     password = String(body.password ?? "");
+    remember = body.remember !== false;
   } catch {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "That email and password don't match." }, { status: 401 });
     }
     const res = NextResponse.json({ ok: true, name: user.name });
-    res.cookies.set(SESSION_COOKIE, await signSession(user.email, user.name), cookieOptions);
+    res.cookies.set(SESSION_COOKIE, await signSession(user.email, user.name, remember), loginCookieOptions(remember));
     return res;
   } catch (err) {
     console.error("[Login]", err);

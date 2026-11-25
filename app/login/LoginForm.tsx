@@ -8,6 +8,7 @@ export default function LoginForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -19,7 +20,7 @@ export default function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, remember }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -61,6 +62,10 @@ export default function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
         />
+      </label>
+      <label className={styles.check}>
+        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+        Remember me
       </label>
       {error && <p className={styles.error} role="alert">{error}</p>}
       <button className={styles.button} type="submit" disabled={busy}>

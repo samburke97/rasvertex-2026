@@ -8,7 +8,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const SESSION_COOKIE = "rv_session";
-export const SESSION_DAYS = 30;
+/** "Remember me" ticked: signed in on this device for 90 days. */
+export const SESSION_DAYS = 90;
+/** Not ticked: the cookie goes when the browser closes, and the token dies after 12 hours anyway. */
+export const SHORT_SESSION_HOURS = 12;
 
 export interface Session {
   email: string;
@@ -38,10 +41,11 @@ async function key(usage: "sign" | "verify"): Promise<CryptoKey | null> {
   return crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [usage]);
 }
 
-export async function signSession(email: string, name: string): Promise<string> {
+export async function signSession(email: string, name: string, remember = true): Promise<string> {
   const k = await key("sign");
   if (!k) throw new Error("AUTH_SECRET is not set (needs 32+ characters)");
-  const expires = Math.floor(Date.now() / 1000) + SESSION_DAYS * 86400;
+  const life = remember ? SESSION_DAYS * 86400 : SHORT_SESSION_HOURS * 3600;
+  const expires = Math.floor(Date.now() / 1000) + life;
   const body = b64url(enc.encode(JSON.stringify({ e: email, n: name, x: expires })));
   const sig = new Uint8Array(await crypto.subtle.sign("HMAC", k, enc.encode(body)));
   return `${body}.${b64url(sig)}`;
@@ -72,3 +76,10 @@ export const cookieOptions = {
   path: "/",
   maxAge: SESSION_DAYS * 86400,
 };
+
+/** Cookie for a fresh sign-in: without "Remember me" it has no maxAge, so the browser drops it on close. */
+export function loginCookieOptions(remember: boolean) {
+  if (remember) return cookieOptions;
+  const { maxAge: _drop, ...rest } = cookieOptions;
+  return rest;
+}
