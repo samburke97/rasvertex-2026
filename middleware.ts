@@ -5,6 +5,7 @@
 //
 //   /login, /api/auth/login      the sign-in itself
 //   /api/mcp                     Claude connector — checks MCP_SECRET itself
+//   /.well-known/*               so Claude sees the connector needs no OAuth
 //   /api/webhooks/*              SimPRO and Resend webhooks
 //   /api/outreach/unsubscribe    unsubscribe links in outreach emails
 //   CRON_PATHS                   Vercel cron jobs (see vercel.json). With
@@ -19,7 +20,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/auth/session";
 import { isActive } from "@/lib/auth/active";
 
-const PUBLIC_PREFIXES = ["/login", "/api/auth/login", "/api/mcp", "/api/webhooks/", "/api/outreach/unsubscribe"];
+// /.well-known/ must answer "not found" rather than redirect to /login:
+// Claude reads a redirect there as an OAuth sign-in to register with, and
+// the connector (which uses its own key) then fails to connect.
+const PUBLIC_PREFIXES = ["/login", "/api/auth/login", "/api/mcp", "/api/webhooks/", "/api/outreach/unsubscribe", "/.well-known/"];
 
 const CRON_PATHS = [
   "/api/admin/unlocked-schedules",
