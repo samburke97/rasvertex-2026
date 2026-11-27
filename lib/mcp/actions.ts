@@ -30,13 +30,13 @@ import type { Tool } from "./tools";
 
 type Args = Record<string, unknown>;
 
-const str = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v));
-const id = (v: unknown) => {
+export const str = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v));
+export const id = (v: unknown) => {
   const n = Number(v);
   return Number.isInteger(n) && n > 0 ? n : 0;
 };
 
-const TAG = "Created via Claude";
+export const TAG = "Created via Claude";
 
 /** SimPRO cost centres (Setup → Accounts → Cost Centres) that job lines can go under. */
 const COST_CENTRES: Record<string, number> = {
@@ -68,7 +68,7 @@ const money = (v: unknown) => {
 const aud = (n: number) => `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** Plain text → the HTML SimPRO stores in descriptions and notes. */
-function html(text: string): string {
+export function html(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -78,12 +78,12 @@ function html(text: string): string {
 }
 
 /** Code tying a confirm to exactly these details. */
-function codeFor(tool: string, details: unknown): string {
+export function codeFor(tool: string, details: unknown): string {
   const key = process.env.MCP_SECRET ?? "";
   return createHmac("sha256", key).update(`${tool}:${JSON.stringify(details)}`).digest("base64url").slice(0, 10);
 }
 
-async function log(tool: string, details: unknown, outcome: { ok: boolean; record?: number; error?: string }) {
+export async function log(tool: string, details: unknown, outcome: { ok: boolean; record?: number; error?: string }) {
   const url = process.env.DATABASE_URL;
   if (!url) return;
   try {
@@ -108,7 +108,7 @@ async function log(tool: string, details: unknown, outcome: { ok: boolean; recor
 }
 
 /** A timeout means SimPRO may still have made the record: say so, so Claude checks before trying again. */
-function explain(err: unknown): string {
+export function explain(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
   if (/abort|timed? ?out/i.test(message)) {
     return `${message}. SimPRO didn't answer in time, so the record MAY have been created. Search for it before trying again.`;
@@ -116,7 +116,7 @@ function explain(err: unknown): string {
   return message;
 }
 
-async function customerName(customerId: number): Promise<string> {
+export async function customerName(customerId: number): Promise<string> {
   try {
     const c = (await simproRead(`/customers/companies/${customerId}`)).data as Record<string, unknown>;
     return str(c.CompanyName);
@@ -126,7 +126,7 @@ async function customerName(customerId: number): Promise<string> {
   }
 }
 
-function previewText(summary: Record<string, unknown>, code: string, warnings: string[]) {
+export function previewText(summary: Record<string, unknown>, code: string, warnings: string[]) {
   return toText({
     status: "PREVIEW — nothing has been created yet",
     will_create: summary,
@@ -381,7 +381,7 @@ function extraFields(v: unknown): Record<string, string | number | boolean> {
 }
 
 /** SimPRO turned the create down: nothing was made. Tell Claude to ask, not to give up or work around it. */
-function rejected(kind: string, err: unknown): Error {
+export function rejected(kind: string, err: unknown): Error {
   const message = explain(err);
   if (/HTTP 4\d\d/.test(message)) {
     return new Error(
