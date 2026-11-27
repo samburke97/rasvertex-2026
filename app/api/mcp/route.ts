@@ -9,7 +9,7 @@
 //
 // Stateless Streamable HTTP: each POST carries one JSON-RPC message (or a
 // batch) and gets a plain JSON answer. Tools live in lib/mcp/tools.ts; all
-// read except simpro_create_job and simpro_add_note (lib/mcp/actions.ts),
+// read except simpro_create_job, _create_quote and _add_note (lib/mcp/actions.ts),
 // which preview first and create only on a confirmed second call.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -21,16 +21,20 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const SERVER = { name: "ras-vertex-simpro", version: "1.1.0" };
+const SERVER = { name: "ras-vertex-simpro", version: "1.2.0" };
 const LATEST = "2025-06-18";
 
 const INSTRUCTIONS =
   "Access to RAS-VERTEX's live SimPRO (jobs, quotes, customers, sites, schedules, invoices). " +
   "Use the search tools for quick lookups and simpro_get_record for detail. For counts, date ranges, " +
   "totals and reports, read simpro_api_guide and then use simpro_query. Amounts are AUD. " +
-  "simpro_create_job and simpro_add_note change the live system: look up the real customer, site or job " +
-  "first, call once for a preview, show it to the person, and only call with confirm_code after they say yes. " +
-  "Never confirm on the person's behalf, and never create several records without asking about each.";
+  "simpro_create_job, simpro_create_quote and simpro_add_note change the live system: look up the real customer, " +
+  "site or job first, ask the person about anything missing or unclear (never guess customers, sites, prices or " +
+  "staff), call once for a preview, show it to the person, and only call with confirm_code after they say yes. " +
+  "Never confirm on the person's behalf, and never create several records without asking about each. " +
+  "If SimPRO turns a create down, tell the person what it needs, ask them for it, and preview again with it; " +
+  "don't switch to the browser instead unless they ask. New jobs and quotes are due 14 days after entry unless " +
+  "the person says otherwise.";
 
 interface RpcMessage {
   jsonrpc?: string;

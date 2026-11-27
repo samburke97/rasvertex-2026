@@ -1,8 +1,8 @@
 // lib/mcp/tools.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// The tools the Claude connector offers. These are read-only; the two that
-// create records (simpro_create_job, simpro_add_note) are in ./actions.ts
-// and appended to TOOLS at the bottom.
+// The tools the Claude connector offers. These are read-only; the ones that
+// create records (simpro_create_job, simpro_create_quote, simpro_add_note)
+// are in ./actions.ts and appended to TOOLS at the bottom.
 //
 //   simpro_search_jobs / _quotes / _customers / _sites — quick text search
 //   simpro_get_record — one job, quote, customer, site, invoice or employee
@@ -53,7 +53,7 @@ async function merged(asks: Promise<{ data: unknown }>[], limit: number) {
 
 const GUIDE = `SimPRO REST API v1.0 — how to query it with simpro_query
 (paths are relative to /api/v1.0/companies/0; simpro_query only reads — creating
- jobs and notes goes through simpro_create_job and simpro_add_note)
+ jobs, quotes and notes goes through the simpro_create_* and simpro_add_note tools)
 
 LIST ENDPOINTS (end with a slash)
   /jobs/                      jobs (Stage: Pending, Progress, Complete, Invoiced, Archived)
