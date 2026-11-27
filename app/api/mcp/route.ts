@@ -8,8 +8,9 @@
 //   Authorization: Bearer <MCP_SECRET>
 //
 // Stateless Streamable HTTP: each POST carries one JSON-RPC message (or a
-// batch) and gets a plain JSON answer. Tools live in lib/mcp/tools.ts and
-// are all read-only.
+// batch) and gets a plain JSON answer. Tools live in lib/mcp/tools.ts; all
+// read except simpro_create_job and simpro_add_note (lib/mcp/actions.ts),
+// which preview first and create only on a confirmed second call.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -20,13 +21,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const SERVER = { name: "ras-vertex-simpro", version: "1.0.0" };
+const SERVER = { name: "ras-vertex-simpro", version: "1.1.0" };
 const LATEST = "2025-06-18";
 
 const INSTRUCTIONS =
-  "Read-only access to RAS-VERTEX's SimPRO (jobs, quotes, customers, sites, schedules, invoices). " +
+  "Access to RAS-VERTEX's live SimPRO (jobs, quotes, customers, sites, schedules, invoices). " +
   "Use the search tools for quick lookups and simpro_get_record for detail. For counts, date ranges, " +
-  "totals and reports, read simpro_api_guide and then use simpro_query. Amounts are AUD.";
+  "totals and reports, read simpro_api_guide and then use simpro_query. Amounts are AUD. " +
+  "simpro_create_job and simpro_add_note change the live system: look up the real customer, site or job " +
+  "first, call once for a preview, show it to the person, and only call with confirm_code after they say yes. " +
+  "Never confirm on the person's behalf, and never create several records without asking about each.";
 
 interface RpcMessage {
   jsonrpc?: string;
@@ -70,11 +74,13 @@ async function handle(msg: RpcMessage) {
       return result(id, {});
     case "tools/list":
       return result(id, {
-        tools: TOOLS.map(({ name, description, inputSchema }) => ({
+        tools: TOOLS.map(({ name, description, inputSchema, readOnly = true }) => ({
           name,
           description,
           inputSchema,
-          annotations: { readOnlyHint: true, openWorldHint: false },
+          annotations: readOnly
+            ? { readOnlyHint: true, openWorldHint: false }
+            : { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
         })),
       });
     case "tools/call": {

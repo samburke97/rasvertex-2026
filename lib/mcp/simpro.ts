@@ -1,10 +1,12 @@
 // lib/mcp/simpro.ts
 // ─────────────────────────────────────────────────────────────────────────────
-// Read-only SimPRO access for the Claude connector (app/api/mcp/route.ts).
+// SimPRO access for the Claude connector (app/api/mcp/route.ts).
 //
-// Every call is a GET under /api/v1.0/companies/0. Nothing here writes to
-// SimPRO. The connector uses its own token when MCP_SIMPRO_ACCESS_TOKEN is
-// set (a read-only key is best), and falls back to SIMPRO_ACCESS_TOKEN.
+// simproRead is a GET under /api/v1.0/companies/0. simproCreate is the only
+// write: a POST that makes a new record (used by the job and note tools in
+// lib/mcp/actions.ts). Nothing here updates or deletes. The connector uses
+// MCP_SIMPRO_ACCESS_TOKEN when set and falls back to SIMPRO_ACCESS_TOKEN;
+// the create tools need a key with write access.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { fetchWithTimeout } from "@/lib/simpro/timeout";
@@ -81,6 +83,29 @@ export async function simproRead(
     count: num("Result-Count"),
     data: await res!.json(),
   };
+}
+
+/** POST a new record under the company path; returns SimPRO's answer (it includes the new ID). */
+export async function simproCreate<T = Record<string, unknown>>(path: string, body: unknown): Promise<T> {
+  if (!BASE || !TOKEN) throw new Error("SimPRO configuration missing — check env vars");
+  const bare = normalisePath(path);
+  let res: Response | undefined;
+  for (let i = 1; i <= 3; i++) {
+    res = await fetchWithTimeout(`${BASE}${COMPANY}${bare}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${TOKEN}`, Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    }, 20_000);
+    // Only a rate limit is retried: SimPRO turned it away, so nothing was made.
+    if (res.status !== 429) break;
+    await new Promise((r) => setTimeout(r, 1000 * 2 ** (i - 1)));
+  }
+  if (!res!.ok) {
+    const text = await res!.text().catch(() => "");
+    throw new Error(`SimPRO HTTP ${res!.status} creating ${bare}${text ? `: ${text.slice(0, 800)}` : ""}`);
+  }
+  return (await res!.json().catch(() => ({}))) as T;
 }
 
 /** JSON for a tool result, cut short (with a note) when it is very long. */
