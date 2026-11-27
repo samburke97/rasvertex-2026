@@ -3,7 +3,10 @@
 // The Claude connector's "do" tools: they create records in live SimPRO.
 //
 //   simpro_create_job   — a new job for an existing customer and site
-//   simpro_create_quote — a new quote, with a salesperson and due date
+//   simpro_create_quote — a new quote
+//
+// Both need a salesperson and a project manager (asked for, never assumed;
+// they can be the same person) and get a due date 14 days out by default.
 //   simpro_add_note     — a note on an existing job or quote
 //
 // Jobs and quotes can be priced across several cost centres, each with
@@ -180,6 +183,11 @@ const COMMON_PROPS = {
   type: { type: "string", enum: ["Service", "Project"], description: "Default Service" },
   cost_centres: CENTRES_SCHEMA,
   due_date: { type: "string", description: "Due date, YYYY-MM-DD. Default: 14 days after today" },
+  customer_contact_id: {
+    type: "number",
+    description: "SimPRO contact ID for the customer contact, from simpro_find_contact (confirm close matches first)",
+  },
+  site_contact_id: { type: "number", description: "SimPRO contact ID for the site contact, from simpro_find_contact" },
   extra_fields: {
     type: "object",
     description:
@@ -293,6 +301,29 @@ async function addLines(base: string, centres: Centre[]): Promise<string[]> {
   return problems;
 }
 
+const STAFF_PROPS = {
+  salesperson: { type: "string", description: "Staff name. Ask the person who — never assume" },
+  project_manager: { type: "string", description: "Staff name. Ask the person who — never assume (can be the salesperson)" },
+};
+
+const STAFF_HELP =
+  "It needs a salesperson and a project manager: if the person hasn't named both, ask them who (they can be the " +
+  "same person) before calling this tool.";
+
+function staffNames(a: Args) {
+  const salesperson = str(a.salesperson);
+  const project_manager = str(a.project_manager);
+  const missing = [!salesperson && "salesperson", !project_manager && "project manager"].filter(Boolean);
+  if (missing.length) throw new Error(`Ask the person who the ${missing.join(" and ")} should be, then call again.`);
+  return { salesperson, project_manager };
+}
+
+/** Both staff, looked up by name. */
+async function staff(d: { salesperson: string; project_manager: string }) {
+  const [sp, pm] = await Promise.all([employee(d.salesperson), employee(d.project_manager)]);
+  return { sp: sp!, pm: pm! };
+}
+
 /** A staff member by name, for salesperson / project manager. */
 async function employee(name: string): Promise<{ ID: number; Name: string } | null> {
   if (!name) return null;
@@ -332,7 +363,10 @@ const tag = (base: string) =>
   );
 
 /** Fields the tools set themselves, which extra_fields can't override. */
-const OWN_FIELDS = new Set(["Customer", "Site", "Type", "Name", "Description", "OrderNo", "DueDate", "Salesperson", "ProjectManager", "Stage", "ID"]);
+const OWN_FIELDS = new Set([
+  "Customer", "Site", "Type", "Name", "Description", "OrderNo", "DueDate", "Salesperson", "ProjectManager",
+  "CustomerContact", "SiteContact", "Stage", "ID",
+]);
 
 function extraFields(v: unknown): Record<string, string | number | boolean> {
   if (!v || typeof v !== "object" || Array.isArray(v)) return {};
@@ -370,6 +404,8 @@ function baseDetails(a: Args) {
     type: str(a.type) === "Project" ? "Project" : "Service",
     cost_centres: readCentres(a),
     due_date: str(a.due_date) || in14Days(),
+    customer_contact_id: id(a.customer_contact_id),
+    site_contact_id: id(a.site_contact_id),
     extra_fields: extraFields(a.extra_fields),
   };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(details.due_date)) throw new Error("due_date must be YYYY-MM-DD");
@@ -377,6 +413,32 @@ function baseDetails(a: Args) {
   if (!details.name) throw new Error("Give it a name");
   return details;
 }
+
+/** Preview lines for the chosen contacts, with a warning when one isn't linked to this customer / site. */
+async function contactsPreview(d: { customer_id: number; site_id: number; customer_contact_id: number; site_contact_id: number }) {
+  const warnings: string[] = [];
+  const one = async (contactId: number, role: "customer" | "site") => {
+    if (!contactId) return "(not set)";
+    const c = (await simproRead(`/contacts/${contactId}`).then((r) => r.data).catch(() => null)) as Record<string, unknown> | null;
+    if (!c) throw new Error(`No contact with ID ${contactId}`);
+    const links = ((role === "customer" ? c.Customers : c.Sites) ?? []) as { ID: number }[];
+    const want = role === "customer" ? d.customer_id : d.site_id;
+    if (!links.some((x) => x.ID === want)) {
+      warnings.push(`${str(c.GivenName)} ${str(c.FamilyName)} isn't linked to this ${role} in SimPRO, so SimPRO may turn it down. Check with the person.`);
+    }
+    return `${str(c.GivenName)} ${str(c.FamilyName)}`.trim() + (c.Email ? ` <${str(c.Email)}>` : "") + ` (ID ${contactId})`;
+  };
+  const [customer_contact, site_contact] = await Promise.all([
+    one(d.customer_contact_id, "customer"),
+    one(d.site_contact_id, "site"),
+  ]);
+  return { customer_contact, site_contact, warnings };
+}
+
+const contactFields = (d: { customer_contact_id: number; site_contact_id: number }) => ({
+  ...(d.customer_contact_id ? { CustomerContact: d.customer_contact_id } : {}),
+  ...(d.site_contact_id ? { SiteContact: d.site_contact_id } : {}),
+});
 
 function priced(preview: Awaited<ReturnType<typeof pricePreview>>) {
   return {
@@ -412,27 +474,28 @@ export const ACTIONS: Tool[] = [
       "into cost centres, e.g. from a client's works order. Two steps: call without confirm_code to get a preview " +
       "(with totals) and a code, show the preview to the person, and only after they confirm call again with exactly " +
       "the same details plus confirm_code. Find customer_id and site_id first with simpro_search_customers and " +
-      "simpro_search_sites; never guess them. " + PRICING_HELP,
+      "simpro_search_sites; never guess them. " + STAFF_HELP + " " + PRICING_HELP,
     inputSchema: {
       type: "object",
       properties: {
         ...COMMON_PROPS,
-        project_manager: { type: "string", description: "Staff name, set as project manager and salesperson (optional)" },
+        ...STAFF_PROPS,
       },
-      required: ["customer_id", "site_id", "name"],
+      required: ["customer_id", "site_id", "name", "salesperson", "project_manager"],
     },
     run: async (a: Args) => {
-      const details = { ...baseDetails(a), project_manager: str(a.project_manager) };
+      const details = { ...baseDetails(a), ...staffNames(a) };
       const code = codeFor("simpro_create_job", details);
       const given = str(a.confirm_code);
 
       if (given !== code) {
-        const [who, pm, price] = await Promise.all([
+        const [who, { sp, pm }, price, contacts] = await Promise.all([
           customerAndSite(details.customer_id, details.site_id),
-          employee(details.project_manager),
+          staff(details),
           pricePreview(details.cost_centres),
+          contactsPreview(details),
         ]);
-        const warnings: string[] = [];
+        const warnings: string[] = [...contacts.warnings];
         if (given) warnings.push("The confirm_code didn't match these details, so this is a fresh preview.");
         if (price.warning) warnings.push(price.warning);
         if (details.order_no) {
@@ -466,7 +529,10 @@ export const ACTIONS: Tool[] = [
             type: details.type,
             stage: "Pending",
             due_date: details.due_date,
-            project_manager: pm?.Name ?? "(not set)",
+            salesperson: sp.Name,
+            project_manager: pm.Name,
+            customer_contact: contacts.customer_contact,
+            site_contact: contacts.site_contact,
             ...(Object.keys(details.extra_fields).length ? { other_fields: details.extra_fields } : {}),
             ...priced(price),
             note_added: TAG,
@@ -476,7 +542,7 @@ export const ACTIONS: Tool[] = [
         );
       }
 
-      const pm = await employee(details.project_manager);
+      const { sp, pm } = await staff(details);
       let jobId = 0;
       try {
         const job = await simproCreate<{ ID: number }>("/jobs/", {
@@ -487,7 +553,9 @@ export const ACTIONS: Tool[] = [
           DueDate: details.due_date,
           ...(details.description ? { Description: html(details.description) } : {}),
           ...(details.order_no ? { OrderNo: details.order_no } : {}),
-          ...(pm ? { ProjectManager: pm.ID, Salesperson: pm.ID } : {}),
+          Salesperson: sp.ID,
+          ProjectManager: pm.ID,
+          ...contactFields(details),
           ...details.extra_fields,
         });
         if (!job?.ID) throw new Error("SimPRO didn't return the new job's ID");
@@ -518,28 +586,28 @@ export const ACTIONS: Tool[] = [
       "centres. Two steps: call without confirm_code to get a preview (with totals) and a code, show the preview to " +
       "the person, and only after they confirm call again with exactly the same details plus confirm_code. Find " +
       "customer_id and site_id first with simpro_search_customers and simpro_search_sites; never guess them. Every " +
-      "quote needs a salesperson (also set as project manager): ask who, if the person hasn't said. " + PRICING_HELP,
+      "quote " + STAFF_HELP.charAt(0).toLowerCase() + STAFF_HELP.slice(1) + " " + PRICING_HELP,
     inputSchema: {
       type: "object",
       properties: {
         ...COMMON_PROPS,
-        salesperson: { type: "string", description: "Staff name, e.g. 'Phil Clark'; also set as project manager" },
+        ...STAFF_PROPS,
       },
-      required: ["customer_id", "site_id", "name", "salesperson"],
+      required: ["customer_id", "site_id", "name", "salesperson", "project_manager"],
     },
     run: async (a: Args) => {
-      const details = { ...baseDetails(a), salesperson: str(a.salesperson) };
-      if (!details.salesperson) throw new Error("Every quote needs a salesperson: ask the person who");
+      const details = { ...baseDetails(a), ...staffNames(a) };
       const code = codeFor("simpro_create_quote", details);
       const given = str(a.confirm_code);
 
       if (given !== code) {
-        const [who, sp, price] = await Promise.all([
+        const [who, { sp, pm }, price, contacts] = await Promise.all([
           customerAndSite(details.customer_id, details.site_id),
-          employee(details.salesperson),
+          staff(details),
           pricePreview(details.cost_centres),
+          contactsPreview(details),
         ]);
-        const warnings: string[] = [];
+        const warnings: string[] = [...contacts.warnings];
         if (given) warnings.push("The confirm_code didn't match these details, so this is a fresh preview.");
         if (price.warning) warnings.push(price.warning);
         if (!details.cost_centres.length) warnings.push("No price lines: the quote will be created at $0.");
@@ -565,7 +633,10 @@ export const ACTIONS: Tool[] = [
             description: details.description || "(none)",
             order_no: details.order_no || "(none)",
             type: details.type,
-            salesperson_and_project_manager: sp!.Name,
+            salesperson: sp.Name,
+            project_manager: pm.Name,
+            customer_contact: contacts.customer_contact,
+            site_contact: contacts.site_contact,
             due_date: details.due_date,
             ...(Object.keys(details.extra_fields).length ? { other_fields: details.extra_fields } : {}),
             ...priced(price),
@@ -576,7 +647,7 @@ export const ACTIONS: Tool[] = [
         );
       }
 
-      const sp = (await employee(details.salesperson))!;
+      const { sp, pm } = await staff(details);
       let quoteId = 0;
       try {
         const quote = await simproCreate<{ ID: number }>("/quotes/", {
@@ -586,9 +657,10 @@ export const ACTIONS: Tool[] = [
           Name: details.name,
           DueDate: details.due_date,
           Salesperson: sp.ID,
-          ProjectManager: sp.ID,
+          ProjectManager: pm.ID,
           ...(details.description ? { Description: html(details.description) } : {}),
           ...(details.order_no ? { OrderNo: details.order_no } : {}),
+          ...contactFields(details),
           ...details.extra_fields,
         });
         if (!quote?.ID) throw new Error("SimPRO didn't return the new quote's ID");

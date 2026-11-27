@@ -34,7 +34,9 @@ const INSTRUCTIONS =
   "Never confirm on the person's behalf, and never create several records without asking about each. " +
   "If SimPRO turns a create down, tell the person what it needs, ask them for it, and preview again with it; " +
   "don't switch to the browser instead unless they ask. New jobs and quotes are due 14 days after entry unless " +
-  "the person says otherwise.";
+  "the person says otherwise. Ask who the salesperson and project manager are unless the person said. When a " +
+  "contact person is mentioned, check simpro_find_contact first: use an exact match on that customer, ask " +
+  "'Did you mean …?' for a close one, and ask which when several match.";
 
 interface RpcMessage {
   jsonrpc?: string;
