@@ -9,7 +9,8 @@
 //
 // Stateless Streamable HTTP: each POST carries one JSON-RPC message (or a
 // batch) and gets a plain JSON answer. Tools live in lib/mcp/tools.ts; all
-// read except simpro_create_job, _create_quote and _add_note (lib/mcp/actions.ts),
+// read except the create tools (lib/mcp/actions.ts: jobs, quotes, notes;
+// lib/mcp/clients.ts: customers, sites, contacts),
 // which preview first and create only on a confirmed second call.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ const INSTRUCTIONS =
   "Access to RAS-VERTEX's live SimPRO (jobs, quotes, customers, sites, schedules, invoices). " +
   "Use the search tools for quick lookups and simpro_get_record for detail. For counts, date ranges, " +
   "totals and reports, read simpro_api_guide and then use simpro_query. Amounts are AUD. " +
-  "simpro_create_job, simpro_create_quote and simpro_add_note change the live system: look up the real customer, " +
+  "The simpro_create_* tools and simpro_add_note change the live system: look up the real customer, " +
   "site or job first, ask the person about anything missing or unclear (never guess customers, sites, prices or " +
   "staff), call once for a preview, show it to the person, and only call with confirm_code after they say yes. " +
   "Never confirm on the person's behalf, and never create several records without asking about each. " +
@@ -36,7 +37,8 @@ const INSTRUCTIONS =
   "don't switch to the browser instead unless they ask. New jobs and quotes are due 14 days after entry unless " +
   "the person says otherwise. Ask who the salesperson and project manager are unless the person said. When a " +
   "contact person is mentioned, check simpro_find_contact first: use an exact match on that customer, ask " +
-  "'Did you mean …?' for a close one, and ask which when several match.";
+  "'Did you mean …?' for a close one, and ask which when several match. Before creating a customer, site or contact, search for it; if it " +
+  "already exists use it, and if it's new, offer to create it rather than leaving it out.";
 
 interface RpcMessage {
   jsonrpc?: string;

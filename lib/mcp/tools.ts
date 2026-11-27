@@ -1,8 +1,8 @@
 // lib/mcp/tools.ts
 // ─────────────────────────────────────────────────────────────────────────────
 // The tools the Claude connector offers. These are read-only; the ones that
-// create records (simpro_create_job, simpro_create_quote, simpro_add_note)
-// are in ./actions.ts and appended to TOOLS at the bottom.
+// create records are in ./actions.ts (jobs, quotes, notes) and ./clients.ts
+// (customers, sites, contacts) and appended to TOOLS at the bottom.
 //
 //   simpro_search_jobs / _quotes / _customers / _sites — quick text search
 //   simpro_find_contact — is this person already a contact? (typo-tolerant,
